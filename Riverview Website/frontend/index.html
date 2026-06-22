@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>The Riverview</title>
+        <link rel="icon" href="assets/logo/logoo.png" type="image/png">
+        <link rel="stylesheet" href="css/header.css">
+        <link rel="stylesheet" href="css/style.css">
+    </head>
+
+    <body>
+
+        <header>
+            <div class="logo">
+                <a href="index.html" class="header-logo"><img src="assets/logo/logoo.png" alt="Riverview Logo"></a>
+                <h1>The Riverview<h1>
+            </div>
+            <div id="hamburger" class="hamburger">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+            <nav id="nav-menu">
+                <a href="#home" class="nav-link active">Home</a>
+                <a href="#about" class="nav-link">About</a>
+                <a href="pages/booking.html">Booking</a>
+                <a href="pages/available-rooms.html" class="btn-primary">See Available Rooms</a>
+            </nav>
+        </header>
+
+        <main>
+            <section class="hero" id="home">
+                <div class="hero-content">
+                    <h1>Welcome to The Riverview</h1>
+                    <p>Experience seamless booking and real-time monitoring — anytime, anywhere.</p>
+                    <a href="pages/booking.html" class="btn-primary">Book Now</a>
+                </div>
+            </section>
+
+            <section class="spaces">
+                <div class="spaces">
+                    <h2>Available Spaces:</h2>
+                    <div class="space-card">
+                        <img src="assets/court.png" alt="Basketball Court">
+                        <h3>Basketball Court</h3>
+                    </div>
+                    <div class="space-card">
+                        <img src="assets/billiards.png" alt="Billiards">
+                        <h3>Billiards</h3>
+                    </div>
+                    <div class="space-card">
+                        <img src="assets/vip.png" alt="VIP Room">
+                        <h3>VIP Room</h3>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <section id="about">
+            <h2>ABOUT</h2>
+            <p>At The Riverview, fun comes first. Play billiards, hit the courts, belt out your favorite songs in karaoke, or relax in our private drinking rooms—there’s something for everyone. With a cozy, vibrant atmosphere, we’re the perfect spot for friends, celebrations, or a night out. Great times, good vibes, and lasting memories await!</p>
+        </section>
+
+        <section class="promotions">
+            <h2>Promotions & Announcements</h2>
+            <ul>
+                <li>🎉 10% Off For Early Morning Bookings!</li>
+                <li>🏸 New Badminton Court Available Starting March 2026.</li>
+                <li>💳 Cashless Payments Now Accepted.</li>
+            </ul>
+        </section>
+
+        <footer>
+
+            <div class="contact">
+                <h3>Contact Us: </h3>
+                <div class="information">
+                    <p>Email: <span> demotest@gmail.com</span></p>
+                    <p>FB: <span> The Riverview</span></p>
+                    <p>IG: <span> @demo_riverview</span></p>
+                </div>
+            </div>
+
+            <div class="brand">
+                &copy; 2026 The Riverview
+            </div>
+
+        </footer>
+
+        <script src="js/header.js"></script>
+        <script>
+            const sections = document.querySelectorAll("section[id]");
+            const navLinks = document.querySelectorAll(".nav-link");
+
+            window.addEventListener("scroll", () => {
+            let currentSection = "";
+
+            sections.forEach(section => {
+                const sectionTop = section.offsetTop - 350;
+                const sectionHeight = section.offsetHeight;
+
+                if (
+                window.scrollY >= sectionTop &&
+                window.scrollY < sectionTop + sectionHeight
+                ) {
+                currentSection = section.getAttribute("id");
+                }
+            });
+
+            navLinks.forEach(link => {
+                link.classList.remove("active");
+
+                if (link.getAttribute("href") === "#" + currentSection) {
+                link.classList.add("active");
+                }
+            });
+            });
+        </script>
+    </body>
+</html>
