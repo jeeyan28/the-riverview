@@ -1,7 +1,6 @@
 @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300..700;1,300..700&display=swap');
 
 
-/* ===== Header ===== */
 header {
     display: flex;
     justify-content: space-between;
@@ -9,33 +8,33 @@ header {
     padding: .5rem 2rem;
     background-color: #f7f3e9;
     box-shadow: 0 1.5px 3px rgb(0,0,0,0.3);
+    position: sticky;
     top: 0;
     z-index: 100;
-    margin-bottom: 20px;
-    position: sticky;
 }
 
-h1{
-    font-family: Cormorant Garamond;
-    font-size: 40px;
-}
-
-header .logo{
-    color: #005b7f;
+/* Logo section */
+.logo {
     display: flex;
     align-items: center;
-    justify-content: center;
-    gap: 30px;
+    gap: 20px;
+    color: #005b7f;
 }
+
 .header-logo img {
     width: 100px;
     height: 100px;
     object-fit: contain;
 }
 
+h1 {
+    font-family: Cormorant Garamond;
+    font-size: 40px;
+}
+
+/* Navigation */
 nav {
     display: flex;
-    align-items: center;
     gap: 2rem;
 }
 
@@ -44,14 +43,44 @@ nav a {
     font-weight: 600;
     padding: 8px 15px;
     border-radius: 8px;
-    transition: background-color 0.4s;
+    transition: background-color 0.3s;
 }
 
 nav a:hover {
-    background-color: #c7c8c8;
-    border: 1px solid;
+    text-decoration: underline;
 }
 
+/* Buttons */
+.nav-buttons {
+    display: flex;
+    gap: 1rem;
+}
+
+#booking {
+    color: white;
+    background-color: #006f9b;
+    font-size: 21px;
+    font-weight: 600;
+    padding: 8px 15px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+}
+
+#booking:hover {
+    background-color: #0283b6;
+}
+
+#login-button{
+    color: #0c678b;
+    background: none;
+    font-size: 21px;
+    font-weight: 600;
+    padding: 8px 15px;
+    border-radius: 15px;
+    border: 0.5px solid black;
+    cursor: pointer;
+}
 
 /* Hamburger Menu */
 .hamburger {

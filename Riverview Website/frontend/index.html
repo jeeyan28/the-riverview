@@ -14,20 +14,22 @@
 
         <header>
             <div class="logo">
-                <a href="index.html" class="header-logo"><img src="assets/logo/logoo.png" alt="Riverview Logo"></a>
-                <h1>The Riverview<h1>
+                <a href="index.html" class="header-logo">
+                    <img src="assets/logo/logoo.png" alt="Riverview Logo">
+                </a>
+                <h1>The Riverview</h1>
             </div>
-            <div id="hamburger" class="hamburger">
-                <span></span>
-                <span></span>
-                <span></span>
-            </div>
+
             <nav id="nav-menu">
                 <a href="#home" class="nav-link active">Home</a>
+                <a href="#rooms" class="btn-primary">Rooms</a>
                 <a href="#about" class="nav-link">About</a>
-                <a href="pages/booking.html">Booking</a>
-                <a href="pages/available-rooms.html" class="btn-primary">See Available Rooms</a>
             </nav>
+
+            <div class="nav-buttons">
+                <button id="login-button">Login</button>
+                <button id="booking">Book Now</button>
+            </div>
         </header>
 
         <main>
@@ -39,38 +41,117 @@
                 </div>
             </section>
 
-            <section class="spaces">
-                <div class="spaces">
-                    <h2>Available Spaces:</h2>
-                    <div class="space-card">
-                        <img src="assets/court.png" alt="Basketball Court">
-                        <h3>Basketball Court</h3>
-                    </div>
-                    <div class="space-card">
-                        <img src="assets/billiards.png" alt="Billiards">
-                        <h3>Billiards</h3>
-                    </div>
-                    <div class="space-card">
-                        <img src="assets/vip.png" alt="VIP Room">
-                        <h3>VIP Room</h3>
-                    </div>
+            <section class="rooms">
+                <div class="space">
+                    <img src="assets/billiards.png">
+                </div>
+
+                <article class="cont">
+                    <h2>Billiards Room</h2>
+                    <p>
+                        Enjoy a relaxing and fun environment with our premium billiards area.
+                        Perfect for friendly matches and spending time with friends.
+                    </p>
+                </article>
+            </section>
+
+            <section class="rooms">
+                <article class="cont">
+                    <h2>Basketball Court</h2>
+                    <p>
+                        Experience our spacious and well-maintained court area, designed for both casual games and competitive matches. Whether you're playing with friends or practicing your skills, the court provides a comfortable and enjoyable space for recreation and active fun.
+                    </p>
+                </article>
+                <div class="space">
+                    <img src="assets/court.png">
                 </div>
             </section>
+
+            <section class="rooms">
+                <div class="space">
+                    <img src="assets/billiards.png">
+                </div>
+
+                <article class="cont">
+                    <h2>Billiards Room</h2>
+                    <p>
+                        Enjoy a relaxing and fun environment with our premium billiards area.
+                        Perfect for friendly matches and spending time with friends.
+                    </p>
+                </article>
+            </section>
+            
+            <section id="rooms">
+                <h2>Choose your Room</h2>
+
+                <div class="roomCont">
+
+                    <div class="room-card">
+                        <img src="assets/billiards.png" alt="">
+                        <h3>Billiards Room</h3>
+
+                        <div class="room-info">
+                            <ul>
+                                <li>Solo Rooms</li>
+                                <ul class="under-ul">
+                                    <li>Regular - ₱200/hr</li>
+                                    <li>Big Room - ₱250/hr</li>
+                                </ul>
+                                <li>Shared Room - ₱150/hr</li>
+                            </ul>
+                            <button>Select Room</button>
+                        </div>
+                    </div>
+
+                    <div class="room-card">
+                        <img src="assets/billiards.png" alt="">
+                        <h3>KTV Room</h3>
+
+                        <div class="room-info">
+                            <ul>
+                                <li>KTV Rooms - ₱300/hr</li>
+                            </ul>
+                            <button>Select Room</button>
+                        </div>
+                    </div>
+
+                    <div class="room-card">
+                        <img src="assets/billiards.png" alt="">
+                        <h3>Basketball Court</h3>
+
+                        <div class="room-info">
+                            <ul>
+                                <li>₱350/hr - 7AM to 5PM</li>
+                                <li>₱400/hr - 5PM to 12AM</li>
+                                <li>₱500/hr - Official games with scoreboard, timer & sound system</li>
+                            </ul>
+                            <button>Select Room</button>
+                        </div>
+                    </div>
+
+                    <div class="room-card">
+                        <img src="assets/billiards.png" alt="">
+                        <h3>Promo</h3>
+
+                        <div class="room-info">
+                            <ul>
+                                <li>VIP Room with KTV and Pool Table</li>
+                                <li>₱400/hr (max 10 pax, add 50/head)</li>
+                            </ul>
+                            <button>Select Room</button>
+                        </div>
+                    </div>
+
+                </div>
+            </section>
+
+            <section id="about">
+                <h2>ABOUT</h2>
+                <p>At The Riverview, fun comes first. Play billiards, hit the courts, belt out your favorite songs in karaoke, or relax in our private drinking rooms—there’s something for everyone. With a cozy, vibrant atmosphere, we’re the perfect spot for friends, celebrations, or a night out. Great times, good vibes, and lasting memories await!</p>
+            </section>
+
+
         </main>
-
-        <section id="about">
-            <h2>ABOUT</h2>
-            <p>At The Riverview, fun comes first. Play billiards, hit the courts, belt out your favorite songs in karaoke, or relax in our private drinking rooms—there’s something for everyone. With a cozy, vibrant atmosphere, we’re the perfect spot for friends, celebrations, or a night out. Great times, good vibes, and lasting memories await!</p>
-        </section>
-
-        <section class="promotions">
-            <h2>Promotions & Announcements</h2>
-            <ul>
-                <li>🎉 10% Off For Early Morning Bookings!</li>
-                <li>🏸 New Badminton Court Available Starting March 2026.</li>
-                <li>💳 Cashless Payments Now Accepted.</li>
-            </ul>
-        </section>
 
         <footer>
 
@@ -88,35 +169,7 @@
             </div>
 
         </footer>
-
-        <script src="js/header.js"></script>
-        <script>
-            const sections = document.querySelectorAll("section[id]");
-            const navLinks = document.querySelectorAll(".nav-link");
-
-            window.addEventListener("scroll", () => {
-            let currentSection = "";
-
-            sections.forEach(section => {
-                const sectionTop = section.offsetTop - 350;
-                const sectionHeight = section.offsetHeight;
-
-                if (
-                window.scrollY >= sectionTop &&
-                window.scrollY < sectionTop + sectionHeight
-                ) {
-                currentSection = section.getAttribute("id");
-                }
-            });
-
-            navLinks.forEach(link => {
-                link.classList.remove("active");
-
-                if (link.getAttribute("href") === "#" + currentSection) {
-                link.classList.add("active");
-                }
-            });
-            });
-        </script>
+        
     </body>
+
 </html>
