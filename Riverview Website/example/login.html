@@ -606,10 +606,12 @@
             <span id="toast-msg"></span>
         </div>
 
-        <script>
-            // ── Password toggle
-            const pwInput    = document.getElementById('password');
-            const toggleBtn  = document.getElementById('toggle-pw');
+    
+    <script>
+
+            // Password toggle
+            const pwInput   = document.getElementById('password');
+            const toggleBtn = document.getElementById('toggle-pw');
             let pwVisible = false;
             toggleBtn.addEventListener('click', () => {
                 pwVisible = !pwVisible;
@@ -617,8 +619,8 @@
                 toggleBtn.textContent = pwVisible ? '🙈' : '👁';
             });
 
-            // ── Custom checkbox
-            const checkBox  = document.getElementById('custom-check');
+            // Custom checkbox
+            const checkBox   = document.getElementById('custom-check');
             const checkInput = document.getElementById('remember-input');
             function toggleCheck() {
                 const checked = checkBox.classList.toggle('checked');
@@ -626,9 +628,11 @@
                 checkBox.setAttribute('aria-checked', checked);
             }
             checkBox.addEventListener('click', toggleCheck);
-            checkBox.addEventListener('keydown', e => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); toggleCheck(); } });
+            checkBox.addEventListener('keydown', e => {
+                if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); toggleCheck(); }
+            });
 
-            // ── Toast
+            // Toast
             let toastTimer;
             function showToast(msg, type = 'success') {
                 const toast = document.getElementById('toast');
@@ -639,7 +643,7 @@
                 toastTimer = setTimeout(() => { toast.classList.remove('show'); }, 3200);
             }
 
-            // ── Validation helpers
+            // Validation
             function setError(fieldId, errorId, show) {
                 const field = document.getElementById(fieldId);
                 const err   = document.getElementById(errorId);
@@ -647,47 +651,66 @@
                 else       { field.classList.remove('has-error'); err.style.display = 'none'; }
             }
 
-            // ── Form submit
+            // Form submit — calls your Express server
             const form = document.getElementById('login-form');
             const btn  = document.getElementById('btn-submit');
 
             form.addEventListener('submit', async (e) => {
                 e.preventDefault();
 
-                const email = document.getElementById('email').value.trim();
+                const email    = document.getElementById('email').value.trim();
                 const password = document.getElementById('password').value;
 
-                // Validate
+                // Client-side validation first
                 const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
                 const passOk  = password.length >= 6;
 
                 setError('field-email',    'email-error',    !emailOk);
                 setError('field-password', 'password-error', !passOk);
-
                 if (!emailOk || !passOk) return;
 
-                // Simulate loading
+                // Call the server
                 btn.classList.add('loading');
-                await new Promise(r => setTimeout(r, 1600));
-                btn.classList.remove('loading');
 
-                // Demo: show success toast (replace with real auth)
-                showToast('Logged in successfully! Redirecting…', 'success');
-                setTimeout(() => { window.location.href = '../index.html'; }, 1800);
+                try {
+                    const response = await fetch('http://localhost:3000/login', {
+                        method:  'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body:    JSON.stringify({ email, password })
+                    });
+
+                    const data = await response.json();
+
+                    if (response.ok) {
+                        // Save user info so other pages can use it
+                        localStorage.setItem('riverview_user', JSON.stringify(data.user));
+                        showToast('Logged in! Redirecting…', 'success');
+                        setTimeout(() => { window.location.href = '../index.html'; }, 1500);
+                    } else {
+                        // Server returned an error (wrong password, no account, etc.)
+                        showToast(data.message || 'Login failed.', 'error');
+                    }
+                } catch (err) {
+                    showToast('Could not reach the server. Is it running?', 'error');
+                } finally {
+                    btn.classList.remove('loading');
+                }
             });
 
-            // ── Google button (demo)
+            // Google button (demo)
             document.getElementById('btn-google').addEventListener('click', () => {
                 showToast('Google sign-in coming soon.', 'error');
             });
 
-            // ── Clear errors on input
+            // Clear errors on input
             document.getElementById('email').addEventListener('input', () => {
                 setError('field-email', 'email-error', false);
             });
             document.getElementById('password').addEventListener('input', () => {
                 setError('field-password', 'password-error', false);
             });
-        </script>
+                    
+    
+    </script>
     </body>
 </html>

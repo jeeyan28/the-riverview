@@ -12,7 +12,7 @@
     <body>
 
         <!-- HEADER -->
-        <header>
+        <header id="site-header">
             <div class="logo">
                 <img src="../frontend/assets/logo/logoo.png" alt="Riverview Logo">
                 <span class="logo-name">The Riverview</span>
@@ -48,71 +48,48 @@
             <!-- HERO -->
             <section class="hero" id="home">
                 <div class="hero-bg"></div>
-                <div class="hero-content">
-                    <h1>Welcome to <em>The Riverview</em>.</h1>
-                    <p>Billiards, basketball, KTV, and more — all under one roof. Book a room in minutes, play all night.</p>
-                    <div class="hero-actions">
-                        <a href="pages/booking.html" class="btn-primary-hero">Book a Space</a>
-                        <a href="#rooms" class="btn-ghost-hero">See Rooms</a>
-                    </div>
-                </div>
-                <div class="hero-scroll">
-                    <div class="hero-scroll-line"></div>
-                    <span>Scroll</span>
-                </div>
-            </section>
 
-            <!-- FEATURES STRIP -->
-            <div class="features-strip">
-                <div class="feature-item">
-                    <div class="feature-icon">🎱</div>
-                    Billiards Rooms
-                </div>
-                <div class="feature-item">
-                    <div class="feature-icon">🏀</div>
-                    Basketball Court
-                </div>
-                <div class="feature-item">
-                    <div class="feature-icon">🎤</div>
-                    KTV Rooms
-                </div>
-                <div class="feature-item">
-                    <div class="feature-icon">🎉</div>
-                    VIP Packages
-                </div>
-            </div>
+                <div class="hero-inner">
 
-            <!-- VENUE INTRO -->
-            <section class="venue-intro">
-                <div class="venue-intro-text">
-                    <h2>A place built for good times, great company.</h2>
-                    <p>Experience seamless booking and real-time monitoring — anytime, anywhere.</p>
-                    <p>Cozy rooms, well-maintained equipment, and a team that keeps things running smooth. That's the Riverview promise.</p>
-                    <div class="venue-stats">
-                        <div>
-                            <div class="stat-num">4+</div>
-                            <div class="stat-label">Spaces</div>
-                        </div>
-                        <div>
-                            <div class="stat-num">7AM</div>
-                            <div class="stat-label">Opens Daily</div>
-                        </div>
-                        <div>
-                            <div class="stat-num">12AM</div>
-                            <div class="stat-label">Last Booking</div>
+                    <!-- LEFT: text -->
+                    <div class="hero-content">
+                        <p class="hero-eyebrow">San Rafael Caingin · Open Daily 7AM–12AM</p>
+                        <h1>Where Family<br>Fun <em>Begins.</em></h1>
+                        <p class="hero-sub">Billiards, basketball, KTV, and more — all under one roof. Book a room in minutes, have fun all night.</p>
+                        <div class="hero-actions">
+                            <a href="pages/booking.html" class="btn-primary-hero">Book a Space</a>
+                            <a href="#rooms" class="btn-ghost-hero">See Rooms</a>
                         </div>
                     </div>
-                </div>
-                <div class="venue-image-grid">
-                    <div class="img-tall">
-                        <img src="../frontend/assets/billiards.png" alt="Billiards Room">
+
+                    <!-- RIGHT: staggered waterfall images -->
+                    <div class="hero-waterfall">
+                        <!-- col 1 — low -->
+                        <div class="wf-col wf-col--low">
+                            <div class="wf-img wf-img--tall">
+                                <img src="/Riverview Website/frontend/assets/pictures/RiverView_4.jpg" alt="pictures">
+                            </div>
+                        </div>
+                        <!-- col 2 — mid -->
+                        <div class="wf-col wf-col--mid">
+                            <div class="wf-img wf-img--short">
+                                <img src="/Riverview Website/frontend/assets/pictures/RiverView_5.jpg" alt="Court">
+                            </div>
+                            <div class="wf-img wf-img--med">
+                                <img src="/Riverview Website/frontend/assets/pictures/RiverView_6.jpg" alt="VIP">
+                            </div>
+                        </div>
+                        <!-- col 3 — high, bleeds right -->
+                        <div class="wf-col wf-col--high">
+                            <div class="wf-img wf-img--med">
+                                <img src="/Riverview Website/frontend/assets/pictures/RiverView_7.jpg" alt="Billiards 2">
+                            </div>
+                            <div class="wf-img wf-img--short">
+                                <img src="/Riverview Website/frontend/assets/pictures/RiverView_8.jpg" alt="Court 2">
+                            </div>
+                        </div>
                     </div>
-                    <div class="img-short">
-                        <img src="../frontend/assets/court.png" alt="Basketball Court">
-                    </div>
-                    <div class="img-short">
-                        <img src="../frontend/assets/vip.png" alt="KTV Room">
-                    </div>
+
                 </div>
             </section>
 
@@ -130,7 +107,7 @@
 
                     <div class="room-card">
                         <div class="room-card-img">
-                            <img src="assets/billiards.png" alt="Billiards Room">
+                            <img src="/Riverview Website/frontend/assets/pictures/Billiard.jpg" alt="Billiards Room">
                             <span class="room-card-badge">Popular</span>
                         </div>
                         <div class="room-card-body">
@@ -146,7 +123,7 @@
 
                     <div class="room-card">
                         <div class="room-card-img">
-                            <img src="assets/billiards.png" alt="KTV Room">
+                            <img src="/Riverview Website/frontend/assets/pictures/KTV.jpg" alt="KTV Room">
                         </div>
                         <div class="room-card-body">
                             <h3>KTV Room</h3>
@@ -159,7 +136,7 @@
 
                     <div class="room-card">
                         <div class="room-card-img">
-                            <img src="assets/court.png" alt="Basketball Court">
+                            <img src="/Riverview Website/frontend/assets/pictures/basketball.jpg" alt="Basketball Court">
                         </div>
                         <div class="room-card-body">
                             <h3>Basketball Court</h3>
@@ -174,7 +151,7 @@
 
                     <div class="room-card">
                         <div class="room-card-img">
-                            <img src="assets/billiards.png" alt="VIP Package">
+                            <img src="/Riverview Website/frontend/assets/pictures/VIP.jpg" alt="VIP Package">
                             <span class="room-card-badge">Promo</span>
                         </div>
                         <div class="room-card-body">
@@ -318,7 +295,13 @@
             hamburger.addEventListener('click', openMobileNav);
             navClose.addEventListener('click', closeMobileNav);
 
-            // Sticky header active link
+            // Header scroll shrink
+            const header = document.getElementById('site-header');
+            window.addEventListener('scroll', () => {
+                header.classList.toggle('scrolled', window.scrollY > 40);
+            });
+
+            // Active nav link
             const sections = document.querySelectorAll('section[id]');
             const navLinks = document.querySelectorAll('nav a');
             window.addEventListener('scroll', () => {
