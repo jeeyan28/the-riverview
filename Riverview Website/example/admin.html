@@ -1,0 +1,924 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>Admin — The Riverview</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;0,700;1,400&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+        <style>
+            *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+            html { font-size: 16px; }
+            body { font-family: 'Inter', sans-serif; background: #0d1b2e; color: #F8F6F1; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+            :root {
+            --navy:   #0A1628;
+            --navy2:  #0f1e35;
+            --navy3:  #162640;
+            --teal:   #00C9A7;
+            --muted:  #8A9BB0;
+            --border: rgba(255,255,255,.08);
+            --sidebar-w: 210px;
+            }
+
+            /* ── LAYOUT ── */
+            #app { display: flex; height: 100vh; overflow: hidden; }
+
+            /* ── SIDEBAR ── */
+            #sidebar {
+            width: var(--sidebar-w);
+            background: var(--navy);
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+            border-right: 1px solid var(--border);
+            }
+            .sb-brand {
+            padding: 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border-bottom: 1px solid var(--border);
+            }
+            .sb-logo {
+            width: 34px; height: 34px;
+            background: var(--teal);
+            border-radius: 9px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 13px; font-weight: 700; color: var(--navy);
+            flex-shrink: 0;
+            }
+            .sb-title { font-family: 'Playfair Display', serif; font-size: 1rem; color: #fff; }
+            .sb-sub { font-size: .7rem; color: var(--muted); }
+            .sb-nav { flex: 1; padding: 10px 8px; display: flex; flex-direction: column; gap: 2px; overflow-y: auto; }
+            .sb-section { font-size: .68rem; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: #3a4d64; padding: 10px 10px 4px; }
+            .sb-item {
+            display: flex; align-items: center; gap: 9px;
+            padding: 8px 10px; border-radius: 8px;
+            cursor: pointer; color: var(--muted);
+            font-size: .82rem; font-weight: 400;
+            border: none; background: none; width: 100%; text-align: left;
+            transition: background .15s, color .15s;
+            }
+            .sb-item i { font-size: 16px; flex-shrink: 0; }
+            .sb-item:hover { background: rgba(255,255,255,.06); color: #fff; }
+            .sb-item.active { background: rgba(0,201,167,.15); color: var(--teal); }
+            .sb-bottom { padding: 10px 8px; border-top: 1px solid var(--border); }
+            .admin-info-row { display: flex; align-items: center; gap: 9px; padding: 8px 10px; }
+            .admin-av {
+            width: 30px; height: 30px; border-radius: 50%;
+            background: rgba(0,201,167,.2); color: var(--teal);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 11px; font-weight: 600; flex-shrink: 0;
+            }
+            .admin-name { font-size: .82rem; color: #fff; }
+            .admin-role { font-size: .7rem; color: var(--muted); }
+
+            /* ── MAIN ── */
+            #main { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
+
+            /* ── TOPBAR ── */
+            .topbar {
+            height: 52px; background: var(--navy2);
+            border-bottom: 1px solid var(--border);
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 0 20px; flex-shrink: 0;
+            }
+            .page-title { font-size: .95rem; font-weight: 500; color: #fff; }
+            .topbar-right { display: flex; align-items: center; gap: 10px; }
+            .tb-chip {
+            display: flex; align-items: center; gap: 5px;
+            font-size: .72rem; color: var(--muted);
+            background: rgba(255,255,255,.05);
+            border: 1px solid var(--border);
+            padding: 4px 10px; border-radius: 20px;
+            }
+            .tb-chip i { font-size: 13px; }
+            .notif-btn { position: relative; background: none; border: none; cursor: pointer; color: var(--muted); font-size: 18px; display: flex; }
+            .notif-dot { position: absolute; top: 1px; right: 1px; width: 6px; height: 6px; border-radius: 50%; background: var(--teal); }
+
+            /* ── CONTENT ── */
+            .content { flex: 1; overflow-y: auto; padding: 16px 20px; display: flex; flex-direction: column; gap: 14px; }
+
+            /* ── PANELS ── */
+            .panel { display: none; flex-direction: column; gap: 14px; }
+            .panel.active { display: flex; }
+
+            /* ── METRIC CARDS ── */
+            .metric-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+            .mc {
+            background: var(--navy2); border: 1px solid var(--border);
+            border-radius: 12px; padding: 14px;
+            }
+            .mc-label { font-size: .72rem; color: var(--muted); margin-bottom: 6px; display: flex; align-items: center; gap: 5px; }
+            .mc-label i { font-size: 13px; }
+            .mc-val { font-size: 22px; font-weight: 600; color: #fff; line-height: 1; }
+            .mc-sub { font-size: .7rem; color: var(--muted); margin-top: 4px; }
+            .mc-sub.up { color: var(--teal); }
+            .mc-sub.dn { color: #ff6b6b; }
+
+            /* ── CARDS ── */
+            .card {
+            background: var(--navy2); border: 1px solid var(--border);
+            border-radius: 14px; padding: 14px 16px;
+            }
+            .card-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+            .card-title { font-size: .85rem; font-weight: 600; color: #fff; }
+            .card-action { font-size: .75rem; color: var(--teal); background: none; border: none; cursor: pointer; }
+
+            /* ── TABLES ── */
+            .tbl { width: 100%; border-collapse: collapse; font-size: .78rem; }
+            .tbl th { text-align: left; padding: 6px 8px; color: var(--muted); font-weight: 400; border-bottom: 1px solid var(--border); white-space: nowrap; }
+            .tbl td { padding: 9px 8px; color: #c8d6e5; border-bottom: 1px solid rgba(255,255,255,.04); vertical-align: middle; }
+            .tbl tr:last-child td { border-bottom: none; }
+            .tbl tr:hover td { background: rgba(255,255,255,.02); }
+
+            /* ── STATUS PILLS ── */
+            .pill { display: inline-block; padding: 2px 9px; border-radius: 20px; font-size: .68rem; font-weight: 600; }
+            .pill-active  { background: rgba(0,201,167,.15);  color: #00C9A7; }
+            .pill-pending { background: rgba(239,159,39,.15); color: #EF9F27; }
+            .pill-done    { background: rgba(138,155,176,.12);color: #8A9BB0; }
+            .pill-overdue { background: rgba(255,107,107,.15);color: #ff6b6b; }
+            .pill-vacant  { background: rgba(55,138,221,.15); color: #378ADD; }
+
+            /* ── ROOM MONITOR ── */
+            .room-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+            .rm {
+            background: var(--navy2); border: 1px solid var(--border);
+            border-radius: 14px; padding: 13px;
+            transition: border-color .2s;
+            }
+            .rm.occupied { border-color: rgba(0,201,167,.3); }
+            .rm.overdue  { border-color: rgba(255,107,107,.35); }
+            .rm.vacant   { border-color: rgba(55,138,221,.25); }
+            .rm-head { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 10px; }
+            .rm-name { font-size: .85rem; font-weight: 600; color: #fff; }
+            .rm-type { font-size: .7rem; color: var(--muted); margin-top: 2px; }
+            .rm-ico { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 15px; }
+            .ico-teal  { background: rgba(0,201,167,.12);  color: var(--teal); }
+            .ico-blue  { background: rgba(55,138,221,.12); color: #378ADD; }
+            .ico-amber { background: rgba(239,159,39,.12); color: #EF9F27; }
+            .rm-rows { display: flex; flex-direction: column; gap: 5px; }
+            .rm-row { display: flex; justify-content: space-between; font-size: .72rem; }
+            .rm-row .lbl { color: var(--muted); }
+            .rm-row .val { color: #c8d6e5; font-weight: 500; }
+            .val-teal { color: var(--teal) !important; }
+            .val-warn { color: #ff6b6b !important; }
+            .rm-bar-wrap { margin: 10px 0 0; height: 4px; background: rgba(255,255,255,.07); border-radius: 2px; overflow: hidden; }
+            .rm-bar { height: 100%; border-radius: 2px; transition: width .4s; }
+            .bar-teal  { background: var(--teal); }
+            .bar-amber { background: #EF9F27; }
+            .bar-red   { background: #ff6b6b; }
+            .rm-actions { display: flex; gap: 6px; margin-top: 10px; }
+            .rm-btn {
+            flex: 1; padding: 6px 0; font-size: .7rem; border-radius: 7px;
+            border: 1px solid var(--border); background: none; cursor: pointer;
+            color: #c8d6e5; font-family: 'Inter', sans-serif;
+            transition: background .15s;
+            }
+            .rm-btn:hover { background: rgba(255,255,255,.05); }
+            .rm-btn.danger { color: #ff6b6b; border-color: rgba(255,107,107,.25); }
+            .rm-btn.danger:hover { background: rgba(255,107,107,.06); }
+
+            /* ── CHARTS ── */
+            .two-col { display: grid; grid-template-columns: 1.6fr 1fr; gap: 12px; }
+            .chart-wrap { position: relative; height: 180px; }
+            .legend { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 10px; }
+            .legend-item { display: flex; align-items: center; gap: 5px; font-size: .72rem; color: var(--muted); }
+            .legend-dot { width: 10px; height: 10px; border-radius: 2px; }
+
+            /* ── HEATMAP ── */
+            #heatmap { display: grid; grid-template-columns: repeat(17, 1fr); gap: 3px; }
+            .hm-cell { height: 30px; border-radius: 4px; }
+            .hm-labels { display: flex; justify-content: space-between; margin-top: 5px; font-size: .68rem; color: var(--muted); }
+
+            /* ── SETTINGS TOGGLES ── */
+            .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+            .sgroup { display: flex; flex-direction: column; gap: 8px; }
+            .sgroup-title { font-size: .78rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; margin-bottom: 2px; }
+            .s-row {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 10px 12px; background: var(--navy3);
+            border: 1px solid var(--border); border-radius: 10px;
+            }
+            .s-label { font-size: .82rem; color: #c8d6e5; }
+            .s-sub   { font-size: .7rem; color: var(--muted); margin-top: 2px; }
+            .toggle  { width: 36px; height: 20px; border-radius: 10px; position: relative; cursor: pointer; transition: background .2s; flex-shrink: 0; }
+            .toggle.on  { background: var(--teal); }
+            .toggle.off { background: rgba(255,255,255,.12); }
+            .toggle-thumb { position: absolute; top: 3px; width: 14px; height: 14px; border-radius: 50%; background: #fff; transition: left .2s; }
+            .toggle.on  .toggle-thumb { left: 19px; }
+            .toggle.off .toggle-thumb { left: 3px; }
+            .s-input {
+            display: flex; flex-direction: column; gap: 5px;
+            padding: 10px 12px; background: var(--navy3);
+            border: 1px solid var(--border); border-radius: 10px;
+            }
+            .s-input label { font-size: .7rem; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+            .s-input input, .s-input select {
+            background: var(--navy2); border: 1px solid var(--border); border-radius: 7px;
+            padding: 6px 9px; color: #c8d6e5; font-size: .82rem; font-family: 'Inter', sans-serif;
+            outline: none;
+            }
+            .s-input input:focus, .s-input select:focus { border-color: var(--teal); }
+
+            /* ── PROFILE ── */
+            .profile-hero {
+            display: flex; align-items: center; gap: 16px;
+            padding: 18px; background: var(--navy2);
+            border: 1px solid var(--border); border-radius: 14px;
+            }
+            .profile-av {
+            width: 58px; height: 58px; border-radius: 50%;
+            background: rgba(0,201,167,.15); color: var(--teal);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.2rem; font-weight: 600; flex-shrink: 0;
+            }
+            .profile-name { font-size: 1rem; font-weight: 600; color: #fff; }
+            .profile-role { font-size: .78rem; color: var(--muted); margin-top: 3px; }
+            .profile-meta { display: flex; gap: 14px; margin-top: 8px; flex-wrap: wrap; }
+            .pmeta { font-size: .75rem; color: var(--muted); display: flex; align-items: center; gap: 5px; }
+            .pmeta i { font-size: 13px; }
+            .p2col { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+            .pfield { display: flex; flex-direction: column; gap: 5px; margin-bottom: 10px; }
+            .pfield label { font-size: .68rem; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+            .pfield input {
+            background: var(--navy3); border: 1px solid var(--border);
+            border-radius: 8px; padding: 8px 11px; color: #c8d6e5;
+            font-size: .82rem; font-family: 'Inter', sans-serif; outline: none;
+            }
+            .pfield input:focus { border-color: var(--teal); }
+            .save-btn {
+            padding: 9px 22px; background: var(--teal); color: var(--navy);
+            border: none; border-radius: 9px; font-size: .82rem; font-weight: 600;
+            cursor: pointer; font-family: 'Inter', sans-serif; transition: opacity .2s;
+            }
+            .save-btn:hover { opacity: .85; }
+
+            /* ── REPORTS ── */
+            .rep-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+            .rep-item {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 11px 13px; background: var(--navy3);
+            border: 1px solid var(--border); border-radius: 10px;
+            }
+            .rep-info { display: flex; align-items: center; gap: 10px; }
+            .rep-ico { width: 34px; height: 34px; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 15px; }
+            .rep-name { font-size: .82rem; color: #c8d6e5; }
+            .rep-date { font-size: .7rem; color: var(--muted); margin-top: 2px; }
+            .dl-btn {
+            display: flex; align-items: center; gap: 5px;
+            padding: 5px 12px; border: 1px solid var(--border);
+            border-radius: 7px; background: none; font-size: .72rem;
+            color: var(--muted); cursor: pointer; font-family: 'Inter', sans-serif;
+            transition: border-color .15s, color .15s;
+            }
+            .dl-btn:hover { border-color: var(--teal); color: var(--teal); }
+
+            /* ── LOGS ── */
+            .log-ok   { color: var(--teal); display: flex; align-items: center; gap: 4px; }
+            .log-fail { color: #ff6b6b;    display: flex; align-items: center; gap: 4px; }
+            .alert-bar {
+            display: flex; align-items: center; gap: 12px;
+            padding: 12px 16px; background: rgba(255,107,107,.06);
+            border: 1px solid rgba(255,107,107,.2); border-radius: 12px;
+            }
+            .alert-bar i { font-size: 18px; color: #ff6b6b; }
+            .alert-bar .alert-title { font-size: .82rem; color: #fff; }
+            .alert-bar .alert-sub   { font-size: .72rem; color: var(--muted); margin-top: 2px; }
+            .resolve-btn {
+            margin-left: auto; padding: 6px 14px;
+            border: 1px solid rgba(255,107,107,.35); border-radius: 7px;
+            background: none; font-size: .75rem; color: #ff6b6b;
+            cursor: pointer; font-family: 'Inter', sans-serif;
+            }
+
+            /* ── MODAL ── */
+            .modal-bg {
+            display: none; position: fixed; inset: 0;
+            background: rgba(0,0,0,.6); z-index: 999;
+            align-items: center; justify-content: center;
+            }
+            .modal-bg.open { display: flex; }
+            .modal {
+            background: var(--navy2); border: 1px solid var(--border);
+            border-radius: 16px; padding: 22px; width: 340px; max-width: 95vw;
+            }
+            .modal-title { font-size: 1rem; font-weight: 600; color: #fff; margin-bottom: 16px; }
+            .mfield { display: flex; flex-direction: column; gap: 5px; margin-bottom: 10px; }
+            .mfield label { font-size: .7rem; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+            .mfield input, .mfield select {
+            background: var(--navy3); border: 1px solid var(--border);
+            border-radius: 8px; padding: 8px 11px; color: #c8d6e5;
+            font-size: .82rem; font-family: 'Inter', sans-serif; outline: none;
+            }
+            .mfield input:focus, .mfield select:focus { border-color: var(--teal); }
+            .modal-actions { display: flex; gap: 8px; margin-top: 16px; }
+            .modal-actions button { flex: 1; padding: 9px; border-radius: 8px; font-size: .82rem; cursor: pointer; font-family: 'Inter', sans-serif; }
+            .btn-cancel  { background: none; border: 1px solid var(--border); color: var(--muted); }
+            .btn-confirm { background: var(--teal); border: none; color: var(--navy); font-weight: 600; }
+
+            /* ── RESPONSIVE ── */
+            @media (max-width: 900px) {
+            .room-grid { grid-template-columns: 1fr 1fr; }
+            .two-col   { grid-template-columns: 1fr; }
+            .settings-grid { grid-template-columns: 1fr; }
+            .p2col     { grid-template-columns: 1fr; }
+            .metric-row { grid-template-columns: 1fr 1fr; }
+            }
+            @media (max-width: 640px) {
+            #sidebar { display: none; }
+            .room-grid { grid-template-columns: 1fr; }
+            .rep-grid  { grid-template-columns: 1fr; }
+            .metric-row { grid-template-columns: 1fr 1fr; }
+            }
+        </style>
+    </head>
+
+    <body>
+
+        <div id="app">
+
+        <!-- ── SIDEBAR ── -->
+        <div id="sidebar">
+            <div class="sb-brand">
+            <div class="sb-logo">RV</div>
+            <div>
+                <div class="sb-title">Riverview</div>
+                <div class="sb-sub">Admin Panel</div>
+            </div>
+            </div>
+
+            <div class="sb-nav">
+            <div class="sb-section">Main</div>
+            <button class="sb-item active" data-panel="dashboard"><i class="ti ti-layout-dashboard"></i>Dashboard</button>
+            <button class="sb-item" data-panel="monitor"><i class="ti ti-device-desktop-analytics"></i>Room Monitor</button>
+            <button class="sb-item" data-panel="bookings"><i class="ti ti-calendar-event"></i>Bookings</button>
+
+            <div class="sb-section">Insights</div>
+            <button class="sb-item" data-panel="analytics"><i class="ti ti-chart-bar"></i>Analytics</button>
+            <button class="sb-item" data-panel="reports"><i class="ti ti-file-analytics"></i>Reports</button>
+
+            <div class="sb-section">Admin</div>
+            <button class="sb-item" data-panel="logs"><i class="ti ti-lock-access"></i>Login History</button>
+            <button class="sb-item" data-panel="settings"><i class="ti ti-settings"></i>Settings</button>
+            <button class="sb-item" data-panel="profile"><i class="ti ti-user-circle"></i>Profile</button>
+            </div>
+
+            <div class="sb-bottom">
+            <div class="admin-info-row">
+                <div class="admin-av">RA</div>
+                <div>
+                <div class="admin-name">Rivera Admin</div>
+                <div class="admin-role">Super Admin</div>
+                </div>
+                <i class="ti ti-logout" style="font-size:14px;color:var(--muted);margin-left:auto;cursor:pointer;"></i>
+            </div>
+            </div>
+        </div>
+
+        <!-- ── MAIN ── -->
+        <div id="main">
+
+            <div class="topbar">
+            <span class="page-title" id="page-title">Dashboard</span>
+            <div class="topbar-right">
+                <div class="tb-chip"><i class="ti ti-map-pin"></i>San Rafael Caingin</div>
+                <div class="tb-chip"><i class="ti ti-clock"></i><span id="live-time"></span></div>
+                <button class="notif-btn" aria-label="Notifications"><i class="ti ti-bell"></i><span class="notif-dot"></span></button>
+            </div>
+            </div>
+
+            <div class="content">
+
+            <!-- ── DASHBOARD ── -->
+            <div class="panel active" id="panel-dashboard">
+                <div class="metric-row">
+                <div class="mc">
+                    <div class="mc-label"><i class="ti ti-calendar-check"></i>Today's Bookings</div>
+                    <div class="mc-val">14</div>
+                    <div class="mc-sub up"><i class="ti ti-trending-up"></i> +3 vs yesterday</div>
+                </div>
+                <div class="mc">
+                    <div class="mc-label"><i class="ti ti-door-enter"></i>Active Sessions</div>
+                    <div class="mc-val">7</div>
+                    <div class="mc-sub">4 Billiards · 2 KTV · 1 Court</div>
+                </div>
+                <div class="mc">
+                    <div class="mc-label"><i class="ti ti-cash"></i>Today's Revenue</div>
+                    <div class="mc-val">₱6,450</div>
+                    <div class="mc-sub up"><i class="ti ti-trending-up"></i> +12% vs avg</div>
+                </div>
+                <div class="mc">
+                    <div class="mc-label"><i class="ti ti-alert-triangle"></i>Overdue Rooms</div>
+                    <div class="mc-val">2</div>
+                    <div class="mc-sub dn">Needs attention</div>
+                </div>
+                </div>
+
+                <div style="display:grid;grid-template-columns:1.4fr 1fr;gap:12px;">
+                <div class="card">
+                    <div class="card-head">
+                    <span class="card-title">Recent Bookings</span>
+                    <button class="card-action" onclick="switchPanel('bookings')">View all →</button>
+                    </div>
+                    <table class="tbl">
+                    <thead><tr><th>Guest</th><th>Room</th><th>Time In</th><th>Status</th></tr></thead>
+                    <tbody>
+                        <tr><td>Maria Santos</td><td>Billiards #2</td><td>2:00 PM</td><td><span class="pill pill-active">Active</span></td></tr>
+                        <tr><td>Jun Reyes</td><td>KTV Room</td><td>3:30 PM</td><td><span class="pill pill-active">Active</span></td></tr>
+                        <tr><td>Barkada G5</td><td>VIP Package</td><td>1:00 PM</td><td><span class="pill pill-overdue">Overdue</span></td></tr>
+                        <tr><td>Leo Mendoza</td><td>Basketball Court</td><td>4:00 PM</td><td><span class="pill pill-pending">Pending</span></td></tr>
+                        <tr><td>Claire Tan</td><td>Billiards #1</td><td>11:00 AM</td><td><span class="pill pill-done">Done</span></td></tr>
+                    </tbody>
+                    </table>
+                </div>
+
+                <div class="card">
+                    <div class="card-head"><span class="card-title">Room Status</span></div>
+                    <div style="display:flex;flex-direction:column;gap:7px;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:var(--navy3);border-radius:8px;">
+                        <span style="font-size:.8rem;color:#c8d6e5;">Billiards #1</span><span class="pill pill-vacant">Vacant</span>
+                    </div>
+                    <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:var(--navy3);border-radius:8px;">
+                        <span style="font-size:.8rem;color:#c8d6e5;">Billiards #2</span><span class="pill pill-active">Active</span>
+                    </div>
+                    <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:var(--navy3);border-radius:8px;">
+                        <span style="font-size:.8rem;color:#c8d6e5;">VIP Package</span><span class="pill pill-overdue">Overdue</span>
+                    </div>
+                    <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:var(--navy3);border-radius:8px;">
+                        <span style="font-size:.8rem;color:#c8d6e5;">KTV Room</span><span class="pill pill-active">Active</span>
+                    </div>
+                    <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:var(--navy3);border-radius:8px;">
+                        <span style="font-size:.8rem;color:#c8d6e5;">Basketball Court</span><span class="pill pill-vacant">Vacant</span>
+                    </div>
+                    </div>
+                </div>
+                </div>
+
+                <div class="card">
+                <div class="card-head"><span class="card-title">Quick Actions</span></div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                    <button onclick="openModal()" style="display:flex;align-items:center;gap:6px;padding:8px 16px;background:rgba(0,201,167,.1);border:1px solid rgba(0,201,167,.3);border-radius:9px;font-size:.8rem;color:var(--teal);cursor:pointer;font-family:'Inter',sans-serif;"><i class="ti ti-plus"></i>Add Booking</button>
+                    <button onclick="switchPanel('monitor')" style="display:flex;align-items:center;gap:6px;padding:8px 16px;background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:9px;font-size:.8rem;color:#c8d6e5;cursor:pointer;font-family:'Inter',sans-serif;"><i class="ti ti-device-desktop-analytics"></i>Monitor Rooms</button>
+                    <button onclick="switchPanel('reports')" style="display:flex;align-items:center;gap:6px;padding:8px 16px;background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:9px;font-size:.8rem;color:#c8d6e5;cursor:pointer;font-family:'Inter',sans-serif;"><i class="ti ti-download"></i>Export Report</button>
+                    <button onclick="switchPanel('logs')" style="display:flex;align-items:center;gap:6px;padding:8px 16px;background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:9px;font-size:.8rem;color:#c8d6e5;cursor:pointer;font-family:'Inter',sans-serif;"><i class="ti ti-lock-access"></i>Login Logs</button>
+                </div>
+                </div>
+            </div>
+
+            <!-- ── ROOM MONITOR ── -->
+            <div class="panel" id="panel-monitor">
+                <div style="display:flex;align-items:center;justify-content:space-between;">
+                <span style="font-size:.78rem;color:var(--muted);">Live monitoring — updates every minute</span>
+                <button onclick="openModal()" style="display:flex;align-items:center;gap:6px;padding:7px 14px;background:rgba(0,201,167,.1);border:1px solid rgba(0,201,167,.3);border-radius:9px;font-size:.78rem;color:var(--teal);cursor:pointer;font-family:'Inter',sans-serif;"><i class="ti ti-plus"></i>Manual Add</button>
+                </div>
+
+                <div class="room-grid">
+                <!-- Billiards #1 -->
+                <div class="rm occupied">
+                    <div class="rm-head">
+                    <div><div class="rm-name">Billiards #1</div><div class="rm-type">Solo — Big Room</div></div>
+                    <div class="rm-ico ico-teal"><i class="ti ti-circle-dashed"></i></div>
+                    </div>
+                    <div class="rm-rows">
+                    <div class="rm-row"><span class="lbl">Guest</span><span class="val">Maria Santos</span></div>
+                    <div class="rm-row"><span class="lbl">Time in</span><span class="val">2:00 PM</span></div>
+                    <div class="rm-row"><span class="lbl">Duration</span><span class="val">2 hrs booked</span></div>
+                    <div class="rm-row"><span class="lbl">Time left</span><span class="val val-teal">1h 12m</span></div>
+                    <div class="rm-row"><span class="lbl">Rate</span><span class="val">₱250/hr</span></div>
+                    </div>
+                    <div class="rm-bar-wrap"><div class="rm-bar bar-teal" style="width:42%;"></div></div>
+                    <div class="rm-actions">
+                    <button class="rm-btn">Extend</button>
+                    <button class="rm-btn danger">End Session</button>
+                    </div>
+                </div>
+
+                <!-- Billiards #2 -->
+                <div class="rm occupied">
+                    <div class="rm-head">
+                    <div><div class="rm-name">Billiards #2</div><div class="rm-type">Shared Room</div></div>
+                    <div class="rm-ico ico-teal"><i class="ti ti-circle-dashed"></i></div>
+                    </div>
+                    <div class="rm-rows">
+                    <div class="rm-row"><span class="lbl">Guest</span><span class="val">Jun Reyes</span></div>
+                    <div class="rm-row"><span class="lbl">Time in</span><span class="val">3:30 PM</span></div>
+                    <div class="rm-row"><span class="lbl">Duration</span><span class="val">1 hr booked</span></div>
+                    <div class="rm-row"><span class="lbl">Time left</span><span class="val val-teal">0h 28m</span></div>
+                    <div class="rm-row"><span class="lbl">Rate</span><span class="val">₱150/hr</span></div>
+                    </div>
+                    <div class="rm-bar-wrap"><div class="rm-bar bar-amber" style="width:75%;"></div></div>
+                    <div class="rm-actions">
+                    <button class="rm-btn">Extend</button>
+                    <button class="rm-btn danger">End Session</button>
+                    </div>
+                </div>
+
+                <!-- VIP Overdue -->
+                <div class="rm overdue">
+                    <div class="rm-head">
+                    <div><div class="rm-name">VIP Package</div><div class="rm-type">KTV + Pool Combo</div></div>
+                    <div class="rm-ico ico-amber"><i class="ti ti-alert-triangle"></i></div>
+                    </div>
+                    <div class="rm-rows">
+                    <div class="rm-row"><span class="lbl">Guest</span><span class="val">Barkada G5</span></div>
+                    <div class="rm-row"><span class="lbl">Time in</span><span class="val">1:00 PM</span></div>
+                    <div class="rm-row"><span class="lbl">Duration</span><span class="val">3 hrs booked</span></div>
+                    <div class="rm-row"><span class="lbl">Time left</span><span class="val val-warn">OVERDUE +18m</span></div>
+                    <div class="rm-row"><span class="lbl">Rate</span><span class="val">₱400/hr</span></div>
+                    </div>
+                    <div class="rm-bar-wrap"><div class="rm-bar bar-red" style="width:100%;"></div></div>
+                    <div class="rm-actions">
+                    <button class="rm-btn">Add Hour</button>
+                    <button class="rm-btn danger">End & Bill</button>
+                    </div>
+                </div>
+
+                <!-- KTV -->
+                <div class="rm occupied">
+                    <div class="rm-head">
+                    <div><div class="rm-name">KTV Room</div><div class="rm-type">Private KTV</div></div>
+                    <div class="rm-ico ico-teal"><i class="ti ti-microphone"></i></div>
+                    </div>
+                    <div class="rm-rows">
+                    <div class="rm-row"><span class="lbl">Guest</span><span class="val">Dela Cruz Family</span></div>
+                    <div class="rm-row"><span class="lbl">Time in</span><span class="val">3:00 PM</span></div>
+                    <div class="rm-row"><span class="lbl">Duration</span><span class="val">2 hrs booked</span></div>
+                    <div class="rm-row"><span class="lbl">Time left</span><span class="val val-teal">1h 45m</span></div>
+                    <div class="rm-row"><span class="lbl">Rate</span><span class="val">₱300/hr</span></div>
+                    </div>
+                    <div class="rm-bar-wrap"><div class="rm-bar bar-teal" style="width:22%;"></div></div>
+                    <div class="rm-actions">
+                    <button class="rm-btn">Extend</button>
+                    <button class="rm-btn danger">End Session</button>
+                    </div>
+                </div>
+
+                <!-- Court Vacant -->
+                <div class="rm vacant">
+                    <div class="rm-head">
+                    <div><div class="rm-name">Basketball Court</div><div class="rm-type">Full court</div></div>
+                    <div class="rm-ico ico-blue"><i class="ti ti-ball-basketball"></i></div>
+                    </div>
+                    <div class="rm-rows">
+                    <div class="rm-row"><span class="lbl">Status</span><span class="val" style="color:#378ADD;">Vacant</span></div>
+                    <div class="rm-row"><span class="lbl">Last session</span><span class="val">12:00–2:00 PM</span></div>
+                    <div class="rm-row"><span class="lbl">Next booking</span><span class="val">5:00 PM</span></div>
+                    <div class="rm-row"><span class="lbl">Rate (PM)</span><span class="val">₱400/hr</span></div>
+                    </div>
+                    <div class="rm-bar-wrap"><div class="rm-bar" style="width:0%;background:#378ADD;"></div></div>
+                    <div class="rm-actions">
+                    <button class="rm-btn" onclick="openModal()">Book Now</button>
+                    <button class="rm-btn">Block Off</button>
+                    </div>
+                </div>
+
+                <!-- Billiards #3 Vacant -->
+                <div class="rm vacant">
+                    <div class="rm-head">
+                    <div><div class="rm-name">Billiards #3</div><div class="rm-type">Solo — Regular</div></div>
+                    <div class="rm-ico ico-blue"><i class="ti ti-circle-off"></i></div>
+                    </div>
+                    <div class="rm-rows">
+                    <div class="rm-row"><span class="lbl">Status</span><span class="val" style="color:#378ADD;">Vacant</span></div>
+                    <div class="rm-row"><span class="lbl">Last session</span><span class="val">10:00–11:00 AM</span></div>
+                    <div class="rm-row"><span class="lbl">Next booking</span><span class="val">Walk-in only</span></div>
+                    <div class="rm-row"><span class="lbl">Rate</span><span class="val">₱200/hr</span></div>
+                    </div>
+                    <div class="rm-bar-wrap"><div class="rm-bar" style="width:0%;background:#378ADD;"></div></div>
+                    <div class="rm-actions">
+                    <button class="rm-btn" onclick="openModal()">Book Now</button>
+                    <button class="rm-btn">Block Off</button>
+                    </div>
+                </div>
+                </div>
+            </div>
+
+            <!-- ── BOOKINGS ── -->
+            <div class="panel" id="panel-bookings">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+                <div style="display:flex;gap:6px;">
+                    <select style="font-size:.78rem;padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:var(--navy3);color:#c8d6e5;font-family:'Inter',sans-serif;">
+                    <option>All Status</option><option>Active</option><option>Pending</option><option>Done</option><option>Overdue</option>
+                    </select>
+                    <select style="font-size:.78rem;padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:var(--navy3);color:#c8d6e5;font-family:'Inter',sans-serif;">
+                    <option>All Rooms</option><option>Billiards</option><option>KTV</option><option>Basketball Court</option><option>VIP Package</option>
+                    </select>
+                </div>
+                <button onclick="openModal()" style="display:flex;align-items:center;gap:6px;padding:7px 14px;background:rgba(0,201,167,.1);border:1px solid rgba(0,201,167,.3);border-radius:9px;font-size:.78rem;color:var(--teal);cursor:pointer;font-family:'Inter',sans-serif;"><i class="ti ti-plus"></i>Manual Booking</button>
+                </div>
+                <div class="card" style="padding:0;overflow:hidden;">
+                <table class="tbl">
+                    <thead style="background:var(--navy3);">
+                    <tr>
+                        <th style="padding:10px 12px;">Guest</th>
+                        <th>Room</th><th>Date</th><th>Time In</th><th>Duration</th><th>Amount</th><th>Status</th><th>Actions</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr><td style="padding:9px 12px;">Maria Santos</td><td>Billiards #1 (Big)</td><td>Jun 25</td><td>2:00 PM</td><td>2 hrs</td><td>₱500</td><td><span class="pill pill-active">Active</span></td><td><button style="border:none;background:none;font-size:.75rem;color:var(--teal);cursor:pointer;">Edit</button></td></tr>
+                    <tr><td style="padding:9px 12px;">Jun Reyes</td><td>KTV Room</td><td>Jun 25</td><td>3:30 PM</td><td>1 hr</td><td>₱300</td><td><span class="pill pill-active">Active</span></td><td><button style="border:none;background:none;font-size:.75rem;color:var(--teal);cursor:pointer;">Edit</button></td></tr>
+                    <tr><td style="padding:9px 12px;">Barkada G5</td><td>VIP Package</td><td>Jun 25</td><td>1:00 PM</td><td>3 hrs</td><td>₱1,200</td><td><span class="pill pill-overdue">Overdue</span></td><td><button style="border:none;background:none;font-size:.75rem;color:#ff6b6b;cursor:pointer;">Resolve</button></td></tr>
+                    <tr><td style="padding:9px 12px;">Leo Mendoza</td><td>Basketball Court</td><td>Jun 25</td><td>5:00 PM</td><td>2 hrs</td><td>₱800</td><td><span class="pill pill-pending">Pending</span></td><td><button style="border:none;background:none;font-size:.75rem;color:var(--teal);cursor:pointer;">Edit</button></td></tr>
+                    <tr><td style="padding:9px 12px;">Claire Tan</td><td>Billiards #3</td><td>Jun 25</td><td>11:00 AM</td><td>1 hr</td><td>₱200</td><td><span class="pill pill-done">Done</span></td><td><button style="border:none;background:none;font-size:.75rem;color:var(--muted);cursor:pointer;">View</button></td></tr>
+                    <tr><td style="padding:9px 12px;">Dela Cruz Fam</td><td>KTV Room</td><td>Jun 25</td><td>3:00 PM</td><td>2 hrs</td><td>₱600</td><td><span class="pill pill-active">Active</span></td><td><button style="border:none;background:none;font-size:.75rem;color:var(--teal);cursor:pointer;">Edit</button></td></tr>
+                    <tr><td style="padding:9px 12px;">Ramos Group</td><td>Basketball Court</td><td>Jun 24</td><td>6:00 PM</td><td>3 hrs</td><td>₱1,200</td><td><span class="pill pill-done">Done</span></td><td><button style="border:none;background:none;font-size:.75rem;color:var(--muted);cursor:pointer;">View</button></td></tr>
+                    </tbody>
+                </table>
+                </div>
+            </div>
+
+            <!-- ── ANALYTICS ── -->
+            <div class="panel" id="panel-analytics">
+                <div class="metric-row">
+                <div class="mc"><div class="mc-label">Weekly Revenue</div><div class="mc-val">₱38,200</div><div class="mc-sub up">+8% vs last week</div></div>
+                <div class="mc"><div class="mc-label">Avg Session</div><div class="mc-val">1.8 hrs</div><div class="mc-sub">per booking</div></div>
+                <div class="mc"><div class="mc-label">Top Room</div><div class="mc-val">Billiards</div><div class="mc-sub">58% of bookings</div></div>
+                <div class="mc"><div class="mc-label">Peak Hour</div><div class="mc-val">7–9 PM</div><div class="mc-sub">busiest window</div></div>
+                </div>
+                <div class="two-col">
+                <div class="card">
+                    <div class="card-head"><span class="card-title">Daily revenue this week (₱)</span></div>
+                    <div class="legend">
+                    <div class="legend-item"><div class="legend-dot" style="background:#00C9A7;"></div>Revenue</div>
+                    </div>
+                    <div class="chart-wrap"><canvas id="c-revenue" aria-label="Daily revenue bar chart this week">Mon 4200, Tue 5100, Wed 4800, Thu 6450, Fri 7200, Sat 6900, Sun 3550.</canvas></div>
+                </div>
+                <div class="card">
+                    <div class="card-head"><span class="card-title">Bookings by room type</span></div>
+                    <div class="legend">
+                    <div class="legend-item"><div class="legend-dot" style="background:#00C9A7;"></div>Billiards 58%</div>
+                    <div class="legend-item"><div class="legend-dot" style="background:#378ADD;"></div>KTV 22%</div>
+                    <div class="legend-item"><div class="legend-dot" style="background:#EF9F27;"></div>Court 12%</div>
+                    <div class="legend-item"><div class="legend-dot" style="background:#D4537E;"></div>VIP 8%</div>
+                    </div>
+                    <div class="chart-wrap"><canvas id="c-rooms" aria-label="Donut chart of bookings by room type">Billiards 58%, KTV 22%, Basketball Court 12%, VIP 8%.</canvas></div>
+                </div>
+                </div>
+                <div class="card">
+                <div class="card-head"><span class="card-title">Hourly traffic — bookings per hour</span></div>
+                <div id="heatmap"></div>
+                <div class="hm-labels"><span>7AM</span><span>10AM</span><span>1PM</span><span>4PM</span><span>7PM</span><span>10PM</span><span>12AM</span></div>
+                </div>
+            </div>
+
+            <!-- ── REPORTS ── -->
+            <div class="panel" id="panel-reports">
+                <div class="card">
+                <div class="card-head"><span class="card-title">Generate & download reports</span></div>
+                <div class="rep-grid">
+                    <div class="rep-item"><div class="rep-info"><div class="rep-ico" style="background:rgba(0,201,167,.1);color:var(--teal);"><i class="ti ti-file-spreadsheet"></i></div><div><div class="rep-name">Daily Booking Report</div><div class="rep-date">Today, Jun 25 2026</div></div></div><button class="dl-btn"><i class="ti ti-download"></i>Export</button></div>
+                    <div class="rep-item"><div class="rep-info"><div class="rep-ico" style="background:rgba(55,138,221,.1);color:#378ADD;"><i class="ti ti-file-analytics"></i></div><div><div class="rep-name">Weekly Revenue Summary</div><div class="rep-date">Jun 19–25 2026</div></div></div><button class="dl-btn"><i class="ti ti-download"></i>Export</button></div>
+                    <div class="rep-item"><div class="rep-info"><div class="rep-ico" style="background:rgba(239,159,39,.1);color:#EF9F27;"><i class="ti ti-chart-pie"></i></div><div><div class="rep-name">Room Utilization Report</div><div class="rep-date">This month</div></div></div><button class="dl-btn"><i class="ti ti-download"></i>Export</button></div>
+                    <div class="rep-item"><div class="rep-info"><div class="rep-ico" style="background:rgba(212,83,126,.1);color:#D4537E;"><i class="ti ti-users"></i></div><div><div class="rep-name">Guest Activity Log</div><div class="rep-date">All time</div></div></div><button class="dl-btn"><i class="ti ti-download"></i>Export</button></div>
+                    <div class="rep-item"><div class="rep-info"><div class="rep-ico" style="background:rgba(99,153,34,.1);color:#639922;"><i class="ti ti-calendar-stats"></i></div><div><div class="rep-name">Monthly Summary</div><div class="rep-date">June 2026</div></div></div><button class="dl-btn"><i class="ti ti-download"></i>Export</button></div>
+                    <div class="rep-item"><div class="rep-info"><div class="rep-ico" style="background:rgba(255,107,107,.1);color:#ff6b6b;"><i class="ti ti-alert-triangle"></i></div><div><div class="rep-name">Overdue Incidents</div><div class="rep-date">Last 30 days</div></div></div><button class="dl-btn"><i class="ti ti-download"></i>Export</button></div>
+                </div>
+                </div>
+                <div class="card">
+                <div class="card-head"><span class="card-title">Custom date range</span></div>
+                <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;">
+                    <div style="display:flex;flex-direction:column;gap:4px;">
+                    <label style="font-size:.7rem;color:var(--muted);">From</label>
+                    <input type="date" value="2026-06-01" style="background:var(--navy3);border:1px solid var(--border);border-radius:8px;padding:7px 10px;color:#c8d6e5;font-size:.82rem;font-family:'Inter',sans-serif;outline:none;">
+                    </div>
+                    <div style="display:flex;flex-direction:column;gap:4px;">
+                    <label style="font-size:.7rem;color:var(--muted);">To</label>
+                    <input type="date" value="2026-06-25" style="background:var(--navy3);border:1px solid var(--border);border-radius:8px;padding:7px 10px;color:#c8d6e5;font-size:.82rem;font-family:'Inter',sans-serif;outline:none;">
+                    </div>
+                    <button class="save-btn">Generate Report</button>
+                </div>
+                </div>
+            </div>
+
+            <!-- ── LOGIN HISTORY ── -->
+            <div class="panel" id="panel-logs">
+                <div class="alert-bar">
+                <i class="ti ti-alert-triangle"></i>
+                <div>
+                    <div class="alert-title">2 failed login attempts detected</div>
+                    <div class="alert-sub">From unfamiliar IPs. Consider enabling 2FA or changing your password.</div>
+                </div>
+                <button class="resolve-btn">Review</button>
+                </div>
+                <div class="card">
+                <div class="card-head"><span class="card-title">Admin login history</span><span style="font-size:.72rem;color:var(--muted);">Last 30 days</span></div>
+                <table class="tbl">
+                    <thead><tr><th>Admin</th><th>Role</th><th>Date & Time</th><th>IP Address</th><th>Device</th><th>Status</th></tr></thead>
+                    <tbody>
+                    <tr><td>Rivera Admin</td><td>Super Admin</td><td>Jun 25, 2026 3:42 PM</td><td>192.168.1.10</td><td>Chrome / Windows</td><td><div class="log-ok"><i class="ti ti-check"></i>Success</div></td></tr>
+                    <tr><td>Rivera Admin</td><td>Super Admin</td><td>Jun 25, 2026 8:05 AM</td><td>192.168.1.10</td><td>Chrome / Windows</td><td><div class="log-ok"><i class="ti ti-check"></i>Success</div></td></tr>
+                    <tr><td>Unknown</td><td>—</td><td>Jun 24, 2026 11:58 PM</td><td>103.22.81.44</td><td>Unknown browser</td><td><div class="log-fail"><i class="ti ti-x"></i>Failed</div></td></tr>
+                    <tr><td>Rivera Admin</td><td>Super Admin</td><td>Jun 24, 2026 2:15 PM</td><td>192.168.1.10</td><td>Safari / iPhone</td><td><div class="log-ok"><i class="ti ti-check"></i>Success</div></td></tr>
+                    <tr><td>Unknown</td><td>—</td><td>Jun 23, 2026 9:33 PM</td><td>45.11.202.5</td><td>Firefox / Linux</td><td><div class="log-fail"><i class="ti ti-x"></i>Failed</div></td></tr>
+                    <tr><td>Rivera Admin</td><td>Super Admin</td><td>Jun 23, 2026 7:00 AM</td><td>192.168.1.10</td><td>Chrome / Windows</td><td><div class="log-ok"><i class="ti ti-check"></i>Success</div></td></tr>
+                    <tr><td>Rivera Admin</td><td>Super Admin</td><td>Jun 22, 2026 5:45 PM</td><td>192.168.1.10</td><td>Chrome / Windows</td><td><div class="log-ok"><i class="ti ti-check"></i>Success</div></td></tr>
+                    </tbody>
+                </table>
+                </div>
+            </div>
+
+            <!-- ── SETTINGS ── -->
+            <div class="panel" id="panel-settings">
+                <div class="settings-grid">
+                <div class="sgroup">
+                    <div class="sgroup-title">Notifications</div>
+                    <div class="s-row"><div><div class="s-label">Overdue room alerts</div><div class="s-sub">Notify when session exceeds booked time</div></div><div class="toggle on" onclick="this.classList.toggle('on');this.classList.toggle('off');"><div class="toggle-thumb"></div></div></div>
+                    <div class="s-row"><div><div class="s-label">New booking alerts</div><div class="s-sub">Ping on every new reservation</div></div><div class="toggle on" onclick="this.classList.toggle('on');this.classList.toggle('off');"><div class="toggle-thumb"></div></div></div>
+                    <div class="s-row"><div><div class="s-label">Failed login alerts</div><div class="s-sub">Email on unrecognized login attempt</div></div><div class="toggle off" onclick="this.classList.toggle('on');this.classList.toggle('off');"><div class="toggle-thumb"></div></div></div>
+                    <div class="s-row"><div><div class="s-label">Daily revenue digest</div><div class="s-sub">End-of-day summary email</div></div><div class="toggle on" onclick="this.classList.toggle('on');this.classList.toggle('off');"><div class="toggle-thumb"></div></div></div>
+                </div>
+                <div class="sgroup">
+                    <div class="sgroup-title">Operations</div>
+                    <div class="s-input"><label>Business hours</label><select><option>7:00 AM – 12:00 AM</option><option>6:00 AM – 12:00 AM</option><option>24 hours</option></select></div>
+                    <div class="s-input"><label>Default session length</label><select><option>1 hour</option><option>2 hours</option><option>3 hours</option></select></div>
+                    <div class="s-input"><label>Overdue grace period (mins)</label><input type="number" value="15" min="0" max="60"></div>
+                    <div class="s-row"><div><div class="s-label">Walk-in bookings</div><div class="s-sub">Allow sessions without reservation</div></div><div class="toggle on" onclick="this.classList.toggle('on');this.classList.toggle('off');"><div class="toggle-thumb"></div></div></div>
+                </div>
+                <div class="sgroup">
+                    <div class="sgroup-title">Pricing overrides</div>
+                    <div class="s-input"><label>Billiards — Solo Regular (₱/hr)</label><input type="number" value="200"></div>
+                    <div class="s-input"><label>KTV Private Room (₱/hr)</label><input type="number" value="300"></div>
+                    <div class="s-input"><label>Basketball Court AM (₱/hr)</label><input type="number" value="350"></div>
+                    <div class="s-input"><label>VIP Package (₱/hr)</label><input type="number" value="400"></div>
+                </div>
+                <div class="sgroup">
+                    <div class="sgroup-title">Security</div>
+                    <div class="s-row"><div><div class="s-label">Two-factor authentication</div><div class="s-sub">Require OTP on every login</div></div><div class="toggle off" onclick="this.classList.toggle('on');this.classList.toggle('off');"><div class="toggle-thumb"></div></div></div>
+                    <div class="s-row"><div><div class="s-label">Session timeout</div><div class="s-sub">Auto-logout after 30 min idle</div></div><div class="toggle on" onclick="this.classList.toggle('on');this.classList.toggle('off');"><div class="toggle-thumb"></div></div></div>
+                    <div class="s-input"><label>Admin email</label><input type="email" value="demotest@gmail.com"></div>
+                    <button class="save-btn" style="margin-top:4px;">Save all settings</button>
+                </div>
+                </div>
+            </div>
+
+            <!-- ── PROFILE ── -->
+            <div class="panel" id="panel-profile">
+                <div class="profile-hero">
+                <div class="profile-av">RA</div>
+                <div>
+                    <div class="profile-name">Rivera Admin</div>
+                    <div class="profile-role">Super Admin · The Riverview</div>
+                    <div class="profile-meta">
+                    <span class="pmeta"><i class="ti ti-mail"></i>demotest@gmail.com</span>
+                    <span class="pmeta"><i class="ti ti-phone"></i>09XX XXX XXXX</span>
+                    <span class="pmeta"><i class="ti ti-map-pin"></i>San Rafael, Bulacan</span>
+                    </div>
+                </div>
+                </div>
+                <div class="p2col">
+                <div class="card">
+                    <div class="card-head"><span class="card-title">Personal information</span></div>
+                    <div class="pfield"><label>First name</label><input type="text" value="Rivera"></div>
+                    <div class="pfield"><label>Last name</label><input type="text" value="Admin"></div>
+                    <div class="pfield"><label>Email address</label><input type="email" value="demotest@gmail.com"></div>
+                    <div class="pfield"><label>Phone number</label><input type="tel" value="09XX XXX XXXX"></div>
+                    <button class="save-btn" style="margin-top:6px;">Save changes</button>
+                </div>
+                <div class="card">
+                    <div class="card-head"><span class="card-title">Change password</span></div>
+                    <div class="pfield"><label>Current password</label><input type="password" placeholder="Enter current password"></div>
+                    <div class="pfield"><label>New password</label><input type="password" placeholder="New password"></div>
+                    <div class="pfield"><label>Confirm new password</label><input type="password" placeholder="Confirm password"></div>
+                    <button class="save-btn" style="margin-top:6px;">Update password</button>
+                </div>
+                </div>
+                <div class="metric-row">
+                <div class="mc"><div class="mc-label">Total Logins</div><div class="mc-val">142</div></div>
+                <div class="mc"><div class="mc-label">Bookings Managed</div><div class="mc-val">388</div></div>
+                <div class="mc"><div class="mc-label">Reports Generated</div><div class="mc-val">27</div></div>
+                <div class="mc"><div class="mc-label">Account Created</div><div class="mc-val" style="font-size:1rem;">Jan 2026</div></div>
+                </div>
+            </div>
+
+            </div>
+        </div>
+        </div>
+
+        <!-- ── MODAL ── -->
+        <div class="modal-bg" id="modal">
+        <div class="modal">
+            <div class="modal-title">Manual Booking</div>
+            <div class="mfield"><label>Guest name</label><input type="text" placeholder="Juan dela Cruz"></div>
+            <div class="mfield"><label>Room</label>
+            <select>
+                <option>Billiards #1 (Regular)</option>
+                <option>Billiards #2 (Big Room)</option>
+                <option>Billiards #3 (Shared)</option>
+                <option>KTV Room</option>
+                <option>Basketball Court</option>
+                <option>VIP Package</option>
+            </select>
+            </div>
+            <div class="mfield"><label>Date</label><input type="date" value="2026-06-25"></div>
+            <div class="mfield"><label>Time in</label><input type="time" value="17:00"></div>
+            <div class="mfield"><label>Duration (hours)</label><input type="number" value="2" min="1" max="8"></div>
+            <div class="mfield"><label>Payment method</label>
+            <select><option>Cash</option><option>GCash</option><option>Maya</option></select>
+            </div>
+            <div class="modal-actions">
+            <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+            <button class="btn-confirm" onclick="closeModal()">Confirm Booking</button>
+            </div>
+        </div>
+        </div>
+
+        <script>
+        /* ── Navigation ── */
+        const titles = {
+            dashboard:'Dashboard', monitor:'Room Monitor', bookings:'Bookings',
+            analytics:'Analytics', reports:'Reports', logs:'Login History',
+            settings:'Settings', profile:'Profile'
+        };
+
+        function switchPanel(name) {
+            document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('.sb-item').forEach(b => b.classList.remove('active'));
+            const panel = document.getElementById('panel-' + name);
+            const btn   = document.querySelector('[data-panel="' + name + '"]');
+            if (panel) panel.classList.add('active');
+            if (btn)   btn.classList.add('active');
+            document.getElementById('page-title').textContent = titles[name] || name;
+            if (name === 'analytics' && !window._chartsBuilt) buildCharts();
+        }
+
+        document.querySelectorAll('.sb-item').forEach(btn => {
+            btn.addEventListener('click', () => switchPanel(btn.dataset.panel));
+        });
+
+        /* ── Live clock ── */
+        function tick() {
+            document.getElementById('live-time').textContent =
+            new Date().toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' });
+        }
+        tick(); setInterval(tick, 30000);
+
+        /* ── Modal ── */
+        function openModal()  { document.getElementById('modal').classList.add('open'); }
+        function closeModal() { document.getElementById('modal').classList.remove('open'); }
+        document.getElementById('modal').addEventListener('click', function(e) {
+            if (e.target === this) closeModal();
+        });
+
+        /* ── Charts ── */
+        function buildCharts() {
+            window._chartsBuilt = true;
+
+            new Chart(document.getElementById('c-revenue'), {
+            type: 'bar',
+            data: {
+                labels: ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'],
+                datasets: [{
+                label: 'Revenue',
+                data: [4200,5100,4800,6450,7200,6900,3550],
+                backgroundColor: '#00C9A7',
+                borderRadius: 5,
+                barPercentage: 0.6
+                }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                x: { grid: { display: false }, ticks: { color: '#8A9BB0', font: { size: 11 } } },
+                y: { grid: { color: 'rgba(255,255,255,.06)' }, ticks: { color: '#8A9BB0', font: { size: 11 }, callback: v => '₱' + v.toLocaleString() } }
+                }
+            }
+            });
+
+            new Chart(document.getElementById('c-rooms'), {
+            type: 'doughnut',
+            data: {
+                labels: ['Billiards','KTV','Court','VIP'],
+                datasets: [{
+                data: [58,22,12,8],
+                backgroundColor: ['#00C9A7','#378ADD','#EF9F27','#D4537E'],
+                borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                cutout: '65%'
+            }
+            });
+
+            /* Heatmap */
+            const traffic = [0,0,1,2,3,4,6,8,7,9,8,6,5,7,9,10,5];
+            const max = Math.max(...traffic);
+            const hm = document.getElementById('heatmap');
+            traffic.forEach((v, i) => {
+            const cell = document.createElement('div');
+            cell.className = 'hm-cell';
+            const alpha = (0.08 + (v / max) * 0.82).toFixed(2);
+            cell.style.background = 'rgba(0,201,167,' + alpha + ')';
+            cell.title = (7 + i) + ':00 — ' + v + ' bookings';
+            hm.appendChild(cell);
+            });
+        }
+        </script>
+    </body>
+</html>
