@@ -3,7 +3,7 @@
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
-        <title>Log In — The Riverview</title>
+        <title>Create Account — The Riverview</title>
         <link rel="icon" href="../assets/logo/logoo.png" type="image/png">
         <link rel="preconnect" href="https://fonts.googleapis.com">
         <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
@@ -31,6 +31,7 @@
                 --muted:   #8A9BB0;
                 --border:  rgba(255,255,255,.08);
                 --error:   #ff6b6b;
+                --success: #00C9A7;
             }
 
             /* ─── HEADER ─── */
@@ -59,7 +60,7 @@
             .page-body {
                 flex: 1;
                 display: grid;
-                grid-template-columns: 1fr 1.3fr;
+                grid-template-columns: 1fr 1fr;
                 min-height: 0;
             }
 
@@ -69,20 +70,16 @@
                 overflow: hidden;
                 display: flex;
                 flex-direction: column;
-                justify-content: center;
+                justify-content: flex-start;
                 padding: 4rem;
                 min-height: 600px;
-                margin-left: 15rem;
-
             }
-
             .left-bg {
                 position: absolute;
                 inset: 0;
                 background: url('../assets/main.png') center/cover no-repeat;
                 opacity: .22;
             }
-
             .left-overlay {
                 position: absolute;
                 inset: 0;
@@ -93,12 +90,10 @@
                     rgba(10,22,40,.2) 100%
                 );
             }
-
             .left-content {
                 position: relative;
                 z-index: 1;
             }
-
             .left-eyebrow {
                 display: inline-flex;
                 align-items: center;
@@ -118,7 +113,6 @@
                 background: var(--teal);
                 border-radius: 2px;
             }
-
             .left-content h2 {
                 font-family: 'Playfair Display', serif;
                 font-size: clamp(1.8rem, 3vw, 2.8rem);
@@ -132,7 +126,6 @@
                 font-style: italic;
                 color: var(--teal);
             }
-
             .left-content p {
                 font-size: .9rem;
                 color: var(--muted);
@@ -149,15 +142,16 @@
                 justify-content: center;
                 padding: 3rem 2rem;
                 background: var(--navy);
+                overflow-y: auto;
             }
 
             .form-card {
                 width: 100%;
-                max-width: 420px;
+                max-width: 440px;
             }
 
             .form-card-header {
-                margin-bottom: 2.5rem;
+                margin-bottom: 2rem;
             }
             .form-card-header .section-label {
                 font-size: .7rem;
@@ -183,10 +177,17 @@
             }
 
             /* ─── FORM ─── */
-            .login-form {
+            .signup-form {
                 display: flex;
                 flex-direction: column;
-                gap: 1.1rem;
+                gap: 1rem;
+            }
+
+            /* Two-col row */
+            .field-row {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: .75rem;
             }
 
             .field {
@@ -216,7 +217,7 @@
                 transition: color .2s;
             }
 
-            .field input {
+            .field input, .field select {
                 width: 100%;
                 background: var(--navy-2);
                 border: 1px solid var(--border);
@@ -227,39 +228,54 @@
                 font-size: .9rem;
                 transition: border-color .2s, background .2s;
                 outline: none;
+                appearance: none;
             }
             .field input::placeholder { color: #4a5d72; }
-            .field input:focus {
+            .field input:focus,
+            .field select:focus {
                 border-color: var(--teal);
                 background: var(--navy-3);
             }
-            .field input:focus ~ .input-icon,
             .input-wrap:focus-within .input-icon { color: var(--teal); }
 
-            /* reorder icon inside wrap */
-            .input-wrap input { order: 2; }
-            .input-wrap .input-icon { order: 1; }
+            /* Password strength bar */
+            .strength-bar-wrap {
+                display: flex;
+                gap: 4px;
+                margin-top: .35rem;
+            }
+            .strength-seg {
+                flex: 1;
+                height: 3px;
+                border-radius: 2px;
+                background: rgba(255,255,255,.08);
+                transition: background .3s;
+            }
+            .strength-label {
+                font-size: .7rem;
+                color: var(--muted);
+                margin-top: .25rem;
+                min-height: 1em;
+                transition: color .3s;
+            }
+
+            /* strength states */
+            .str-1 .strength-seg:nth-child(1) { background: #ff6b6b; }
+            .str-2 .strength-seg:nth-child(1),
+            .str-2 .strength-seg:nth-child(2) { background: #ffb347; }
+            .str-3 .strength-seg:nth-child(1),
+            .str-3 .strength-seg:nth-child(2),
+            .str-3 .strength-seg:nth-child(3) { background: #ffd700; }
+            .str-4 .strength-seg { background: var(--teal); }
 
             .field-error {
                 font-size: .75rem;
                 color: var(--error);
                 display: none;
             }
-            .field.has-error input { border-color: var(--error); }
+            .field.has-error input,
+            .field.has-error select { border-color: var(--error); }
             .field.has-error .field-error { display: block; }
-
-            .password-row {
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-            }
-            .forgot-link {
-                font-size: .78rem;
-                color: var(--teal);
-                font-weight: 500;
-                transition: opacity .2s;
-            }
-            .forgot-link:hover { opacity: .75; }
 
             .toggle-pw {
                 position: absolute;
@@ -277,15 +293,16 @@
             }
             .toggle-pw:hover { color: var(--teal); }
 
-            /* remember me */
-            .remember-row {
+            /* Terms checkbox */
+            .terms-row {
                 display: flex;
-                align-items: center;
+                align-items: flex-start;
                 gap: .6rem;
             }
             .custom-check {
                 width: 17px;
                 height: 17px;
+                min-width: 17px;
                 border: 1.5px solid var(--border);
                 border-radius: 4px;
                 background: var(--navy-2);
@@ -293,8 +310,8 @@
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                flex-shrink: 0;
                 transition: border-color .2s, background .2s;
+                margin-top: 2px;
             }
             .custom-check.checked {
                 background: var(--teal);
@@ -302,15 +319,18 @@
             }
             .custom-check svg { display: none; }
             .custom-check.checked svg { display: block; }
-            #remember-input { display: none; }
-            .remember-label {
+            #terms-input { display: none; }
+            .terms-label {
                 font-size: .82rem;
                 color: var(--muted);
                 cursor: pointer;
                 user-select: none;
+                line-height: 1.5;
             }
+            .terms-label a { color: var(--teal); font-weight: 600; }
+            .terms-label a:hover { text-decoration: underline; }
 
-            /* divider */
+            /* Divider */
             .divider {
                 display: flex;
                 align-items: center;
@@ -325,7 +345,7 @@
                 background: var(--border);
             }
 
-            /* submit */
+            /* Submit */
             .btn-submit {
                 width: 100%;
                 padding: .9rem;
@@ -367,7 +387,7 @@
             }
             @keyframes spin { to { transform: rotate(360deg); } }
 
-            /* social login */
+            /* Social */
             .btn-social {
                 width: 100%;
                 padding: .8rem;
@@ -386,15 +406,14 @@
                 transition: background .2s, border-color .2s;
             }
             .btn-social:hover { background: var(--navy-3); border-color: rgba(255,255,255,.14); }
-            .btn-social img { width: 18px; height: 18px; }
 
-            .signup-row {
+            .login-row {
                 text-align: center;
                 font-size: .83rem;
                 color: var(--muted);
             }
-            .signup-row a { color: var(--teal); font-weight: 600; }
-            .signup-row a:hover { text-decoration: underline; }
+            .login-row a { color: var(--teal); font-weight: 600; }
+            .login-row a:hover { text-decoration: underline; }
 
             /* ─── TOAST ─── */
             .toast {
@@ -445,6 +464,7 @@
                 .right-panel { padding: 2.5rem 1.5rem; align-items: flex-start; padding-top: 3rem; }
                 header { padding: 1rem 1.5rem; }
                 footer { padding: 1rem 1.5rem; flex-direction: column; gap: .5rem; text-align: center; }
+                .field-row { grid-template-columns: 1fr; }
             }
         </style>
     </head>
@@ -466,9 +486,9 @@
                 <div class="left-bg"></div>
                 <div class="left-overlay"></div>
                 <div class="left-content">
-                    <div class="left-eyebrow">Members Area</div>
-                    <h2>Book faster.<br>Play <em>smarter.</em></h2>
-                    <p>Log in to manage your reservations, check availability in real time, and never miss a prime-time slot again.</p>
+                    <div class="left-eyebrow">Join the Club</div>
+                    <h2>Your spot is<br><em>waiting.</em></h2>
+                    <p>Create a free account and get instant access to online booking, real-time availability, and exclusive member-only perks.</p>
                 </div>
             </div>
 
@@ -477,12 +497,61 @@
                 <div class="form-card">
 
                     <div class="form-card-header">
-                        <div class="section-label">Welcome back</div>
-                        <h1>Log in to<br>your account</h1>
-                        <p>Enter your details to access your bookings.</p>
+                        <div class="section-label">Get started</div>
+                        <h1>Create your<br>free account</h1>
+                        <p>Takes less than a minute. No credit card needed.</p>
                     </div>
 
-                    <form class="login-form" id="login-form" novalidate>
+                    <form class="signup-form" id="signup-form" novalidate>
+
+                        <!-- Name row -->
+                        <div class="field-row">
+                            <div class="field" id="field-firstname">
+                                <label for="firstname">First name</label>
+                                <div class="input-wrap">
+                                    <input
+                                        type="text"
+                                        id="firstname"
+                                        name="firstname"
+                                        placeholder="Juan"
+                                        autocomplete="given-name"
+                                    >
+                                    <span class="input-icon">👤</span>
+                                </div>
+                                <span class="field-error" id="firstname-error">Enter your first name.</span>
+                            </div>
+
+                            <div class="field" id="field-lastname">
+                                <label for="lastname">Last name</label>
+                                <div class="input-wrap">
+                                    <input
+                                        type="text"
+                                        id="lastname"
+                                        name="lastname"
+                                        placeholder="dela Cruz"
+                                        autocomplete="family-name"
+                                    >
+                                    <span class="input-icon">👤</span>
+                                </div>
+                                <span class="field-error" id="lastname-error">Enter your last name.</span>
+                            </div>
+                        </div>
+
+                        <!-- Phone -->
+                        <div class="field" id="field-phone">
+                            <label for="phone">Phone number</label>
+                            <div class="input-wrap">
+                                <input
+                                    type="tel"
+                                    id="phone"
+                                    name="phone"
+                                    placeholder="09XX XXX XXXX"
+                                    autocomplete="tel"
+                                >
+                                <span class="input-icon">📱</span>
+                            </div>
+                            <span class="field-error" id="phone-error">Enter a valid PH phone number.</span>
+                        </div>
 
                         <!-- Email -->
                         <div class="field" id="field-email">
@@ -502,40 +571,63 @@
 
                         <!-- Password -->
                         <div class="field" id="field-password">
-                            <div class="password-row">
-                                <label for="password">Password</label>
-                                <a href="#" class="forgot-link">Forgot password?</a>
-                            </div>
+                            <label for="password">Password</label>
                             <div class="input-wrap">
                                 <input
                                     type="password"
                                     id="password"
                                     name="password"
-                                    placeholder="Enter your password"
-                                    autocomplete="current-password"
+                                    placeholder="Create a password"
+                                    autocomplete="new-password"
                                 >
                                 <span class="input-icon">🔒</span>
-                                <button type="button" class="toggle-pw" id="toggle-pw" aria-label="Show password">
-                                    👁
-                                </button>
+                                <button type="button" class="toggle-pw" id="toggle-pw" aria-label="Show password">👁</button>
                             </div>
-                            <span class="field-error" id="password-error">Password must be at least 6 characters.</span>
+                            <!-- Strength bar -->
+                            <div class="strength-bar-wrap" id="strength-bar">
+                                <div class="strength-seg"></div>
+                                <div class="strength-seg"></div>
+                                <div class="strength-seg"></div>
+                                <div class="strength-seg"></div>
+                            </div>
+                            <div class="strength-label" id="strength-label"></div>
+                            <span class="field-error" id="password-error">Password must be at least 8 characters.</span>
                         </div>
 
-                        <!-- Remember me -->
-                        <div class="remember-row">
-                            <input type="checkbox" id="remember-input" name="remember">
-                            <div class="custom-check" id="custom-check" role="checkbox" aria-checked="false" tabindex="0">
+                        <!-- Confirm Password -->
+                        <div class="field" id="field-confirm">
+                            <label for="confirm">Confirm password</label>
+                            <div class="input-wrap">
+                                <input
+                                    type="password"
+                                    id="confirm"
+                                    name="confirm"
+                                    placeholder="Re-enter your password"
+                                    autocomplete="new-password"
+                                >
+                                <span class="input-icon">🔒</span>
+                                <button type="button" class="toggle-pw" id="toggle-confirm" aria-label="Show confirm password">👁</button>
+                            </div>
+                            <span class="field-error" id="confirm-error">Passwords do not match.</span>
+                        </div>
+
+                        <!-- Terms -->
+                        <div class="terms-row">
+                            <input type="checkbox" id="terms-input" name="terms">
+                            <div class="custom-check" id="terms-check" role="checkbox" aria-checked="false" tabindex="0">
                                 <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
                                     <path d="M1 4L3.5 6.5L9 1" stroke="#0A1628" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                                 </svg>
                             </div>
-                            <label for="remember-input" class="remember-label">Remember me for 30 days</label>
+                            <label for="terms-input" class="terms-label">
+                                I agree to The Riverview's <a href="#">Terms of Use</a> and <a href="#">Privacy Policy</a>
+                            </label>
                         </div>
+                        <span class="field-error" id="terms-error" style="display:none;margin-top:-.5rem;">You must accept the terms to continue.</span>
 
                         <!-- Submit -->
                         <button type="submit" class="btn-submit" id="btn-submit">
-                            <span class="btn-text">Log in</span>
+                            <span class="btn-text">Create account</span>
                             <span class="btn-spinner"><span class="spinner-ring"></span></span>
                         </button>
 
@@ -549,11 +641,11 @@
                                 <path d="M3.964 10.71A5.41 5.41 0 013.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 000 9c0 1.452.348 2.827.957 4.042l3.007-2.332z" fill="#FBBC05"/>
                                 <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 00.957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z" fill="#EA4335"/>
                             </svg>
-                            Continue with Google
+                            Sign up with Google
                         </button>
 
-                        <div class="signup-row">
-                            New here? <a href="register.html">Create a free account</a>
+                        <div class="login-row">
+                            Already have an account? <a href="login.html">Log in</a>
                         </div>
 
                     </form>
@@ -578,89 +670,144 @@
             <span id="toast-msg"></span>
         </div>
 
-    
-    <script>
-
-            // Password toggle
-            const pwInput   = document.getElementById('password');
-            const toggleBtn = document.getElementById('toggle-pw');
-            let pwVisible = false;
-            toggleBtn.addEventListener('click', () => {
-                pwVisible = !pwVisible;
-                pwInput.type = pwVisible ? 'text' : 'password';
-                toggleBtn.textContent = pwVisible ? '🙈' : '👁';
-            });
-
-            // Custom checkbox
-            const checkBox   = document.getElementById('custom-check');
-            const checkInput = document.getElementById('remember-input');
-            function toggleCheck() {
-                const checked = checkBox.classList.toggle('checked');
-                checkInput.checked = checked;
-                checkBox.setAttribute('aria-checked', checked);
+        <script>
+            /* ── Password toggles ── */
+            function makeToggle(inputId, btnId) {
+                const input = document.getElementById(inputId);
+                const btn   = document.getElementById(btnId);
+                let vis = false;
+                btn.addEventListener('click', () => {
+                    vis = !vis;
+                    input.type = vis ? 'text' : 'password';
+                    btn.textContent = vis ? '🙈' : '👁';
+                });
             }
-            checkBox.addEventListener('click', toggleCheck);
-            checkBox.addEventListener('keydown', e => {
-                if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); toggleCheck(); }
+            makeToggle('password', 'toggle-pw');
+            makeToggle('confirm',  'toggle-confirm');
+
+            /* ── Password strength ── */
+            const pwInput      = document.getElementById('password');
+            const strengthBar  = document.getElementById('strength-bar');
+            const strengthLbl  = document.getElementById('strength-label');
+
+            const strengthLevels = [
+                { label: '',         color: 'var(--muted)' },
+                { label: 'Weak',     color: '#ff6b6b' },
+                { label: 'Fair',     color: '#ffb347' },
+                { label: 'Good',     color: '#ffd700' },
+                { label: 'Strong',   color: 'var(--teal)' },
+            ];
+
+            function calcStrength(pw) {
+                let score = 0;
+                if (pw.length >= 8)  score++;
+                if (pw.length >= 12) score++;
+                if (/[A-Z]/.test(pw) && /[a-z]/.test(pw)) score++;
+                if (/\d/.test(pw))   score++;
+                if (/[^A-Za-z0-9]/.test(pw)) score++;
+                return Math.min(4, Math.ceil(score * 4 / 5));
+            }
+
+            pwInput.addEventListener('input', () => {
+                const val = pwInput.value;
+                const lvl = val.length === 0 ? 0 : Math.max(1, calcStrength(val));
+                strengthBar.className = 'strength-bar-wrap' + (lvl ? ' str-' + lvl : '');
+                strengthLbl.textContent = lvl ? strengthLevels[lvl].label : '';
+                strengthLbl.style.color = strengthLevels[lvl].color;
             });
 
-            // Toast
+            /* ── Terms checkbox ── */
+            const termsCheck = document.getElementById('terms-check');
+            const termsInput = document.getElementById('terms-input');
+            function toggleTerms() {
+                const checked = termsCheck.classList.toggle('checked');
+                termsInput.checked = checked;
+                termsCheck.setAttribute('aria-checked', checked);
+                if (checked) document.getElementById('terms-error').style.display = 'none';
+            }
+            termsCheck.addEventListener('click', toggleTerms);
+            termsCheck.addEventListener('keydown', e => {
+                if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); toggleTerms(); }
+            });
+
+            /* ── Toast ── */
             let toastTimer;
             function showToast(msg, type = 'success') {
                 const toast = document.getElementById('toast');
-                document.getElementById('toast-msg').textContent = msg;
+                document.getElementById('toast-msg').textContent  = msg;
                 document.getElementById('toast-icon').textContent = type === 'success' ? '✅' : '⚠️';
                 toast.className = 'toast show' + (type === 'error' ? ' error' : '');
                 clearTimeout(toastTimer);
-                toastTimer = setTimeout(() => { toast.classList.remove('show'); }, 3200);
+                toastTimer = setTimeout(() => toast.classList.remove('show'), 3200);
             }
 
-            // Validation
+            /* ── Validation helpers ── */
             function setError(fieldId, errorId, show) {
                 const field = document.getElementById(fieldId);
                 const err   = document.getElementById(errorId);
-                if (show) { field.classList.add('has-error'); err.style.display = 'block'; }
-                else       { field.classList.remove('has-error'); err.style.display = 'none'; }
+                if (!field || !err) return;
+                if (show) { field.classList.add('has-error');    err.style.display = 'block'; }
+                else      { field.classList.remove('has-error'); err.style.display = 'none';  }
             }
 
-            // Form submit — calls your Express server
-            const form = document.getElementById('login-form');
+            /* ── Inline clear errors ── */
+            ['firstname','lastname','phone','email','password','confirm'].forEach(id => {
+                document.getElementById(id).addEventListener('input', () => {
+                    setError('field-' + id, id + '-error', false);
+                });
+            });
+
+            /* ── Form submit ── */
+            const form = document.getElementById('signup-form');
             const btn  = document.getElementById('btn-submit');
 
             form.addEventListener('submit', async (e) => {
                 e.preventDefault();
 
-                const email    = document.getElementById('email').value.trim();
-                const password = document.getElementById('password').value;
+                const firstname = document.getElementById('firstname').value.trim();
+                const lastname  = document.getElementById('lastname').value.trim();
+                const phone     = document.getElementById('phone').value.trim();
+                const email     = document.getElementById('email').value.trim();
+                const password  = document.getElementById('password').value;
+                const confirm   = document.getElementById('confirm').value;
+                const terms     = termsInput.checked;
 
-                // Client-side validation first
-                const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-                const passOk  = password.length >= 6;
+                // Validate
+                const emailOk    = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+                const phoneOk    = /^(09|\+639)\d{9}$/.test(phone.replace(/\s/g, ''));
+                const passOk     = password.length >= 8;
+                const confirmOk  = password === confirm;
 
-                setError('field-email',    'email-error',    !emailOk);
-                setError('field-password', 'password-error', !passOk);
-                if (!emailOk || !passOk) return;
+                setError('field-firstname', 'firstname-error', !firstname);
+                setError('field-lastname',  'lastname-error',  !lastname);
+                setError('field-phone',     'phone-error',     !phoneOk);
+                setError('field-email',     'email-error',     !emailOk);
+                setError('field-password',  'password-error',  !passOk);
+                setError('field-confirm',   'confirm-error',   !confirmOk);
 
-                // Call the server
+                const termsErr = document.getElementById('terms-error');
+                if (!terms) termsErr.style.display = 'block';
+                else        termsErr.style.display = 'none';
+
+                if (!firstname || !lastname || !phoneOk || !emailOk || !passOk || !confirmOk || !terms) return;
+
+                // Submit
                 btn.classList.add('loading');
 
                 try {
-                    const response = await fetch('http://localhost:3000/login', {
+                    const response = await fetch('http://localhost:3000/register', {
                         method:  'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body:    JSON.stringify({ email, password })
+                        body: JSON.stringify({ firstname, lastname, phone, email, password })
                     });
 
                     const data = await response.json();
 
                     if (response.ok) {
-                        // Save user info so other pages can use it
-                        localStorage.setItem('riverview_user', JSON.stringify(data.user));
-                        showToast('Logged in! Redirecting…', 'success');
-                        setTimeout(() => { window.location.href = '../index.html'; }, 1500);
+                        showToast('Account created! Redirecting to login…', 'success');
+                        setTimeout(() => { window.location.href = 'login.html'; }, 1800);
                     } else {
-                        // Server returned an error (wrong password, no account, etc.)
-                        showToast(data.message || 'Login failed.', 'error');
+                        showToast(data.message || 'Registration failed. Try again.', 'error');
                     }
                 } catch (err) {
                     showToast('Could not reach the server. Is it running?', 'error');
@@ -669,20 +816,11 @@
                 }
             });
 
-            // Google button (demo)
+            /* ── Google (demo) ── */
             document.getElementById('btn-google').addEventListener('click', () => {
-                showToast('Google sign-in coming soon.', 'error');
+                showToast('Google sign-up coming soon.', 'error');
             });
+        </script>
 
-            // Clear errors on input
-            document.getElementById('email').addEventListener('input', () => {
-                setError('field-email', 'email-error', false);
-            });
-            document.getElementById('password').addEventListener('input', () => {
-                setError('field-password', 'password-error', false);
-            });
-                    
-    
-    </script>
     </body>
 </html>
