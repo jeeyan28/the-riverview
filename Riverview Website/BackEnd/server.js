@@ -7,9 +7,10 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
-app.use(cors()); // allows your HTML frontend to call this server
+app.use(cors());
 
 const User = require("./model/user");
+console.log("Loaded from:", require.resolve("./model/user"));
 
 // ── Health check
 app.get("/", (req, res) => {
@@ -22,9 +23,9 @@ app.get("/", (req, res) => {
 // ── Register a new user
 app.post("/register", async (req, res) => {
   try {
-    const { name, email, password } = req.body;
+    const { firstname, lastname, phone, email, password } = req.body;
 
-    if (!name || !email || !password) {
+    if (!firstname || !lastname || !phone || !email || !password) {
       return res.status(400).json({ message: "All fields are required." });
     }
 
@@ -33,7 +34,9 @@ app.post("/register", async (req, res) => {
       return res.status(409).json({ message: "Email already in use." });
     }
 
-    const user = new User({ name, email, password });
+    // All new registrations are regular users by default.
+    // To make someone an admin, update their role directly in MongoDB.
+    const user = new User({ firstname, lastname, phone, email, password });
     await user.save();
 
     res.status(201).json({ message: "Account created successfully." });
@@ -62,13 +65,15 @@ app.post("/login", async (req, res) => {
       return res.status(401).json({ message: "Invalid email or password." });
     }
 
-    // Success — return basic user info (no password)
+    // Return role so the frontend can redirect accordingly
     res.json({
       message: "Login successful.",
       user: {
-        id:    user._id,
-        name:  user.name,
-        email: user.email,
+        id:        user._id,
+        firstname: user.firstname,
+        lastname:  user.lastname,
+        email:     user.email,
+        role:      user.role,         // "admin" or "user"
       }
     });
   } catch (err) {
