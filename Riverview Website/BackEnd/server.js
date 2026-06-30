@@ -1,3 +1,8 @@
+// 1. FORCE PUBLIC DNS (Must be the very first lines of code)
+const dns = require('node:dns');
+dns.setServers(['1.1.1.1', '8.8.8.8']);
+
+// 2. Load dependencies
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
@@ -34,8 +39,6 @@ app.post("/register", async (req, res) => {
       return res.status(409).json({ message: "Email already in use." });
     }
 
-    // All new registrations are regular users by default.
-    // To make someone an admin, update their role directly in MongoDB.
     const user = new User({ firstname, lastname, phone, email, password });
     await user.save();
 
@@ -65,7 +68,6 @@ app.post("/login", async (req, res) => {
       return res.status(401).json({ message: "Invalid email or password." });
     }
 
-    // Return role so the frontend can redirect accordingly
     res.json({
       message: "Login successful.",
       user: {
@@ -73,7 +75,7 @@ app.post("/login", async (req, res) => {
         firstname: user.firstname,
         lastname:  user.lastname,
         email:     user.email,
-        role:      user.role,         // "admin" or "user"
+        role:      user.role,
       }
     });
   } catch (err) {
