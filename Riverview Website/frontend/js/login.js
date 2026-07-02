@@ -86,7 +86,7 @@ form.addEventListener('submit', async (e) => {
                 setTimeout(() => { window.location.href = 'admin.html'; }, 1500);
             } else {
                 showToast(`Welcome back, ${data.user.firstname}!`, 'success');
-                setTimeout(() => { window.location.href = '../index.html'; }, 1500);
+                setTimeout(() => { window.location.href = 'index.html'; }, 1500);
             }
         } else {
             showToast(data.message || 'Login failed.', 'error');
