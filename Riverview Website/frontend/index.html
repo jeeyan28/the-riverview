@@ -167,6 +167,89 @@
                 </div>
             </section>
 
+            <!-- =================== MODAL MARKUP =================== -->
+            <div id="booking-modal" class="bk-overlay">
+                <div class="bk-modal">
+                
+                    <button class="bk-close" id="bkClose" aria-label="Close">✕</button>
+                
+                    <div class="bk-header">
+                    <div class="bk-room-icon" id="bkRoomIcon"><i class="fa-solid fa-circle-dot"></i></div>
+                    <div>
+                        <p class="bk-eyebrow">Book a space</p>
+                        <h2 id="bkRoomName">Billiards Room</h2>
+                    </div>
+                    </div>
+                
+                    <div class="bk-body">
+                
+                    <!-- STEP 1: PRICE / OPTION -->
+                    <div class="bk-step" id="bkStepPrice">
+                        <div class="bk-slots-head">
+                        <p>Choose a pricing option to get started.</p>
+                        </div>
+                
+                        <div class="bk-price-list" id="bkPriceList"></div>
+                    </div>
+                
+                    <!-- STEP 2: CALENDAR -->
+                    <div class="bk-step bk-step--hidden" id="bkStepCalendar">
+                        <button class="bk-back" id="bkBackToPriceFromCal"><i class="fa-solid fa-arrow-left"></i> Back to pricing</button>
+                
+                        <p class="bk-selected-option-pill" id="bkCalSelectedOption">Solo &mdash; Regular &middot; &#8369;200/hr</p>
+                
+                        <div class="bk-cal-head">
+                        <button class="bk-nav-btn" id="bkPrevMonth" aria-label="Previous month"><i class="fa-solid fa-chevron-left"></i></button>
+                        <span class="bk-month-label" id="bkMonthLabel">June 2026</span>
+                        <button class="bk-nav-btn" id="bkNextMonth" aria-label="Next month"><i class="fa-solid fa-chevron-right"></i></button>
+                        </div>
+                
+                        <div class="bk-weekdays">
+                        <span>Su</span><span>Mo</span><span>Tu</span><span>We</span><span>Th</span><span>Fr</span><span>Sa</span>
+                        </div>
+                
+                        <div class="bk-grid" id="bkCalGrid"></div>
+                
+                        <div class="bk-legend">
+                        <span><i class="bk-dot bk-dot--open"></i> Available</span>
+                        <span><i class="bk-dot bk-dot--full"></i> Fully booked</span>
+                        <span><i class="bk-dot bk-dot--past"></i> Unavailable</span>
+                        </div>
+                    </div>
+                
+                    <!-- STEP 3: TIME SLOTS -->
+                    <div class="bk-step bk-step--hidden" id="bkStepSlots">
+                        <button class="bk-back" id="bkBackToCal"><i class="fa-solid fa-arrow-left"></i> Back to calendar</button>
+                
+                        <div class="bk-slots-head">
+                        <h3 id="bkSelectedDate">Friday, July 3</h3>
+                        <p id="bkSelectedOption">Solo &mdash; Regular &middot; &#8369;200/hr</p>
+                        </div>
+                
+                        <div class="bk-slots-grid" id="bkSlotsGrid"></div>
+                
+                        <div class="bk-summary" id="bkSummary">
+                        <div>
+                            <p class="bk-summary-label">Selected</p>
+                            <p class="bk-summary-value" id="bkSummaryText">No time selected yet</p>
+                        </div>
+                        <button class="bk-confirm" id="bkConfirm" disabled>Confirm &#8369;0</button>
+                        </div>
+                    </div>
+                
+                    <!-- STEP 3: CONFIRMATION -->
+                    <div class="bk-step bk-step--hidden" id="bkStepConfirm">
+                        <div class="bk-confirm-icon"><i class="fa-solid fa-check"></i></div>
+                            <h3>Booking request sent</h3>
+                            <p id="bkConfirmDetails">Billiards Room — Friday, July 3, 2026 at 3:00 PM</p>
+                            <p class="bk-confirm-note">We'll text or email you a confirmation shortly. Walk-ins are also welcome if your plans change.</p>
+                            <button class="bk-done" id="bkDone">Done</button>
+                        </div>
+                
+                    </div>
+                </div>
+            </div>
+
             <!-- SPACES SHOWCASE -->
             <section style="background: var(--cream);">
                 <div class="spaces">
@@ -210,90 +293,6 @@
                     </div>
                 </div>
             </section>
-
-            <!-- =================== MODAL MARKUP =================== -->
-            <div id="booking-modal" class="bk-overlay">
-                <div class="bk-modal">
-                    <button class="bk-close" id="bkClose" aria-label="Close">✕</button>
-                
-                    <div class="bk-header">
-                        <div class="bk-room-icon" id="bkRoomIcon"><i class="fa-solid fa-circle-dot"></i></div>
-                        <div>
-                            <p class="bk-eyebrow">Book a space</p>
-                            <h2 id="bkRoomName">Billiards Room</h2>
-                        </div>
-                    </div>
-                
-                    <div class="bk-body">
-                
-                        <!-- STEP 1: PRICE / OPTION -->
-                        <div class="bk-step" id="bkStepPrice">
-                            <div class="bk-slots-head">
-                            <p>Choose a pricing option to get started.</p>
-                            </div>
-                    
-                            <div class="bk-price-list" id="bkPriceList"></div>
-                        </div>
-                
-                        <!-- STEP 2: CALENDAR -->
-                        <div class="bk-step bk-step--hidden" id="bkStepCalendar">
-                            <button class="bk-back" id="bkBackToPriceFromCal"><i class="fa-solid fa-arrow-left"></i> Back to pricing</button>
-                    
-                            <p class="bk-selected-option-pill" id="bkCalSelectedOption">Solo &mdash; Regular &middot; &#8369;200/hr</p>
-                    
-                            <div class="bk-cal-head">
-                                <button class="bk-nav-btn" id="bkPrevMonth" aria-label="Previous month"><i class="fa-solid fa-chevron-left"></i></button>
-                                <span class="bk-month-label" id="bkMonthLabel">June 2026</span>
-                                <button class="bk-nav-btn" id="bkNextMonth" aria-label="Next month"><i class="fa-solid fa-chevron-right"></i></button>
-                            </div>
-                    
-                            <div class="bk-weekdays">
-                                <span>Su</span><span>Mo</span><span>Tu</span><span>We</span><span>Th</span><span>Fr</span><span>Sa</span>
-                            </div>
-                    
-                            <div class="bk-grid" id="bkCalGrid"></div>
-                    
-                            <div class="bk-legend">
-                                <span><i class="bk-dot bk-dot--open"></i> Available</span>
-                                <span><i class="bk-dot bk-dot--full"></i> Fully booked</span>
-                                <span><i class="bk-dot bk-dot--past"></i> Unavailable</span>
-                            </div>
-
-                        </div>
-                
-                        <!-- STEP 3: TIME SLOTS -->
-                        <div class="bk-step bk-step--hidden" id="bkStepSlots">
-                            <button class="bk-back" id="bkBackToCal"><i class="fa-solid fa-arrow-left"></i> Back to calendar</button>
-                    
-                            <div class="bk-slots-head">
-                            <h3 id="bkSelectedDate">Friday, July 3</h3>
-                            <p id="bkSelectedOption">Solo &mdash; Regular &middot; &#8369;200/hr</p>
-                            </div>
-                    
-                            <div class="bk-slots-grid" id="bkSlotsGrid"></div>
-                    
-                            <div class="bk-summary" id="bkSummary">
-                                <div>
-                                    <p class="bk-summary-label">Selected</p>
-                                    <p class="bk-summary-value" id="bkSummaryText">No time selected yet</p>
-                                </div>
-                                <button class="bk-confirm" id="bkConfirm" disabled>Confirm &#8369;0</button>
-                            </div>
-                        </div>
-                
-                        <!-- STEP 3: CONFIRMATION -->
-                        <div class="bk-step bk-step--hidden" id="bkStepConfirm">
-                            <div class="bk-confirm-icon"><i class="fa-solid fa-check"></i></div>
-                            <h3>Booking request sent</h3>
-                            <p id="bkConfirmDetails">Billiards Room — Friday, July 3, 2026 at 3:00 PM</p>
-                            <p class="bk-confirm-note">We'll text or email you a confirmation shortly. Walk-ins are also welcome if your plans change.</p>
-                            <button class="bk-done" id="bkDone">Done</button>
-                        </div>
-                
-                    </div>
-                </div>
-                
-            </div>
 
             <!-- ABOUT -->
             <section id="about">
@@ -647,7 +646,6 @@
             document.getElementById('bkBackToCal').addEventListener('click', () => showStep('bkStepCalendar'));
             document.getElementById('bkConfirm').addEventListener('click', confirmBooking);
             document.getElementById('bkDone').addEventListener('click', closeBooking);
-
         </script>
     </body>
 </html>

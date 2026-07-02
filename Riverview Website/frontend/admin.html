@@ -194,7 +194,121 @@
             .hm-cell { height: 30px; border-radius: 4px; }
             .hm-labels { display: flex; justify-content: space-between; margin-top: 5px; font-size: .68rem; color: var(--muted); }
 
-            /* ── SETTINGS TOGGLES ── */
+            /* ── SETTINGS: SUB-TABS ── */
+            .set-tabs {
+            display: flex; background: var(--navy2); border: 1px solid var(--border);
+            border-radius: 12px; padding: 4px; gap: 4px;
+            }
+            .set-tab {
+            flex: 1; text-align: center; padding: 9px 0; border-radius: 9px;
+            font-size: .82rem; color: var(--muted); cursor: pointer; border: none;
+            background: none; font-family: 'Inter', sans-serif; font-weight: 500;
+            transition: background .15s, color .15s;
+            }
+            .set-tab:hover { color: #fff; }
+            .set-tab.active { background: rgba(0,201,167,.14); color: var(--teal); }
+            .set-subpanel { display: none; flex-direction: column; gap: 14px; }
+            .set-subpanel.active { display: flex; }
+
+            /* ── FACILITY CARDS ── */
+            .fac-head { display: flex; align-items: center; justify-content: space-between; }
+            .fac-head-left { display: flex; align-items: center; gap: 9px; }
+            .fac-head-left i { font-size: 17px; color: var(--teal); }
+            .fac-head-title { font-size: .92rem; font-weight: 600; color: #fff; }
+            .btn-teal {
+            display: flex; align-items: center; gap: 6px;
+            padding: 8px 15px; background: var(--teal); color: var(--navy);
+            border: none; border-radius: 9px; font-size: .8rem; font-weight: 600;
+            cursor: pointer; font-family: 'Inter', sans-serif; transition: opacity .2s;
+            white-space: nowrap;
+            }
+            .btn-teal:hover { opacity: .85; }
+            .btn-teal-outline {
+            display: flex; align-items: center; gap: 6px;
+            padding: 8px 15px; background: rgba(0,201,167,.08); color: var(--teal);
+            border: 1px solid rgba(0,201,167,.3); border-radius: 9px; font-size: .8rem; font-weight: 600;
+            cursor: pointer; font-family: 'Inter', sans-serif; transition: background .2s;
+            white-space: nowrap;
+            }
+            .btn-teal-outline:hover { background: rgba(0,201,167,.16); }
+
+            .fac-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+            .fac-card {
+            background: var(--navy2); border: 1px solid var(--border);
+            border-radius: 14px; overflow: hidden; display: flex; flex-direction: column;
+            }
+            .fac-img {
+            height: 110px; background: linear-gradient(135deg, var(--navy3), var(--navy2));
+            display: flex; align-items: center; justify-content: center;
+            font-size: .75rem; color: var(--muted); border-bottom: 1px solid var(--border);
+            }
+            .fac-body { padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; flex: 1; }
+            .fac-title-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+            .fac-name { font-size: .86rem; font-weight: 600; color: #fff; }
+            .fac-meta { font-size: .7rem; color: var(--muted); margin-top: 2px; }
+            .fac-price { font-size: .8rem; font-weight: 600; color: var(--teal); white-space: nowrap; }
+            .fac-desc { font-size: .72rem; color: #9fb0c3; line-height: 1.4; border-top: 1px solid var(--border); padding-top: 8px; }
+            .fac-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+            .fac-tag { font-size: .66rem; color: #c8d6e5; background: var(--navy3); border: 1px solid var(--border); padding: 3px 8px; border-radius: 6px; }
+            .fac-actions { display: flex; gap: 6px; margin-top: 2px; }
+            .fac-edit-btn {
+            flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
+            padding: 7px 0; border-radius: 8px; border: 1px solid rgba(0,201,167,.3);
+            background: rgba(0,201,167,.1); color: var(--teal); font-size: .75rem; font-weight: 600;
+            cursor: pointer; font-family: 'Inter', sans-serif;
+            }
+            .fac-edit-btn:hover { background: rgba(0,201,167,.18); }
+            .fac-icon-btn {
+            width: 32px; display: flex; align-items: center; justify-content: center;
+            border-radius: 8px; border: 1px solid var(--border); background: none;
+            color: var(--muted); cursor: pointer; font-size: .8rem;
+            }
+            .fac-icon-btn:hover { color: var(--teal); border-color: rgba(0,201,167,.3); }
+            .fac-icon-btn.del:hover { color: #ff6b6b; border-color: rgba(255,107,107,.3); }
+
+            /* ── OPERATING SCHEDULE ── */
+            .sched-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 24px; }
+            .sched-field { display: flex; flex-direction: column; gap: 6px; }
+            .sched-field label { font-size: .72rem; color: var(--muted); }
+            .sched-input-wrap {
+            display: flex; align-items: center; gap: 8px;
+            background: var(--navy3); border: 1px solid var(--border);
+            border-radius: 9px; padding: 9px 12px;
+            }
+            .sched-input-wrap i { color: var(--teal); font-size: 15px; }
+            .sched-input-wrap input, .sched-input-wrap select {
+            background: none; border: none; outline: none; color: #fff;
+            font-size: .85rem; font-family: 'Inter', sans-serif; width: 100%;
+            }
+            .sched-inline { display: flex; align-items: center; gap: 8px; }
+            .sched-inline select {
+            background: var(--navy3); border: 1px solid var(--border); border-radius: 8px;
+            padding: 8px 10px; color: #fff; font-size: .85rem; font-family: 'Inter', sans-serif; outline: none;
+            }
+            .sched-inline span { font-size: .78rem; color: var(--muted); }
+            .day-row { display: flex; gap: 8px; flex-wrap: wrap; }
+            .day-pill {
+            padding: 7px 16px; border-radius: 20px; font-size: .78rem; font-weight: 500;
+            cursor: pointer; border: 1px solid var(--border); background: var(--navy3); color: var(--muted);
+            font-family: 'Inter', sans-serif; transition: background .15s, color .15s;
+            }
+            .day-pill.on { background: var(--teal); color: var(--navy); border-color: var(--teal); }
+
+            /* ── HOLIDAY LIST ── */
+            .holiday-note { font-size: .78rem; color: var(--muted); }
+            .holiday-list { display: flex; flex-direction: column; gap: 8px; }
+            .holiday-item {
+            display: flex; align-items: center; gap: 12px;
+            padding: 12px 14px; background: var(--navy3);
+            border: 1px solid var(--border); border-radius: 10px;
+            }
+            .holiday-item i.ico { font-size: 16px; color: var(--teal); }
+            .holiday-name { font-size: .82rem; color: #fff; font-weight: 500; }
+            .holiday-date { font-size: .7rem; color: var(--muted); margin-top: 2px; }
+            .holiday-del { margin-left: auto; background: none; border: none; color: var(--muted); cursor: pointer; font-size: 15px; }
+            .holiday-del:hover { color: #ff6b6b; }
+
+            /* ── SETTINGS TOGGLES (legacy, still used inside pricing/promo/etc if needed) ── */
             .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
             .sgroup { display: flex; flex-direction: column; gap: 8px; }
             .sgroup-title { font-size: .78rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; margin-bottom: 2px; }
@@ -223,6 +337,32 @@
             outline: none;
             }
             .s-input input:focus, .s-input select:focus { border-color: var(--teal); }
+
+            /* ── PROMOTION ── */
+            .promo-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+            .promo-card {
+            background: var(--navy2); border: 1px solid var(--border); border-radius: 14px; padding: 14px;
+            display: flex; flex-direction: column; gap: 10px;
+            }
+            .promo-top { display: flex; align-items: center; justify-content: space-between; }
+            .promo-code {
+            font-family: 'Inter', sans-serif; font-size: .8rem; font-weight: 700; letter-spacing: .04em;
+            color: var(--teal); background: rgba(0,201,167,.1); border: 1px dashed rgba(0,201,167,.4);
+            padding: 4px 10px; border-radius: 7px;
+            }
+            .promo-name { font-size: .85rem; font-weight: 600; color: #fff; }
+            .promo-desc { font-size: .74rem; color: var(--muted); }
+            .promo-meta { display: flex; justify-content: space-between; font-size: .7rem; color: var(--muted); border-top: 1px solid var(--border); padding-top: 8px; }
+
+            /* ── AUDIT LOG ── */
+            .audit-item { display: flex; gap: 12px; padding: 11px 4px; border-bottom: 1px solid rgba(255,255,255,.05); }
+            .audit-item:last-child { border-bottom: none; }
+            .audit-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--teal); margin-top: 5px; flex-shrink: 0; }
+            .audit-dot.warn { background: #EF9F27; }
+            .audit-dot.del { background: #ff6b6b; }
+            .audit-text { font-size: .8rem; color: #c8d6e5; }
+            .audit-text b { color: #fff; }
+            .audit-time { font-size: .68rem; color: var(--muted); margin-top: 2px; }
 
             /* ── PROFILE ── */
             .profile-hero {
@@ -321,18 +461,26 @@
             .btn-confirm { background: var(--teal); border: none; color: var(--navy); font-weight: 600; }
 
             /* ── RESPONSIVE ── */
+            @media (max-width: 1100px) {
+            .fac-grid { grid-template-columns: repeat(2, 1fr); }
+            .promo-grid { grid-template-columns: 1fr 1fr; }
+            }
             @media (max-width: 900px) {
             .room-grid { grid-template-columns: 1fr 1fr; }
             .two-col   { grid-template-columns: 1fr; }
             .settings-grid { grid-template-columns: 1fr; }
             .p2col     { grid-template-columns: 1fr; }
             .metric-row { grid-template-columns: 1fr 1fr; }
+            .sched-2col { grid-template-columns: 1fr; }
+            .set-tabs { flex-wrap: wrap; }
             }
             @media (max-width: 640px) {
             #sidebar { display: none; }
             .room-grid { grid-template-columns: 1fr; }
             .rep-grid  { grid-template-columns: 1fr; }
             .metric-row { grid-template-columns: 1fr 1fr; }
+            .fac-grid { grid-template-columns: 1fr; }
+            .promo-grid { grid-template-columns: 1fr; }
             }
         </style>
     </head>
@@ -723,36 +871,238 @@
 
             <!-- ── SETTINGS ── -->
             <div class="panel" id="panel-settings">
+
+                <div class="set-tabs">
+                <button class="set-tab active" data-set="facilities">Facilities</button>
+                <button class="set-tab" data-set="pricing">Pricing</button>
+                <button class="set-tab" data-set="promotion">Promotion</button>
+                <button class="set-tab" data-set="audit">Audit Log</button>
+                </div>
+
+                <!-- FACILITIES -->
+                <div class="set-subpanel active" id="set-facilities">
+
+                <div class="card">
+                    <div class="fac-head">
+                    <div class="fac-head-left"><i class="ti ti-building"></i><span class="fac-head-title">Manage your Facility</span></div>
+                    <button class="btn-teal" onclick="openModal()"><i class="ti ti-plus"></i>Add Facility</button>
+                    </div>
+                </div>
+
+                <div class="fac-grid">
+                    <div class="fac-card">
+                    <div class="fac-img"><i class="ti ti-photo" style="font-size:22px;margin-right:6px;"></i>KTV Room Image</div>
+                    <div class="fac-body">
+                        <div class="fac-title-row">
+                        <div>
+                            <div class="fac-name">Family KTV Room</div>
+                            <div class="fac-meta">Entertainment · Max 15 pax</div>
+                        </div>
+                        <div class="fac-price">₱800/hr</div>
+                        </div>
+                        <div class="fac-desc">Spacious KTV room with high-end sound system, large screen, and party lighting.</div>
+                        <div class="fac-tags"><span class="fac-tag">Sound System</span><span class="fac-tag">Party Lights</span></div>
+                        <div class="fac-actions">
+                        <button class="fac-edit-btn"><i class="ti ti-edit"></i>Edit</button>
+                        <button class="fac-icon-btn"><i class="ti ti-copy"></i></button>
+                        <button class="fac-icon-btn del"><i class="ti ti-trash"></i></button>
+                        </div>
+                    </div>
+                    </div>
+
+                    <div class="fac-card">
+                    <div class="fac-img"><i class="ti ti-photo" style="font-size:22px;margin-right:6px;"></i>KTV Room Image</div>
+                    <div class="fac-body">
+                        <div class="fac-title-row">
+                        <div>
+                            <div class="fac-name">Family KTV Room</div>
+                            <div class="fac-meta">Entertainment · Max 15 pax</div>
+                        </div>
+                        <div class="fac-price">₱800/hr</div>
+                        </div>
+                        <div class="fac-desc">Spacious KTV room with high-end sound system, large screen, and party lighting.</div>
+                        <div class="fac-tags"><span class="fac-tag">Sound System</span><span class="fac-tag">Party Lights</span></div>
+                        <div class="fac-actions">
+                        <button class="fac-edit-btn"><i class="ti ti-edit"></i>Edit</button>
+                        <button class="fac-icon-btn"><i class="ti ti-copy"></i></button>
+                        <button class="fac-icon-btn del"><i class="ti ti-trash"></i></button>
+                        </div>
+                    </div>
+                    </div>
+
+                    <div class="fac-card">
+                    <div class="fac-img"><i class="ti ti-photo" style="font-size:22px;margin-right:6px;"></i>KTV Room Image</div>
+                    <div class="fac-body">
+                        <div class="fac-title-row">
+                        <div>
+                            <div class="fac-name">Family KTV Room</div>
+                            <div class="fac-meta">Entertainment · Max 15 pax</div>
+                        </div>
+                        <div class="fac-price">₱800/hr</div>
+                        </div>
+                        <div class="fac-desc">Spacious KTV room with high-end sound system, large screen, and party lighting.</div>
+                        <div class="fac-tags"><span class="fac-tag">Sound System</span><span class="fac-tag">Party Lights</span></div>
+                        <div class="fac-actions">
+                        <button class="fac-edit-btn"><i class="ti ti-edit"></i>Edit</button>
+                        <button class="fac-icon-btn"><i class="ti ti-copy"></i></button>
+                        <button class="fac-icon-btn del"><i class="ti ti-trash"></i></button>
+                        </div>
+                    </div>
+                    </div>
+
+                    <div class="fac-card">
+                    <div class="fac-img"><i class="ti ti-photo" style="font-size:22px;margin-right:6px;"></i>KTV Room Image</div>
+                    <div class="fac-body">
+                        <div class="fac-title-row">
+                        <div>
+                            <div class="fac-name">Family KTV Room</div>
+                            <div class="fac-meta">Entertainment · Max 15 pax</div>
+                        </div>
+                        <div class="fac-price">₱800/hr</div>
+                        </div>
+                        <div class="fac-desc">Spacious KTV room with high-end sound system, large screen, and party lighting.</div>
+                        <div class="fac-tags"><span class="fac-tag">Sound System</span><span class="fac-tag">Party Lights</span></div>
+                        <div class="fac-actions">
+                        <button class="fac-edit-btn"><i class="ti ti-edit"></i>Edit</button>
+                        <button class="fac-icon-btn"><i class="ti ti-copy"></i></button>
+                        <button class="fac-icon-btn del"><i class="ti ti-trash"></i></button>
+                        </div>
+                    </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-head"><span class="card-title"><i class="ti ti-clock" style="color:var(--teal);margin-right:6px;"></i>Operating Schedule</span></div>
+                    <div class="sched-2col">
+                    <div class="sched-field">
+                        <label>Opening Hour</label>
+                        <div class="sched-input-wrap"><i class="ti ti-clock"></i><input type="time" value="06:00"></div>
+                    </div>
+                    <div class="sched-field">
+                        <label>Closing Hour</label>
+                        <div class="sched-input-wrap"><i class="ti ti-clock"></i><input type="time" value="22:00"></div>
+                    </div>
+                    <div class="sched-field">
+                        <label>Max Advance Reservation</label>
+                        <div class="sched-inline">
+                        <select><option>15</option><option>30</option><option selected>30</option><option>60</option></select>
+                        <span>days in advance</span>
+                        </div>
+                    </div>
+                    <div class="sched-field">
+                        <label>Booking Cutoff Time</label>
+                        <div class="sched-inline">
+                        <select><option>1</option><option selected>2</option><option>4</option></select>
+                        <span>hours before facility opens</span>
+                        </div>
+                    </div>
+                    </div>
+                    <div class="sched-field" style="margin-top:4px;">
+                    <label>Open Days</label>
+                    <div class="day-row">
+                        <button class="day-pill on">Mon</button>
+                        <button class="day-pill on">Tue</button>
+                        <button class="day-pill on">Wed</button>
+                        <button class="day-pill on">Thu</button>
+                        <button class="day-pill on">Fri</button>
+                        <button class="day-pill on">Sat</button>
+                        <button class="day-pill">Sun</button>
+                    </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="fac-head">
+                    <div class="fac-head-left"><i class="ti ti-calendar-x"></i><span class="fac-head-title">Holiday & Closure Dates</span></div>
+                    <button class="btn-teal-outline" onclick="openModal()"><i class="ti ti-plus"></i>Add Date</button>
+                    </div>
+                    <div class="holiday-note">Customers cannot book on these dates. The reservation calendar will automatically block them.</div>
+                    <div class="holiday-list" style="margin-top:10px;">
+                    <div class="holiday-item">
+                        <i class="ti ti-calendar-off ico"></i>
+                        <div><div class="holiday-name">New Year's Day</div><div class="holiday-date">January 1, 2027 — Full Day Closure</div></div>
+                        <button class="holiday-del"><i class="ti ti-trash"></i></button>
+                    </div>
+                    <div class="holiday-item">
+                        <i class="ti ti-calendar-off ico"></i>
+                        <div><div class="holiday-name">Independence Day</div><div class="holiday-date">June 12, 2027 — Full Day Closure</div></div>
+                        <button class="holiday-del"><i class="ti ti-trash"></i></button>
+                    </div>
+                    <div class="holiday-item">
+                        <i class="ti ti-calendar-off ico"></i>
+                        <div><div class="holiday-name">Christmas Day</div><div class="holiday-date">December 25, 2026 — Full Day Closure</div></div>
+                        <button class="holiday-del"><i class="ti ti-trash"></i></button>
+                    </div>
+                    </div>
+                </div>
+
+                </div>
+
+                <!-- PRICING -->
+                <div class="set-subpanel" id="set-pricing">
                 <div class="settings-grid">
-                <div class="sgroup">
-                    <div class="sgroup-title">Notifications</div>
-                    <div class="s-row"><div><div class="s-label">Overdue room alerts</div><div class="s-sub">Notify when session exceeds booked time</div></div><div class="toggle on" onclick="this.classList.toggle('on');this.classList.toggle('off');"><div class="toggle-thumb"></div></div></div>
-                    <div class="s-row"><div><div class="s-label">New booking alerts</div><div class="s-sub">Ping on every new reservation</div></div><div class="toggle on" onclick="this.classList.toggle('on');this.classList.toggle('off');"><div class="toggle-thumb"></div></div></div>
-                    <div class="s-row"><div><div class="s-label">Failed login alerts</div><div class="s-sub">Email on unrecognized login attempt</div></div><div class="toggle off" onclick="this.classList.toggle('on');this.classList.toggle('off');"><div class="toggle-thumb"></div></div></div>
-                    <div class="s-row"><div><div class="s-label">Daily revenue digest</div><div class="s-sub">End-of-day summary email</div></div><div class="toggle on" onclick="this.classList.toggle('on');this.classList.toggle('off');"><div class="toggle-thumb"></div></div></div>
-                </div>
-                <div class="sgroup">
-                    <div class="sgroup-title">Operations</div>
-                    <div class="s-input"><label>Business hours</label><select><option>7:00 AM – 12:00 AM</option><option>6:00 AM – 12:00 AM</option><option>24 hours</option></select></div>
-                    <div class="s-input"><label>Default session length</label><select><option>1 hour</option><option>2 hours</option><option>3 hours</option></select></div>
-                    <div class="s-input"><label>Overdue grace period (mins)</label><input type="number" value="15" min="0" max="60"></div>
-                    <div class="s-row"><div><div class="s-label">Walk-in bookings</div><div class="s-sub">Allow sessions without reservation</div></div><div class="toggle on" onclick="this.classList.toggle('on');this.classList.toggle('off');"><div class="toggle-thumb"></div></div></div>
-                </div>
-                <div class="sgroup">
-                    <div class="sgroup-title">Pricing overrides</div>
+                    <div class="sgroup">
+                    <div class="sgroup-title">Base rates</div>
                     <div class="s-input"><label>Billiards — Solo Regular (₱/hr)</label><input type="number" value="200"></div>
+                    <div class="s-input"><label>Billiards — Big Room (₱/hr)</label><input type="number" value="250"></div>
                     <div class="s-input"><label>KTV Private Room (₱/hr)</label><input type="number" value="300"></div>
                     <div class="s-input"><label>Basketball Court AM (₱/hr)</label><input type="number" value="350"></div>
+                    <div class="s-input"><label>Basketball Court PM (₱/hr)</label><input type="number" value="400"></div>
                     <div class="s-input"><label>VIP Package (₱/hr)</label><input type="number" value="400"></div>
+                    </div>
+                    <div class="sgroup">
+                    <div class="sgroup-title">Surcharges & discounts</div>
+                    <div class="s-row"><div><div class="s-label">Peak hour surcharge</div><div class="s-sub">Apply extra fee 7–9 PM</div></div><div class="toggle on" onclick="this.classList.toggle('on');this.classList.toggle('off');"><div class="toggle-thumb"></div></div></div>
+                    <div class="s-input"><label>Peak surcharge (%)</label><input type="number" value="15"></div>
+                    <div class="s-row"><div><div class="s-label">Weekend pricing</div><div class="s-sub">Different rate Sat–Sun</div></div><div class="toggle off" onclick="this.classList.toggle('on');this.classList.toggle('off');"><div class="toggle-thumb"></div></div></div>
+                    <div class="s-row"><div><div class="s-label">Group discount</div><div class="s-sub">Auto-apply for 3+ hour bookings</div></div><div class="toggle on" onclick="this.classList.toggle('on');this.classList.toggle('off');"><div class="toggle-thumb"></div></div></div>
+                    <button class="save-btn" style="margin-top:4px;">Save pricing</button>
+                    </div>
                 </div>
-                <div class="sgroup">
-                    <div class="sgroup-title">Security</div>
-                    <div class="s-row"><div><div class="s-label">Two-factor authentication</div><div class="s-sub">Require OTP on every login</div></div><div class="toggle off" onclick="this.classList.toggle('on');this.classList.toggle('off');"><div class="toggle-thumb"></div></div></div>
-                    <div class="s-row"><div><div class="s-label">Session timeout</div><div class="s-sub">Auto-logout after 30 min idle</div></div><div class="toggle on" onclick="this.classList.toggle('on');this.classList.toggle('off');"><div class="toggle-thumb"></div></div></div>
-                    <div class="s-input"><label>Admin email</label><input type="email" value="demotest@gmail.com"></div>
-                    <button class="save-btn" style="margin-top:4px;">Save all settings</button>
+                </div>
+
+                <!-- PROMOTION -->
+                <div class="set-subpanel" id="set-promotion">
+                <div class="fac-head">
+                    <div class="fac-head-left"><i class="ti ti-discount-2"></i><span class="fac-head-title">Active Promotions</span></div>
+                    <button class="btn-teal" onclick="openModal()"><i class="ti ti-plus"></i>New Promo</button>
+                </div>
+                <div class="promo-grid">
+                    <div class="promo-card">
+                    <div class="promo-top"><span class="promo-code">RIVER10</span><span class="pill pill-active">Active</span></div>
+                    <div class="promo-name">10% Off Weekday Bookings</div>
+                    <div class="promo-desc">Applies to all rooms Mon–Thu, min. 2 hour booking.</div>
+                    <div class="promo-meta"><span>Used 34 times</span><span>Ends Jul 31</span></div>
+                    </div>
+                    <div class="promo-card">
+                    <div class="promo-top"><span class="promo-code">KTVFAM20</span><span class="pill pill-active">Active</span></div>
+                    <div class="promo-name">₱20 Off Family KTV</div>
+                    <div class="promo-desc">Flat discount on Family KTV Room bookings of 3+ hours.</div>
+                    <div class="promo-meta"><span>Used 12 times</span><span>Ends Aug 15</span></div>
+                    </div>
+                    <div class="promo-card">
+                    <div class="promo-top"><span class="promo-code">SUMMER25</span><span class="pill pill-pending">Scheduled</span></div>
+                    <div class="promo-name">Summer Court Special</div>
+                    <div class="promo-desc">25% off Basketball Court AM sessions.</div>
+                    <div class="promo-meta"><span>Starts Jul 10</span><span>Ends Aug 30</span></div>
+                    </div>
                 </div>
                 </div>
+
+                <!-- AUDIT LOG -->
+                <div class="set-subpanel" id="set-audit">
+                <div class="card">
+                    <div class="card-head"><span class="card-title">Settings change history</span><span style="font-size:.72rem;color:var(--muted);">Last 30 days</span></div>
+                    <div>
+                    <div class="audit-item"><div class="audit-dot"></div><div><div class="audit-text"><b>Rivera Admin</b> updated KTV Private Room rate to ₱300/hr</div><div class="audit-time">Jun 25, 2026 · 9:12 AM</div></div></div>
+                    <div class="audit-item"><div class="audit-dot warn"></div><div><div class="audit-text"><b>Rivera Admin</b> changed closing hour from 12:00 AM to 10:00 PM</div><div class="audit-time">Jun 24, 2026 · 4:30 PM</div></div></div>
+                    <div class="audit-item"><div class="audit-dot"></div><div><div class="audit-text"><b>Rivera Admin</b> added holiday closure — Christmas Day</div><div class="audit-time">Jun 23, 2026 · 11:05 AM</div></div></div>
+                    <div class="audit-item"><div class="audit-dot del"></div><div><div class="audit-text"><b>Rivera Admin</b> removed promo code WELCOME5</div><div class="audit-time">Jun 21, 2026 · 2:47 PM</div></div></div>
+                    <div class="audit-item"><div class="audit-dot"></div><div><div class="audit-text"><b>Rivera Admin</b> added new facility — Family KTV Room</div><div class="audit-time">Jun 19, 2026 · 10:20 AM</div></div></div>
+                    </div>
+                </div>
+                </div>
+
             </div>
 
             <!-- ── PROFILE ── -->
@@ -847,6 +1197,21 @@
 
         document.querySelectorAll('.sb-item').forEach(btn => {
             btn.addEventListener('click', () => switchPanel(btn.dataset.panel));
+        });
+
+        /* ── Settings sub-tabs ── */
+        document.querySelectorAll('.set-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+            document.querySelectorAll('.set-tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.set-subpanel').forEach(p => p.classList.remove('active'));
+            tab.classList.add('active');
+            document.getElementById('set-' + tab.dataset.set).classList.add('active');
+            });
+        });
+
+        /* ── Day pill toggles ── */
+        document.querySelectorAll('.day-pill').forEach(p => {
+            p.addEventListener('click', () => p.classList.toggle('on'));
         });
 
         /* ── Live clock ── */

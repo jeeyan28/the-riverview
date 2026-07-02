@@ -329,7 +329,7 @@ nav a:hover, nav a.active { color: var(--navy); background: var(--card); }
     font-size: 1.25rem; color: #fff; font-weight: 600;
 }
  
-.bk-body { padding: 0 1.75rem 1.75rem; }
+.bk-body { padding: 0 1.75rem 1.75rem; min-height: 470px; }
  
 .bk-step--hidden { display: none; }
  
@@ -496,7 +496,6 @@ nav a:hover, nav a.active { color: var(--navy); background: var(--card); }
     transition: background .2s;
 }
 .bk-done:hover { background: rgba(0,201,167,.2); }
-
  
 
 /* ─── SPACES SHOWCASE ─── */
