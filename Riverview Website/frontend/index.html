@@ -8,14 +8,14 @@
         <link rel="preconnect" href="https://fonts.googleapis.com">
         <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
-        <link rel="stylesheet" href="style.css">
+        <link rel="stylesheet" href="css/style.css">
     </head>
     <body>
 
         <!-- HEADER -->
         <header id="site-header">
             <div class="logo">
-                <img src="../frontend/assets/logo/logoo.png" alt="Riverview Logo">
+                <img src="assets/logo/logoo.png" alt="Riverview Logo">
                 <span class="logo-name">The Riverview</span>
             </div>
 
@@ -67,25 +67,25 @@
                         <!-- col 1 — low -->
                         <div class="wf-col wf-col--low">
                             <div class="wf-img wf-img--tall">
-                                <img src="/Riverview Website/frontend/assets/pictures/RiverView_4.jpg" alt="pictures">
+                                <img src="assets/pictures/RiverView_4.jpg" alt="pictures">
                             </div>
                         </div>
                         <!-- col 2 — mid -->
                         <div class="wf-col wf-col--mid">
                             <div class="wf-img wf-img--short">
-                                <img src="/Riverview Website/frontend/assets/pictures/RiverView_5.jpg" alt="Court">
+                                <img src="assets/pictures/RiverView_5.jpg" alt="Court">
                             </div>
                             <div class="wf-img wf-img--med">
-                                <img src="/Riverview Website/frontend/assets/pictures/RiverView_6.jpg" alt="VIP">
+                                <img src="assets/pictures/RiverView_6.jpg" alt="VIP">
                             </div>
                         </div>
                         <!-- col 3 — high, bleeds right -->
                         <div class="wf-col wf-col--high">
                             <div class="wf-img wf-img--med">
-                                <img src="/Riverview Website/frontend/assets/pictures/RiverView_7.jpg" alt="Billiards 2">
+                                <img src="assets/pictures/RiverView_7.jpg" alt="Billiards 2">
                             </div>
                             <div class="wf-img wf-img--short">
-                                <img src="/Riverview Website/frontend/assets/pictures/RiverView_8.jpg" alt="Court 2">
+                                <img src="assets/pictures/RiverView_8.jpg" alt="Court 2">
                             </div>
                         </div>
                     </div>
@@ -103,67 +103,9 @@
                     <p>All rooms available. Walk-ins welcome — reservations recommended on weekends.</p>
                 </div>
 
-                <div class="room-grid">
-
-                    <div class="room-card">
-                        <div class="room-card-img">
-                            <img src="/Riverview Website/frontend/assets/pictures/Billiard.jpg" alt="Billiards Room">
-                            <span class="room-card-badge">Popular</span>
-                        </div>
-                        <div class="room-card-body">
-                            <h3>Billiards Room</h3>
-                            <ul class="price-list">
-                                <li><span>Solo — Regular</span> <span class="price-amt">₱200/hr</span></li>
-                                <li><span>Solo — Big Room</span> <span class="price-amt">₱250/hr</span></li>
-                                <li><span>Shared Room</span> <span class="price-amt">₱150/hr</span></li>
-                            </ul>
-                            <a href="#" class="btn-select" onclick="openBooking(event, 'billiards')">Select Room</a>
-                        </div>
-                    </div>
-
-                    <div class="room-card">
-                        <div class="room-card-img">
-                            <img src="/Riverview Website/frontend/assets/pictures/KTV.jpg" alt="KTV Room">
-                        </div>
-                        <div class="room-card-body">
-                            <h3>KTV Room</h3>
-                            <ul class="price-list">
-                                <li><span>Private KTV Room</span> <span class="price-amt">₱300/hr</span></li>
-                            </ul>
-                            <a href="#" class="btn-select" onclick="openBooking(event, 'billiards')">Select Room</a>
-                        </div>
-                    </div>
-
-                    <div class="room-card">
-                        <div class="room-card-img">
-                            <img src="/Riverview Website/frontend/assets/pictures/basketball.jpg" alt="Basketball Court">
-                        </div>
-                        <div class="room-card-body">
-                            <h3>Basketball Court</h3>
-                            <ul class="price-list">
-                                <li><span>7AM – 5PM</span> <span class="price-amt">₱350/hr</span></li>
-                                <li><span>5PM – 12AM</span> <span class="price-amt">₱400/hr</span></li>
-                                <li><span>Official game (w/ scoreboard, timer & sound)</span> <span class="price-amt">₱500/hr</span></li>
-                            </ul>
-                            <a href="#" class="btn-select" onclick="openBooking(event, 'billiards')">Select Room</a>
-                        </div>
-                    </div>
-
-                    <div class="room-card">
-                        <div class="room-card-img">
-                            <img src="/Riverview Website/frontend/assets/pictures/VIP.jpg" alt="VIP Package">
-                            <span class="room-card-badge">Promo</span>
-                        </div>
-                        <div class="room-card-body">
-                            <h3>VIP Package</h3>
-                            <ul class="price-list">
-                                <li><span>KTV + Pool Table combo</span> <span class="price-amt">₱400/hr</span></li>
-                                <li><span>Max 10 pax (+₱50/head)</span> <span class="price-amt">—</span></li>
-                            </ul>
-                            <a href="#" class="btn-select" onclick="openBooking(event, 'billiards')">Select Room</a>
-                        </div>
-                    </div>
-
+                <!-- Populated dynamically by index.js from GET /api/rooms, grouped by category -->
+                <div class="room-grid" id="room-grid">
+                    <div style="text-align:center;color:#888;padding:32px 0;grid-column:1/-1;">Loading rooms…</div>
                 </div>
             </section>
 
@@ -227,6 +169,12 @@
                         </div>
                 
                         <div class="bk-slots-grid" id="bkSlotsGrid"></div>
+
+                        <!-- Guest details — required before a booking can be submitted -->
+                        <div class="bk-guest-fields" style="display:flex;flex-direction:column;gap:8px;margin:14px 0;">
+                            <input type="text" id="bkGuestName" placeholder="Full name" style="padding:10px 12px;border-radius:8px;border:1px solid #ddd;font-family:'Inter',sans-serif;font-size:.9rem;">
+                            <input type="text" id="bkGuestContact" placeholder="Phone number or email" style="padding:10px 12px;border-radius:8px;border:1px solid #ddd;font-family:'Inter',sans-serif;font-size:.9rem;">
+                        </div>
                 
                         <div class="bk-summary" id="bkSummary">
                         <div>
@@ -267,7 +215,7 @@
                                 <p>Multiple tables, great lighting, and a chill atmosphere. Perfect for a quick session or a long evening with friends.</p>
                             </div>
                             <div class="space-img">
-                                <img src="assets/billiards.png" alt="Billiards">
+                                <img src="assets/images/billiards.png" alt="Billiards">
                             </div>
                         </div>
                         <div class="space-row">
@@ -277,7 +225,7 @@
                                 <p>Full-size court with proper flooring. Includes scoreboard, timer, and sound system for official games.</p>
                             </div>
                             <div class="space-img">
-                                <img src="assets/court.png" alt="Basketball Court">
+                                <img src="assets/images/court.png" alt="Basketball Court">
                             </div>
                         </div>
                         <div class="space-row">
@@ -287,7 +235,7 @@
                                 <p>Private rooms with updated song libraries. Bring your barkada, bring your voice. No judgment here.</p>
                             </div>
                             <div class="space-img">
-                                <img src="assets/billiards.png" alt="KTV Room">
+                                <img src="assets/images/billiards.png" alt="KTV Room">
                             </div>
                         </div>
                     </div>
@@ -363,289 +311,6 @@
             </div>
         </footer>
 
-        <script>
-            const hamburger = document.getElementById('hamburger');
-            const mobileNav = document.getElementById('mobile-nav');
-            const navClose = document.getElementById('nav-close');
-
-            function openMobileNav() {
-                mobileNav.classList.add('open');
-                document.body.style.overflow = 'hidden';
-                hamburger.classList.add('active');
-            }
-            function closeMobileNav() {
-                mobileNav.classList.remove('open');
-                document.body.style.overflow = '';
-                hamburger.classList.remove('active');
-            }
-
-            hamburger.addEventListener('click', openMobileNav);
-            navClose.addEventListener('click', closeMobileNav);
-
-            // Header scroll shrink
-            const header = document.getElementById('site-header');
-            window.addEventListener('scroll', () => {
-                header.classList.toggle('scrolled', window.scrollY > 40);
-            });
-
-            // Active nav link
-            const sections = document.querySelectorAll('section[id]');
-            const navLinks = document.querySelectorAll('nav a');
-            window.addEventListener('scroll', () => {
-                let current = '';
-                sections.forEach(s => {
-                    if (window.scrollY >= s.offsetTop - 120) current = s.id;
-                });
-                navLinks.forEach(a => {
-                    a.classList.toggle('active', a.getAttribute('href') === '#' + current);
-                });
-            });
-
-            /* =================== BOOKING MODAL=================== */
-            // ---- Room definitions: match these keys to your onclick calls ----
-            const ROOMS = {
-                billiards: {
-                    name: 'Billiards Room', icon: 'fa-solid fa-circle-dot', openHour: 7, closeHour: 24,
-                    options: [
-                        { id: 'solo-regular', name: 'Solo \u2014 Regular', sub: 'One player, standard table', price: 200 },
-                        { id: 'solo-big', name: 'Solo \u2014 Big Room', sub: 'One player, larger table', price: 250 },
-                        { id: 'shared', name: 'Shared Room', sub: 'Shared with other guests', price: 150 }
-                    ]
-                },
-                ktv: {
-                    name: 'KTV Room', icon: 'fa-solid fa-music', openHour: 7, closeHour: 24,
-                    options: [
-                        { id: 'private', name: 'Private KTV Room', sub: 'Full room to yourselves', price: 300 }
-                    ]
-                },
-                basketball: {
-                    name: 'Basketball Court', icon: 'fa-solid fa-basketball', openHour: 7, closeHour: 24,
-                    options: [
-                        { id: 'day', name: '7AM \u2013 5PM', sub: 'Daytime rate', price: 350 },
-                        { id: 'night', name: '5PM \u2013 12AM', sub: 'Evening rate', price: 400 },
-                        { id: 'official', name: 'Official game', sub: 'Scoreboard, timer and sound', price: 500 }
-                    ]
-                },
-                vip: {
-                    name: 'VIP Package', icon: 'fa-solid fa-crown', openHour: 7, closeHour: 24,
-                    options: [
-                        { id: 'combo', name: 'KTV + Pool Table combo', sub: 'Max 10 pax, +\u20b150/head after', price: 400 }
-                    ]
-                }
-            };
-            
-            // ---- DUMMY reserved-slots data, keyed by "room|YYYY-MM-DD": [hour, hour, ...] ----
-            // Replace loadAvailability() below with a real fetch() to your backend.
-            const RESERVED = {
-                'billiards|2026-07-03': [10, 11, 18, 19, 20],
-                'billiards|2026-07-05': [7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23],
-                'ktv|2026-07-04': [20, 21],
-                'basketball|2026-07-10': [16, 17],
-            };
-            
-            let bkState = { room: null, viewDate: new Date(), selectedDate: null, selectedOption: null, selectedHour: null };
-            
-            function openBooking(e, roomKey) {
-                if (e) e.preventDefault();
-                bkState.room = roomKey;
-                bkState.selectedDate = null;
-                bkState.selectedOption = null;
-                bkState.selectedHour = null;
-                bkState.viewDate = new Date();
-            
-                const room = ROOMS[roomKey];
-                document.getElementById('bkRoomName').textContent = room.name;
-                document.getElementById('bkRoomIcon').innerHTML = `<i class="${room.icon}"></i>`;
-            
-                showStep('bkStepPrice');
-                renderPriceOptions();
-                document.getElementById('booking-modal').classList.add('open');
-                document.body.style.overflow = 'hidden';
-            }
-            
-            function closeBooking() {
-                document.getElementById('booking-modal').classList.remove('open');
-                document.body.style.overflow = '';
-            }
-            
-            function showStep(id) {
-                ['bkStepCalendar', 'bkStepPrice', 'bkStepSlots', 'bkStepConfirm'].forEach(s => {
-                    document.getElementById(s).classList.toggle('bk-step--hidden', s !== id);
-                });
-            }
-            
-            // ---- Availability lookup (swap this for a real API call later) ----
-            function loadAvailability(roomKey, dateStr) {
-                return RESERVED[`${roomKey}|${dateStr}`] || [];
-            }
-            
-            function dateKey(y, m, d) {
-                return `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-            }
-            
-            function renderCalendar() {
-                const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-                const y = bkState.viewDate.getFullYear();
-                const m = bkState.viewDate.getMonth();
-                document.getElementById('bkMonthLabel').textContent = `${months[m]} ${y}`;
-            
-                const firstDay = new Date(y, m, 1).getDay();
-                const daysInMonth = new Date(y, m + 1, 0).getDate();
-                const today = new Date(); today.setHours(0,0,0,0);
-            
-                const grid = document.getElementById('bkCalGrid');
-                grid.innerHTML = '';
-            
-                for (let i = 0; i < firstDay; i++) {
-                    const el = document.createElement('div');
-                    el.className = 'bk-day bk-day--empty';
-                    grid.appendChild(el);
-                }
-            
-                const room = ROOMS[bkState.room];
-                const totalHours = room.closeHour - room.openHour;
-            
-                for (let d = 1; d <= daysInMonth; d++) {
-                    const thisDate = new Date(y, m, d);
-                    const key = dateKey(y, m, d);
-                    const el = document.createElement('div');
-                    el.className = 'bk-day';
-                    el.textContent = d;
-            
-                    if (thisDate < today) {
-                        el.classList.add('bk-day--disabled');
-                    } else {
-                        const reserved = loadAvailability(bkState.room, key);
-                        if (reserved.length >= totalHours) {
-                            el.classList.add('bk-day--full');
-                        } else {
-                            el.classList.add('bk-day--open');
-                        }
-                        if (thisDate.getTime() === today.getTime()) el.classList.add('bk-day--today');
-                        el.addEventListener('click', () => selectDate(y, m, d));
-                    }
-                    grid.appendChild(el);
-                }
-            }
-            
-            function selectDate(y, m, d) {
-                bkState.selectedDate = { y, m, d };
-                bkState.selectedHour = null;
-            
-                const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-                const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-                const dateObj = new Date(y, m, d);
-                const label = `${days[dateObj.getDay()]}, ${months[m]} ${d}`;
-                document.getElementById('bkSelectedDate').textContent = label;
-                const opt = bkState.selectedOption;
-                document.getElementById('bkSelectedOption').textContent = `${opt.name} \u00b7 \u20b1${opt.price}/hr`;
-            
-                renderSlots();
-                showStep('bkStepSlots');
-            }
-            
-            function renderPriceOptions() {
-                const room = ROOMS[bkState.room];
-                const list = document.getElementById('bkPriceList');
-                list.innerHTML = '';
-            
-                room.options.forEach(opt => {
-                    const el = document.createElement('div');
-                    el.className = 'bk-price-card';
-                    el.innerHTML = `
-                        <div>
-                            <p class="bk-price-name">${opt.name}</p>
-                            <p class="bk-price-sub">${opt.sub}</p>
-                        </div>
-                        <span class="bk-price-amt">\u20b1${opt.price}/hr</span>
-                    `;
-                    el.addEventListener('click', () => selectOption(opt));
-                    list.appendChild(el);
-                });
-            }
-            
-            function selectOption(opt) {
-                bkState.selectedOption = opt;
-                document.getElementById('bkCalSelectedOption').textContent = `${opt.name} \u00b7 \u20b1${opt.price}/hr`;
-                bkState.viewDate = new Date();
-                renderCalendar();
-                showStep('bkStepCalendar');
-            }
-            
-            function renderSlots() {
-                const { y, m, d } = bkState.selectedDate;
-                const key = dateKey(y, m, d);
-                const reserved = loadAvailability(bkState.room, key);
-                const room = ROOMS[bkState.room];
-            
-                const grid = document.getElementById('bkSlotsGrid');
-                grid.innerHTML = '';
-            
-                for (let h = room.openHour; h < room.closeHour; h++) {
-                    const isReserved = reserved.includes(h);
-                    const label = formatHour(h);
-                    const el = document.createElement('div');
-                    el.className = 'bk-slot' + (isReserved ? ' bk-slot--reserved' : '');
-                    el.textContent = label;
-                    if (!isReserved) {
-                        el.addEventListener('click', () => selectHour(h, el));
-                    }
-                    grid.appendChild(el);
-                }
-            
-                document.getElementById('bkSummaryText').textContent = 'No time selected yet';
-                document.getElementById('bkConfirm').disabled = true;
-                document.getElementById('bkConfirm').textContent = 'Confirm \u20b10';
-            }
-            
-            function selectHour(h, el) {
-                document.querySelectorAll('.bk-slot').forEach(s => s.classList.remove('bk-slot--selected'));
-                el.classList.add('bk-slot--selected');
-                bkState.selectedHour = h;
-                const price = bkState.selectedOption.price;
-                document.getElementById('bkSummaryText').textContent = formatHour(h) + ' \u2013 ' + formatHour(h + 1);
-                document.getElementById('bkConfirm').disabled = false;
-                document.getElementById('bkConfirm').textContent = `Confirm \u20b1${price}`;
-            }
-            
-            function formatHour(h) {
-                const hh = h % 24;
-                const period = hh >= 12 ? 'PM' : 'AM';
-                let display = hh % 12;
-                if (display === 0) display = 12;
-                return `${display}:00 ${period}`;
-            }
-            
-            function confirmBooking() {
-                const { y, m, d } = bkState.selectedDate;
-                const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-                const room = ROOMS[bkState.room];
-                const opt = bkState.selectedOption;
-                const text = `${room.name} (${opt.name}) \u2014 ${months[m]} ${d}, ${y} at ${formatHour(bkState.selectedHour)} \u00b7 \u20b1${opt.price}`;
-                document.getElementById('bkConfirmDetails').textContent = text;
-                showStep('bkStepConfirm');
-            
-                // ---- This is where you'd POST the booking to your backend ----
-                // fetch('/api/bookings', { method: 'POST', body: JSON.stringify({...}) })
-            }
-            
-            // ---- wire up events ----
-            document.getElementById('bkClose').addEventListener('click', closeBooking);
-            document.getElementById('booking-modal').addEventListener('click', (e) => {
-                if (e.target.id === 'booking-modal') closeBooking();
-            });
-            document.getElementById('bkPrevMonth').addEventListener('click', () => {
-                bkState.viewDate.setMonth(bkState.viewDate.getMonth() - 1);
-                renderCalendar();
-            });
-            document.getElementById('bkNextMonth').addEventListener('click', () => {
-                bkState.viewDate.setMonth(bkState.viewDate.getMonth() + 1);
-                renderCalendar();
-            });
-            document.getElementById('bkBackToPriceFromCal').addEventListener('click', () => showStep('bkStepPrice'));
-            document.getElementById('bkBackToCal').addEventListener('click', () => showStep('bkStepCalendar'));
-            document.getElementById('bkConfirm').addEventListener('click', confirmBooking);
-            document.getElementById('bkDone').addEventListener('click', closeBooking);
-        </script>
+        <script src="js/index.js"></script>
     </body>
 </html>

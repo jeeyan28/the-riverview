@@ -107,7 +107,7 @@ nav a:hover, nav a.active { color: var(--navy); background: var(--card); }
 .hero-bg {
     position: absolute;
     inset: 0;
-    background: url('assets/main.png') center/cover no-repeat;
+    background: url('../assets/images/main.png') center/cover no-repeat;
     opacity: .15;
 }
 
