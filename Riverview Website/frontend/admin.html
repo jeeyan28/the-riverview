@@ -126,7 +126,7 @@
                 </div>
             </div>
 
-            <!-- ── ROOM MONITOR ── -->
+            <!-- ── ROOM MONITOR ── --> 
             <div class="panel" id="panel-monitor">
                 <div style="display:flex;align-items:center;justify-content:space-between;">
                 <span style="font-size:.78rem;color:var(--muted);">Live monitoring — updates every minute</span>
@@ -145,8 +145,11 @@
                     <select id="bk-filter-status" style="font-size:.78rem;padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:var(--navy3);color:#c8d6e5;font-family:'Inter',sans-serif;">
                     <option value="">All Status</option><option value="Active">Active</option><option value="Pending">Pending</option><option value="Done">Done</option><option value="Overdue">Overdue</option>
                     </select>
-                    <select id="bk-filter-category" style="font-size:.78rem;padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:var(--navy3);color:#c8d6e5;font-family:'Inter',sans-serif;">
-                    <option value="">All Rooms</option><option value="Billiards">Billiards</option><option value="KTV">KTV</option><option value="Basketball Court">Basketball Court</option><option value="VIP Package">VIP Package</option>
+                    <select id="bk-filter-status" style="font-size:.78rem;padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:var(--navy3);color:#c8d6e5;font-family:'Inter',sans-serif;">
+                    <option value="">All Status</option><option value="Active">Active</option><option value="Pending">Pending</option><option value="Done">Done</option><option value="Overdue">Overdue</option>
+                    </select>
+                    <select id="bk-filter-room" style="font-size:.78rem;padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:var(--navy3);color:#c8d6e5;font-family:'Inter',sans-serif;">
+                    <option value="">All Rooms</option>
                     </select>
                 </div>
                 <button onclick="openModal()" style="display:flex;align-items:center;gap:6px;padding:7px 14px;background:rgba(0,201,167,.1);border:1px solid rgba(0,201,167,.3);border-radius:9px;font-size:.78rem;color:var(--teal);cursor:pointer;font-family:'Inter',sans-serif;"><i class="ti ti-plus"></i>Manual Booking</button>
@@ -483,66 +486,69 @@
 
         <!-- ── FACILITY EDIT / ADD MODAL ── -->
         <div class="modal-bg" id="facility-modal">
-        <div class="modal modal-lg">
-            <div class="modal-lg-title" id="fm-title">Edit Facility</div>
-            <div class="modal-lg-sub" id="fm-sub">Update facility information, status and settings.</div>
+            <div class="modal modal-lg">
+                <div class="modal-lg-title" id="fm-title">Edit Facility</div>
+                <div class="modal-lg-sub" id="fm-sub">Update facility information, pricing tiers, and features.</div>
 
-            <div class="frow">
-            <div class="ffield"><label class="flabel">Facility Name</label><input type="text" id="fm-name" placeholder="Enter here"></div>
-            <div class="ffield"><label class="flabel">Category</label>
-                <select id="fm-category">
-                <option>Billiards</option>
-                <option>KTV</option>
-                <option>Basketball Court</option>
-                <option>VIP Package</option>
-                </select>
-            </div>
-            </div>
+                <div class="frow">
+                <div class="ffield"><label class="flabel">Facility Name</label><input type="text" id="fm-name" placeholder="e.g. Billiards"></div>
+                <div class="ffield"><label class="flabel">Room Number</label><input type="text" id="fm-room" placeholder="e.g. Room 3"></div>
+                </div>
 
-            <div class="frow">
-            <div class="ffield"><label class="flabel">Room Number</label><input type="text" id="fm-room" placeholder="Enter here"></div>
-            <div class="ffield"><label class="flabel">Maximum Capacity</label><input type="text" id="fm-capacity" placeholder="Enter here"></div>
-            </div>
+                <div class="ffield">
+                <label class="flabel">Description</label>
+                <textarea id="fm-desc" placeholder="Short description guests will see"></textarea>
+                </div>
 
-            <div class="ffield">
-            <label class="flabel">Description</label>
-            <textarea id="fm-desc" placeholder="Enter here"></textarea>
-            </div>
+                <!-- Pricing tiers -->
+                <div class="ffield">
+                <div class="flabel-row">
+                    <label class="flabel">Pricing Tiers</label>
+                    <span class="flabel-hint">Each tier needs a name, rate, and pax allowance — this is what guests pick from</span>
+                </div>
+                <div id="fm-variant-list" class="variant-list"></div>
+                <button type="button" class="add-row-btn" onclick="addVariantRow()"><i class="ti ti-plus"></i>Add pricing tier</button>
+                </div>
 
-            <div class="frow">
-            <div class="ffield"><label class="flabel">Price (₱/hr)</label><input type="number" id="fm-price" placeholder="0" min="0"></div>
-            <div class="ffield"><label class="flabel">Status</label>
-                <select id="fm-status">
-                <option>Available</option>
-                <option>Occupied</option>
-                <option>Under Maintenance</option>
-                <option>Inactive</option>
-                </select>
-            </div>
-            </div>
+                <div class="frow">
+                <div class="ffield"><label class="flabel">Base Price (₱/hr)</label><input type="number" id="fm-price" placeholder="0" min="0"></div>
+                <div class="ffield"><label class="flabel">Status</label>
+                    <select id="fm-status">
+                    <option>Available</option>
+                    <option>Occupied</option>
+                    <option>Under Maintenance</option>
+                    <option>Inactive</option>
+                    </select>
+                </div>
+                </div>
+                <div class="field-note">Base price is used only when no pricing tiers are set.</div>
 
-            <div class="ffield">
-            <label class="flabel">Edit Image</label>
-            <div class="upload-box" id="fm-upload-box" onclick="document.getElementById('fm-image-input').click()">
-                <img id="fm-image-preview" style="display:none;max-height:90px;border-radius:6px;margin-bottom:6px;object-fit:cover;">
-                <i class="ti ti-photo" id="fm-upload-icon"></i>
-                <div class="up-title" id="fm-upload-title">Click to upload facility images</div>
-                <div class="up-sub">PNG, JPG up to 10MB</div>
-            </div>
-            <input type="file" id="fm-image-input" accept="image/png,image/jpeg" style="display:none;">
-            </div>
+                <div class="ffield">
+                <label class="flabel">Facility Image</label>
+                <div class="upload-box" id="fm-upload-box" onclick="document.getElementById('fm-image-input').click()">
+                    <img id="fm-image-preview" style="display:none;max-height:110px;border-radius:8px;margin-bottom:8px;object-fit:cover;">
+                    <i class="ti ti-photo" id="fm-upload-icon"></i>
+                    <div class="up-title" id="fm-upload-title">Click to upload facility image</div>
+                    <div class="up-sub">PNG, JPG up to 10MB</div>
+                </div>
+                <input type="file" id="fm-image-input" accept="image/png,image/jpeg" style="display:none;">
+                </div>
 
-            <div class="ffield" style="margin-bottom:22px;">
-            <label class="flabel">Additional Features</label>
-            <input type="text" id="fm-features" placeholder="Air-conditioned, Speaker, and TV">
-            </div>
+                <div class="ffield" style="margin-bottom:22px;">
+                <label class="flabel">Additional Features</label>
+                <div id="fm-feature-chips" class="chip-list"></div>
+                <div class="chip-input-row">
+                    <input type="text" id="fm-feature-input" placeholder="e.g. Air-conditioned, Free WiFi — press Enter to add">
+                    <button type="button" class="chip-add-btn" onclick="addFeatureChip()"><i class="ti ti-plus"></i></button>
+                </div>
+                </div>
 
-            <div class="modal-actions-split">
-            <button class="btn-remove" id="fm-remove-btn" onclick="removeFacility()">Remove</button>
-            <button class="btn-save" id="fm-save-btn" onclick="saveFacility()">Save Changes</button>
+                <div class="modal-actions-split">
+                <button class="btn-remove" id="fm-remove-btn" onclick="removeFacility()">Remove</button>
+                <button class="btn-save" id="fm-save-btn" onclick="saveFacility()">Save Changes</button>
+                </div>
             </div>
-        </div>
-        </div>
+            </div>
         <script src="js/admin.js"></script>
     </body>
 </html>

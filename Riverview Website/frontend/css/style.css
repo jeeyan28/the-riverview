@@ -254,6 +254,21 @@ nav a:hover, nav a.active { color: var(--navy); background: var(--card); }
 .room-card-body { padding: 1.25rem 1.25rem 1.5rem; display: flex; flex-direction: column; flex: 1; }
 .room-card-body h3 { font-family: 'Playfair Display', serif; font-size: 1.2rem; color: #fff; margin-bottom: 1rem; }
 
+.room-card-status{
+    display:inline-block; font-size:.68rem; font-weight:600; padding:3px 10px;
+    border-radius:20px; margin-bottom:.85rem; width:fit-content;
+    letter-spacing:.03em; text-transform:uppercase;
+}
+.room-status-available{ background:rgba(0,201,167,.15); color:#00C9A7; }
+.room-status-occupied{ background:rgba(55,138,221,.15); color:#378ADD; }
+.room-status-maintenance{ background:rgba(239,159,39,.15); color:#EF9F27; }
+.room-status-inactive{ background:rgba(138,155,176,.15); color:#8A9BB0; }
+
+.room-card-desc{
+    font-size:.78rem; color:var(--muted); line-height:1.55;
+    margin-bottom:.9rem;
+}
+
 .price-list { list-style: none; display: flex; flex-direction: column; gap: .5rem; margin-bottom: 1.5rem; flex: 1; }
 .price-list li {
     font-size: .8rem; color: var(--muted);
@@ -261,6 +276,8 @@ nav a:hover, nav a.active { color: var(--navy); background: var(--card); }
     gap: .5rem; padding-bottom: .5rem;
     border-bottom: 1px solid rgba(255,255,255,.06);
 }
+.price-list li .price-name{ color:#dfe3ec; font-weight:500; display:block; }
+.price-list li .price-pax{ color:var(--muted); font-size:.7rem; display:block; margin-top:1px; }
 .price-list li:last-child { border-bottom: none; padding-bottom: 0; }
 .price-list .price-amt { color: var(--teal); font-weight: 600; white-space: nowrap; font-size: .78rem; }
 

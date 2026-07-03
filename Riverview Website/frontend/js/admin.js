@@ -4,9 +4,58 @@ const SERVER_ORIGIN = API_BASE.replace(/\/api$/, ''); // used to build full URLs
 
 function resolveImageUrl(image) {
     if (!image) return '';
-    if (image.startsWith('http://') || image.startsWith('https://')) return image;
+    if (image.startsWith('http://') || image.startsWith('https://') || image.startsWith('data:')) return image;
     return `${SERVER_ORIGIN}${image}`;
 }
+
+/* ── Demo data — shown only if the backend at API_BASE can't be reached,
+   so the panel still looks right while you preview or design against it. ── */
+const DEMO_ROOMS = [
+    {
+        _id: 'demo-1', name: 'Family KTV Room', roomNumber: 'KTV-01',
+        price: 200, status: 'Available',
+        description: 'Spacious KTV room with high-end sound system, large screen, and party lighting.',
+        features: ['Sound System', 'Party Lights', 'Air-conditioned'],
+        variants: [
+            { label: 'Solo — Regular', price: 200, pax: '4 pax' },
+            { label: 'Big Room', price: 250, pax: '15 pax' }
+        ],
+        image: ''
+    },
+    {
+        _id: 'demo-2', name: 'Classic Billiards Table', roomNumber: 'BIL-02',
+        price: 200, status: 'Occupied',
+        description: 'Regulation-size table in a quiet, air-conditioned corner room.',
+        features: ['Air-conditioned', 'Cue Rental Included'],
+        variants: [
+            { label: 'Solo — Regular', price: 200, pax: '2 pax' },
+            { label: 'Big Room', price: 250, pax: '6 pax' }
+        ],
+        image: ''
+    },
+    {
+        _id: 'demo-3', name: 'Outdoor Basketball Court', roomNumber: 'CRT-01',
+        price: 350, status: 'Available',
+        description: 'Full-size outdoor court with lighting for evening games.',
+        features: ['Floodlights', 'Scoreboard'],
+        variants: [
+            { label: 'Morning (AM)', price: 350, pax: '20 pax' },
+            { label: 'Evening (PM)', price: 400, pax: '20 pax' }
+        ],
+        image: ''
+    },
+    {
+        _id: 'demo-4', name: 'VIP Lounge Package', roomNumber: 'VIP-01',
+        price: 400, status: 'Under Maintenance',
+        description: 'Private lounge bundling KTV, billiards, and a dedicated server.',
+        features: ['Private Bar', 'Dedicated Staff', 'Sound System'],
+        variants: [
+            { label: 'Standard', price: 400, pax: '10 pax' }
+        ],
+        image: ''
+    }
+];
+let usingDemoData = false;
 
 /* ── Navigation ── */
 const titles = {
@@ -65,17 +114,43 @@ async function fetchRooms() {
     try {
         const res = await fetch(`${API_BASE}/rooms`);
         if (!res.ok) throw new Error('Failed to load rooms');
-        roomsCache = await res.json();
+        const data = await res.json();
+        roomsCache = normalizeRooms(data);
+        usingDemoData = false;
         return roomsCache;
     } catch (err) {
-        console.error(err);
-        return [];
+        console.warn('Could not reach the rooms API — showing demo data instead.', err);
+        roomsCache = normalizeRooms(DEMO_ROOMS);
+        usingDemoData = true;
+        return roomsCache;
     }
+}
+
+/* Make sure every room has the shape the UI expects, even if the backend
+   hasn't been updated with the new `variants` / `features` fields yet. */
+function normalizeRooms(rooms) {
+    return (rooms || []).map(r => ({
+        ...r,
+        capacity: r.capacity != null ? r.capacity : '',
+        features: Array.isArray(r.features) ? r.features : (typeof r.features === 'string' && r.features
+            ? r.features.split(',').map(f => f.trim()).filter(Boolean) : []),
+        variants: Array.isArray(r.variants) ? r.variants : (typeof r.variants === 'string' && r.variants
+            ? safeParseJson(r.variants, []) : [])
+    }));
+}
+
+function safeParseJson(str, fallback) {
+    try { return JSON.parse(str); } catch { return fallback; }
 }
 
 /* ══════════════════════════════════════════
    ── SETTINGS → FACILITIES ──
    ══════════════════════════════════════════ */
+const statusClassMap = {
+    Available: 'st-available', Occupied: 'st-occupied',
+    'Under Maintenance': 'st-maintenance', Inactive: 'st-inactive'
+};
+
 async function renderFacilities() {
     const grid = document.getElementById('fac-grid');
     grid.innerHTML = '<div style="text-align:center;color:var(--muted);padding:24px 0;grid-column:1/-1;">Loading facilities…</div>';
@@ -86,44 +161,68 @@ async function renderFacilities() {
         return;
     }
 
-    grid.innerHTML = rooms.map(r => `
+    grid.innerHTML = rooms.map(r => {
+        const hasVariants = r.variants && r.variants.length > 0;
+        const topPrice = hasVariants
+            ? `From ₱${Math.min(...r.variants.map(v => Number(v.price) || 0))}/hr`
+            : (r.price ? `₱${r.price}/hr` : '—');
+
+        const variantsHtml = hasVariants ? `
+            <div class="fac-variants">
+                ${r.variants.map(v => `
+                    <div class="fac-variant-row">
+                        <span class="fv-label">${escapeHtml(v.label)}${v.pax ? ' · ' + escapeHtml(v.pax) : ''}</span>
+                        <span class="fv-price">₱${v.price}/hr</span>
+                    </div>
+                `).join('')}
+            </div>` : '';
+
+        return `
         <div class="fac-card">
             <div class="fac-img">
                 ${r.image
                     ? `<img src="${resolveImageUrl(r.image)}" alt="${escapeHtml(r.name)}" style="width:100%;height:100%;object-fit:cover;">`
-                    : `<i class="ti ti-photo" style="font-size:22px;margin-right:6px;"></i>${escapeHtml(r.category)} Image`}
+                    : `<i class="ti ti-photo" style="font-size:22px;margin-right:6px;"></i>${escapeHtml(r.name)} Image`}
             </div>
             <div class="fac-body">
                 <div class="fac-title-row">
                     <div>
                         <div class="fac-name">${escapeHtml(r.name)}</div>
-                        <div class="fac-meta">${escapeHtml(r.category)} · ${escapeHtml(r.roomNumber)} · Max ${escapeHtml(r.capacity)}</div>
+                        <div class="fac-meta">${escapeHtml(r.roomNumber)}</div>
                     </div>
-                    <div class="fac-price">₱${r.price}/hr</div>
+                    <div class="fac-price">${topPrice}</div>
                 </div>
+                ${variantsHtml}
                 <div class="fac-desc">${escapeHtml(r.description || '')}</div>
+                <span class="fac-status ${statusClassMap[r.status] || 'st-available'}">${escapeHtml(r.status)}</span>
                 <div class="fac-tags">${(r.features || []).map(f => `<span class="fac-tag">${escapeHtml(f)}</span>`).join('')}</div>
                 <div class="fac-actions">
                     <button class="fac-edit-btn" onclick='openFacilityModal("edit", ${JSON.stringify(roomToFormData(r)).replace(/'/g, "&#39;")})'><i class="ti ti-edit"></i>Edit</button>
-                    <button class="fac-icon-btn" onclick="duplicateFacility('${r._id}')"><i class="ti ti-copy"></i></button>
-                    <button class="fac-icon-btn del" onclick="quickDeleteFacility('${r._id}')"><i class="ti ti-trash"></i></button>
+                    <button class="fac-icon-btn" onclick="duplicateFacility('${r._id}')" title="Duplicate"><i class="ti ti-copy"></i></button>
+                    <button class="fac-icon-btn del" onclick="quickDeleteFacility('${r._id}')" title="Remove"><i class="ti ti-trash"></i></button>
                 </div>
             </div>
         </div>
-    `).join('');
+    `}).join('');
+
+    if (usingDemoData) {
+        grid.insertAdjacentHTML('beforeend',
+            `<div style="grid-column:1/-1;font-size:.72rem;color:var(--muted);padding:4px 2px;">
+                <i class="ti ti-info-circle"></i> Showing sample facilities — connect the API at ${API_BASE} to manage live data.
+            </div>`);
+    }
 }
 
 function roomToFormData(r) {
     return {
         id: r._id,
         name: r.name,
-        category: r.category,
         room: r.roomNumber,
-        capacity: r.capacity,
         desc: r.description || '',
         price: r.price,
         status: r.status,
-        features: (r.features || []).join(', '),
+        features: r.features || [],
+        variants: r.variants || [],
         image: r.image || ''
     };
 }
@@ -133,36 +232,45 @@ function escapeHtml(str) {
 }
 
 let currentFacilityId = null;
-let selectedImageFile = null; // the actual File object chosen in the modal, if any
+let selectedImageFile = null;   // the actual File object chosen in the modal, if any
+let currentVariants = [];       // [{label, price}]
+let currentFeatures = [];       // ['Air-conditioned', ...]
 
+/* ── Modal open/close ── */
 function openFacilityModal(mode, data) {
     data = data || {};
     const isEdit = mode === 'edit';
     currentFacilityId = isEdit ? data.id : null;
     selectedImageFile = null;
+    currentVariants = isEdit && Array.isArray(data.variants) ? data.variants.map(v => ({ ...v })) : [];
+    currentFeatures = isEdit && Array.isArray(data.features) ? [...data.features] : [];
 
     document.getElementById('fm-title').textContent = isEdit ? 'Edit Facility' : 'Add Facility';
     document.getElementById('fm-sub').textContent = isEdit
-    ? 'Update facility information, status and settings.'
+    ? 'Update facility information, pricing tiers, and features.'
     : 'Add a new facility to your listing.';
     document.getElementById('fm-name').value = data.name || '';
-    document.getElementById('fm-category').value = data.category || 'Billiards';
     document.getElementById('fm-room').value = data.room || '';
-    document.getElementById('fm-capacity').value = data.capacity || '';
     document.getElementById('fm-desc').value = data.desc || '';
     document.getElementById('fm-price').value = data.price || '';
     document.getElementById('fm-status').value = data.status || 'Available';
-    document.getElementById('fm-features').value = data.features || '';
     document.getElementById('fm-remove-btn').style.display = isEdit ? 'inline-block' : 'none';
     document.getElementById('fm-save-btn').textContent = isEdit ? 'Save Changes' : 'Add Facility';
     document.getElementById('fm-image-input').value = '';
+    document.getElementById('fm-feature-input').value = '';
     setFacilityImagePreview(data.image ? resolveImageUrl(data.image) : '');
+
+    renderVariantRows();
+    renderFeatureChips();
+
     document.getElementById('facility-modal').classList.add('open');
 }
 function closeFacilityModal() {
     document.getElementById('facility-modal').classList.remove('open');
     currentFacilityId = null;
     selectedImageFile = null;
+    currentVariants = [];
+    currentFeatures = [];
 }
 document.getElementById('facility-modal').addEventListener('click', function(e) {
     if (e.target === this) closeFacilityModal();
@@ -180,7 +288,7 @@ function setFacilityImagePreview(url) {
     } else {
         preview.style.display = 'none';
         icon.style.display = '';
-        title.textContent = 'Click to upload facility images';
+        title.textContent = 'Click to upload facility image';
     }
 }
 
@@ -201,24 +309,99 @@ document.getElementById('fm-image-input').addEventListener('change', (e) => {
     setFacilityImagePreview(URL.createObjectURL(file));
 });
 
+/* ── Pricing tiers (sub-rooms) ── */
+function renderVariantRows() {
+    const list = document.getElementById('fm-variant-list');
+    if (!currentVariants.length) {
+        list.innerHTML = '<div class="variant-empty">No pricing tiers yet — add one for things like "Solo — Regular" or "Big Room".</div>';
+        return;
+    }
+    list.innerHTML = currentVariants.map((v, i) => `
+        <div class="variant-row">
+            <input type="text" class="variant-label" value="${escapeHtml(v.label)}" placeholder="e.g. Big Room"
+                oninput="updateVariant(${i}, 'label', this.value)">
+            <div class="variant-price-wrap">
+                <span>₱</span>
+                <input type="number" min="0" value="${v.price}" placeholder="0"
+                    oninput="updateVariant(${i}, 'price', this.value)">
+                <span>/hr</span>
+            </div>
+            <input type="text" class="variant-pax" value="${escapeHtml(v.pax || '')}" placeholder="e.g. 6 pax"
+                oninput="updateVariant(${i}, 'pax', this.value)">
+            <button type="button" class="variant-remove-btn" onclick="removeVariantRow(${i})" title="Remove tier"><i class="ti ti-trash"></i></button>
+        </div>
+    `).join('');
+}
+function addVariantRow() {
+    currentVariants.push({ label: '', price: '', pax: '' });
+    renderVariantRows();
+    const rows = document.querySelectorAll('#fm-variant-list .variant-label');
+    if (rows.length) rows[rows.length - 1].focus();
+}
+function updateVariant(i, field, value) {
+    if (!currentVariants[i]) return;
+    currentVariants[i][field] = field === 'price' ? value : value;
+}
+function removeVariantRow(i) {
+    currentVariants.splice(i, 1);
+    renderVariantRows();
+}
+
+/* ── Feature chips ── */
+function renderFeatureChips() {
+    const wrap = document.getElementById('fm-feature-chips');
+    wrap.innerHTML = currentFeatures.map((f, i) => `
+        <span class="chip">${escapeHtml(f)}<button type="button" onclick="removeFeatureChip(${i})" title="Remove"><i class="ti ti-x" style="font-size:11px;"></i></button></span>
+    `).join('');
+}
+function addFeatureChip() {
+    const input = document.getElementById('fm-feature-input');
+    const raw = input.value.trim();
+    if (!raw) return;
+    // allow comma-separated paste, e.g. "Aircon, Free WiFi"
+    raw.split(',').map(s => s.trim()).filter(Boolean).forEach(f => {
+        if (!currentFeatures.some(existing => existing.toLowerCase() === f.toLowerCase())) {
+            currentFeatures.push(f);
+        }
+    });
+    input.value = '';
+    renderFeatureChips();
+    input.focus();
+}
+function removeFeatureChip(i) {
+    currentFeatures.splice(i, 1);
+    renderFeatureChips();
+}
+document.getElementById('fm-feature-input').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); addFeatureChip(); }
+});
+
+/* ── Save / Remove ── */
 function readFacilityForm() {
     return {
         name: document.getElementById('fm-name').value.trim(),
-        category: document.getElementById('fm-category').value,
         roomNumber: document.getElementById('fm-room').value.trim(),
-        capacity: document.getElementById('fm-capacity').value.trim(),
         description: document.getElementById('fm-desc').value.trim(),
-        price: Number(document.getElementById('fm-price').value),
+        price: Number(document.getElementById('fm-price').value) || 0,
         status: document.getElementById('fm-status').value,
-        features: document.getElementById('fm-features').value
+        features: JSON.stringify(currentFeatures),
+        variants: JSON.stringify(
+            currentVariants
+                .filter(v => v.label.trim() !== '' || v.price !== '')
+                .map(v => ({ label: v.label.trim(), price: Number(v.price) || 0, pax: (v.pax || '').trim() }))
+        )
     };
 }
 
 async function saveFacility() {
     const payload = readFacilityForm();
 
-    if (!payload.name || !payload.roomNumber || !payload.capacity || !payload.price) {
-        alert('Please fill in name, room number, capacity, and price.');
+    if (!payload.name || !payload.roomNumber) {
+    alert('Please fill in facility name and room number.');
+    return;
+    }
+    if (!payload.price && JSON.parse(payload.variants).length === 0) {
+        alert('Add a base price, or at least one pricing tier.');
         return;
     }
 
@@ -228,6 +411,15 @@ async function saveFacility() {
     btn.disabled = true;
 
     try {
+        if (usingDemoData) {
+            // No live backend reachable — apply the change to the in-memory demo set
+            // so the UI still reflects the edit during preview.
+            applyDemoSave(payload);
+            closeFacilityModal();
+            await renderFacilities();
+            return;
+        }
+
         const url = currentFacilityId ? `${API_BASE}/rooms/${currentFacilityId}` : `${API_BASE}/rooms`;
         const method = currentFacilityId ? 'PUT' : 'POST';
 
@@ -254,9 +446,32 @@ async function saveFacility() {
     }
 }
 
+function applyDemoSave(payload) {
+    const record = {
+        name: payload.name, category: payload.category, roomNumber: payload.roomNumber,
+        capacity: payload.capacity, description: payload.description, price: payload.price,
+        status: payload.status, features: JSON.parse(payload.features), variants: JSON.parse(payload.variants),
+        image: selectedImageFile ? URL.createObjectURL(selectedImageFile) : (document.getElementById('fm-image-preview').src || '')
+    };
+    if (currentFacilityId) {
+        const idx = DEMO_ROOMS.findIndex(r => r._id === currentFacilityId);
+        if (idx !== -1) DEMO_ROOMS[idx] = { ...DEMO_ROOMS[idx], ...record };
+    } else {
+        DEMO_ROOMS.push({ _id: 'demo-' + Date.now(), ...record });
+    }
+}
+
 async function removeFacility() {
     if (!currentFacilityId) return closeFacilityModal();
     if (!confirm('Remove this facility? This cannot be undone.')) return;
+
+    if (usingDemoData) {
+        const idx = DEMO_ROOMS.findIndex(r => r._id === currentFacilityId);
+        if (idx !== -1) DEMO_ROOMS.splice(idx, 1);
+        closeFacilityModal();
+        await renderFacilities();
+        return;
+    }
 
     try {
         const res = await fetch(`${API_BASE}/rooms/${currentFacilityId}`, { method: 'DELETE' });
@@ -271,6 +486,14 @@ async function removeFacility() {
 
 async function quickDeleteFacility(id) {
     if (!confirm('Remove this facility? This cannot be undone.')) return;
+
+    if (usingDemoData) {
+        const idx = DEMO_ROOMS.findIndex(r => r._id === id);
+        if (idx !== -1) DEMO_ROOMS.splice(idx, 1);
+        await renderFacilities();
+        return;
+    }
+
     try {
         const res = await fetch(`${API_BASE}/rooms/${id}`, { method: 'DELETE' });
         if (!res.ok) throw new Error('Failed to delete facility.');
@@ -285,15 +508,23 @@ async function duplicateFacility(id) {
     const room = roomsCache.find(r => r._id === id);
     if (!room) return;
     const payload = {
-        name: room.name,
+        name: room.name + ' (Copy)',
         category: room.category,
-        roomNumber: room.roomNumber + ' (Copy)',
+        roomNumber: room.roomNumber,
         capacity: room.capacity,
         description: room.description,
         price: room.price,
         status: room.status,
-        features: room.features
+        features: JSON.stringify(room.features || []),
+        variants: JSON.stringify(room.variants || [])
     };
+
+    if (usingDemoData) {
+        DEMO_ROOMS.push({ _id: 'demo-' + Date.now(), ...payload, features: room.features || [], variants: room.variants || [], image: room.image });
+        await renderFacilities();
+        return;
+    }
+
     try {
         const res = await fetch(`${API_BASE}/rooms`, {
             method: 'POST',
@@ -459,7 +690,7 @@ async function renderRoomMonitor() {
             </div>
             <div class="rm-rows">
                 <div class="rm-row"><span class="lbl">Category</span><span class="val">${escapeHtml(r.category)}</span></div>
-                <div class="rm-row"><span class="lbl">Capacity</span><span class="val">${escapeHtml(r.capacity)}</span></div>
+                <div class="rm-row"><span class="lbl">Capacity</span><span class="val">${escapeHtml(String(r.capacity))}</span></div>
                 <div class="rm-row"><span class="lbl">Status</span><span class="val">${escapeHtml(r.status)}</span></div>
                 <div class="rm-row"><span class="lbl">Rate</span><span class="val">₱${r.price}/hr</span></div>
             </div>

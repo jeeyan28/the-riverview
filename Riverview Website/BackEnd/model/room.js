@@ -1,23 +1,24 @@
 const mongoose = require("mongoose");
 
+const variantSchema = new mongoose.Schema({
+  label: { type: String, trim: true },
+  price: { type: Number, min: 0 },
+  pax:   { type: String, trim: true } // e.g. "6 pax", "Up to 15"
+}, { _id: false });
+
 const roomSchema = new mongoose.Schema({
-  name:        { type: String, required: true, trim: true },
-  category:    {
-    type: String,
-    required: true,
-    enum: ["Billiards", "KTV", "Basketball Court", "VIP Package"]
-  },
-  roomNumber:  { type: String, required: true, trim: true }, // e.g. "Billiards #1", "KTV-01"
-  capacity:    { type: String, required: true, trim: true }, // e.g. "15 pax"
+  name:        { type: String, required: true, trim: true }, // this is now the facility identity — no more category
+  roomNumber:  { type: String, required: true, trim: true },
   description: { type: String, default: "" },
-  price:       { type: Number, required: true, min: 0 },     // ₱ per hour
+  price:       { type: Number, default: 0, min: 0 }, // fallback rate, used only if no pricing tiers exist
   status:      {
     type: String,
     enum: ["Available", "Occupied", "Under Maintenance", "Inactive"],
     default: "Available"
   },
   features:    [{ type: String }],
-  image:       { type: String, default: "" }, // filename or URL
+  variants:    [variantSchema],
+  image:       { type: String, default: "" },
   createdAt:   { type: Date, default: Date.now }
 });
 
