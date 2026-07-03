@@ -21,17 +21,14 @@ function closeMobileNav() {
     document.body.style.overflow = '';
     hamburger.classList.remove('active');
 }
-
 hamburger.addEventListener('click', openMobileNav);
 navClose.addEventListener('click', closeMobileNav);
 
-// Header scroll shrink
 const header = document.getElementById('site-header');
 window.addEventListener('scroll', () => {
     header.classList.toggle('scrolled', window.scrollY > 40);
 });
 
-// Active nav link
 const sections = document.querySelectorAll('section[id]');
 const navLinks = document.querySelectorAll('nav a');
 window.addEventListener('scroll', () => {
@@ -45,35 +42,24 @@ window.addEventListener('scroll', () => {
 });
 
 document.getElementById('login-button').addEventListener('click', function() {
-    window.location.href = 'login.html'; // change to your actual login page URL
+    window.location.href = 'login.html';
 });
 
 /* =================== ROOM CARDS (live from database) =================== */
-// Static per-category display config — image, icon, badge. Add a mapping here
-// whenever you introduce a brand-new category in the admin Facilities panel.
-const CATEGORY_META = {
-    'Billiards':         { image: 'assets/pictures/Billiard.jpg',   icon: 'fa-solid fa-circle-dot', badge: 'Popular' },
-    'KTV':               { image: 'assets/pictures/KTV.jpg',        icon: 'fa-solid fa-music',      badge: null },
-    'Basketball Court':  { image: 'assets/pictures/basketball.jpg', icon: 'fa-solid fa-basketball',  badge: null },
-    'VIP Package':       { image: 'assets/pictures/VIP.jpg',        icon: 'fa-solid fa-crown',       badge: 'Promo' }
+const statusPillClass = {
+    Available: 'room-status-available', Occupied: 'room-status-occupied',
+    'Under Maintenance': 'room-status-maintenance', Inactive: 'room-status-inactive'
 };
 
-// Populated by loadRooms(), grouped by category: { "Billiards": [roomDoc, roomDoc, ...], ... }
-let ROOMS_BY_CATEGORY = {};
+// Flat list of facility docs — no more category grouping
+let ROOMS = [];
 
 async function loadRooms() {
     const grid = document.getElementById('room-grid');
     try {
-        const res = await fetch(`${API_BASE}/rooms`, { });
+        const res = await fetch(`${API_BASE}/rooms`);
         if (!res.ok) throw new Error('Failed to load rooms');
-        const rooms = (await res.json()).filter(r => r.status !== 'Inactive');
-
-        ROOMS_BY_CATEGORY = {};
-        rooms.forEach(r => {
-            if (!ROOMS_BY_CATEGORY[r.category]) ROOMS_BY_CATEGORY[r.category] = [];
-            ROOMS_BY_CATEGORY[r.category].push(r);
-        });
-
+        ROOMS = (await res.json()).filter(r => r.status !== 'Inactive');
         renderRoomCards();
     } catch (err) {
         console.error(err);
@@ -83,34 +69,31 @@ async function loadRooms() {
 
 function renderRoomCards() {
     const grid = document.getElementById('room-grid');
-    const categories = Object.keys(ROOMS_BY_CATEGORY);
 
-    if (!categories.length) {
+    if (!ROOMS.length) {
         grid.innerHTML = '<div style="text-align:center;color:#888;padding:32px 0;grid-column:1/-1;">No rooms available yet — check back soon.</div>';
         return;
     }
 
-    grid.innerHTML = categories.map(category => {
-        const rooms = ROOMS_BY_CATEGORY[category];
-        const meta = CATEGORY_META[category] || { image: 'assets/pictures/Billiard.jpg', icon: 'fa-solid fa-circle-dot', badge: null };
+    grid.innerHTML = ROOMS.map(room => {
+        const hasVariants = room.variants && room.variants.length > 0;
+        const cardImage = room.image ? resolveImageUrl(room.image) : 'assets/pictures/Billiard.jpg';
 
-        // Prefer the actual uploaded image of the first room in this category;
-        // fall back to the static category placeholder only if none was uploaded.
-        const roomWithImage = rooms.find(r => r.image);
-        const cardImage = roomWithImage ? resolveImageUrl(roomWithImage.image) : meta.image;
+        const priceListHtml = hasVariants
+            ? room.variants.map(v => `<li><span>${escapeHtml(v.label)}${v.pax ? ' · ' + escapeHtml(v.pax) : ''}</span> <span class="price-amt">₱${v.price}/hr</span></li>`).join('')
+            : `<li><span>Standard</span> <span class="price-amt">₱${room.price || 0}/hr</span></li>`;
 
         return `
             <div class="room-card">
                 <div class="room-card-img">
-                    <img src="${cardImage}" alt="${category}">
-                    ${meta.badge ? `<span class="room-card-badge">${meta.badge}</span>` : ''}
+                    <img src="${cardImage}" alt="${escapeHtml(room.name)}">
                 </div>
                 <div class="room-card-body">
-                    <h3>${category}</h3>
-                    <ul class="price-list">
-                        ${rooms.map(r => `<li><span>${escapeHtml(r.name)}</span> <span class="price-amt">₱${r.price}/hr</span></li>`).join('')}
-                    </ul>
-                    <a href="#" class="btn-select" onclick="openBooking(event, '${category}')">Select Room</a>
+                    <h3>${escapeHtml(room.name)}</h3>
+                    <ul class="price-list">${priceListHtml}</ul>
+                    <p class="room-card-desc">${escapeHtml(room.description || '')}</p>
+                    <span class="room-card-status ${statusPillClass[room.status] || 'room-status-available'}">${escapeHtml(room.status)}</span>
+                    <a href="#" class="btn-select" onclick="openBooking(event, '${room._id}')">Select Room</a>
                 </div>
             </div>
         `;
@@ -125,8 +108,6 @@ function escapeHtml(str) {
 const OPEN_HOUR = 7;
 const CLOSE_HOUR = 24;
 
-// ---- Reserved-slots lookup, built from real bookings fetched from the API ----
-// Keyed by "roomId|YYYY-MM-DD": [hour, hour, ...]
 let RESERVED = {};
 
 async function loadAvailability(roomId, dateStr) {
@@ -152,20 +133,21 @@ async function loadAvailability(roomId, dateStr) {
     return RESERVED[key] || [];
 }
 
-let bkState = { category: null, room: null, viewDate: new Date(), selectedDate: null, selectedOption: null, selectedHour: null };
+let bkState = { room: null, viewDate: new Date(), selectedDate: null, selectedVariant: null, selectedHour: null };
 
-function openBooking(e, category) {
+function openBooking(e, roomId) {
     if (e) e.preventDefault();
-    bkState.category = category;
-    bkState.room = null;
+    const room = ROOMS.find(r => r._id === roomId);
+    if (!room) return;
+
+    bkState.room = room;
     bkState.selectedDate = null;
-    bkState.selectedOption = null;
+    bkState.selectedVariant = null;
     bkState.selectedHour = null;
     bkState.viewDate = new Date();
 
-    const meta = CATEGORY_META[category] || { icon: 'fa-solid fa-circle-dot' };
-    document.getElementById('bkRoomName').textContent = category;
-    document.getElementById('bkRoomIcon').innerHTML = `<i class="${meta.icon}"></i>`;
+    document.getElementById('bkRoomName').textContent = room.name;
+    document.getElementById('bkRoomIcon').innerHTML = `<i class="fa-solid fa-circle-dot"></i>`;
 
     showStep('bkStepPrice');
     renderPriceOptions();
@@ -189,29 +171,32 @@ function dateKey(y, m, d) {
 }
 
 function renderPriceOptions() {
-    const rooms = ROOMS_BY_CATEGORY[bkState.category] || [];
+    const room = bkState.room;
+    const options = (room.variants && room.variants.length)
+        ? room.variants
+        : [{ label: 'Standard', price: room.price || 0, pax: '' }];
+
     const list = document.getElementById('bkPriceList');
     list.innerHTML = '';
 
-    rooms.forEach(room => {
+    options.forEach(opt => {
         const el = document.createElement('div');
         el.className = 'bk-price-card';
         el.innerHTML = `
             <div>
-                <p class="bk-price-name">${escapeHtml(room.name)}</p>
-                <p class="bk-price-sub">${escapeHtml(room.roomNumber)}${room.description ? ' — ' + escapeHtml(room.description) : ''}</p>
+                <p class="bk-price-name">${escapeHtml(opt.label)}</p>
+                <p class="bk-price-sub">${opt.pax ? escapeHtml(opt.pax) : ''}</p>
             </div>
-            <span class="bk-price-amt">\u20b1${room.price}/hr</span>
+            <span class="bk-price-amt">\u20b1${opt.price}/hr</span>
         `;
-        el.addEventListener('click', () => selectOption(room));
+        el.addEventListener('click', () => selectOption(opt));
         list.appendChild(el);
     });
 }
 
-function selectOption(room) {
-    bkState.room = room;
-    bkState.selectedOption = { id: room._id, name: room.name, price: room.price };
-    document.getElementById('bkCalSelectedOption').textContent = `${room.name} \u00b7 \u20b1${room.price}/hr`;
+function selectOption(opt) {
+    bkState.selectedVariant = opt;
+    document.getElementById('bkCalSelectedOption').textContent = `${opt.label} \u00b7 \u20b1${opt.price}/hr`;
     bkState.viewDate = new Date();
     renderCalendar();
     showStep('bkStepCalendar');
@@ -236,8 +221,6 @@ function renderCalendar() {
         grid.appendChild(el);
     }
 
-    const totalHours = CLOSE_HOUR - OPEN_HOUR;
-
     for (let d = 1; d <= daysInMonth; d++) {
         const thisDate = new Date(y, m, d);
         const el = document.createElement('div');
@@ -247,7 +230,7 @@ function renderCalendar() {
         if (thisDate < today) {
             el.classList.add('bk-day--disabled');
         } else {
-            el.classList.add('bk-day--open'); // exact availability resolved when a date is clicked
+            el.classList.add('bk-day--open');
             if (thisDate.getTime() === today.getTime()) el.classList.add('bk-day--today');
             el.addEventListener('click', () => selectDate(y, m, d));
         }
@@ -264,8 +247,8 @@ async function selectDate(y, m, d) {
     const dateObj = new Date(y, m, d);
     const label = `${days[dateObj.getDay()]}, ${months[m]} ${d}`;
     document.getElementById('bkSelectedDate').textContent = label;
-    const opt = bkState.selectedOption;
-    document.getElementById('bkSelectedOption').textContent = `${opt.name} \u00b7 \u20b1${opt.price}/hr`;
+    const opt = bkState.selectedVariant;
+    document.getElementById('bkSelectedOption').textContent = `${opt.label} \u00b7 \u20b1${opt.price}/hr`;
 
     await renderSlots();
     showStep('bkStepSlots');
@@ -302,7 +285,7 @@ function selectHour(h, el) {
     document.querySelectorAll('.bk-slot').forEach(s => s.classList.remove('bk-slot--selected'));
     el.classList.add('bk-slot--selected');
     bkState.selectedHour = h;
-    const price = bkState.selectedOption.price;
+    const price = bkState.selectedVariant.price;
     document.getElementById('bkSummaryText').textContent = formatHour(h) + ' \u2013 ' + formatHour(h + 1);
     document.getElementById('bkConfirm').disabled = false;
     document.getElementById('bkConfirm').textContent = `Confirm \u20b1${price}`;
@@ -328,7 +311,7 @@ async function confirmBooking() {
     const { y, m, d } = bkState.selectedDate;
     const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
     const room = bkState.room;
-    const opt = bkState.selectedOption;
+    const opt = bkState.selectedVariant;
     const dateStr = dateKey(y, m, d);
     const timeStr = `${String(bkState.selectedHour).padStart(2, '0')}:00`;
 
@@ -345,6 +328,7 @@ async function confirmBooking() {
                 guestName,
                 guestContact,
                 roomId: room._id,
+                variantLabel: opt.label,
                 date: dateStr,
                 timeIn: timeStr,
                 duration: 1,
@@ -358,11 +342,10 @@ async function confirmBooking() {
             throw new Error(err.message || 'Could not complete your booking.');
         }
 
-        const text = `${room.name} (${opt.name}) \u2014 ${months[m]} ${d}, ${y} at ${formatHour(bkState.selectedHour)} \u00b7 \u20b1${opt.price}`;
+        const text = `${room.name} (${opt.label}) \u2014 ${months[m]} ${d}, ${y} at ${formatHour(bkState.selectedHour)} \u00b7 \u20b1${opt.price}`;
         document.getElementById('bkConfirmDetails').textContent = text;
         showStep('bkStepConfirm');
 
-        // Clear the cached availability for this room/date so the next lookup is fresh
         delete RESERVED[`${room._id}|${dateStr}`];
     } catch (err) {
         console.error(err);
@@ -373,7 +356,6 @@ async function confirmBooking() {
     }
 }
 
-// ---- wire up events ----
 document.getElementById('bkClose').addEventListener('click', closeBooking);
 document.getElementById('booking-modal').addEventListener('click', (e) => {
     if (e.target.id === 'booking-modal') closeBooking();
@@ -391,5 +373,4 @@ document.getElementById('bkBackToCal').addEventListener('click', () => showStep(
 document.getElementById('bkConfirm').addEventListener('click', confirmBooking);
 document.getElementById('bkDone').addEventListener('click', closeBooking);
 
-/* ── Initial load ── */
 loadRooms();

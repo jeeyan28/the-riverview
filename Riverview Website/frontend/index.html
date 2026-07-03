@@ -1,316 +1,316 @@
-<!DOCTYPE html>
-<html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <title>The Riverview</title>
-        <link rel="icon" href="assets/logo/logoo.png" type="image/png">
-        <link rel="preconnect" href="https://fonts.googleapis.com">
-        <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
-        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
-        <link rel="stylesheet" href="css/style.css">
-    </head>
-    <body>
+    <!DOCTYPE html>
+    <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <title>The Riverview</title>
+            <link rel="icon" href="assets/logo/logoo.png" type="image/png">
+            <link rel="preconnect" href="https://fonts.googleapis.com">
+            <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+            <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
+            <link rel="stylesheet" href="css/style.css">
+        </head>
+        <body>
 
-        <!-- HEADER -->
-        <header id="site-header">
-            <div class="logo">
-                <img src="assets/logo/logoo.png" alt="Riverview Logo">
-                <span class="logo-name">The Riverview</span>
-            </div>
-
-            <nav id="nav-menu">
-                <a href="#home" class="active">Home</a>
-                <a href="#rooms">Rooms</a>
-                <a href="#about">About</a>
-            </nav>
-
-            <div class="nav-buttons">
-                <button class="btn-login" id="login-button">Log in</button>
-            </div>
-
-            <div class="hamburger" id="hamburger" aria-label="Open menu">
-                <span></span><span></span><span></span>
-            </div>
-        </header>
-
-        <!-- MOBILE NAV -->
-        <div class="mobile-nav" id="mobile-nav">
-            <button class="mobile-nav-close" id="nav-close">✕</button>
-            <a href="#home"  onclick="closeMobileNav()">Home</a>
-            <a href="#rooms" onclick="closeMobileNav()">Rooms</a>
-            <a href="#about" onclick="closeMobileNav()">About</a>
-            <button class="btn-book" style="font-size:1rem;padding:.75rem 2rem;border-radius:8px;margin-top:1rem;">Book Now</button>
-        </div>
-
-        <main>
-
-            <!-- HERO -->
-            <section class="hero" id="home">
-                <div class="hero-bg"></div>
-
-                <div class="hero-inner">
-
-                    <!-- LEFT: text -->
-                    <div class="hero-content">
-                        <p class="hero-eyebrow">San Rafael Caingin · Open Daily 7AM–12AM</p>
-                        <h1>Where Family<br>Fun <em>Begins.</em></h1>
-                        <p class="hero-sub">Billiards, basketball, KTV, and more — all under one roof. Book a room in minutes, have fun all night.</p>
-                        <div class="hero-actions">
-                            <a href="#" class="btn-primary-hero">Book a Space</a>
-                            <a href="#rooms" class="btn-ghost-hero">See Rooms</a>
-                        </div>
-                    </div>
-
-                    <!-- RIGHT: staggered waterfall images -->
-                    <div class="hero-waterfall">
-                        <!-- col 1 — low -->
-                        <div class="wf-col wf-col--low">
-                            <div class="wf-img wf-img--tall">
-                                <img src="assets/pictures/RiverView_4.jpg" alt="pictures">
-                            </div>
-                        </div>
-                        <!-- col 2 — mid -->
-                        <div class="wf-col wf-col--mid">
-                            <div class="wf-img wf-img--short">
-                                <img src="assets/pictures/RiverView_5.jpg" alt="Court">
-                            </div>
-                            <div class="wf-img wf-img--med">
-                                <img src="assets/pictures/RiverView_6.jpg" alt="VIP">
-                            </div>
-                        </div>
-                        <!-- col 3 — high, bleeds right -->
-                        <div class="wf-col wf-col--high">
-                            <div class="wf-img wf-img--med">
-                                <img src="assets/pictures/RiverView_7.jpg" alt="Billiards 2">
-                            </div>
-                            <div class="wf-img wf-img--short">
-                                <img src="assets/pictures/RiverView_8.jpg" alt="Court 2">
-                            </div>
-                        </div>
-                    </div>
-
-                </div>
-            </section>
-
-            <!-- ROOMS -->
-            <section id="rooms">
-                <div class="rooms-header">
-                    <div>
-                        <div class="section-label" style="color:var(--teal)">Book a Space</div>
-                        <h2>Choose Your Room</h2>
-                    </div>
-                    <p>All rooms available. Walk-ins welcome — reservations recommended on weekends.</p>
+            <!-- HEADER -->
+            <header id="site-header">
+                <div class="logo">
+                    <img src="assets/logo/logoo.png" alt="Riverview Logo">
+                    <span class="logo-name">The Riverview</span>
                 </div>
 
-                <!-- Populated dynamically by index.js from GET /api/rooms, grouped by category -->
-                <div class="room-grid" id="room-grid">
-                    <div style="text-align:center;color:#888;padding:32px 0;grid-column:1/-1;">Loading rooms…</div>
+                <nav id="nav-menu">
+                    <a href="#home" class="active">Home</a>
+                    <a href="#rooms">Rooms</a>
+                    <a href="#about">About</a>
+                </nav>
+
+                <div class="nav-buttons">
+                    <button class="btn-login" id="login-button">Log in</button>
                 </div>
-            </section>
 
-            <!-- =================== MODAL MARKUP =================== -->
-            <div id="booking-modal" class="bk-overlay">
-                <div class="bk-modal">
-                
-                    <button class="bk-close" id="bkClose" aria-label="Close">✕</button>
-                
-                    <div class="bk-header">
-                    <div class="bk-room-icon" id="bkRoomIcon"><i class="fa-solid fa-circle-dot"></i></div>
-                    <div>
-                        <p class="bk-eyebrow">Book a space</p>
-                        <h2 id="bkRoomName">Billiards Room</h2>
-                    </div>
-                    </div>
-                
-                    <div class="bk-body">
-                
-                    <!-- STEP 1: PRICE / OPTION -->
-                    <div class="bk-step" id="bkStepPrice">
-                        <div class="bk-slots-head">
-                        <p>Choose a pricing option to get started.</p>
-                        </div>
-                
-                        <div class="bk-price-list" id="bkPriceList"></div>
-                    </div>
-                
-                    <!-- STEP 2: CALENDAR -->
-                    <div class="bk-step bk-step--hidden" id="bkStepCalendar">
-                        <button class="bk-back" id="bkBackToPriceFromCal"><i class="fa-solid fa-arrow-left"></i> Back to pricing</button>
-                
-                        <p class="bk-selected-option-pill" id="bkCalSelectedOption">Solo &mdash; Regular &middot; &#8369;200/hr</p>
-                
-                        <div class="bk-cal-head">
-                        <button class="bk-nav-btn" id="bkPrevMonth" aria-label="Previous month"><i class="fa-solid fa-chevron-left"></i></button>
-                        <span class="bk-month-label" id="bkMonthLabel">June 2026</span>
-                        <button class="bk-nav-btn" id="bkNextMonth" aria-label="Next month"><i class="fa-solid fa-chevron-right"></i></button>
-                        </div>
-                
-                        <div class="bk-weekdays">
-                        <span>Su</span><span>Mo</span><span>Tu</span><span>We</span><span>Th</span><span>Fr</span><span>Sa</span>
-                        </div>
-                
-                        <div class="bk-grid" id="bkCalGrid"></div>
-                
-                        <div class="bk-legend">
-                        <span><i class="bk-dot bk-dot--open"></i> Available</span>
-                        <span><i class="bk-dot bk-dot--full"></i> Fully booked</span>
-                        <span><i class="bk-dot bk-dot--past"></i> Unavailable</span>
-                        </div>
-                    </div>
-                
-                    <!-- STEP 3: TIME SLOTS -->
-                    <div class="bk-step bk-step--hidden" id="bkStepSlots">
-                        <button class="bk-back" id="bkBackToCal"><i class="fa-solid fa-arrow-left"></i> Back to calendar</button>
-                
-                        <div class="bk-slots-head">
-                        <h3 id="bkSelectedDate">Friday, July 3</h3>
-                        <p id="bkSelectedOption">Solo &mdash; Regular &middot; &#8369;200/hr</p>
-                        </div>
-                
-                        <div class="bk-slots-grid" id="bkSlotsGrid"></div>
+                <div class="hamburger" id="hamburger" aria-label="Open menu">
+                    <span></span><span></span><span></span>
+                </div>
+            </header>
 
-                        <!-- Guest details — required before a booking can be submitted -->
-                        <div class="bk-guest-fields" style="display:flex;flex-direction:column;gap:8px;margin:14px 0;">
-                            <input type="text" id="bkGuestName" placeholder="Full name" style="padding:10px 12px;border-radius:8px;border:1px solid #ddd;font-family:'Inter',sans-serif;font-size:.9rem;">
-                            <input type="text" id="bkGuestContact" placeholder="Phone number or email" style="padding:10px 12px;border-radius:8px;border:1px solid #ddd;font-family:'Inter',sans-serif;font-size:.9rem;">
+            <!-- MOBILE NAV -->
+            <div class="mobile-nav" id="mobile-nav">
+                <button class="mobile-nav-close" id="nav-close">✕</button>
+                <a href="#home"  onclick="closeMobileNav()">Home</a>
+                <a href="#rooms" onclick="closeMobileNav()">Rooms</a>
+                <a href="#about" onclick="closeMobileNav()">About</a>
+                <button class="btn-book" style="font-size:1rem;padding:.75rem 2rem;border-radius:8px;margin-top:1rem;">Book Now</button>
+            </div>
+
+            <main>
+
+                <!-- HERO -->
+                <section class="hero" id="home">
+                    <div class="hero-bg"></div>
+
+                    <div class="hero-inner">
+
+                        <!-- LEFT: text -->
+                        <div class="hero-content">
+                            <p class="hero-eyebrow">San Rafael Caingin · Open Daily 7AM–12AM</p>
+                            <h1>Where Family<br>Fun <em>Begins.</em></h1>
+                            <p class="hero-sub">Billiards, basketball, KTV, and more — all under one roof. Book a room in minutes, have fun all night.</p>
+                            <div class="hero-actions">
+                                <a href="#" class="btn-primary-hero">Book a Space</a>
+                                <a href="#rooms" class="btn-ghost-hero">See Rooms</a>
+                            </div>
                         </div>
-                
-                        <div class="bk-summary" id="bkSummary">
+
+                        <!-- RIGHT: staggered waterfall images -->
+                        <div class="hero-waterfall">
+                            <!-- col 1 — low -->
+                            <div class="wf-col wf-col--low">
+                                <div class="wf-img wf-img--tall">
+                                    <img src="assets/pictures/RiverView_4.jpg" alt="pictures">
+                                </div>
+                            </div>
+                            <!-- col 2 — mid -->
+                            <div class="wf-col wf-col--mid">
+                                <div class="wf-img wf-img--short">
+                                    <img src="assets/pictures/RiverView_5.jpg" alt="Court">
+                                </div>
+                                <div class="wf-img wf-img--med">
+                                    <img src="assets/pictures/RiverView_6.jpg" alt="VIP">
+                                </div>
+                            </div>
+                            <!-- col 3 — high, bleeds right -->
+                            <div class="wf-col wf-col--high">
+                                <div class="wf-img wf-img--med">
+                                    <img src="assets/pictures/RiverView_7.jpg" alt="Billiards 2">
+                                </div>
+                                <div class="wf-img wf-img--short">
+                                    <img src="assets/pictures/RiverView_8.jpg" alt="Court 2">
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </section>
+
+                <!-- ROOMS -->
+                <section id="rooms">
+                    <div class="rooms-header">
                         <div>
-                            <p class="bk-summary-label">Selected</p>
-                            <p class="bk-summary-value" id="bkSummaryText">No time selected yet</p>
+                            <div class="section-label" style="color:var(--teal)">Book a Space</div>
+                            <h2>Choose Your Room</h2>
                         </div>
-                        <button class="bk-confirm" id="bkConfirm" disabled>Confirm &#8369;0</button>
-                        </div>
-                    </div>
-                
-                    <!-- STEP 3: CONFIRMATION -->
-                    <div class="bk-step bk-step--hidden" id="bkStepConfirm">
-                        <div class="bk-confirm-icon"><i class="fa-solid fa-check"></i></div>
-                            <h3>Booking request sent</h3>
-                            <p id="bkConfirmDetails">Billiards Room — Friday, July 3, 2026 at 3:00 PM</p>
-                            <p class="bk-confirm-note">We'll text or email you a confirmation shortly. Walk-ins are also welcome if your plans change.</p>
-                            <button class="bk-done" id="bkDone">Done</button>
-                        </div>
-                
-                    </div>
-                </div>
-            </div>
-
-            <!-- SPACES SHOWCASE -->
-            <section style="background: var(--cream);">
-                <div class="spaces">
-                    <div class="spaces-header">
-                        <div class="section-label">Our Spaces</div>
-                        <h2>Designed for play,<br>built to last.</h2>
-                        <p>Every space at The Riverview is kept clean, well-lit, and ready to go — whether it's your first visit or your fiftieth.</p>
+                        <p>All rooms available. Walk-ins welcome — reservations recommended on weekends.</p>
                     </div>
 
-                    <div class="spaces-list">
-                        <div class="space-row">
-                            <div class="space-num">01</div>
-                            <div class="space-info">
-                                <h3>Billiards Room</h3>
-                                <p>Multiple tables, great lighting, and a chill atmosphere. Perfect for a quick session or a long evening with friends.</p>
-                            </div>
-                            <div class="space-img">
-                                <img src="assets/images/billiards.png" alt="Billiards">
-                            </div>
-                        </div>
-                        <div class="space-row">
-                            <div class="space-num">02</div>
-                            <div class="space-info">
-                                <h3>Basketball Court</h3>
-                                <p>Full-size court with proper flooring. Includes scoreboard, timer, and sound system for official games.</p>
-                            </div>
-                            <div class="space-img">
-                                <img src="assets/images/court.png" alt="Basketball Court">
-                            </div>
-                        </div>
-                        <div class="space-row">
-                            <div class="space-num">03</div>
-                            <div class="space-info">
-                                <h3>KTV Room</h3>
-                                <p>Private rooms with updated song libraries. Bring your barkada, bring your voice. No judgment here.</p>
-                            </div>
-                            <div class="space-img">
-                                <img src="assets/images/billiards.png" alt="KTV Room">
-                            </div>
-                        </div>
+                    <!-- Populated dynamically by index.js from GET /api/rooms, grouped by category -->
+                    <div class="room-grid" id="room-grid">
+                        <div style="text-align:center;color:#888;padding:32px 0;grid-column:1/-1;">Loading rooms…</div>
                     </div>
-                </div>
-            </section>
+                </section>
 
-            <!-- ABOUT -->
-            <section id="about">
-                <div class="about-inner">
-                    <div class="about-left">
-                        <div class="section-label">About Us</div>
-                        <h2>Fun comes first.<br>Always.</h2>
-                        <p>At The Riverview, we believe the best nights are the ones you didn't plan. Play billiards, shoot hoops, belt out your favorite songs — we've got every kind of good time covered. A cozy, vibrant atmosphere with great vibes and even better company. Come as you are.</p>
-                    </div>
+                <!-- =================== MODAL MARKUP =================== -->
+                <div id="booking-modal" class="bk-overlay">
+                    <div class="bk-modal">
+                    
+                        <button class="bk-close" id="bkClose" aria-label="Close">✕</button>
+                    
+                        <div class="bk-header">
+                        <div class="bk-room-icon" id="bkRoomIcon"><i class="fa-solid fa-circle-dot"></i></div>
+                        <div>
+                            <p class="bk-eyebrow">Book a space</p>
+                            <h2 id="bkRoomName">Billiards Room</h2>
+                        </div>
+                        </div>
+                    
+                        <div class="bk-body">
+                    
+                        <!-- STEP 1: PRICE / OPTION -->
+                        <div class="bk-step" id="bkStepPrice">
+                            <div class="bk-slots-head">
+                            <p>Choose a pricing option to get started.</p>
+                            </div>
+                    
+                            <div class="bk-price-list" id="bkPriceList"></div>
+                        </div>
+                    
+                        <!-- STEP 2: CALENDAR -->
+                        <div class="bk-step bk-step--hidden" id="bkStepCalendar">
+                            <button class="bk-back" id="bkBackToPriceFromCal"><i class="fa-solid fa-arrow-left"></i> Back to pricing</button>
+                    
+                            <p class="bk-selected-option-pill" id="bkCalSelectedOption">Solo &mdash; Regular &middot; &#8369;200/hr</p>
+                    
+                            <div class="bk-cal-head">
+                            <button class="bk-nav-btn" id="bkPrevMonth" aria-label="Previous month"><i class="fa-solid fa-chevron-left"></i></button>
+                            <span class="bk-month-label" id="bkMonthLabel">June 2026</span>
+                            <button class="bk-nav-btn" id="bkNextMonth" aria-label="Next month"><i class="fa-solid fa-chevron-right"></i></button>
+                            </div>
+                    
+                            <div class="bk-weekdays">
+                            <span>Su</span><span>Mo</span><span>Tu</span><span>We</span><span>Th</span><span>Fr</span><span>Sa</span>
+                            </div>
+                    
+                            <div class="bk-grid" id="bkCalGrid"></div>
+                    
+                            <div class="bk-legend">
+                            <span><i class="bk-dot bk-dot--open"></i> Available</span>
+                            <span><i class="bk-dot bk-dot--full"></i> Fully booked</span>
+                            <span><i class="bk-dot bk-dot--past"></i> Unavailable</span>
+                            </div>
+                        </div>
+                    
+                        <!-- STEP 3: TIME SLOTS -->
+                        <div class="bk-step bk-step--hidden" id="bkStepSlots">
+                            <button class="bk-back" id="bkBackToCal"><i class="fa-solid fa-arrow-left"></i> Back to calendar</button>
+                    
+                            <div class="bk-slots-head">
+                            <h3 id="bkSelectedDate">Friday, July 3</h3>
+                            <p id="bkSelectedOption">Solo &mdash; Regular &middot; &#8369;200/hr</p>
+                            </div>
+                    
+                            <div class="bk-slots-grid" id="bkSlotsGrid"></div>
 
-                    <div class="about-right">
-                        <div class="about-card">
-                            <div class="about-card-icon">🕐</div>
-                            <h4>Open Daily</h4>
-                            <p>7AM to midnight, every day of the week. We keep the lights on so you can play longer.</p>
+                            <!-- Guest details — required before a booking can be submitted -->
+                            <div class="bk-guest-fields" style="display:flex;flex-direction:column;gap:8px;margin:14px 0;">
+                                <input type="text" id="bkGuestName" placeholder="Full name" style="padding:10px 12px;border-radius:8px;border:1px solid #ddd;font-family:'Inter',sans-serif;font-size:.9rem;">
+                                <input type="text" id="bkGuestContact" placeholder="Phone number or email" style="padding:10px 12px;border-radius:8px;border:1px solid #ddd;font-family:'Inter',sans-serif;font-size:.9rem;">
+                            </div>
+                    
+                            <div class="bk-summary" id="bkSummary">
+                            <div>
+                                <p class="bk-summary-label">Selected</p>
+                                <p class="bk-summary-value" id="bkSummaryText">No time selected yet</p>
+                            </div>
+                            <button class="bk-confirm" id="bkConfirm" disabled>Confirm &#8369;0</button>
+                            </div>
                         </div>
-                        <div class="about-card">
-                            <div class="about-card-icon">📱</div>
-                            <h4>Easy Booking</h4>
-                            <p>Reserve your room online in seconds. Walk-ins always welcome, reservations always smoother.</p>
-                        </div>
-                        <div class="about-card">
-                            <div class="about-card-icon">🎉</div>
-                            <h4>Events & Parties</h4>
-                            <p>Celebrating something? We'll help set it up. Birthdays, team events, reunions — we handle it.</p>
-                        </div>
-                        <div class="about-card">
-                            <div class="about-card-icon">🏆</div>
-                            <h4>Official Games</h4>
-                            <p>Full scoreboard, timer, and sound system for serious basketball matchups. Play like it counts.</p>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-        </main>
-
-        <!-- FOOTER -->
-        <footer>
-            <div class="footer-inner">
-                <div class="footer-top">
-                    <div class="footer-brand">
-                        <div class="logo-name" style="font-family:'Playfair Display',serif;font-size:1.3rem;font-weight:600;color:#fff;margin-bottom:.75rem;">The Riverview</div>
-                        <p>The Best and favorite leisure destination. Come for the games, stay for the vibes.</p>
-                    </div>
-                    <div class="footer-col">
-                        <h4>Explore</h4>
-                        <a href="#home">Home</a>
-                        <a href="#rooms">Rooms</a>
-                        <a href="#about">About</a>
-                        <a href="#">Book Now</a>
-                    </div>
-                    <div class="footer-col footer-newsletter">
-                        <form class="newsletter-form">
-                            <input type="email" placeholder="Your Email Address" required>
-                            <button type="submit">Subscribe</button>
-                        </form>
-                        <div class="social-icons">
-                            <a href="#" aria-label="Instagram"><i class="fa-brands fa-instagram"></i></a>
-                            <a href="https://www.facebook.com/profile.php?id=61550783505442"  target="_blank" aria-label="Facebook"><i class="fa-brands fa-facebook-f"></i></a>
+                    
+                        <!-- STEP 3: CONFIRMATION -->
+                        <div class="bk-step bk-step--hidden" id="bkStepConfirm">
+                            <div class="bk-confirm-icon"><i class="fa-solid fa-check"></i></div>
+                                <h3>Booking request sent</h3>
+                                <p id="bkConfirmDetails">Billiards Room — Friday, July 3, 2026 at 3:00 PM</p>
+                                <p class="bk-confirm-note">We'll text or email you a confirmation shortly. Walk-ins are also welcome if your plans change.</p>
+                                <button class="bk-done" id="bkDone">Done</button>
+                            </div>
+                    
                         </div>
                     </div>
                 </div>
-                <div class="footer-bottom">
-                    <span><span class="teal-dot"></span>© 2026 The Riverview. All rights reserved.</span>
-                    <span>0355 Caingin, San Rafael, Philippines, 3008</span>
-                </div>
-            </div>
-        </footer>
 
-        <script src="js/index.js"></script>
-    </body>
-</html>
+                <!-- SPACES SHOWCASE -->
+                <section style="background: var(--cream);">
+                    <div class="spaces">
+                        <div class="spaces-header">
+                            <div class="section-label">Our Spaces</div>
+                            <h2>Designed for play,<br>built to last.</h2>
+                            <p>Every space at The Riverview is kept clean, well-lit, and ready to go — whether it's your first visit or your fiftieth.</p>
+                        </div>
+
+                        <div class="spaces-list">
+                            <div class="space-row">
+                                <div class="space-num">01</div>
+                                <div class="space-info">
+                                    <h3>Billiards Room</h3>
+                                    <p>Multiple tables, great lighting, and a chill atmosphere. Perfect for a quick session or a long evening with friends.</p>
+                                </div>
+                                <div class="space-img">
+                                    <img src="assets/images/billiards.png" alt="Billiards">
+                                </div>
+                            </div>
+                            <div class="space-row">
+                                <div class="space-num">02</div>
+                                <div class="space-info">
+                                    <h3>Basketball Court</h3>
+                                    <p>Full-size court with proper flooring. Includes scoreboard, timer, and sound system for official games.</p>
+                                </div>
+                                <div class="space-img">
+                                    <img src="assets/images/court.png" alt="Basketball Court">
+                                </div>
+                            </div>
+                            <div class="space-row">
+                                <div class="space-num">03</div>
+                                <div class="space-info">
+                                    <h3>KTV Room</h3>
+                                    <p>Private rooms with updated song libraries. Bring your barkada, bring your voice. No judgment here.</p>
+                                </div>
+                                <div class="space-img">
+                                    <img src="assets/images/billiards.png" alt="KTV Room">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ABOUT -->
+                <section id="about">
+                    <div class="about-inner">
+                        <div class="about-left">
+                            <div class="section-label">About Us</div>
+                            <h2>Fun comes first.<br>Always.</h2>
+                            <p>At The Riverview, we believe the best nights are the ones you didn't plan. Play billiards, shoot hoops, belt out your favorite songs — we've got every kind of good time covered. A cozy, vibrant atmosphere with great vibes and even better company. Come as you are.</p>
+                        </div>
+
+                        <div class="about-right">
+                            <div class="about-card">
+                                <div class="about-card-icon">🕐</div>
+                                <h4>Open Daily</h4>
+                                <p>7AM to midnight, every day of the week. We keep the lights on so you can play longer.</p>
+                            </div>
+                            <div class="about-card">
+                                <div class="about-card-icon">📱</div>
+                                <h4>Easy Booking</h4>
+                                <p>Reserve your room online in seconds. Walk-ins always welcome, reservations always smoother.</p>
+                            </div>
+                            <div class="about-card">
+                                <div class="about-card-icon">🎉</div>
+                                <h4>Events & Parties</h4>
+                                <p>Celebrating something? We'll help set it up. Birthdays, team events, reunions — we handle it.</p>
+                            </div>
+                            <div class="about-card">
+                                <div class="about-card-icon">🏆</div>
+                                <h4>Official Games</h4>
+                                <p>Full scoreboard, timer, and sound system for serious basketball matchups. Play like it counts.</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+            </main>
+
+            <!-- FOOTER -->
+            <footer>
+                <div class="footer-inner">
+                    <div class="footer-top">
+                        <div class="footer-brand">
+                            <div class="logo-name" style="font-family:'Playfair Display',serif;font-size:1.3rem;font-weight:600;color:#fff;margin-bottom:.75rem;">The Riverview</div>
+                            <p>The Best and favorite leisure destination. Come for the games, stay for the vibes.</p>
+                        </div>
+                        <div class="footer-col">
+                            <h4>Explore</h4>
+                            <a href="#home">Home</a>
+                            <a href="#rooms">Rooms</a>
+                            <a href="#about">About</a>
+                            <a href="#">Book Now</a>
+                        </div>
+                        <div class="footer-col footer-newsletter">
+                            <form class="newsletter-form">
+                                <input type="email" placeholder="Your Email Address" required>
+                                <button type="submit">Subscribe</button>
+                            </form>
+                            <div class="social-icons">
+                                <a href="#" aria-label="Instagram"><i class="fa-brands fa-instagram"></i></a>
+                                <a href="https://www.facebook.com/profile.php?id=61550783505442"  target="_blank" aria-label="Facebook"><i class="fa-brands fa-facebook-f"></i></a>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="footer-bottom">
+                        <span><span class="teal-dot"></span>© 2026 The Riverview. All rights reserved.</span>
+                        <span>0355 Caingin, San Rafael, Philippines, 3008</span>
+                    </div>
+                </div>
+            </footer>
+
+            <script src="js/index.js"></script>
+        </body>
+    </html>
