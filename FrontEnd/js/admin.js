@@ -8,6 +8,78 @@ function resolveImageUrl(image) {
     return `${SERVER_ORIGIN}${image}`;
 }
 
+/* ══════════════════════════════════════════
+   ── ADMIN AUTH GUARD ──
+   Add this block to the very top of admin.js, before anything else runs.
+   It confirms the session cookie is still valid server-side (not just that
+   *something* is sitting in localStorage) and hides UI sections the
+   logged-in role isn't allowed to touch.
+   ══════════════════════════════════════════ */
+
+const ROLE_PERMISSIONS = {
+    super_admin: ['pos:access', 'pos:refund', 'room:view', 'room:manage', 'booking:view', 'booking:manage', 'reports:view', 'admin:manage'],
+    manager:     ['pos:access', 'pos:refund', 'room:view', 'room:manage', 'booking:view', 'booking:manage', 'reports:view'],
+    staff:       ['pos:access', 'room:view', 'booking:view', 'booking:manage'],
+};
+
+let sessionAdmin = null;
+
+async function guardAdminPage() {
+    try {
+        const res = await fetch(`${API_BASE}/auth/me`, { credentials: 'include' });
+        if (!res.ok) throw new Error('not authenticated');
+
+        const { user } = await res.json();
+        if (!['staff', 'manager', 'super_admin'].includes(user.role)) {
+            throw new Error('not an admin');
+        }
+
+        sessionAdmin = user;
+        applyRoleVisibility(user.role);
+    } catch (err) {
+        window.location.href = 'login.html';
+    }
+}
+
+function hasAdminPermission(permission) {
+    if (!sessionAdmin) return false;
+    return (ROLE_PERMISSIONS[sessionAdmin.role] || []).includes(permission);
+}
+
+function applyRoleVisibility(role) {
+    // Hide sidebar sections the role has no permissions for.
+    document.querySelectorAll('[data-requires-permission]').forEach(el => {
+        const needed = el.dataset.requiresPermission;
+        el.style.display = hasAdminPermission(needed) ? '' : 'none';
+    });
+    // Hide anything restricted to a specific role list, e.g. data-requires-role="super_admin"
+    document.querySelectorAll('[data-requires-role]').forEach(el => {
+        const allowed = el.dataset.requiresRole.split(',').map(r => r.trim());
+        el.style.display = allowed.includes(role) ? '' : 'none';
+    });
+}
+
+document.getElementById('admin-logout-btn')?.addEventListener('click', async () => {
+    await fetch(`${API_BASE}/auth/logout`, { method: 'POST', credentials: 'include' });
+    localStorage.removeItem('riverview_user');
+    sessionStorage.removeItem('riverview_user');
+    window.location.href = 'login.html';
+});
+
+guardAdminPage();
+
+/* ══════════════════════════════════════════
+   Usage in admin.html — tag sidebar buttons / panels like this:
+
+     <button class="sb-item" data-panel="settings" data-requires-permission="room:manage">Room Settings</button>
+     <button class="sb-item" data-panel="admins" data-requires-role="super_admin">Manage Admins</button>
+
+   Any element with data-requires-permission / data-requires-role gets
+   hidden automatically once guardAdminPage() resolves.
+   ══════════════════════════════════════════ */
+
+   
+
 /* ── Demo data — shown only if the backend at API_BASE can't be reached,
    so the panel still looks right while you preview or design against it. ── */
 const DEMO_ROOMS = [
@@ -448,7 +520,7 @@ async function saveFacility() {
 
 function applyDemoSave(payload) {
     const record = {
-        name: payload.name, category: payload.category, roomNumber: payload.roomNumber,
+        name: payload.name, roomNumber: payload.roomNumber,
         capacity: payload.capacity, description: payload.description, price: payload.price,
         status: payload.status, features: JSON.parse(payload.features), variants: JSON.parse(payload.variants),
         image: selectedImageFile ? URL.createObjectURL(selectedImageFile) : (document.getElementById('fm-image-preview').src || '')
@@ -509,7 +581,6 @@ async function duplicateFacility(id) {
     if (!room) return;
     const payload = {
         name: room.name + ' (Copy)',
-        category: room.category,
         roomNumber: room.roomNumber,
         capacity: room.capacity,
         description: room.description,
@@ -689,7 +760,6 @@ async function renderRoomMonitor() {
                 </div>
             </div>
             <div class="rm-rows">
-                <div class="rm-row"><span class="lbl">Category</span><span class="val">${escapeHtml(r.category)}</span></div>
                 <div class="rm-row"><span class="lbl">Capacity</span><span class="val">${escapeHtml(String(r.capacity))}</span></div>
                 <div class="rm-row"><span class="lbl">Status</span><span class="val">${escapeHtml(r.status)}</span></div>
                 <div class="rm-row"><span class="lbl">Rate</span><span class="val">₱${r.price}/hr</span></div>

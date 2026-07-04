@@ -1,0 +1,107 @@
+/* ─── Header user chip (shown instead of "Log in" once a user is logged in) ─── */
+.user-chip {
+    position: relative;
+    display: none; /* toggled to flex via JS when a user is logged in */
+    align-items: center;
+    gap: .5rem;
+    cursor: pointer;
+    padding: .35rem .6rem .35rem .35rem;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: none;
+    transition: background .2s, border-color .2s;
+    user-select: none;
+}
+.user-chip:hover { background: var(--card-light); }
+header:not(.scrolled) .user-chip { border-color: rgba(255,255,255,.3); }
+header:not(.scrolled) .user-chip-name,
+header:not(.scrolled) .user-chip i { color: #fff; }
+
+.user-chip-avatar {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    background: var(--teal);
+    color: var(--navy);
+    font-weight: 700;
+    font-size: .8rem;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+}
+.user-chip-name {
+    font-size: .85rem;
+    font-weight: 500;
+    color: var(--text-main);
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.user-chip > i { font-size: .65rem; color: var(--text-muted-light); transition: transform .2s; }
+.user-chip-menu.open ~ i,
+.user-chip.open > i { transform: rotate(180deg); }
+
+.user-chip-menu {
+    position: absolute;
+    top: calc(100% + 10px);
+    right: 0;
+    min-width: 180px;
+    background: var(--surface-alt);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: 0 12px 32px rgba(10,22,40,.14);
+    padding: .4rem;
+    display: none;
+    flex-direction: column;
+    gap: 2px;
+    z-index: 250;
+}
+.user-chip-menu.open { display: flex; }
+.user-chip-menu a,
+.user-chip-menu button {
+    display: flex; align-items: center; gap: .6rem;
+    padding: .6rem .7rem;
+    border-radius: 8px;
+    font-size: .85rem;
+    font-weight: 500;
+    color: var(--text-main);
+    background: none;
+    border: none;
+    text-align: left;
+    width: 100%;
+    cursor: pointer;
+    transition: background .15s;
+    font-family: 'Inter', sans-serif;
+}
+.user-chip-menu a:hover,
+.user-chip-menu button:hover { background: var(--card-light); }
+.user-chip-menu button { color: #d1483f; }
+
+/* ─── Profile page specifics (page shell reuses login.css) ─── */
+.profile-avatar-lg {
+    width: 64px; height: 64px;
+    border-radius: 50%;
+    background: var(--teal, #00C9A7);
+    color: #0A1628;
+    font-weight: 700;
+    font-size: 1.4rem;
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 1rem;
+}
+.profile-tabs {
+    display: flex;
+    gap: .4rem;
+    margin-bottom: 1.75rem;
+    border-bottom: 1px solid var(--border, rgba(10,22,40,.1));
+}
+.profile-tab {
+    background: none; border: none; cursor: pointer;
+    padding: .7rem 1rem;
+    font-size: .88rem; font-weight: 600;
+    font-family: 'Inter', sans-serif;
+    color: #8A9BB0;
+    border-bottom: 2px solid transparent;
+    transition: color .2s, border-color .2s;
+}
+.profile-tab.active { color: #0A1628; border-color: #00C9A7; }
+.profile-panel { display: none; }
+.profile-panel.active { display: block; }

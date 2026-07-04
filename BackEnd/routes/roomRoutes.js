@@ -2,6 +2,8 @@ const express = require("express");
 const router = express.Router();
 const Room = require("../model/room");
 const upload = require("../middleware/upload");
+const { requirePermission } = require("../middleware/adminAuth");
+const { PERMISSIONS } = require("../utils/permissions");
 
 function parseFeatures(features) {
   if (Array.isArray(features)) return features;
@@ -34,6 +36,7 @@ function parseVariants(variants) {
   }
 }
 
+// Public — guests need to see rooms to book them
 router.get("/", async (req, res) => {
   try {
     const filter = {};
@@ -57,7 +60,8 @@ router.get("/:id", async (req, res) => {
   }
 });
 
-router.post("/", upload.single("image"), async (req, res) => {
+// Everything below changes room data — manager/super_admin only
+router.post("/", requirePermission(PERMISSIONS.ROOM_MANAGE), upload.single("image"), async (req, res) => {
   try {
     const { name, roomNumber, description, price, status, features, variants } = req.body;
 
@@ -83,7 +87,7 @@ router.post("/", upload.single("image"), async (req, res) => {
   }
 });
 
-router.put("/:id", upload.single("image"), async (req, res) => {
+router.put("/:id", requirePermission(PERMISSIONS.ROOM_MANAGE), upload.single("image"), async (req, res) => {
   try {
     const { name, roomNumber, description, price, status, features, variants } = req.body;
 
@@ -107,7 +111,7 @@ router.put("/:id", upload.single("image"), async (req, res) => {
   }
 });
 
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", requirePermission(PERMISSIONS.ROOM_MANAGE), async (req, res) => {
   try {
     const room = await Room.findByIdAndDelete(req.params.id);
     if (!room) return res.status(404).json({ message: "Room not found." });

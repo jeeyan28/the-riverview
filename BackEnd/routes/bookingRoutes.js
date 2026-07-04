@@ -2,13 +2,14 @@ const express = require("express");
 const router = express.Router();
 const Room = require("../model/room");
 const Booking = require("../model/booking");
+const { requirePermission } = require("../middleware/adminAuth");
+const { PERMISSIONS } = require("../utils/permissions");
 
 // ── List all bookings (optionally filter by status/category)
-router.get("/", async (req, res) => {
+router.get("/", requirePermission(PERMISSIONS.BOOKING_VIEW), async (req, res) => {
   try {
     const filter = {};
     if (req.query.status) filter.status = req.query.status;
-    if (req.query.category) filter.category = req.query.category;
 
     const bookings = await Booking.find(filter).sort({ createdAt: -1 });
     res.json(bookings);
@@ -18,10 +19,11 @@ router.get("/", async (req, res) => {
   }
 });
 
-// ── Create a booking (guest booking flow + admin Manual Booking modal)
+// ── Create a booking (guest booking flow is public; admin Manual Booking modal
+//    is covered by the same route — left open to guests, same as before)
 router.post("/", async (req, res) => {
   try {
-    const { guestName, guestContact, roomId, date, timeIn, duration, paymentMethod, status } = req.body;
+    const { guestName, guestContact, roomId, variantLabel, date, timeIn, duration, paymentMethod, status } = req.body;
 
     if (!guestName || !roomId || !date || !timeIn || !duration) {
       return res.status(400).json({ message: "guestName, roomId, date, timeIn and duration are required." });
@@ -30,16 +32,24 @@ router.post("/", async (req, res) => {
     const room = await Room.findById(roomId);
     if (!room) return res.status(404).json({ message: "Selected room does not exist." });
 
+    let unitPrice = room.price;
+    if (room.variants && room.variants.length) {
+      const variant = room.variants.find(v => v.label === variantLabel);
+      if (!variant) return res.status(400).json({ message: "Selected pricing option not found." });
+      unitPrice = variant.price;
+    }
+
+    if (!Number.isFinite(unitPrice)) {
+      return res.status(400).json({ message: "Could not determine price for this room/option." });
+    }
+
     const booking = new Booking({
       guestName,
       guestContact: guestContact || "",
       room: room._id,
       roomLabel: room.roomNumber || room.name,
-      category: room.category,
-      date,
-      timeIn,
-      duration,
-      amount: room.price * duration,
+      variantLabel: variantLabel || null, date, timeIn, duration,
+      amount: unitPrice * duration,
       status: status || "Pending",
       paymentMethod: paymentMethod || "Cash"
     });
@@ -52,8 +62,8 @@ router.post("/", async (req, res) => {
   }
 });
 
-// ── Update a booking (e.g. change status to Active/Done/Overdue)
-router.put("/:id", async (req, res) => {
+// ── Update a booking (e.g. change status to Active/Done/Overdue) — admin only
+router.put("/:id", requirePermission(PERMISSIONS.BOOKING_MANAGE), async (req, res) => {
   try {
     const { status, duration, paymentMethod } = req.body;
     const update = {};
@@ -70,8 +80,8 @@ router.put("/:id", async (req, res) => {
   }
 });
 
-// ── Delete/cancel a booking
-router.delete("/:id", async (req, res) => {
+// ── Delete/cancel a booking — admin only
+router.delete("/:id", requirePermission(PERMISSIONS.BOOKING_MANAGE), async (req, res) => {
   try {
     const booking = await Booking.findByIdAndDelete(req.params.id);
     if (!booking) return res.status(404).json({ message: "Booking not found." });
