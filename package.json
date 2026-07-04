@@ -1,11 +1,16 @@
 {
   "dependencies": {
     "cloudinary": "^1.41.3",
+    "connect-mongo": "^6.0.0",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
+    "express-rate-limit": "^8.5.2",
+    "express-session": "^1.19.0",
+    "google-auth-library": "^10.9.0",
     "mongoose": "^9.7.3",
     "multer": "^2.2.0",
-    "multer-storage-cloudinary": "^4.0.0"
+    "multer-storage-cloudinary": "^4.0.0",
+    "nodemailer": "^9.0.3"
   }
 }

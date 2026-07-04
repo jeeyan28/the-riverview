@@ -84,6 +84,10 @@ function setError(fieldId, errorId, show) {
     });
 });
 
+/* ── Backend base URL — must match the API server's actual host/port,
+   NOT the Live Server port this page itself is served from. ── */
+const API_BASE_URL = 'http://localhost:3000';
+
 /* ── Form submit ── */
 const form = document.getElementById('signup-form');
 const btn  = document.getElementById('btn-submit');
@@ -122,7 +126,7 @@ form.addEventListener('submit', async (e) => {
     btn.classList.add('loading');
 
     try {
-        const response = await fetch('http://localhost:3000/register', {
+        const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
             method:  'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ firstname, lastname, phone, email, password })

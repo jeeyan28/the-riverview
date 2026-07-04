@@ -44,12 +44,12 @@
 
             <div class="sb-bottom">
             <div class="admin-info-row">
-                <div class="admin-av">RA</div>
+                <div class="admin-av" id="sb-admin-av">RA</div>
                 <div>
-                <div class="admin-name">Rivera Admin</div>
-                <div class="admin-role">Super Admin</div>
+                <div class="admin-name" id="sb-admin-name">Rivera Admin</div>
+                <div class="admin-role" id="sb-admin-role">Super Admin</div>
                 </div>
-                <i class="ti ti-logout" style="font-size:14px;color:var(--muted);margin-left:auto;cursor:pointer;"></i>
+                <i class="ti ti-logout" id="admin-logout-btn" style="font-size:14px;color:var(--muted);margin-left:auto;cursor:pointer;"></i>
             </div>
             </div>
         </div>
@@ -142,9 +142,6 @@
             <div class="panel" id="panel-bookings">
                 <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
                 <div style="display:flex;gap:6px;">
-                    <select id="bk-filter-status" style="font-size:.78rem;padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:var(--navy3);color:#c8d6e5;font-family:'Inter',sans-serif;">
-                    <option value="">All Status</option><option value="Active">Active</option><option value="Pending">Pending</option><option value="Done">Done</option><option value="Overdue">Overdue</option>
-                    </select>
                     <select id="bk-filter-status" style="font-size:.78rem;padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:var(--navy3);color:#c8d6e5;font-family:'Inter',sans-serif;">
                     <option value="">All Status</option><option value="Active">Active</option><option value="Pending">Pending</option><option value="Done">Done</option><option value="Overdue">Overdue</option>
                     </select>
@@ -421,13 +418,13 @@
             <!-- ── PROFILE ── -->
             <div class="panel" id="panel-profile">
                 <div class="profile-hero">
-                <div class="profile-av">RA</div>
+                <div class="profile-av" id="profile-av">RA</div>
                 <div>
-                    <div class="profile-name">Rivera Admin</div>
-                    <div class="profile-role">Super Admin · The Riverview</div>
+                    <div class="profile-name" id="profile-fullname">Rivera Admin</div>
+                    <div class="profile-role" id="profile-role">Super Admin · The Riverview</div>
                     <div class="profile-meta">
-                    <span class="pmeta"><i class="ti ti-mail"></i>demotest@gmail.com</span>
-                    <span class="pmeta"><i class="ti ti-phone"></i>09XX XXX XXXX</span>
+                    <span class="pmeta"><i class="ti ti-mail"></i><span id="profile-meta-email">demotest@gmail.com</span></span>
+                    <span class="pmeta"><i class="ti ti-phone"></i><span id="profile-meta-phone">09XX XXX XXXX</span></span>
                     <span class="pmeta"><i class="ti ti-map-pin"></i>San Rafael, Bulacan</span>
                     </div>
                 </div>
@@ -435,18 +432,18 @@
                 <div class="p2col">
                 <div class="card">
                     <div class="card-head"><span class="card-title">Personal information</span></div>
-                    <div class="pfield"><label>First name</label><input type="text" value="Rivera"></div>
-                    <div class="pfield"><label>Last name</label><input type="text" value="Admin"></div>
-                    <div class="pfield"><label>Email address</label><input type="email" value="demotest@gmail.com"></div>
-                    <div class="pfield"><label>Phone number</label><input type="tel" value="09XX XXX XXXX"></div>
-                    <button class="save-btn" style="margin-top:6px;">Save changes</button>
+                    <div class="pfield"><label>First name</label><input type="text" id="profile-firstname" value="Rivera"></div>
+                    <div class="pfield"><label>Last name</label><input type="text" id="profile-lastname" value="Admin"></div>
+                    <div class="pfield"><label>Email address</label><input type="email" id="profile-email" value="demotest@gmail.com"></div>
+                    <div class="pfield"><label>Phone number</label><input type="tel" id="profile-phone" value="09XX XXX XXXX"></div>
+                    <button class="save-btn" id="profile-save-details-btn" style="margin-top:6px;">Save changes</button>
                 </div>
                 <div class="card">
                     <div class="card-head"><span class="card-title">Change password</span></div>
-                    <div class="pfield"><label>Current password</label><input type="password" placeholder="Enter current password"></div>
-                    <div class="pfield"><label>New password</label><input type="password" placeholder="New password"></div>
-                    <div class="pfield"><label>Confirm new password</label><input type="password" placeholder="Confirm password"></div>
-                    <button class="save-btn" style="margin-top:6px;">Update password</button>
+                    <div class="pfield"><label>Current password</label><input type="password" id="profile-current-password" placeholder="Enter current password"></div>
+                    <div class="pfield"><label>New password</label><input type="password" id="profile-new-password" placeholder="New password"></div>
+                    <div class="pfield"><label>Confirm new password</label><input type="password" id="profile-confirm-password" placeholder="Confirm password"></div>
+                    <button class="save-btn" id="profile-save-password-btn" style="margin-top:6px;">Update password</button>
                 </div>
                 </div>
                 <div class="metric-row">
@@ -550,5 +547,6 @@
             </div>
             </div>
         <script src="js/admin.js"></script>
+        <script src="js/admin-profile.js"></script>
     </body>
 </html>
