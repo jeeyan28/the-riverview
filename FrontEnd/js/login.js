@@ -134,7 +134,7 @@ document.querySelector('.forgot-link')?.addEventListener('click', async (e) => {
    Requires this in login.html's <head>:
      <script src="https://accounts.google.com/gsi/client" async defer></script>
    and GOOGLE_CLIENT_ID set below to match your backend's GOOGLE_CLIENT_ID. */
-const GOOGLE_CLIENT_ID = 'YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com';
+const GOOGLE_CLIENT_ID = '488226777682-bvm3f2kr7oi1nkbmcs96mm0n09gvgvf0.apps.googleusercontent.com';
 
 function initGoogleSignIn() {
     if (!window.google || !google.accounts?.id) {
@@ -144,7 +144,24 @@ function initGoogleSignIn() {
     google.accounts.id.initialize({
         client_id: GOOGLE_CLIENT_ID,
         callback: handleGoogleCredential,
+        // Needed for browsers (Safari, Chrome w/ 3rd-party-cookie blocking, etc.)
+        // that reject Google's default FedCM/One-Tap flow silently.
+        use_fedcm_for_prompt: true,
     });
+
+    // google.accounts.id.prompt() (One Tap) is frequently suppressed by the
+    // browser with no error and no callback — that's why the button looked
+    // "broken." Render Google's own button as the reliable, guaranteed-visible
+    // fallback into a hidden container, then forward a click on our styled
+    // button to it.
+    const hiddenHost = document.getElementById('google-btn-host') || (() => {
+        const div = document.createElement('div');
+        div.id = 'google-btn-host';
+        div.style.display = 'none';
+        document.body.appendChild(div);
+        return div;
+    })();
+    google.accounts.id.renderButton(hiddenHost, { type: 'standard' });
 }
 
 async function handleGoogleCredential(response) {
@@ -171,7 +188,15 @@ document.getElementById('btn-google').addEventListener('click', () => {
         showToast('Google sign-in is still loading — try again in a second.', 'error');
         return;
     }
-    google.accounts.id.prompt();
+    // Click the real (hidden) Google-rendered button rather than relying on
+    // prompt() alone, since prompt() can be silently dismissed with no
+    // callback firing at all.
+    const realGoogleButton = document.querySelector('#google-btn-host div[role="button"]');
+    if (realGoogleButton) {
+        realGoogleButton.click();
+    } else {
+        google.accounts.id.prompt();
+    }
 });
 
 initGoogleSignIn();

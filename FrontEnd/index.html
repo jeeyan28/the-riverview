@@ -20,11 +20,12 @@
     </head>
     <body>
 
-        <!-- PROMO ANNOUNCEMENT BAR -->
+        <!-- ANNOUNCEMENT BAR — combines admin promos AND holiday/closure notices
+             into a single one-line strip. Multiple items are joined with "II". -->
         <div id="promo-banner" class="promo-banner">
-            <p class="promo-text">
+            <p class="promo-text" id="promo-text-line">
                 <span class="promo-emoji">🎉</span>
-                Special Promo: 20% off all bookings this weekend! <span class="promo-sep">|</span> Closed July 15 for maintenance
+                Special Promo: 20% off all bookings this weekend!
             </p>
             <button class="promo-close" id="promoClose" aria-label="Dismiss announcement">✕</button>
         </div>
@@ -58,6 +59,12 @@
                     <div class="user-chip-menu" id="user-chip-menu">
                         <button type="button" onclick="openProfileModal()">
                         <i class="fa-solid fa-user"></i> My Profile
+                        </button>
+                        <!-- Shown only when the logged-in account is staff/manager/super_admin —
+                             lets an admin jump to the dashboard using the SAME session cookie,
+                             with no separate login step. Toggled by initAuthHeader() in index.js. -->
+                        <button type="button" id="admin-dashboard-link" style="display:none;" onclick="window.location.href='admin.html'">
+                        <i class="fa-solid fa-gauge"></i> Admin Dashboard
                         </button>
                         <button type="button" id="logout-button"><i class="fa-solid fa-right-from-bracket"></i> Log out</button>
                     </div>
@@ -220,6 +227,8 @@
                         <div class="bk-guest-fields" style="display:flex;flex-direction:column;gap:8px;margin:14px 0;">
                             <input type="text" id="bkGuestName" placeholder="Full name" style="padding:10px 12px;border-radius:8px;border:1px solid #ddd;font-family:'Inter',sans-serif;font-size:.9rem;">
                             <input type="text" id="bkGuestContact" placeholder="Phone number or email" style="padding:10px 12px;border-radius:8px;border:1px solid #ddd;font-family:'Inter',sans-serif;font-size:.9rem;">
+                            <input type="number" id="bkGuestCount" min="1" value="1" placeholder="Number of guests" style="padding:10px 12px;border-radius:8px;border:1px solid #ddd;font-family:'Inter',sans-serif;font-size:.9rem;">
+                            <textarea id="bkGuestNote" rows="2" placeholder="Comment / special request (optional) — e.g. birthday setup, extra chairs" style="padding:10px 12px;border-radius:8px;border:1px solid #ddd;font-family:'Inter',sans-serif;font-size:.9rem;resize:vertical;"></textarea>
                         </div>
                 
                         <div class="bk-summary" id="bkSummary">
@@ -231,12 +240,49 @@
                         </div>
                     </div>
                 
-                    <!-- STEP 3: CONFIRMATION -->
+                    <!-- STEP 4: DOWN PAYMENT -->
+                    <div class="bk-step bk-step--hidden" id="bkStepPayment">
+                        <button class="bk-back" id="bkBackToSlots"><i class="fa-solid fa-arrow-left"></i> Back to time selection</button>
+
+                        <div class="bk-slots-head">
+                            <h3>Down payment required</h3>
+                            <p>A down payment secures your slot. Choose a payment method below, then upload your payment screenshot.</p>
+                        </div>
+
+                        <div class="bk-summary" style="margin-bottom:14px;">
+                            <div>
+                                <p class="bk-summary-label">Amount to pay now</p>
+                                <p class="bk-summary-value" id="bkDownPaymentAmount">₱0</p>
+                            </div>
+                        </div>
+
+                        <!-- Populated dynamically from GET /api/settings (admin-managed Payment
+                             Methods) by renderPayMethodButtons() in js/index.js — this can be
+                             two, one, or several buttons depending on what's active in admin. -->
+                        <div class="bk-pay-methods" id="bkPayMethods" style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;"></div>
+
+                        <div style="text-align:center;margin-bottom:14px;">
+                            <img id="bkQrImage" src="" alt="Payment QR code" style="max-width:220px;width:100%;border-radius:12px;border:1px solid #ddd;">
+                            <p style="font-size:.78rem;color:#888;margin-top:6px;">Scan with your payment app, then take a screenshot of the successful payment.</p>
+                        </div>
+
+                        <label for="bkScreenshotInput" style="display:block;border:2px dashed #ccc;border-radius:10px;padding:16px;text-align:center;cursor:pointer;font-size:.85rem;color:#555;" id="bkScreenshotLabel">
+                            <i class="fa-solid fa-upload"></i> Click to upload your payment screenshot
+                        </label>
+                        <input type="file" id="bkScreenshotInput" accept="image/png,image/jpeg,image/webp" style="display:none;">
+                        <img id="bkScreenshotPreview" style="display:none;max-width:100%;max-height:180px;margin-top:10px;border-radius:8px;">
+
+                        <div class="bk-summary" style="margin-top:14px;">
+                            <button class="bk-confirm" id="bkSubmitPayment" disabled>Submit Booking</button>
+                        </div>
+                    </div>
+
+                    <!-- STEP 5: CONFIRMATION -->
                     <div class="bk-step bk-step--hidden" id="bkStepConfirm">
-                        <div class="bk-confirm-icon"><i class="fa-solid fa-check"></i></div>
-                            <h3>Booking request sent</h3>
+                        <div class="bk-confirm-icon"><i class="fa-solid fa-clock"></i></div>
+                            <h3>Booking submitted — Pending Payment Verification</h3>
                             <p id="bkConfirmDetails">Billiards Room — Friday, July 3, 2026 at 3:00 PM</p>
-                            <p class="bk-confirm-note">We'll text or email you a confirmation shortly. Walk-ins are also welcome if your plans change.</p>
+                            <p class="bk-confirm-note">Our team will verify your payment screenshot shortly. You'll see your booking status change to "Confirmed" once approved — you can check it anytime from your profile.</p>
                             <button class="bk-done" id="bkDone">Done</button>
                         </div>
                 

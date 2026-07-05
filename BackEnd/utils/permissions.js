@@ -12,6 +12,12 @@ const PERMISSIONS = {
   REPORTS_VIEW: "reports:view",
 
   ADMIN_MANAGE: "admin:manage",    // create/edit/deactivate other staff/manager/super_admin accounts
+
+  // Operating hours, holidays/closures, and homepage announcements.
+  // Staff can VIEW these (e.g. to answer a guest's question) but only
+  // manager/super_admin can change what's live on the public homepage.
+  SETTINGS_VIEW:   "settings:view",
+  SETTINGS_MANAGE: "settings:manage",
 };
 
 const ROLE_PERMISSIONS = {
@@ -25,6 +31,8 @@ const ROLE_PERMISSIONS = {
     PERMISSIONS.BOOKING_VIEW,
     PERMISSIONS.BOOKING_MANAGE,
     PERMISSIONS.REPORTS_VIEW,
+    PERMISSIONS.SETTINGS_VIEW,
+    PERMISSIONS.SETTINGS_MANAGE,
   ],
 
   staff: [
@@ -32,6 +40,7 @@ const ROLE_PERMISSIONS = {
     PERMISSIONS.ROOM_VIEW,
     PERMISSIONS.BOOKING_VIEW,
     PERMISSIONS.BOOKING_MANAGE,
+    PERMISSIONS.SETTINGS_VIEW,
   ],
 };
 
