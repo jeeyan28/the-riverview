@@ -10,6 +10,23 @@
         <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
         <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
         <link rel="stylesheet" href="css/admin.css">
+        <style>
+            .bkcal-nav-btn{width:28px;height:28px;border-radius:8px;background:rgba(255,255,255,.05);border:1px solid var(--border);color:#c8d6e5;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:.75rem;}
+            .bkcal-nav-btn:hover{background:rgba(255,255,255,.1);}
+            .bkcal-month-label{font-size:.85rem;font-weight:600;color:#fff;min-width:120px;text-align:center;}
+            .bkcal-today-btn{font-size:.72rem;padding:5px 10px;border-radius:7px;border:1px solid var(--border);background:none;color:var(--muted);cursor:pointer;font-family:'Inter',sans-serif;}
+            .bkcal-weekdays,.bkcal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;}
+            .bkcal-weekdays{margin-bottom:4px;}
+            .bkcal-weekday-label{text-align:center;font-size:.65rem;font-weight:600;color:#6b7588;text-transform:uppercase;letter-spacing:.04em;padding:2px 0;}
+            .bkcal-day{aspect-ratio:1;border-radius:8px;background:rgba(255,255,255,.03);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;cursor:pointer;position:relative;font-size:.78rem;color:#dfe3ec;border:1px solid transparent;transition:background .15s,border-color .15s;}
+            .bkcal-day:hover{background:rgba(0,201,167,.1);border-color:rgba(0,201,167,.3);}
+            .bkcal-day--empty{visibility:hidden;cursor:default;}
+            .bkcal-day.is-today{box-shadow:inset 0 0 0 1px rgba(0,201,167,.5);}
+            .bkcal-day.is-selected{background:#00C9A7;border-color:#00C9A7;color:#06251f;font-weight:700;}
+            .bkcal-day.has-bookings .bkcal-dot{background:#378ADD;color:#fff;}
+            .bkcal-day.is-selected .bkcal-dot{background:#06251f;color:#fff;}
+            .bkcal-dot{font-size:.6rem;font-weight:700;background:rgba(255,255,255,.08);color:#8A9BB0;border-radius:10px;padding:0 5px;min-width:14px;text-align:center;}
+        </style>
     </head>
 
     <body>
@@ -31,6 +48,7 @@
             <button class="sb-item active" data-panel="dashboard"><i class="ti ti-layout-dashboard"></i>Dashboard</button>
             <button class="sb-item" data-panel="monitor"><i class="ti ti-device-desktop-analytics"></i>Room Monitor</button>
             <button class="sb-item" data-panel="bookings"><i class="ti ti-calendar-event"></i>Bookings</button>
+            <button class="sb-item" data-panel="pos" data-requires-permission="pos:access"><i class="ti ti-cash-register"></i>POS</button>
 
             <div class="sb-section">Insights</div>
             <button class="sb-item" data-panel="analytics"><i class="ti ti-chart-bar"></i>Analytics</button>
@@ -62,6 +80,9 @@
             <div class="topbar-right">
                 <div class="tb-chip"><i class="ti ti-map-pin"></i>San Rafael Caingin</div>
                 <div class="tb-chip"><i class="ti ti-clock"></i><span id="live-time"></span></div>
+                <!-- Same login session works on the public site — this just navigates,
+                     it never logs the admin out or requires them to sign in again. -->
+                <button class="tb-chip" id="view-user-site-btn" type="button" style="cursor:pointer;background:rgba(0,201,167,.1);border-color:rgba(0,201,167,.3);color:var(--teal);" title="Open the public-facing site in a new tab"><i class="ti ti-external-link"></i>View User Site</button>
                 <button class="notif-btn" aria-label="Notifications"><i class="ti ti-bell"></i><span class="notif-dot"></span></button>
             </div>
             </div>
@@ -141,28 +162,95 @@
             <!-- ── BOOKINGS ── -->
             <div class="panel" id="panel-bookings">
                 <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
-                <div style="display:flex;gap:6px;">
-                    <select id="bk-filter-status" style="font-size:.78rem;padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:var(--navy3);color:#c8d6e5;font-family:'Inter',sans-serif;">
-                    <option value="">All Status</option><option value="Active">Active</option><option value="Pending">Pending</option><option value="Done">Done</option><option value="Overdue">Overdue</option>
-                    </select>
-                    <select id="bk-filter-room" style="font-size:.78rem;padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:var(--navy3);color:#c8d6e5;font-family:'Inter',sans-serif;">
-                    <option value="">All Rooms</option>
-                    </select>
+                    <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                        <input type="text" id="bk-search" placeholder="Search name or phone…" style="font-size:.78rem;padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:var(--navy3);color:#c8d6e5;font-family:'Inter',sans-serif;min-width:170px;">
+                        <select id="bk-filter-status" style="font-size:.78rem;padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:var(--navy3);color:#c8d6e5;font-family:'Inter',sans-serif;">
+                        <option value="">All Status</option>
+                        <option value="Pending Payment Verification">Pending Payment Verification</option>
+                        <option value="Confirmed">Confirmed</option>
+                        <option value="Rejected">Rejected</option>
+                        <option value="Active">Active</option><option value="Pending">Pending</option><option value="Done">Done</option><option value="Overdue">Overdue</option><option value="Cancelled">Cancelled</option>
+                        </select>
+                        <select id="bk-filter-payment" style="font-size:.78rem;padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:var(--navy3);color:#c8d6e5;font-family:'Inter',sans-serif;">
+                        <option value="">All Payment Status</option>
+                        <option value="Unpaid">Unpaid</option><option value="Pending Verification">Pending Verification</option><option value="Paid">Paid</option><option value="Rejected">Rejected</option>
+                        </select>
+                        <select id="bk-filter-room" style="font-size:.78rem;padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:var(--navy3);color:#c8d6e5;font-family:'Inter',sans-serif;">
+                        <option value="">All Rooms</option>
+                        </select>
+                        <!-- ADDED (Tier 1): exact-date filter. Backend already supported ?date= in
+                            bookingRoutes.js — this was the only filter missing a UI control. -->
+                        <input type="date" id="bk-filter-date" title="Filter by exact date" style="font-size:.78rem;padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:var(--navy3);color:#c8d6e5;font-family:'Inter',sans-serif;">
+                        <button id="bk-clear-filters" type="button" style="font-size:.78rem;padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:none;color:var(--muted);font-family:'Inter',sans-serif;cursor:pointer;">Clear</button>
+                    </div>
+                    <button onclick="openModal()" style="display:flex;align-items:center;gap:6px;padding:7px 14px;background:rgba(0,201,167,.1);border:1px solid rgba(0,201,167,.3);border-radius:9px;font-size:.78rem;color:var(--teal);cursor:pointer;font-family:'Inter',sans-serif;"><i class="ti ti-plus"></i>Manual Booking</button>
                 </div>
-                <button onclick="openModal()" style="display:flex;align-items:center;gap:6px;padding:7px 14px;background:rgba(0,201,167,.1);border:1px solid rgba(0,201,167,.3);border-radius:9px;font-size:.78rem;color:var(--teal);cursor:pointer;font-family:'Inter',sans-serif;"><i class="ti ti-plus"></i>Manual Booking</button>
+                <div class="card" id="bk-calendar-card" style="padding:14px 16px;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+                            <div style="display:flex;align-items:center;gap:8px;">
+                            <button id="bkcal-prev" type="button" class="bkcal-nav-btn"><i class="ti ti-chevron-left"></i></button>
+                            <span id="bkcal-month-label" class="bkcal-month-label"></span>
+                            <button id="bkcal-next" type="button" class="bkcal-nav-btn"><i class="ti ti-chevron-right"></i></button>
+                        </div>
+                        <button id="bkcal-today" type="button" class="bkcal-today-btn">Today</button>
+                    </div>
+                    <div id="bkcal-weekdays" class="bkcal-weekdays"></div>
+                    <div id="bkcal-grid" class="bkcal-grid"></div>
                 </div>
-                <div class="card" style="padding:0;overflow:hidden;">
+                <div class="card" style="padding:0;overflow:hidden;overflow-x:auto;">
                 <table class="tbl">
                     <thead style="background:var(--navy3);">
                     <tr>
-                        <th style="padding:10px 12px;">Guest</th>
-                        <th>Room</th><th>Date</th><th>Time In</th><th>Duration</th><th>Amount</th><th>Status</th><th>Actions</th>
+                        <th style="padding:10px 12px;">Customer</th>
+                        <th>Phone</th><th>Service</th><th>Room</th><th>Date</th><th>Time</th><th>Hours</th><th>Payment</th><th>Status</th><th>Actions</th>
                     </tr>
                     </thead>
                     <tbody id="bookings-tbody">
-                    <tr><td colspan="8" style="text-align:center;color:var(--muted);padding:16px 0;">Loading…</td></tr>
+                    <tr><td colspan="10" style="text-align:center;color:var(--muted);padding:16px 0;">Loading…</td></tr>
                     </tbody>
                 </table>
+                </div>
+            </div>
+
+            <!-- ── POS (POINT OF SALE) ── -->
+            <div class="panel" id="panel-pos">
+                <div class="two-col" style="align-items:flex-start;">
+                    <div class="card">
+                        <div class="card-head"><span class="card-title">New Sale</span></div>
+                        <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
+                            <input id="pos-item-name" type="text" placeholder="Item name (e.g. Bottled Water)" style="flex:2;min-width:160px;padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--navy3);color:#fff;font-family:'Inter',sans-serif;font-size:.82rem;">
+                            <input id="pos-item-price" type="number" min="0" step="0.01" placeholder="Price" style="flex:1;min-width:80px;padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--navy3);color:#fff;font-family:'Inter',sans-serif;font-size:.82rem;">
+                            <input id="pos-item-qty" type="number" min="1" step="1" value="1" placeholder="Qty" style="flex:0 0 70px;padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--navy3);color:#fff;font-family:'Inter',sans-serif;font-size:.82rem;">
+                            <button id="pos-add-item-btn" class="btn-teal" type="button"><i class="ti ti-plus"></i>Add</button>
+                        </div>
+                        <div class="card" style="padding:0;overflow:hidden;">
+                            <table class="tbl">
+                                <thead style="background:var(--navy3);"><tr><th style="padding:8px 10px;">Item</th><th>Price</th><th>Qty</th><th>Subtotal</th><th></th></tr></thead>
+                                <tbody id="pos-cart-body"><tr><td colspan="5" style="text-align:center;color:var(--muted);padding:14px 0;">Cart is empty</td></tr></tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-head"><span class="card-title">Checkout</span></div>
+                        <div class="rm-row"><span class="lbl">Subtotal</span><span class="val" id="pos-subtotal">₱0.00</span></div>
+                        <div class="rm-row"><span class="lbl">Discount</span><span class="val"><input id="pos-discount" type="number" min="0" step="0.01" value="0" style="width:90px;padding:5px 8px;border-radius:6px;border:1px solid var(--border);background:var(--navy3);color:#fff;font-family:'Inter',sans-serif;font-size:.8rem;text-align:right;"></span></div>
+                        <div class="rm-row" style="font-weight:700;"><span class="lbl">Total</span><span class="val" id="pos-total">₱0.00</span></div>
+                        <div class="sched-field" style="margin-top:10px;">
+                            <label>Payment method</label>
+                            <select id="pos-payment-method" style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--navy3);color:#fff;font-family:'Inter',sans-serif;font-size:.82rem;">
+                                <option value="Cash">Cash</option><option value="GCash">GCash</option><option value="Maya">Maya</option>
+                            </select>
+                        </div>
+                        <input id="pos-note" type="text" placeholder="Note (optional — e.g. room number)" style="width:100%;margin-top:8px;padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--navy3);color:#fff;font-family:'Inter',sans-serif;font-size:.8rem;box-sizing:border-box;">
+                        <button id="pos-checkout-btn" class="save-btn" style="width:100%;margin-top:12px;" type="button"><i class="ti ti-cash"></i> Complete Sale</button>
+                    </div>
+                </div>
+                <div class="card" style="padding:0;overflow:hidden;overflow-x:auto;">
+                    <div class="card-head" style="padding:12px 14px 0;"><span class="card-title">Today's Transactions</span></div>
+                    <table class="tbl">
+                        <thead style="background:var(--navy3);"><tr><th style="padding:10px 12px;">Time</th><th>Items</th><th>Total</th><th>Payment</th><th>Cashier</th><th>Status</th><th data-requires-permission="pos:refund">Actions</th></tr></thead>
+                        <tbody id="pos-sales-tbody"><tr><td colspan="7" style="text-align:center;color:var(--muted);padding:16px 0;">Loading…</td></tr></tbody>
+                    </table>
                 </div>
             </div>
 
@@ -263,6 +351,8 @@
                 <button class="set-tab active" data-set="facilities">Facilities</button>
                 <button class="set-tab" data-set="pricing">Pricing</button>
                 <button class="set-tab" data-set="promotion">Promotion</button>
+                <button class="set-tab" data-set="announcements">Announcements</button>
+                <button class="set-tab" data-set="payment-methods">Payment Methods</button>
                 <button class="set-tab" data-set="audit">Audit Log</button>
                 </div>
 
@@ -286,63 +376,50 @@
                     <div class="sched-2col">
                     <div class="sched-field">
                         <label>Opening Hour</label>
-                        <div class="sched-input-wrap"><i class="ti ti-clock"></i><input type="time" value="06:00"></div>
+                        <div class="sched-input-wrap"><i class="ti ti-clock"></i><input type="time" id="op-open-time" value="06:00"></div>
                     </div>
                     <div class="sched-field">
                         <label>Closing Hour</label>
-                        <div class="sched-input-wrap"><i class="ti ti-clock"></i><input type="time" value="22:00"></div>
+                        <div class="sched-input-wrap"><i class="ti ti-clock"></i><input type="time" id="op-close-time" value="22:00"></div>
                     </div>
                     <div class="sched-field">
                         <label>Max Advance Reservation</label>
                         <div class="sched-inline">
-                        <select><option>15</option><option>30</option><option selected>30</option><option>60</option></select>
+                        <select id="op-max-advance"><option value="15">15</option><option value="30" selected>30</option><option value="60">60</option></select>
                         <span>days in advance</span>
                         </div>
                     </div>
                     <div class="sched-field">
                         <label>Booking Cutoff Time</label>
                         <div class="sched-inline">
-                        <select><option>1</option><option selected>2</option><option>4</option></select>
+                        <select id="op-cutoff-hours"><option value="1">1</option><option value="2" selected>2</option><option value="4">4</option></select>
                         <span>hours before facility opens</span>
                         </div>
                     </div>
                     </div>
                     <div class="sched-field" style="margin-top:4px;">
                     <label>Open Days</label>
-                    <div class="day-row">
-                        <button class="day-pill on">Mon</button>
-                        <button class="day-pill on">Tue</button>
-                        <button class="day-pill on">Wed</button>
-                        <button class="day-pill on">Thu</button>
-                        <button class="day-pill on">Fri</button>
-                        <button class="day-pill on">Sat</button>
-                        <button class="day-pill">Sun</button>
+                    <div class="day-row" id="op-day-row">
+                        <button class="day-pill on" data-day="1">Mon</button>
+                        <button class="day-pill on" data-day="2">Tue</button>
+                        <button class="day-pill on" data-day="3">Wed</button>
+                        <button class="day-pill on" data-day="4">Thu</button>
+                        <button class="day-pill on" data-day="5">Fri</button>
+                        <button class="day-pill on" data-day="6">Sat</button>
+                        <button class="day-pill" data-day="0">Sun</button>
                     </div>
                     </div>
+                    <button id="op-save-btn" class="save-btn" style="margin-top:10px;" type="button">Save operating schedule</button>
                 </div>
 
                 <div class="card">
                     <div class="fac-head">
                     <div class="fac-head-left"><i class="ti ti-calendar-x"></i><span class="fac-head-title">Holiday & Closure Dates</span></div>
-                    <button class="btn-teal-outline" onclick="openModal()"><i class="ti ti-plus"></i>Add Date</button>
+                    <button class="btn-teal-outline" id="add-holiday-btn" type="button"><i class="ti ti-plus"></i>Add Date</button>
                     </div>
-                    <div class="holiday-note">Customers cannot book on these dates. The reservation calendar will automatically block them.</div>
-                    <div class="holiday-list" style="margin-top:10px;">
-                    <div class="holiday-item">
-                        <i class="ti ti-calendar-off ico"></i>
-                        <div><div class="holiday-name">New Year's Day</div><div class="holiday-date">January 1, 2027 — Full Day Closure</div></div>
-                        <button class="holiday-del"><i class="ti ti-trash"></i></button>
-                    </div>
-                    <div class="holiday-item">
-                        <i class="ti ti-calendar-off ico"></i>
-                        <div><div class="holiday-name">Independence Day</div><div class="holiday-date">June 12, 2027 — Full Day Closure</div></div>
-                        <button class="holiday-del"><i class="ti ti-trash"></i></button>
-                    </div>
-                    <div class="holiday-item">
-                        <i class="ti ti-calendar-off ico"></i>
-                        <div><div class="holiday-name">Christmas Day</div><div class="holiday-date">December 25, 2026 — Full Day Closure</div></div>
-                        <button class="holiday-del"><i class="ti ti-trash"></i></button>
-                    </div>
+                    <div class="holiday-note">Customers cannot book on these dates. The reservation calendar will automatically block them, and each upcoming date also appears in the announcement banner at the top of the homepage.</div>
+                    <div class="holiday-list" id="holiday-list" style="margin-top:10px;">
+                    <div style="text-align:center;color:var(--muted);padding:12px 0;">Loading…</div>
                     </div>
                 </div>
 
@@ -396,6 +473,30 @@
                     <div class="promo-desc">25% off Basketball Court AM sessions.</div>
                     <div class="promo-meta"><span>Starts Jul 10</span><span>Ends Aug 30</span></div>
                     </div>
+                </div>
+                </div>
+
+                <!-- ANNOUNCEMENTS (homepage promo banner) -->
+                <div class="set-subpanel" id="set-announcements">
+                <div class="fac-head">
+                    <div class="fac-head-left"><i class="ti ti-speakerphone"></i><span class="fac-head-title">Homepage Announcements</span></div>
+                    <button class="btn-teal" id="add-announcement-btn" type="button"><i class="ti ti-plus"></i>New Announcement</button>
+                </div>
+                <p style="margin:8px 0 0;font-size:.78rem;color:var(--muted);">Active announcements appear as the dismissible banner at the top of the public homepage. Inactive or expired ones stay here but won't show to guests.</p>
+                <div id="announcements-list" style="margin-top:10px;display:flex;flex-direction:column;gap:10px;">
+                    <div style="text-align:center;color:var(--muted);padding:12px 0;">Loading…</div>
+                </div>
+                </div>
+
+                <!-- PAYMENT METHODS (booking down-payment step: GCash/Maya/etc buttons + QR) -->
+                <div class="set-subpanel" id="set-payment-methods">
+                <div class="fac-head">
+                    <div class="fac-head-left"><i class="ti ti-qrcode"></i><span class="fac-head-title">Down-Payment Methods</span></div>
+                    <button class="btn-teal" id="add-payment-method-btn" type="button"><i class="ti ti-plus"></i>Add Payment Method</button>
+                </div>
+                <p style="margin:8px 0 0;font-size:.78rem;color:var(--muted);">These are the buttons guests see on the booking page's down-payment step (e.g. GCash, Maya). Each needs a QR code image for guests to scan. Disable one instead of deleting it if a wallet is temporarily unavailable — its button disappears from the booking page until you re-enable it.</p>
+                <div id="payment-methods-list" style="margin-top:10px;display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;">
+                    <div style="text-align:center;color:var(--muted);padding:12px 0;grid-column:1/-1;">Loading…</div>
                 </div>
                 </div>
 
@@ -458,6 +559,92 @@
         </div>
         </div>
 
+        <!-- ── MODAL: VIEW PAYMENT PROOF ── -->
+        <div class="modal-bg" id="proof-modal">
+        <div class="modal">
+            <div class="modal-title">Payment Screenshot</div>
+            <div id="proof-modal-body" style="text-align:center;">
+                <img id="proof-modal-img" src="" alt="Payment screenshot" style="max-width:100%;max-height:60vh;border-radius:10px;">
+                <p id="proof-modal-meta" style="font-size:.8rem;color:var(--muted);margin-top:10px;"></p>
+            </div>
+            <div class="modal-actions">
+                <button class="btn-cancel" onclick="closeProofModal()">Close</button>
+                <button class="btn-cancel" style="color:var(--red);border-color:rgba(255,107,107,.3);" id="proof-reject-btn" onclick="rejectFromProofModal()">Reject</button>
+                <button class="btn-confirm" id="proof-approve-btn" onclick="approveFromProofModal()">Approve</button>
+            </div>
+        </div>
+        </div>
+
+        <!-- ── MODAL: BOOKING DETAILS (View button on the Bookings table) ──
+             Shows full customer info, booking details, the guest's uploaded
+             payment screenshot, their past booking history, and any
+             comment/special request left when booking. Confirm/Edit/Cancel
+             act on the real booking via the same endpoints the table's quick
+             actions already use. -->
+        <div class="modal-bg" id="booking-detail-modal">
+        <div class="modal modal-xl">
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
+                <div>
+                    <div class="modal-lg-title">Booking Details</div>
+                    <p class="modal-lg-sub" id="bd-booking-id" style="margin-bottom:0;">Booking ID: #BK-000000</p>
+                </div>
+                <span class="pill" id="bd-status-pill">—</span>
+            </div>
+
+            <div class="bd-section">
+                <div class="bd-section-title"><i class="ti ti-user"></i> Customer Information</div>
+                <div class="bd-grid">
+                    <div class="bd-field"><label>Customer Name</label><p id="bd-guest-name">—</p></div>
+                    <div class="bd-field"><label>Email</label><p id="bd-guest-email">—</p></div>
+                    <div class="bd-field"><label>Phone Number</label><p id="bd-guest-phone">—</p></div>
+                </div>
+            </div>
+
+            <div class="bd-section">
+                <div class="bd-section-title"><i class="ti ti-calendar-event"></i> Booking Details</div>
+                <div class="bd-grid">
+                    <div class="bd-field"><label>Room</label><p id="bd-room">—</p></div>
+                    <div class="bd-field"><label>Date</label><p id="bd-date">—</p></div>
+                    <div class="bd-field"><label>Time</label><p id="bd-time">—</p></div>
+                    <div class="bd-field"><label>Duration</label><p id="bd-duration">—</p></div>
+                    <div class="bd-field"><label>Number of Guests</label><p id="bd-guests">—</p></div>
+                    <div class="bd-field"><label>Total Amount</label><p id="bd-amount">—</p></div>
+                </div>
+            </div>
+
+            <div class="bd-section" id="bd-screenshot-section" style="display:none;">
+                <div class="bd-section-title"><i class="ti ti-receipt"></i> Payment Screenshot</div>
+                <img id="bd-screenshot" class="bd-screenshot" src="" alt="Payment screenshot sent by the guest" onclick="openProofModal(currentBookingDetailId)">
+                <p class="bd-screenshot-hint">Click to view full size, approve, or reject.</p>
+            </div>
+
+            <div class="bd-section">
+                <div class="bd-section-title"><i class="ti ti-history"></i> Booking History</div>
+                <div class="card" style="padding:0;overflow:hidden;">
+                    <table class="tbl">
+                        <thead style="background:var(--navy3);"><tr><th style="padding:8px 10px;">Date</th><th>Room</th><th>Duration</th><th>Status</th></tr></thead>
+                        <tbody id="bd-history-tbody"><tr><td colspan="4" style="text-align:center;color:var(--muted);padding:10px 0;font-size:.8rem;">No previous bookings from this guest.</td></tr></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="bd-section">
+                <div class="bd-section-title"><i class="ti ti-file-text"></i> Additional Notes</div>
+                <p class="bd-notes-label">Special Requests</p>
+                <p class="bd-notes-body" id="bd-notes">No special requests provided.</p>
+            </div>
+
+            <div class="modal-actions" style="justify-content:space-between;">
+                <button class="btn-cancel" style="color:var(--red);border-color:rgba(255,107,107,.3);" id="bd-cancel-btn" onclick="cancelBookingFromDetail()">Cancel Booking</button>
+                <div style="display:flex;gap:10px;">
+                    <button class="btn-cancel" id="bd-close-btn" onclick="closeBookingDetailModal()">Close</button>
+                    <button class="btn-cancel" id="bd-edit-btn" onclick="editBookingFromDetail()">Edit Booking</button>
+                    <button class="btn-confirm" id="bd-confirm-btn" onclick="confirmBookingFromDetail()">Confirm Booking</button>
+                </div>
+            </div>
+        </div>
+        </div>
+
         <!-- ── MODAL: MANUAL BOOKING ── -->
         <div class="modal-bg" id="modal">
         <div class="modal">
@@ -481,6 +668,38 @@
         </div>
         </div>
 
+        <!-- ── MODAL: EDIT BOOKING (ADDED — Tier 1) ──
+             Lets admins adjust duration / payment method / status directly,
+             on top of the quick action buttons already in the table. Reuses
+             the existing .modal / .mfield / .modal-actions styling so it
+             matches the Manual Booking modal above. -->
+        <div class="modal-bg" id="edit-booking-modal">
+        <div class="modal">
+            <div class="modal-title">Edit Booking</div>
+            <p id="eb-summary" style="font-size:.8rem;color:var(--muted);margin:-8px 0 14px;"></p>
+            <div class="mfield"><label>Duration (hours)</label><input type="number" id="eb-duration" min="1" max="5"></div>
+            <div class="mfield"><label>Payment method</label>
+            <select id="eb-payment"><option>Cash</option><option>GCash</option><option>Maya</option></select>
+            </div>
+            <div class="mfield"><label>Status</label>
+            <select id="eb-status">
+                <option value="Pending">Pending</option>
+                <option value="Pending Payment Verification">Pending Payment Verification</option>
+                <option value="Confirmed">Confirmed</option>
+                <option value="Rejected">Rejected</option>
+                <option value="Active">Active</option>
+                <option value="Done">Done</option>
+                <option value="Overdue">Overdue</option>
+                <option value="Cancelled">Cancelled</option>
+            </select>
+            </div>
+            <div class="modal-actions">
+            <button class="btn-cancel" onclick="closeEditBookingModal()">Cancel</button>
+            <button class="btn-confirm" id="eb-save-btn" onclick="saveBookingEdit()">Save Changes</button>
+            </div>
+        </div>
+        </div>
+
         <!-- ── FACILITY EDIT / ADD MODAL ── -->
         <div class="modal-bg" id="facility-modal">
             <div class="modal modal-lg">
@@ -488,7 +707,7 @@
                 <div class="modal-lg-sub" id="fm-sub">Update facility information, pricing tiers, and features.</div>
 
                 <div class="frow">
-                <div class="ffield"><label class="flabel">Facility Name</label><input type="text" id="fm-name" placeholder="e.g. Billiards"></div>
+                <div class="ffield"><label class="flabel">Category</label><input type="text" id="fm-name" placeholder="e.g. Billiards"></div>
                 <div class="ffield"><label class="flabel">Room Number</label><input type="text" id="fm-room" placeholder="e.g. Room 3"></div>
                 </div>
 
@@ -518,6 +737,7 @@
                     </select>
                 </div>
                 </div>
+
                 <div class="field-note">Base price is used only when no pricing tiers are set.</div>
 
                 <div class="ffield">
@@ -546,6 +766,41 @@
                 </div>
             </div>
             </div>
+
+        <!-- ── PAYMENT METHOD ADD / EDIT MODAL ── -->
+        <div class="modal-bg" id="payment-method-modal">
+            <div class="modal modal-lg">
+                <div class="modal-lg-title" id="pm-title">Add Payment Method</div>
+                <div class="modal-lg-sub">This button (and QR code) appears on the booking page's down-payment step.</div>
+
+                <div class="ffield">
+                <label class="flabel">Method Name</label>
+                <input type="text" id="pm-name" placeholder="e.g. GCash, Maya, BPI QR">
+                </div>
+
+                <div class="ffield">
+                <label class="flabel">QR Code Image</label>
+                <div class="upload-box" id="pm-upload-box" onclick="document.getElementById('pm-image-input').click()">
+                    <img id="pm-image-preview" style="display:none;max-height:160px;border-radius:8px;margin-bottom:8px;object-fit:contain;">
+                    <i class="ti ti-qrcode" id="pm-upload-icon"></i>
+                    <div class="up-title" id="pm-upload-title">Click to upload QR code image</div>
+                    <div class="up-sub">PNG, JPG up to 5MB</div>
+                </div>
+                <input type="file" id="pm-image-input" accept="image/png,image/jpeg,image/webp" style="display:none;">
+                </div>
+
+                <div class="s-row" style="margin-bottom:22px;">
+                <div><div class="s-label">Available to guests</div><div class="s-sub">Turn off to hide this button without deleting it (e.g. wallet temporarily down)</div></div>
+                <div class="toggle on" id="pm-active-toggle" onclick="this.classList.toggle('on');this.classList.toggle('off');"><div class="toggle-thumb"></div></div>
+                </div>
+
+                <div class="modal-actions-split">
+                <button class="btn-remove" id="pm-remove-btn" onclick="removePaymentMethod()">Remove</button>
+                <button class="btn-save" id="pm-save-btn" onclick="savePaymentMethod()">Save Changes</button>
+                </div>
+            </div>
+            </div>
+
         <script src="js/admin.js"></script>
         <script src="js/admin-profile.js"></script>
     </body>

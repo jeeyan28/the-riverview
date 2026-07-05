@@ -194,7 +194,11 @@ router.post("/forgot-password", forgotPasswordLimiter, async (req, res) => {
   user.resetPasswordExpires = Date.now() + 60 * 60 * 1000; // 1 hour
   await user.save();
 
-  const resetUrl = `${process.env.APP_BASE_URL}/reset-password.html?token=${rawToken}`;
+  // APP_BASE_URL may hold a comma-separated list of allowed CORS origins —
+  // the reset link only ever needs one canonical base, so always take the
+  // first entry rather than gluing the whole raw string onto the URL.
+  const primaryBaseUrl = (process.env.APP_BASE_URL || "").split(",")[0].trim();
+  const resetUrl = `${primaryBaseUrl}/reset-password.html?token=${rawToken}`;
   try {
     await sendPasswordResetEmail(user, resetUrl);
   } catch (err) {
@@ -239,13 +243,9 @@ router.post("/reset-password/:token", forgotPasswordLimiter, async (req, res) =>
 
 // ── Current session user (used on page load to confirm still logged in + get role)
 router.get("/me", ensureAuthenticated, async (req, res) => {
-  const user = await User.findById(req.session.userId);
-
-  if (!user) {
-    return res.status(404).json({ message: "User not found." });
-  }
-
-  res.json({ user: sanitizeUser(user) });
+  // req.user was already loaded and confirmed active by ensureAuthenticated —
+  // no need to hit the database again for the same document.
+  res.json({ user: sanitizeUser(req.user) });
 });
 // ── Logout
 router.post("/logout", (req, res) => {

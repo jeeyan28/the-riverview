@@ -147,7 +147,73 @@ form.addEventListener('submit', async (e) => {
     }
 });
 
-/* ── Google (demo) ── */
+/* ── Google sign-up (Google Identity Services) ──
+   Requires this in register.html's <head>:
+     <script src="https://accounts.google.com/gsi/client" async defer></script>
+   GOOGLE_CLIENT_ID must match the backend's GOOGLE_CLIENT_ID env var.
+   Reuses POST /api/auth/google — the same endpoint login.js uses — which
+   already creates a new customer account on the fly for a first-time
+   Google sign-in, so "register with Google" and "log in with Google" are
+   the same server-side action by design. */
+const GOOGLE_CLIENT_ID = '488226777682-bvm3f2kr7oi1nkbmcs96mm0n09gvgvf0.apps.googleusercontent.com';
+
+function redirectAfterAuth(user) {
+    const isAdmin = ['staff', 'manager', 'super_admin'].includes(user.role);
+    window.location.href = isAdmin ? 'admin.html' : 'index.html';
+}
+
+async function handleGoogleCredential(response) {
+    try {
+        const res = await fetch(`${API_BASE_URL}/api/auth/google`, {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ idToken: response.credential })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || 'Google sign-up failed.');
+
+        localStorage.setItem('riverview_user', JSON.stringify(data.user));
+        showToast('Welcome! Redirecting…', 'success');
+        setTimeout(() => redirectAfterAuth(data.user), 1200);
+    } catch (err) {
+        showToast(err.message || 'Google sign-up failed.', 'error');
+    }
+}
+
+function initGoogleSignUp() {
+    if (!window.google || !google.accounts?.id) {
+        return setTimeout(initGoogleSignUp, 300);
+    }
+    google.accounts.id.initialize({
+        client_id: GOOGLE_CLIENT_ID,
+        callback: handleGoogleCredential,
+        use_fedcm_for_prompt: true,
+    });
+
+    // Render Google's real button into a hidden host and forward clicks to it,
+    // since the One Tap prompt() call can be silently suppressed by the browser.
+    const hiddenHost = document.getElementById('google-btn-host') || (() => {
+        const div = document.createElement('div');
+        div.id = 'google-btn-host';
+        div.style.display = 'none';
+        document.body.appendChild(div);
+        return div;
+    })();
+    google.accounts.id.renderButton(hiddenHost, { type: 'standard' });
+}
+
 document.getElementById('btn-google').addEventListener('click', () => {
-    showToast('Google sign-up coming soon.', 'error');
+    if (!window.google || !google.accounts?.id) {
+        showToast('Google sign-in is still loading — try again in a second.', 'error');
+        return;
+    }
+    const realGoogleButton = document.querySelector('#google-btn-host div[role="button"]');
+    if (realGoogleButton) {
+        realGoogleButton.click();
+    } else {
+        google.accounts.id.prompt();
+    }
 });
+
+initGoogleSignUp();

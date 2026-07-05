@@ -26,6 +26,7 @@ button { cursor: pointer; border: none; font-family: 'Inter', sans-serif; }
     --border: rgba(10,22,40,.1);
     --header-h: 68px;
     --banner-h: 0px;
+    --holiday-h: 0px;
 
     /* theme-aware tokens (light = default) */
     --surface:            var(--cream);
@@ -55,7 +56,11 @@ body, header, .spaces, nav a, .btn-login, .newsletter-form, .newsletter-form inp
     transition: background .3s ease, color .3s ease, border-color .3s ease;
 }
 
-/* ─── PROMO ANNOUNCEMENT BANNER ─── */
+/* ─── ANNOUNCEMENT BANNER ───
+   A single strip that carries BOTH admin-managed promo announcements AND
+   holiday/closure notices, rendered as one non-wrapping line. When there is
+   more than one item, renderAnnouncementBanner() (index.js) joins them with
+   " II " so it still reads as a single line rather than stacking banners. */
 .promo-banner {
     position: fixed;
     top: 0; left: 0; right: 0;
@@ -68,7 +73,7 @@ body, header, .spaces, nav a, .btn-login, .newsletter-form, .newsletter-form inp
     gap: 1rem;
     padding: .8rem 3.5rem;
     text-align: center;
-    transition: transform .3s ease, opacity .3s ease;
+    transition: transform .3s ease, opacity .3s ease, top .3s ease;
 }
 .promo-banner.is-hidden {
     transform: translateY(-100%);
@@ -79,9 +84,13 @@ body, header, .spaces, nav a, .btn-login, .newsletter-form, .newsletter-form inp
     font-size: .85rem;
     font-weight: 600;
     line-height: 1.5;
+    max-width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 .promo-emoji { margin-right: .35rem; }
-.promo-sep { margin: 0 .5rem; opacity: .6; font-weight: 400; }
+.promo-sep { margin: 0 .6rem; opacity: .7; font-weight: 700; }
 .promo-close {
     position: absolute;
     right: 1.25rem;
@@ -535,6 +544,11 @@ nav a:hover, nav a.active { color: var(--text-main); background: var(--card-ligh
 .bk-day--full {
     color: #6b7588;
 }
+.bk-day--holiday {
+    background: rgba(226,85,75,.06);
+    text-decoration: line-through;
+    text-decoration-color: rgba(226,85,75,.5);
+}
 .bk-day--full::after {
     content: ''; width: 4px; height: 4px; border-radius: 50%;
     background: #e2554b; margin-top: 2px;
@@ -919,6 +933,7 @@ footer { background: #060e1a; color: var(--muted); padding: 3.5rem 4rem 2rem; }
     .hero-carousel { display: none; } /* hide carousel on mobile, bg shows instead */
     .promo-banner { padding: .7rem 2.5rem; }
     .promo-text { font-size: .75rem; }
+
     #rooms { padding: 4rem 1.5rem; }
     .rooms-header { flex-direction: column; align-items: flex-start; gap: 1rem; }
     .rooms-header p { text-align: left; }

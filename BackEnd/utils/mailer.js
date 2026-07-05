@@ -24,4 +24,4 @@ async function sendPasswordResetEmail(user, resetUrl) {
   });
 }
 
-module.exports = { sendPasswordResetEmail };
+module.exports = { sendPasswordResetEmail };  

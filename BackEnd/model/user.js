@@ -9,8 +9,12 @@ const ROLES = ["user", "staff", "manager", "super_admin"];
 
 const userSchema = new mongoose.Schema({
   firstname: { type: String, required: true },
-  lastname:  { type: String, required: true },
-  phone:     { type: String, required: true },
+  // Not required at the schema level: Google sign-in may omit the family name,
+  // and a Google account can never supply a phone number at all. The manual
+  // /api/auth/register route still enforces both as required there, since
+  // that's the only place we control the full form.
+  lastname:  { type: String, default: "" },
+  phone:     { type: String, default: "" },
   email:     { type: String, required: true, unique: true, lowercase: true },
   // Not required anymore: an admin created for Google-only sign-in may have no password.
   password: { type: String, select: false },
