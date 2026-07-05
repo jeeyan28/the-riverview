@@ -63,18 +63,14 @@ settingsSchema.statics.getSingleton = async function () {
   if (!doc) {
     doc = await this.create({ _id: "global" });
   }
-  // Backfill the two payment methods the booking flow already hardcoded
-  // (GCash/Maya, pointing at the QR images already shipped in
-  // FrontEnd/assets/pictures/) so existing installs keep working exactly
-  // as before the very first time this runs, with nothing extra to do.
-  // Admins can then edit/replace/disable them from the new admin UI.
-  if (!doc.paymentMethods || doc.paymentMethods.length === 0) {
-    doc.paymentMethods = [
-      { name: "GCash", qrImage: "assets/pictures/gcash-qr.png", isActive: true },
-      { name: "Maya",  qrImage: "assets/pictures/maya-qr.png",  isActive: true },
-    ];
-    await doc.save();
-  }
+  // NOTE: this used to auto-backfill two hardcoded manual QR methods
+  // (GCash/Maya) the first time it ran. That's been removed now that
+  // checkout is automatic through PayMongo (see routes/paymongoRoutes.js) —
+  // new installs simply start with an empty `paymentMethods` list. The
+  // schema, admin CRUD (Settings > Payment Methods), and QR upload code all
+  // still work exactly as before if an admin ever wants to add a manual
+  // wallet/bank method back — nothing here was deleted, just no longer
+  // auto-seeded.
   return doc;
 };
 

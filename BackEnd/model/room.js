@@ -23,6 +23,13 @@ const roomSchema = new mongoose.Schema({
   roomNumber:  { type: String, required: true, trim: true },
   description: { type: String, default: "" },
   price:       { type: Number, default: 0, min: 0 }, // fallback rate, used only if no pricing tiers exist
+  // Maximum number of guests (pax) this facility can hold. 0/unset means "no
+  // limit enforced" so existing rooms created before this field don't
+  // suddenly block bookings until an admin sets a real number. Used by
+  // validateAndPriceBooking() (utils/bookingHelper.js) to reject a booking
+  // whose guestCount exceeds it, and by the public booking page to cap the
+  // Pax selector per room.
+  capacity:    { type: Number, default: 0, min: 0 },
   status:      {
     type: String,
     enum: ["Available", "Occupied", "Under Maintenance", "Inactive"],

@@ -28,6 +28,14 @@ if (process.env.NODE_ENV === "production") {
 // Sets baseline security headers (HSTS, X-Content-Type-Options, X-Frame-Options, etc).
 app.use(helmet());
 
+// PayMongo webhook — MUST be registered before express.json() below and use
+// express.raw(), because verifying the Paymongo-Signature header requires
+// the exact raw bytes PayMongo sent. If express.json() parsed the body first,
+// re-serializing it to compute the signature would (almost always) produce
+// different bytes and every legitimate webhook would fail verification.
+const { webhookHandler } = require("./routes/paymongoRoutes");
+app.post("/api/payments/paymongo/webhook", express.raw({ type: "application/json" }), webhookHandler);
+
 // Cap request body size so a huge payload can't be used as a cheap DoS vector.
 app.use(express.json({ limit: "100kb" }));
 
@@ -89,6 +97,7 @@ app.use("/api/bookings", require("./routes/bookingRoutes"));
 app.use("/api/users", require("./routes/userRoutes"));
 app.use("/api/settings", require("./routes/settingsRoutes")); // operating hours, holidays, announcements
 app.use("/api/pos", require("./routes/posRoutes"));           // POS sales
+app.use("/api/payments/paymongo", require("./routes/paymongoRoutes").router); // automatic online payment (checkout + status)
 
 // ── Centralized error handler (catches multer file-type/size errors, etc.)
 app.use((err, req, res, next) => {

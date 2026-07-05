@@ -618,6 +618,11 @@
                 <p class="bd-screenshot-hint">Click to view full size, approve, or reject.</p>
             </div>
 
+            <div class="bd-section" id="bd-paymongo-section" style="display:none;">
+                <div class="bd-section-title"><i class="ti ti-credit-card"></i> Payment</div>
+                <p style="font-size:.85rem;color:var(--muted);margin:0;">Paid automatically online via PayMongo — confirmed and verified by PayMongo directly, no screenshot or manual approval needed.</p>
+            </div>
+
             <div class="bd-section">
                 <div class="bd-section-title"><i class="ti ti-history"></i> Booking History</div>
                 <div class="card" style="padding:0;overflow:hidden;">
@@ -736,6 +741,12 @@
                     <option>Inactive</option>
                     </select>
                 </div>
+                </div>
+
+                <div class="ffield">
+                <label class="flabel">Max Capacity (Pax)</label>
+                <span class="flabel-hint">Guests won't be able to book more pax than this. Leave 0/blank for no limit.</span>
+                <input type="number" id="fm-capacity" placeholder="e.g. 10" min="0">
                 </div>
 
                 <div class="field-note">Base price is used only when no pricing tiers are set.</div>

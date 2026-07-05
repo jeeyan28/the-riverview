@@ -278,6 +278,7 @@
             desc: r.description || '',
             price: r.price,
             status: r.status,
+            capacity: r.capacity || '',
             features: r.features || [],
             variants: r.variants || [],
             image: r.image || ''
@@ -312,6 +313,7 @@
         document.getElementById('fm-desc').value = data.desc || '';
         document.getElementById('fm-price').value = data.price || '';
         document.getElementById('fm-status').value = data.status || 'Available';
+        document.getElementById('fm-capacity').value = data.capacity || '';
         document.getElementById('fm-remove-btn').style.display = isEdit ? 'inline-block' : 'none';
         document.getElementById('fm-save-btn').textContent = isEdit ? 'Save Changes' : 'Add Facility';
         document.getElementById('fm-image-input').value = '';
@@ -442,6 +444,7 @@
             description: document.getElementById('fm-desc').value.trim(),
             price: Number(document.getElementById('fm-price').value) || 0,
             status: document.getElementById('fm-status').value,
+            capacity: Number(document.getElementById('fm-capacity').value) || 0,
             features: JSON.stringify(currentFeatures),
             variants: JSON.stringify(
                 currentVariants
@@ -890,6 +893,10 @@
             screenshotSection.style.display = '';
         } else {
             screenshotSection.style.display = 'none';
+        }
+        const paymongoSection = document.getElementById('bd-paymongo-section');
+        if (paymongoSection) {
+            paymongoSection.style.display = booking.paymentProvider === 'paymongo' ? '' : 'none';
         }
 
         // Booking history — this guest's other bookings (matched by contact,

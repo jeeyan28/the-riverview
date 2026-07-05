@@ -89,7 +89,7 @@ router.get("/:id", async (req, res) => {
 // Everything below changes room data — manager/super_admin only
 router.post("/", requirePermission(PERMISSIONS.ROOM_MANAGE), upload.single("image"), async (req, res) => {
   try {
-    const { name, roomNumber, description, price, status, features, variants, category } = req.body;
+    const { name, roomNumber, description, price, status, features, variants, category, capacity } = req.body;
 
     if (!name || !roomNumber) {
       return res.status(400).json({ message: "name and roomNumber are required." });
@@ -105,6 +105,7 @@ router.post("/", requirePermission(PERMISSIONS.ROOM_MANAGE), upload.single("imag
       status: status || "Available",
       features: parseFeatures(features),
       variants: parseVariants(variants),
+      capacity: Number(capacity) || 0,
       image: req.file ? req.file.path : (req.body.image || ""),
       ...(categoryFields || { category: null, categoryName: "" })
     });
@@ -120,7 +121,7 @@ router.post("/", requirePermission(PERMISSIONS.ROOM_MANAGE), upload.single("imag
 
 router.put("/:id", requirePermission(PERMISSIONS.ROOM_MANAGE), upload.single("image"), async (req, res) => {
   try {
-    const { name, roomNumber, description, price, status, features, variants, category } = req.body;
+    const { name, roomNumber, description, price, status, features, variants, category, capacity } = req.body;
 
     const update = {};
     if (name !== undefined) update.name = name;
@@ -130,6 +131,7 @@ router.put("/:id", requirePermission(PERMISSIONS.ROOM_MANAGE), upload.single("im
     if (status !== undefined) update.status = status;
     if (features !== undefined) update.features = parseFeatures(features);
     if (variants !== undefined) update.variants = parseVariants(variants);
+    if (capacity !== undefined) update.capacity = Number(capacity) || 0;
     if (req.file) update.image = req.file.path;
 
     if (category !== undefined) {
