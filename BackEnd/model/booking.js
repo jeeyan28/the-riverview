@@ -21,9 +21,14 @@ const bookingSchema = new mongoose.Schema({
   // "Pending" / "Active" / "Done" / "Overdue" remain for admin-created walk-in /
   // manual bookings (Manual Booking modal / Room Monitoring), which skip payment
   // verification entirely. "Cancelled" applies to either path.
+  // "Awaiting Online Payment" = an automatic PayMongo checkout session has
+  // been created for this booking but the customer hasn't finished paying
+  // (or PayMongo's webhook hasn't confirmed it) yet. It auto-advances to
+  // "Confirmed" the moment PayMongo confirms payment (no admin review) —
+  // see routes/paymongoRoutes.js.
   status:        {
     type: String,
-    enum: ["Pending", "Pending Payment Verification", "Confirmed", "Rejected", "Active", "Done", "Overdue", "Cancelled"],
+    enum: ["Pending", "Pending Payment Verification", "Awaiting Online Payment", "Confirmed", "Rejected", "Active", "Done", "Overdue", "Cancelled"],
     default: "Pending"
   },
   // Tracks down-payment verification separately from overall booking status,
@@ -40,10 +45,26 @@ const bookingSchema = new mongoose.Schema({
   // "GCash", "Maya", or a wallet added later) — the admin UI is the source of
   // truth for which names are valid/active, not a hardcoded list here.
   paymentMethod: { type: String, default: "Cash", trim: true },
+  // "manual" = old GCash/Maya-style flow: customer scans a QR and uploads a
+  // screenshot for an admin to review (paymentProofUpload/paymentScreenshot
+  // above — kept fully intact for any future manual method). "paymongo" =
+  // new automatic flow: customer pays through a PayMongo-hosted Checkout
+  // Session and the booking is confirmed automatically by PayMongo's webhook,
+  // with no screenshot and no admin review. See routes/paymongoRoutes.js.
+  paymentProvider: { type: String, enum: ["manual", "paymongo"], default: "manual" },
+  // PayMongo Checkout Session id (e.g. "cs_..."), set when a booking is
+  // created through the automatic-payment path. Used to match incoming
+  // webhook events back to this booking, and as a fallback to re-query
+  // PayMongo's API directly if the webhook is delayed.
+  paymongoCheckoutSessionId: { type: String, default: "" },
+  // Populated once PayMongo reports which underlying payment settled the
+  // checkout session (informational / support use only).
+  paymongoPaymentId: { type: String, default: "" },
   // "online" = customer self-service booking through the public site (requires down
-  // payment + screenshot verification). "walk-in" = created by an admin/staff account
-  // (Manual Booking modal or Room Monitoring). Room Monitoring must ONLY ever show
-  // "walk-in" bookings, never "online" ones.
+  // payment + screenshot verification, OR an automatic PayMongo payment).
+  // "walk-in" = created by an admin/staff account (Manual Booking modal or
+  // Room Monitoring). Room Monitoring must ONLY ever show "walk-in" bookings,
+  // never "online" ones.
   source:        { type: String, enum: ["online", "walk-in"], default: "online" },
   // Every booking now requires a logged-in session (customer or admin), so we
   // can record who made it. Not `required` on the schema itself so any

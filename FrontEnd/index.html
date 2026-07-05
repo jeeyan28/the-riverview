@@ -224,11 +224,31 @@
                         </div>
 
                         <!-- Guest details — required before a booking can be submitted -->
-                        <div class="bk-guest-fields" style="display:flex;flex-direction:column;gap:8px;margin:14px 0;">
-                            <input type="text" id="bkGuestName" placeholder="Full name" style="padding:10px 12px;border-radius:8px;border:1px solid #ddd;font-family:'Inter',sans-serif;font-size:.9rem;">
-                            <input type="text" id="bkGuestContact" placeholder="Phone number or email" style="padding:10px 12px;border-radius:8px;border:1px solid #ddd;font-family:'Inter',sans-serif;font-size:.9rem;">
-                            <input type="number" id="bkGuestCount" min="1" value="1" placeholder="Number of guests" style="padding:10px 12px;border-radius:8px;border:1px solid #ddd;font-family:'Inter',sans-serif;font-size:.9rem;">
-                            <textarea id="bkGuestNote" rows="2" placeholder="Comment / special request (optional) — e.g. birthday setup, extra chairs" style="padding:10px 12px;border-radius:8px;border:1px solid #ddd;font-family:'Inter',sans-serif;font-size:.9rem;resize:vertical;"></textarea>
+                        <div class="bk-guest-fields">
+                            <div class="bk-field">
+                                <label class="bk-field-label" for="bkGuestName">Full name</label>
+                                <input type="text" id="bkGuestName" class="bk-field-input" placeholder="Juan Dela Cruz">
+                            </div>
+                            <div class="bk-field">
+                                <label class="bk-field-label" for="bkGuestContact">Phone number or email</label>
+                                <input type="text" id="bkGuestContact" class="bk-field-input" placeholder="09xx xxx xxxx or you@email.com">
+                            </div>
+                            <div class="bk-field">
+                                <label class="bk-field-label" for="bkGuestCount">
+                                    Number of guests (Pax)
+                                    <span class="bk-field-hint" id="bkGuestCountHint"></span>
+                                </label>
+                                <div class="bk-pax-stepper">
+                                    <button type="button" class="bk-pax-btn" id="bkPaxMinus" aria-label="Decrease guests"><i class="fa-solid fa-minus"></i></button>
+                                    <input type="number" id="bkGuestCount" class="bk-field-input bk-pax-input" min="1" value="1" inputmode="numeric">
+                                    <button type="button" class="bk-pax-btn" id="bkPaxPlus" aria-label="Increase guests"><i class="fa-solid fa-plus"></i></button>
+                                </div>
+                                <p class="bk-field-error" id="bkGuestCountError" style="display:none;"></p>
+                            </div>
+                            <div class="bk-field">
+                                <label class="bk-field-label" for="bkGuestNote">Comment / special request <span class="bk-field-optional">(optional)</span></label>
+                                <textarea id="bkGuestNote" class="bk-field-input bk-field-textarea" rows="2" placeholder="e.g. birthday setup, extra chairs"></textarea>
+                            </div>
                         </div>
                 
                         <div class="bk-summary" id="bkSummary">
@@ -246,46 +266,49 @@
 
                         <div class="bk-slots-head">
                             <h3>Down payment required</h3>
-                            <p>A down payment secures your slot. Choose a payment method below, then upload your payment screenshot.</p>
+                            <p>The minimum down payment equals this room's first-hour rate — it secures your slot instantly.</p>
                         </div>
 
-                        <div class="bk-summary" style="margin-bottom:14px;">
+                        <div class="bk-summary bk-downpayment-summary">
                             <div>
                                 <p class="bk-summary-label">Amount to pay now</p>
                                 <p class="bk-summary-value" id="bkDownPaymentAmount">₱0</p>
                             </div>
+                            <div class="bk-downpayment-note">
+                                <i class="fa-solid fa-circle-info"></i>
+                                <span>First hour rate — the remaining balance is settled on-site.</span>
+                            </div>
                         </div>
 
-                        <!-- Populated dynamically from GET /api/settings (admin-managed Payment
-                             Methods) by renderPayMethodButtons() in js/index.js — this can be
-                             two, one, or several buttons depending on what's active in admin. -->
-                        <div class="bk-pay-methods" id="bkPayMethods" style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;"></div>
-
-                        <div style="text-align:center;margin-bottom:14px;">
-                            <img id="bkQrImage" src="" alt="Payment QR code" style="max-width:220px;width:100%;border-radius:12px;border:1px solid #ddd;">
-                            <p style="font-size:.78rem;color:#888;margin-top:6px;">Scan with your payment app, then take a screenshot of the successful payment.</p>
-                        </div>
-
-                        <label for="bkScreenshotInput" style="display:block;border:2px dashed #ccc;border-radius:10px;padding:16px;text-align:center;cursor:pointer;font-size:.85rem;color:#555;" id="bkScreenshotLabel">
-                            <i class="fa-solid fa-upload"></i> Click to upload your payment screenshot
-                        </label>
-                        <input type="file" id="bkScreenshotInput" accept="image/png,image/jpeg,image/webp" style="display:none;">
-                        <img id="bkScreenshotPreview" style="display:none;max-width:100%;max-height:180px;margin-top:10px;border-radius:8px;">
-
-                        <div class="bk-summary" style="margin-top:14px;">
-                            <button class="bk-confirm" id="bkSubmitPayment" disabled>Submit Booking</button>
+                        <!-- Automatic online payment (PayMongo) — the ONLY payment path.
+                             No screenshot, no manual verification: PayMongo confirms the
+                             payment and your booking is auto-confirmed the moment it clears. -->
+                        <div class="bk-online-pay-card">
+                            <p class="bk-online-pay-title"><i class="fa-solid fa-shield-halved"></i> Pay securely online</p>
+                            <p class="bk-online-pay-sub">Pay by GCash, Maya, QR Ph, or card through our secure checkout. Your booking confirms automatically — no waiting, no manual verification.</p>
+                            <button type="button" class="bk-confirm" id="bkPayOnlineBtn">Proceed to Secure Checkout</button>
+                            <p id="bkPayOnlineError" style="display:none;font-size:.78rem;color:#e2554b;margin-top:8px;"></p>
                         </div>
                     </div>
 
-                    <!-- STEP 5: CONFIRMATION -->
-                    <div class="bk-step bk-step--hidden" id="bkStepConfirm">
-                        <div class="bk-confirm-icon"><i class="fa-solid fa-clock"></i></div>
-                            <h3>Booking submitted — Pending Payment Verification</h3>
-                            <p id="bkConfirmDetails">Billiards Room — Friday, July 3, 2026 at 3:00 PM</p>
-                            <p class="bk-confirm-note">Our team will verify your payment screenshot shortly. You'll see your booking status change to "Confirmed" once approved — you can check it anytime from your profile.</p>
-                            <button class="bk-done" id="bkDone">Done</button>
-                        </div>
-                
+                    <!-- STEP 4b: RETURNING FROM PAYMONGO CHECKOUT — shown when the page
+                         loads with ?paymongo=success|cancel&bookingId=... in the URL
+                         (see handlePaymongoReturn() in js/index.js). Doesn't depend on
+                         any in-memory booking-modal state, since a full page reload
+                         happens on the way back from PayMongo's hosted checkout page. -->
+                    <div class="bk-step bk-step--hidden" id="bkStepPaymongoReturn">
+                        <div class="bk-confirm-icon" id="bkPmReturnIcon"><i class="fa-solid fa-spinner fa-spin"></i></div>
+                        <h3 id="bkPmReturnTitle">Confirming your payment…</h3>
+                        <p id="bkPmReturnDetails">Please wait a moment.</p>
+
+                        <!-- Professional booking summary — filled in by renderBookingSummary()
+                             in js/index.js once payment is confirmed. Hidden while still polling
+                             or if payment didn't go through. -->
+                        <div class="bk-summary-card" id="bkPmSummaryCard" style="display:none;"></div>
+
+                        <button class="bk-done" id="bkPmReturnDone" style="display:none;">Done</button>
+                    </div>
+
                     </div>
                 </div>
             </div>

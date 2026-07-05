@@ -343,11 +343,6 @@ function initHeroCarousel() {
 initHeroCarousel();
 
 /* =================== ROOM CARDS (live from database) =================== */
-const statusPillClass = {
-    Available: 'room-status-available', Occupied: 'room-status-occupied',
-    'Under Maintenance': 'room-status-maintenance', Inactive: 'room-status-inactive'
-};
-
 // Flat list of facility docs — no more category grouping
 let ROOMS = [];
 
@@ -385,22 +380,64 @@ function renderRoomCards() {
             ? room.variants.map(v => `<li><span>${escapeHtml(v.label)}${v.pax ? ' · ' + escapeHtml(v.pax) : ''}</span> <span class="price-amt">₱${v.price}/hr</span></li>`).join('')
             : `<li><span>Standard</span> <span class="price-amt">₱${room.price || 0}/hr</span></li>`;
 
+        // Public-facing status is simplified to exactly three states per the
+        // room card: "Available", "Fully Booked" (today's slots are all
+        // taken — computed live in refreshLiveRoomStatuses()), or
+        // "Unavailable" (admin marked it Occupied/Under Maintenance/Inactive).
+        // Starts on the admin-set status and is upgraded to "Fully Booked"
+        // asynchronously once today's bookings are checked.
+        const initiallyAvailable = room.status === 'Available';
+        const initialLabel = initiallyAvailable ? 'Available' : 'Unavailable';
+        const initialClass = initiallyAvailable ? 'room-status-available' : 'room-status-unavailable';
+        const capacity = getRoomCapacity(room);
+
         return `
-            <div class="room-card">
+            <div class="room-card" data-room-id="${room._id}">
                 <div class="room-card-img">
                     <img src="${cardImage}" alt="${escapeHtml(room.name)}">
                 </div>
                 <div class="room-card-body">
                     <h3>${escapeHtml(room.name)}</h3>
+                    ${capacity ? `<p class="room-card-capacity"><i class="fa-solid fa-users"></i> Up to ${capacity} guests</p>` : ''}
                     <ul class="price-list">${priceListHtml}</ul>
                     <p class="room-card-desc">${escapeHtml(room.description || '')}</p>
                     ${featuresHtml}
-                    <span class="room-card-status ${statusPillClass[room.status] || 'room-status-available'}">${escapeHtml(room.status)}</span>
+                    <span class="room-card-status ${initialClass}" id="room-status-badge-${room._id}">${initialLabel}</span>
                     <a href="#" class="btn-select" onclick="openBooking(event, '${room._id}')">Select Room</a>
                 </div>
             </div>
         `;
     }).join('');
+
+    refreshLiveRoomStatuses();
+}
+
+// Upgrades any "Available" badge to "Fully Booked" if every remaining
+// operating hour today is already reserved for that specific room — each
+// room's bookings are looked up independently (GET /api/bookings/availability
+// filters by roomId), so one room filling up never affects another's badge.
+async function refreshLiveRoomStatuses() {
+    const now = new Date();
+    const todayStr = dateKey(now.getFullYear(), now.getMonth(), now.getDate());
+    const currentHour = Math.max(OPEN_HOUR, now.getHours());
+
+    await Promise.all(ROOMS.filter(r => r.status === 'Available').map(async (room) => {
+        const badge = document.getElementById(`room-status-badge-${room._id}`);
+        if (!badge) return;
+        try {
+            const reserved = await loadAvailability(room._id, todayStr);
+            let fullyBooked = currentHour < CLOSE_HOUR; // only meaningful if there's time left today
+            for (let h = currentHour; h < CLOSE_HOUR && fullyBooked; h++) {
+                if (!reserved.includes(h)) fullyBooked = false;
+            }
+            if (fullyBooked) {
+                badge.textContent = 'Fully Booked';
+                badge.className = 'room-card-status room-status-fullybooked';
+            }
+        } catch (err) {
+            console.error(err);
+        }
+    }));
 }
 
 function escapeHtml(str) {
@@ -491,6 +528,13 @@ function openBooking(e, roomId) {
             contactField.value = user.phone || user.email || '';
         }
     }
+
+    // Reset the Pax field to 1 and apply this room's capacity limit fresh
+    // each time the modal opens for a (possibly different) room.
+    const guestCountField = document.getElementById('bkGuestCount');
+    if (guestCountField) guestCountField.value = 1;
+    document.getElementById('bkGuestCountError').style.display = 'none';
+    applyPaxLimit();
 }
 
 function closeBooking() {
@@ -499,7 +543,7 @@ function closeBooking() {
 }
 
 function showStep(id) {
-    ['bkStepCalendar', 'bkStepPrice', 'bkStepSlots', 'bkStepPayment', 'bkStepConfirm'].forEach(s => {
+    ['bkStepCalendar', 'bkStepPrice', 'bkStepSlots', 'bkStepPayment', 'bkStepPaymongoReturn'].forEach(s => {
         document.getElementById(s).classList.toggle('bk-step--hidden', s !== id);
     });
 }
@@ -536,6 +580,7 @@ function selectOption(opt) {
     bkState.selectedVariant = opt;
     document.getElementById('bkCalSelectedOption').textContent = `${opt.label} \u00b7 \u20b1${opt.price}/hr`;
     bkState.viewDate = new Date();
+    applyPaxLimit();
     renderCalendar();
     showStep('bkStepCalendar');
 }
@@ -644,6 +689,7 @@ async function renderSlots() {
     const guestNoteField = document.getElementById('bkGuestNote');
     if (guestCountField) guestCountField.value = 1;
     if (guestNoteField) guestNoteField.value = '';
+    applyPaxLimit();
     document.getElementById('bkSummaryText').textContent = 'No time selected yet';
     document.getElementById('bkConfirm').disabled = true;
     document.getElementById('bkConfirm').textContent = 'Confirm ₱0';
@@ -733,26 +779,90 @@ function formatHour(h) {
     return `${display}:00 ${period}`;
 }
 
-// Mirrors the server-side calculation in bookingRoutes.js (computeDownPayment) so
-// the amount shown here matches what the backend will actually require. The
-// server always recomputes and enforces this itself — this is display-only.
-const DOWN_PAYMENT_PERCENT = 0.3;
-const MIN_DOWN_PAYMENT = 100;
-function computeDownPayment(amount) {
-    return Math.max(MIN_DOWN_PAYMENT, Math.round(amount * DOWN_PAYMENT_PERCENT));
+// Mirrors the server-side calculation in utils/bookingHelper.js
+// (computeDownPayment) so the amount shown here matches what the backend
+// will actually require. The down payment equals the room/variant's FIRST
+// HOUR rate — not a percentage of the total — regardless of how many hours
+// are booked. The server always recomputes and enforces this itself; this
+// is display-only.
+function computeDownPayment(unitPrice) {
+    return Math.max(0, Math.round(Number(unitPrice) || 0));
 }
 
-// Payment method buttons + QR codes for the down-payment step are now
-// admin-managed (Settings > Payment Methods in admin.html) instead of
-// hardcoded here. They're fetched along with the rest of the public site
-// settings in loadSiteSettings() and land in SITE_SETTINGS.paymentMethods —
-// see renderPayMethodButtons() below, which builds the buttons dynamically
-// so admins can offer two, one, or several methods, and disable/re-enable
-// any of them at any time without a code change.
+/* =================== PAX / ROOM CAPACITY =================== */
+// A room's capacity comes from its own `capacity` field (set by an admin
+// under Room Management). 0/unset means "no limit enforced" so rooms
+// created before this field existed keep working exactly as before.
+function getRoomCapacity(room) {
+    const cap = Number(room?.capacity);
+    return Number.isFinite(cap) && cap > 0 ? cap : null;
+}
 
-// STEP 1 of confirming: validate guest details, then move to the down-payment step.
-// (Actual booking submission now happens in submitPaymentAndBook, once a payment
-// screenshot has been attached.)
+// Keeps the Pax input's max attribute + helper hint in sync with whichever
+// room is currently open in the modal. Called whenever a room/option is
+// selected (openBooking, selectOption) and whenever slots are (re)rendered.
+function applyPaxLimit() {
+    const room = bkState.room;
+    const input = document.getElementById('bkGuestCount');
+    const hint = document.getElementById('bkGuestCountHint');
+    if (!room || !input) return;
+
+    const cap = getRoomCapacity(room);
+    if (cap) {
+        input.max = String(cap);
+        if (hint) hint.textContent = `Max ${cap} pax`;
+        if (Number(input.value) > cap) input.value = String(cap);
+    } else {
+        input.removeAttribute('max');
+        if (hint) hint.textContent = '';
+    }
+    validatePaxInput();
+}
+
+// Inline validation only (doesn't block typing) — the Confirm button is
+// gated by validatePaxInput()'s return value inside confirmBooking().
+function validatePaxInput() {
+    const room = bkState.room;
+    const input = document.getElementById('bkGuestCount');
+    const errEl = document.getElementById('bkGuestCountError');
+    if (!room || !input) return true;
+
+    const cap = getRoomCapacity(room);
+    const val = parseInt(input.value, 10);
+    let message = '';
+    if (!Number.isFinite(val) || val < 1) {
+        message = 'Please enter at least 1 guest.';
+    } else if (cap && val > cap) {
+        message = `This room accommodates up to ${cap} guest(s). Please reduce your pax or choose a bigger room.`;
+    }
+
+    if (errEl) {
+        errEl.textContent = message;
+        errEl.style.display = message ? 'block' : 'none';
+    }
+    input.classList.toggle('bk-field-input--error', !!message);
+    return !message;
+}
+
+document.getElementById('bkGuestCount')?.addEventListener('input', validatePaxInput);
+document.getElementById('bkPaxMinus')?.addEventListener('click', () => {
+    const input = document.getElementById('bkGuestCount');
+    const val = Math.max(1, (parseInt(input.value, 10) || 1) - 1);
+    input.value = String(val);
+    validatePaxInput();
+});
+document.getElementById('bkPaxPlus')?.addEventListener('click', () => {
+    const input = document.getElementById('bkGuestCount');
+    const cap = getRoomCapacity(bkState.room);
+    let val = (parseInt(input.value, 10) || 1) + 1;
+    if (cap) val = Math.min(val, cap);
+    input.value = String(val);
+    validatePaxInput();
+});
+
+// STEP 1 of confirming: validate guest details + pax capacity, then move to
+// the down-payment step (the only remaining path is the automatic PayMongo
+// checkout — see payOnlineAutomatically()).
 //
 // BUGFIX: this used to gate on getStoredUser() alone, which only reflects what
 // THIS tab last wrote to storage — not whether the server still considers the
@@ -771,6 +881,9 @@ async function confirmBooking() {
     if (!guestName || !guestContact) {
         alert('Please enter your name and a phone number or email so we can confirm your booking.');
         return;
+    }
+    if (!validatePaxInput()) {
+        return; // inline error is already shown next to the Pax field
     }
 
     const confirmBtn = document.getElementById('bkConfirm');
@@ -793,128 +906,59 @@ async function confirmBooking() {
     bkState.guestCount = guestCount;
     bkState.specialRequests = specialRequests;
     bkState.amount = amount;
-    bkState.screenshotFile = null;
 
-    document.getElementById('bkDownPaymentAmount').textContent = `₱${computeDownPayment(amount).toLocaleString()}`;
-    renderPayMethodButtons();
-    document.getElementById('bkScreenshotPreview').style.display = 'none';
-    document.getElementById('bkScreenshotInput').value = '';
-    document.getElementById('bkSubmitPayment').disabled = true;
+    // Down payment = first hour's rate (opt.price), not the total amount.
+    document.getElementById('bkDownPaymentAmount').textContent = `₱${computeDownPayment(opt.price).toLocaleString()}`;
 
     showStep('bkStepPayment');
 }
 
-// Builds the payment method buttons + wires their click handlers from
-// whatever is currently active in admin (SITE_SETTINGS.paymentMethods).
-// Re-run every time the down-payment step opens so a method an admin just
-// disabled/enabled/added is always reflected, without needing a page reload.
-function renderPayMethodButtons() {
-    const methods = SITE_SETTINGS.paymentMethods || [];
-    const wrap = document.getElementById('bkPayMethods');
-    const qrImg = document.getElementById('bkQrImage');
-    if (!wrap) return;
+// Manual/screenshot payment has been removed completely — Proceed to Secure
+// Checkout (payOnlineAutomatically, below) is now the only way a customer
+// pays and books. See routes/bookingRoutes.js's POST / for the matching
+// backend change.
 
-    if (!methods.length) {
-        wrap.innerHTML = '<p style="font-size:.8rem;color:#b33;">No payment methods are available right now. Please contact us to complete your booking.</p>';
-        bkState.selectedPaymentMethod = null;
-        qrImg.style.display = 'none';
-        return;
-    }
-
-    wrap.innerHTML = methods.map((m, i) => `
-        <button type="button" class="bk-duration-btn bk-pay-method-btn${i === 0 ? ' bk-duration-btn--selected' : ''}" data-method="${escapeAttr(m.name)}" data-qr="${escapeAttr(m.qrImage || '')}">${escapeAttr(m.name)}</button>
-    `).join('');
-
-    bkState.selectedPaymentMethod = methods[0].name;
-    qrImg.style.display = 'block';
-    qrImg.src = methods[0].qrImage || '';
-
-    wrap.querySelectorAll('.bk-pay-method-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            bkState.selectedPaymentMethod = btn.dataset.method;
-            wrap.querySelectorAll('.bk-pay-method-btn').forEach(b => b.classList.toggle('bk-duration-btn--selected', b === btn));
-            qrImg.src = btn.dataset.qr || '';
-        });
-    });
-}
-
-// Minimal HTML-attribute escaper for the template strings above (method
-// names are admin-entered free text, so this avoids broken markup if one
-// ever contains a quote or angle bracket).
-function escapeAttr(str) {
-    return String(str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-}
-
-document.getElementById('bkScreenshotInput').addEventListener('change', (e) => {
-    const file = e.target.files[0];
-    const preview = document.getElementById('bkScreenshotPreview');
-    const submitBtn = document.getElementById('bkSubmitPayment');
-
-    if (!file) {
-        bkState.screenshotFile = null;
-        preview.style.display = 'none';
-        submitBtn.disabled = true;
-        return;
-    }
-
-    bkState.screenshotFile = file;
-    preview.src = URL.createObjectURL(file);
-    preview.style.display = 'block';
-    submitBtn.disabled = false;
-});
-
-// STEP 2 of confirming: actually submit the booking, now with the payment screenshot attached.
-async function submitPaymentAndBook() {
+// Automatic online payment (PayMongo) — no screenshot needed. Creates the
+// booking server-side (same validation/pricing as the manual path) and
+// redirects the browser to PayMongo's hosted checkout page. The booking
+// only ever becomes "Confirmed"/"Paid" automatically once PayMongo's
+// webhook confirms payment (see handlePaymongoReturn() below for what
+// happens when the customer comes back).
+async function payOnlineAutomatically() {
     const { y, m, d } = bkState.selectedDate;
-    const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
     const room = bkState.room;
     const opt = bkState.selectedVariant;
     const dateStr = dateKey(y, m, d);
     const timeStr = `${String(bkState.selectedHour).padStart(2, '0')}:00`;
     const duration = bkState.selectedDuration;
 
-    if (!bkState.selectedPaymentMethod) {
-        alert('No payment method is available right now. Please contact us to complete your booking.');
-        return;
-    }
-    if (!bkState.screenshotFile) {
-        alert('Please upload your payment screenshot before submitting.');
-        return;
-    }
-
-    const submitBtn = document.getElementById('bkSubmitPayment');
-    const originalText = submitBtn.textContent;
-    submitBtn.textContent = 'Submitting…';
-    submitBtn.disabled = true;
+    const btn = document.getElementById('bkPayOnlineBtn');
+    const errEl = document.getElementById('bkPayOnlineError');
+    errEl.style.display = 'none';
+    const originalText = btn.textContent;
+    btn.textContent = 'Redirecting…';
+    btn.disabled = true;
 
     try {
-        const formData = new FormData();
-        formData.append('guestName', bkState.guestName);
-        formData.append('guestContact', bkState.guestContact);
-        formData.append('guestCount', String(bkState.guestCount || 1));
-        formData.append('specialRequests', bkState.specialRequests || '');
-        formData.append('roomId', room._id);
-        formData.append('variantLabel', opt.label);
-        formData.append('date', dateStr);
-        formData.append('timeIn', timeStr);
-        formData.append('duration', String(duration));
-        formData.append('paymentMethod', bkState.selectedPaymentMethod);
-        formData.append('paymentScreenshot', bkState.screenshotFile);
-
-        // credentials: 'include' is required here — without it the browser never
-        // sends the session cookie cross-origin, and the server (correctly) rejects
-        // the request as "not logged in" even though the user is signed in.
-        const res = await fetch(`${API_BASE}/bookings`, {
+        const res = await fetch(`${API_BASE}/payments/paymongo/checkout`, {
             method: 'POST',
             credentials: 'include',
-            body: formData, // no Content-Type header — the browser sets the multipart boundary
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                guestName: bkState.guestName,
+                guestContact: bkState.guestContact,
+                guestCount: bkState.guestCount || 1,
+                specialRequests: bkState.specialRequests || '',
+                roomId: room._id,
+                variantLabel: opt.label,
+                date: dateStr,
+                timeIn: timeStr,
+                duration,
+            }),
         });
 
+        const data = await res.json().catch(() => ({}));
         if (!res.ok) {
-            const err = await res.json().catch(() => ({}));
-            // Session died between the confirmBooking() check and this submit
-            // (e.g. the 8-hour session expired while the user was picking a
-            // payment method) — send them to log in instead of a dead-end alert.
             if (res.status === 401) {
                 localStorage.removeItem(USER_KEY);
                 sessionStorage.removeItem(USER_KEY);
@@ -922,21 +966,171 @@ async function submitPaymentAndBook() {
                 window.location.href = 'login.html';
                 return;
             }
-            throw new Error(err.message || 'Could not complete your booking.');
+            throw new Error(data.message || 'Could not start online payment.');
         }
 
-        const text = `${room.name} (${opt.label}) — ${months[m]} ${d}, ${y} at ${formatHour(bkState.selectedHour)}–${formatHour(bkState.selectedHour + duration)} · Down payment ₱${computeDownPayment(bkState.amount)}`;
-        document.getElementById('bkConfirmDetails').textContent = text;
-        showStep('bkStepConfirm');
-
+        // Remember which room/date we were booking so, if the user hits the
+        // browser back button instead of using PayMongo's own cancel link,
+        // the slot still shows correctly next time availability is refreshed.
         delete RESERVED[`${room._id}|${dateStr}`];
+
+        window.location.href = data.checkoutUrl;
     } catch (err) {
         console.error(err);
-        alert(err.message || 'Something went wrong submitting your booking. Please try again.');
-    } finally {
-        submitBtn.textContent = originalText;
-        submitBtn.disabled = false;
+        errEl.textContent = err.message || 'Something went wrong starting checkout. Please try again.';
+        errEl.style.display = 'block';
+        btn.textContent = originalText;
+        btn.disabled = false;
     }
+}
+
+// Builds the professional booking-summary card (room, date, time, duration,
+// pax, payment status, reference number) shown once a booking's payment is
+// confirmed — see handlePaymongoReturn() below.
+function renderBookingSummary(containerId, booking) {
+    const container = document.getElementById(containerId);
+    if (!container || !booking) return;
+
+    const dateLabel = booking.date
+        ? new Date(`${booking.date}T00:00:00`).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
+        : '—';
+    const startHour = parseInt(String(booking.timeIn || '0').split(':')[0], 10) || 0;
+    const timeLabel = `${formatHour(startHour)} – ${formatHour(startHour + (booking.duration || 0))}`;
+
+    const paymentPillClass = booking.paymentStatus === 'Paid' ? 'bk-status-pill--paid'
+        : (booking.paymentStatus === 'Pending Verification' || booking.paymentStatus === 'Unpaid') ? 'bk-status-pill--pending'
+        : 'bk-status-pill--unpaid';
+
+    const reference = booking.paymongoPaymentId || booking._id || '—';
+
+    container.innerHTML = `
+        <p class="bk-summary-card-title">Booking summary</p>
+        <div class="bk-summary-row">
+            <span class="bk-sr-label"><i class="fa-solid fa-door-open"></i> Room</span>
+            <span class="bk-sr-value">${escapeHtml(booking.roomLabel || '—')}${booking.variantLabel ? ` · ${escapeHtml(booking.variantLabel)}` : ''}</span>
+        </div>
+        <div class="bk-summary-row">
+            <span class="bk-sr-label"><i class="fa-solid fa-calendar-days"></i> Date</span>
+            <span class="bk-sr-value">${escapeHtml(dateLabel)}</span>
+        </div>
+        <div class="bk-summary-row">
+            <span class="bk-sr-label"><i class="fa-solid fa-clock"></i> Time</span>
+            <span class="bk-sr-value">${timeLabel}</span>
+        </div>
+        <div class="bk-summary-row">
+            <span class="bk-sr-label"><i class="fa-solid fa-hourglass-half"></i> Duration</span>
+            <span class="bk-sr-value">${booking.duration || 0}h</span>
+        </div>
+        <div class="bk-summary-row">
+            <span class="bk-sr-label"><i class="fa-solid fa-users"></i> Pax</span>
+            <span class="bk-sr-value">${booking.guestCount || 1} guest${(booking.guestCount || 1) > 1 ? 's' : ''}</span>
+        </div>
+        <div class="bk-summary-row">
+            <span class="bk-sr-label"><i class="fa-solid fa-peso-sign"></i> Down payment</span>
+            <span class="bk-sr-value">₱${Number(booking.downPayment || 0).toLocaleString()}</span>
+        </div>
+        <div class="bk-summary-row">
+            <span class="bk-sr-label"><i class="fa-solid fa-circle-check"></i> Payment status</span>
+            <span class="bk-sr-value"><span class="bk-status-pill ${paymentPillClass}">${escapeHtml(booking.paymentStatus || 'Unpaid')}</span></span>
+        </div>
+        <div class="bk-summary-row">
+            <span class="bk-sr-label"><i class="fa-solid fa-hashtag"></i> Reference no.</span>
+            <span class="bk-sr-value bk-ref-value">${escapeHtml(String(reference))}</span>
+        </div>
+    `;
+    container.style.display = 'block';
+}
+
+
+// checkout (either ?paymongo=success or ?paymongo=cancel, with &bookingId=...).
+// Runs on every page load — a full navigation happens on the way back from
+// PayMongo, so none of the in-memory bkState from before checkout survives;
+// this only needs the bookingId from the URL.
+async function handlePaymongoReturn() {
+    const params = new URLSearchParams(window.location.search);
+    const result = params.get('paymongo');
+    const bookingId = params.get('bookingId');
+    if (!result || !bookingId) return;
+
+    // Clean the URL so refreshing/sharing it doesn't re-trigger this.
+    const cleanUrl = window.location.pathname;
+    window.history.replaceState({}, document.title, cleanUrl);
+
+    document.getElementById('bkRoomName').textContent = 'Online Payment';
+    document.getElementById('bkRoomIcon').innerHTML = `<i class="fa-solid fa-credit-card"></i>`;
+    showStep('bkStepPaymongoReturn');
+    document.getElementById('booking-modal').classList.add('open');
+    document.body.style.overflow = 'hidden';
+
+    const iconEl = document.getElementById('bkPmReturnIcon');
+    const titleEl = document.getElementById('bkPmReturnTitle');
+    const detailsEl = document.getElementById('bkPmReturnDetails');
+    const doneBtn = document.getElementById('bkPmReturnDone');
+
+    if (result === 'cancel') {
+        // Best-effort: release the held slot. Safe to call even if the
+        // booking was actually paid a moment earlier (server no-ops that case).
+        try {
+            await fetch(`${API_BASE}/payments/paymongo/cancel/${encodeURIComponent(bookingId)}`, {
+                method: 'POST',
+                credentials: 'include',
+            });
+        } catch (err) {
+            console.error(err);
+        }
+        iconEl.innerHTML = '<i class="fa-solid fa-circle-xmark"></i>';
+        titleEl.textContent = 'Payment cancelled';
+        detailsEl.textContent = "No worries — your slot wasn't charged and hasn't been held. Feel free to book again whenever you're ready.";
+        doneBtn.style.display = 'inline-block';
+        return;
+    }
+
+    // result === 'success' — poll briefly in case the webhook hasn't landed yet.
+    const user = await verifySession();
+    if (!user) {
+        iconEl.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i>';
+        titleEl.textContent = 'Please log in to confirm';
+        detailsEl.textContent = 'Log in with the same account you booked with to see your payment status.';
+        doneBtn.style.display = 'inline-block';
+        return;
+    }
+
+    const maxAttempts = 6;
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        try {
+            const res = await fetch(`${API_BASE}/payments/paymongo/status/${encodeURIComponent(bookingId)}`, {
+                credentials: 'include',
+            });
+            const data = await res.json().catch(() => ({}));
+            if (res.ok && data.paymentStatus === 'Paid') {
+                iconEl.innerHTML = '<i class="fa-solid fa-circle-check"></i>';
+                titleEl.textContent = 'Payment confirmed — booking Confirmed!';
+                detailsEl.textContent = 'Your down payment went through and your slot is secured. See you then!';
+
+                // Fetch the full booking so we can show a proper summary
+                // (room, date, time, duration, pax, payment status, reference).
+                try {
+                    const bookingRes = await fetch(`${API_BASE}/bookings/${encodeURIComponent(bookingId)}`, { credentials: 'include' });
+                    if (bookingRes.ok) {
+                        renderBookingSummary('bkPmSummaryCard', await bookingRes.json());
+                    }
+                } catch (err) {
+                    console.error(err);
+                }
+
+                doneBtn.style.display = 'inline-block';
+                return;
+            }
+        } catch (err) {
+            console.error(err);
+        }
+        await new Promise(r => setTimeout(r, 2000));
+    }
+
+    iconEl.innerHTML = '<i class="fa-solid fa-clock"></i>';
+    titleEl.textContent = "Still confirming your payment…";
+    detailsEl.textContent = "This can take a little longer than usual. You'll see your booking move to \"Confirmed\" in your profile shortly — no need to pay again.";
+    doneBtn.style.display = 'inline-block';
 }
 
 document.getElementById('bkClose').addEventListener('click', closeBooking);
@@ -955,10 +1149,11 @@ document.getElementById('bkBackToPriceFromCal').addEventListener('click', () => 
 document.getElementById('bkBackToCal').addEventListener('click', () => showStep('bkStepCalendar'));
 document.getElementById('bkConfirm').addEventListener('click', confirmBooking);
 document.getElementById('bkBackToSlots').addEventListener('click', () => showStep('bkStepSlots'));
-document.getElementById('bkSubmitPayment').addEventListener('click', submitPaymentAndBook);
-document.getElementById('bkDone').addEventListener('click', closeBooking);
+document.getElementById('bkPayOnlineBtn').addEventListener('click', payOnlineAutomatically);
+document.getElementById('bkPmReturnDone').addEventListener('click', closeBooking);
 
 loadRooms();
+handlePaymongoReturn();
 
 /* =================== PROFILE MODAL =================== */
 /* Append to main.js — it reuses API_BASE, USER_KEY, getStoredUser(),

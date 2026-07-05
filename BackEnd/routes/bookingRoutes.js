@@ -6,16 +6,7 @@ const Settings = require("../model/settings");
 const { requirePermission, ensureAuthenticated } = require("../middleware/adminAuth");
 const { paymentProofUpload } = require("../middleware/upload");
 const { PERMISSIONS, isAdminRole } = require("../utils/permissions");
-
-// Down payment required to move a booking out of the "not yet paid" state.
-// Percentage of the room's total price, with a peso floor so a 1-hour
-// low-rate booking still requires a meaningful commitment.
-const DOWN_PAYMENT_PERCENT = 0.3;
-const MIN_DOWN_PAYMENT = 100;
-
-function computeDownPayment(amount) {
-  return Math.max(MIN_DOWN_PAYMENT, Math.round(amount * DOWN_PAYMENT_PERCENT));
-}
+const { validateAndPriceBooking, computeDownPayment } = require("../utils/bookingHelper");
 
 // ── List all bookings — admin only. Supports the Booking Management search/filter UI:
 //    ?search=   matches guest name or contact (case-insensitive, partial)
@@ -71,104 +62,38 @@ router.get("/availability", async (req, res) => {
 
 // ── Create a booking — requires a logged-in session (customer or admin).
 //
-//    Two distinct paths share this endpoint:
-//    - Customer (role "user") booking from the public site: multipart/form-data,
-//      must include a `paymentScreenshot` file, gets a down payment calculated
-//      server-side, and always starts as "Pending Payment Verification" — the
-//      client cannot set its own status/paymentStatus for this path.
-//    - Admin/staff (Manual Booking modal, walk-in): plain JSON, no payment proof
-//      required, status defaults to "Active" as before.
+//    Manual/screenshot payment has been removed entirely: the ONLY way a
+//    customer (role "user") can now pay is the automatic PayMongo checkout
+//    at POST /api/payments/paymongo/checkout (routes/paymongoRoutes.js),
+//    which is what the public booking page calls. This endpoint therefore
+//    only ever creates bookings for:
+//    - Admin/staff (Manual Booking modal, walk-in / Room Monitoring): plain
+//      JSON, no payment proof required, status defaults to "Active" as before.
+//    A non-admin hitting this endpoint directly gets a clear error pointing
+//    them at the online-checkout endpoint instead, rather than silently
+//    accepting an unpaid/unverifiable booking.
 router.post("/", ensureAuthenticated, paymentProofUpload.single("paymentScreenshot"), async (req, res) => {
   try {
+    const isAdminBooking = isAdminRole(req.user.role);
+    if (!isAdminBooking) {
+      return res.status(400).json({
+        message: "Manual payment is no longer available. Please book and pay through the secure online checkout (POST /api/payments/paymongo/checkout).",
+      });
+    }
+
     const { guestName, guestContact, guestEmail, guestCount: guestCountRaw, specialRequests, roomId, variantLabel, date, timeIn, duration: durationRaw, paymentMethod } = req.body;
     const duration = Number(durationRaw);
     const guestCount = guestCountRaw !== undefined && guestCountRaw !== "" ? Number(guestCountRaw) : 1;
 
-    if (!guestName || !roomId || !date || !timeIn || !duration) {
+    if (!guestName) {
       return res.status(400).json({ message: "guestName, roomId, date, timeIn and duration are required." });
     }
-    if (!Number.isFinite(duration) || duration < 1 || duration > 5) {
-      return res.status(400).json({ message: "Duration must be between 1 and 5 hours." });
-    }
 
-    const room = await Room.findById(roomId);
-    if (!room) return res.status(404).json({ message: "Selected room does not exist." });
-
-    let unitPrice = room.price;
-    if (room.variants && room.variants.length) {
-      const variant = room.variants.find(v => v.label === variantLabel);
-      if (!variant) return res.status(400).json({ message: "Selected pricing option not found." });
-      unitPrice = variant.price;
-    }
-    if (!Number.isFinite(unitPrice)) {
-      return res.status(400).json({ message: "Could not determine price for this room/option." });
-    }
-
-    // Prevent double-booking: reject if the requested window overlaps an existing,
-    // still-live booking for the same room/date.
-    const startHour = parseInt(String(timeIn).split(":")[0], 10);
-    const existing = await Booking.find({
-      room: room._id,
-      date,
-      status: { $nin: ["Cancelled", "Rejected"] },
-    }).select("timeIn duration");
-    const overlaps = existing.some(b => {
-      const bStart = parseInt(String(b.timeIn).split(":")[0], 10);
-      return startHour < bStart + b.duration && bStart < startHour + duration;
-    });
-    if (overlaps) {
-      return res.status(409).json({ message: "That time slot was just taken. Please pick another." });
-    }
-
-    const amount = unitPrice * duration;
-    const isAdminBooking = isAdminRole(req.user.role);
-
-    // Holiday/closure and operating-day enforcement — only for the online
-    // customer path. Walk-in bookings taken by staff on-site are allowed to
-    // proceed regardless (e.g. a private event the business chooses to host
-    // on an otherwise-closed day), matching how the admin calendar/manual
-    // booking modal has always worked.
-    if (!isAdminBooking) {
-      const settings = await Settings.getSingleton();
-      const isHoliday = (settings.holidays || []).some(h => h.date === date && h.fullDay);
-      const oh = settings.operatingHours || {};
-      const openDays = oh.openDays;
-      const [yy, mm, dd] = String(date).split("-").map(Number);
-      const dayOfWeek = new Date(yy, (mm || 1) - 1, dd || 1).getDay();
-      const isClosedDay = Array.isArray(openDays) && openDays.length > 0 && !openDays.includes(dayOfWeek);
-
-      if (isHoliday || isClosedDay) {
-        return res.status(409).json({ message: "We're closed on the selected date. Please choose another day." });
-      }
-
-      // Time-of-day enforcement — the requested window must fit fully inside
-      // the admin's configured operating hours (mirrors the client-side
-      // calendar/slot picker in index.js, but re-checked here so this can't
-      // be bypassed by calling the API directly).
-      const parseHour = (str, fallback) => {
-        const h = parseInt(String(str || "").split(":")[0], 10);
-        return Number.isFinite(h) ? h : fallback;
-      };
-      const openHour = parseHour(oh.openTime, 0);
-      let closeHour = parseHour(oh.closeTime, 24);
-      if (closeHour <= openHour) closeHour += 24; // "00:00" close = midnight/end-of-day
-      const endHour = startHour + duration;
-      if (startHour < openHour || endHour > closeHour) {
-        return res.status(409).json({ message: "That time is outside our operating hours. Please choose another slot." });
-      }
-
-      // Booking cutoff — how many hours before the slot's start a booking must
-      // be made. maxAdvanceDays is enforced client-side on the calendar; this
-      // covers the "book too last-minute" case which the client also blocks
-      // but which is worth re-checking server-side.
-      const cutoffHours = Number(oh.bookingCutoffHours) || 0;
-      if (cutoffHours > 0) {
-        const slotStart = new Date(yy, (mm || 1) - 1, dd || 1, startHour, 0, 0, 0);
-        const hoursUntilSlot = (slotStart.getTime() - Date.now()) / 3600000;
-        if (hoursUntilSlot < cutoffHours) {
-          return res.status(409).json({ message: `Bookings must be made at least ${cutoffHours} hour(s) in advance. Please choose a later slot.` });
-        }
-      }
+    let room, amount;
+    try {
+      ({ room, amount } = await validateAndPriceBooking({ roomId, variantLabel, date, timeIn, duration, isAdminBooking, guestCount }));
+    } catch (e) {
+      return res.status(e.status || 500).json({ message: e.message || "Server error." });
     }
 
     const booking = new Booking({
@@ -186,32 +111,39 @@ router.post("/", ensureAuthenticated, paymentProofUpload.single("paymentScreensh
       amount,
       paymentMethod: paymentMethod || "Cash",
       bookedBy: req.session.userId,
-    });
-
-    if (isAdminBooking) {
       // Walk-in / manual booking — no down payment flow, admin sets status directly
       // (defaults to "Active" to match prior behavior of the Manual Booking modal).
-      booking.source = "walk-in";
-      booking.status = req.body.status || "Active";
-      booking.paymentStatus = "Paid";
-      booking.downPayment = 0;
-    } else {
-      // Online customer booking — always requires proof of payment.
-      if (!req.file) {
-        return res.status(400).json({ message: "Please upload a screenshot of your down payment before submitting." });
-      }
-      booking.source = "online";
-      booking.status = "Pending Payment Verification";
-      booking.paymentStatus = "Pending Verification";
-      booking.downPayment = computeDownPayment(amount);
-      booking.paymentScreenshot = req.file.path;
-    }
+      source: "walk-in",
+      status: req.body.status || "Active",
+      paymentStatus: "Paid",
+      downPayment: 0,
+    });
 
     await booking.save();
     res.status(201).json(booking);
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Server error." });
+  }
+});
+
+// ── Get a single booking — used by the public booking page to render the
+//    professional booking summary (room/date/time/duration/pax/payment
+//    status/reference) right after checkout. Only the guest who made the
+//    booking (bookedBy) or an admin may view it — this is deliberately NOT
+//    fully public, since it includes guest contact info.
+router.get("/:id", ensureAuthenticated, async (req, res) => {
+  try {
+    const booking = await Booking.findById(req.params.id);
+    if (!booking) return res.status(404).json({ message: "Booking not found." });
+
+    if (String(booking.bookedBy) !== String(req.user._id) && !isAdminRole(req.user.role)) {
+      return res.status(403).json({ message: "Not allowed." });
+    }
+    res.json(booking);
+  } catch (err) {
+    console.error(err);
+    res.status(400).json({ message: "Invalid booking id." });
   }
 });
 

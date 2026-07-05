@@ -105,3 +105,4 @@ header:not(.scrolled) .user-chip i { color: #fff; }
 .profile-tab.active { color: #0A1628; border-color: #00C9A7; }
 .profile-panel { display: none; }
 .profile-panel.active { display: block; }
+

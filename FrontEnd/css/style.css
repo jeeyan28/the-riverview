@@ -255,7 +255,7 @@ nav a:hover, nav a.active { color: var(--text-main); background: var(--card-ligh
     margin-bottom: 1.1rem;
 }
 .hero h1 em {
-    font-family: 'Sour Gummy', cursive;
+    font-family: 'Playfair Display', serif;
     color: var(--teal); font-style: normal;
 }
 
@@ -367,8 +367,12 @@ nav a:hover, nav a.active { color: var(--text-main); background: var(--card-ligh
 .rooms-header p { color: var(--muted); font-size: .875rem; max-width: 320px; text-align: right; }
 
 .room-grid {
-    max-width: 1300px; margin: 0 auto;
-    display: grid; grid-template-columns: repeat(4,1fr); gap: 1.25rem;
+    max-width: 1300px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 300px));
+    justify-content: center; /* Centers the columns */
+    gap: 1.25rem;
 }
 .room-card {
     background: #0f1e35; border-radius: 16px; overflow: hidden;
@@ -390,6 +394,12 @@ nav a:hover, nav a.active { color: var(--text-main); background: var(--card-ligh
 }
 .room-card-body { padding: 1.25rem 1.25rem 1.5rem; display: flex; flex-direction: column; flex: 1; }
 .room-card-body h3 { font-family: 'Playfair Display', serif; font-size: 1.2rem; color: #fff; margin-bottom: 1rem; }
+
+.room-card-capacity {
+    font-size: .74rem; color: var(--muted); margin: -.7rem 0 .8rem;
+    display: flex; align-items: center; gap: 6px;
+}
+.room-card-capacity i { color: var(--teal); font-size: .68rem; }
 
 .room-card-status{
     display:inline-block; font-size:.68rem; font-weight:600; padding:3px 10px;
@@ -653,18 +663,18 @@ nav a:hover, nav a.active { color: var(--text-main); background: var(--card-ligh
 .bk-duration-btn--selected { background:#111; color:#fff; border-color:#111; }
 .bk-duration-btn--disabled { opacity:0.35; pointer-events:none; }
  
-/* ----- confirmation step ----- */
-.bk-step#bkStepConfirm { text-align: center; padding: 1rem 0 .5rem; }
+/* ----- confirmation / paymongo-return step ----- */
+#bkStepPaymongoReturn { text-align: center; padding: 1rem 0 .5rem; }
 .bk-confirm-icon {
     width: 56px; height: 56px; border-radius: 50%;
     background: rgba(0,201,167,.12); color: #00C9A7;
     display: flex; align-items: center; justify-content: center;
     font-size: 1.4rem; margin: 0 auto 1.1rem;
 }
-.bk-step#bkStepConfirm h3 {
+#bkStepPaymongoReturn h3 {
     font-family: 'Playfair Display', serif; color: #fff; font-size: 1.2rem; margin-bottom: .5rem;
 }
-.bk-step#bkStepConfirm p { font-size: .85rem; color: #b7bdca; margin-bottom: .4rem; }
+#bkStepPaymongoReturn > p { font-size: .85rem; color: #b7bdca; margin-bottom: .4rem; }
 .bk-confirm-note { color: #6b7588 !important; font-size: .78rem !important; margin: .6rem 0 1.4rem !important; }
 .bk-done {
     background: rgba(0,201,167,.12); color: #00C9A7;
@@ -673,7 +683,89 @@ nav a:hover, nav a.active { color: var(--text-main); background: var(--card-ligh
     transition: background .2s;
 }
 .bk-done:hover { background: rgba(0,201,167,.2); }
- 
+
+/* ----- redesigned guest-details fields (matches Admin Dashboard inputs) ----- */
+.bk-guest-fields { display: flex; flex-direction: column; gap: 14px; margin: 14px 0 4px; }
+.bk-field { display: flex; flex-direction: column; gap: 6px; }
+.bk-field-label {
+    font-size: .72rem; font-weight: 600; color: #8b93a6;
+    text-transform: uppercase; letter-spacing: .05em;
+    display: flex; align-items: center; gap: 8px;
+}
+.bk-field-optional { text-transform: none; letter-spacing: 0; font-weight: 400; color: #566079; }
+.bk-field-hint { text-transform: none; letter-spacing: 0; font-weight: 500; color: #00C9A7; font-size: .72rem; }
+.bk-field-input {
+    padding: .7rem .85rem; border-radius: 10px;
+    border: 1px solid rgba(255,255,255,.1); background: rgba(255,255,255,.04);
+    color: #fff; font-family: 'Inter', sans-serif; font-size: .88rem;
+    transition: border-color .2s, background .2s;
+}
+.bk-field-input::placeholder { color: #566079; }
+.bk-field-input:focus { outline: none; border-color: rgba(0,201,167,.5); background: rgba(0,201,167,.05); }
+.bk-field-input--error { border-color: rgba(226,85,75,.5) !important; background: rgba(226,85,75,.06) !important; }
+.bk-field-textarea { resize: vertical; min-height: 60px; }
+.bk-field-error { font-size: .72rem; color: #e2554b; margin: 0; }
+
+.bk-pax-stepper { display: flex; align-items: stretch; gap: 8px; }
+.bk-pax-btn {
+    width: 40px; flex-shrink: 0; border-radius: 10px; border: 1px solid rgba(255,255,255,.1);
+    background: rgba(255,255,255,.04); color: #dfe3ec; cursor: pointer; font-size: .85rem;
+    transition: background .15s, border-color .15s;
+}
+.bk-pax-btn:hover { background: rgba(0,201,167,.12); border-color: rgba(0,201,167,.4); color: #00C9A7; }
+.bk-pax-input { text-align: center; flex: 1; }
+
+/* ----- down-payment / online-payment step ----- */
+.bk-downpayment-summary { flex-direction: column; align-items: flex-start; gap: .4rem; }
+.bk-downpayment-note {
+    display: flex; align-items: center; gap: 6px;
+    font-size: .74rem; color: #8b93a6;
+}
+.bk-downpayment-note i { color: #00C9A7; }
+.bk-online-pay-card {
+    border: 1px solid rgba(0,201,167,.2); border-radius: 14px; padding: 18px;
+    margin-top: 16px; background: rgba(0,201,167,.05);
+}
+.bk-online-pay-title {
+    font-family: 'Playfair Display', serif; font-weight: 700; color: #fff;
+    font-size: 1rem; margin: 0 0 6px; display: flex; align-items: center; gap: 8px;
+}
+.bk-online-pay-title i { color: #00C9A7; }
+.bk-online-pay-sub { font-size: .8rem; color: #8b93a6; margin: 0 0 14px; }
+.bk-online-pay-card .bk-confirm { width: 100%; }
+
+/* ----- professional booking summary card (confirmation / paymongo return) ----- */
+.bk-summary-card {
+    text-align: left; background: rgba(255,255,255,.03);
+    border: 1px solid rgba(255,255,255,.08); border-radius: 14px;
+    padding: 18px 20px; margin: 1rem 0 1.4rem;
+}
+.bk-summary-card-title {
+    font-size: .68rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+    color: #00C9A7; margin-bottom: 12px;
+}
+.bk-summary-row {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 1rem; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,.06);
+}
+.bk-summary-row:last-child { border-bottom: none; }
+.bk-summary-row .bk-sr-label {
+    font-size: .78rem; color: #8b93a6; display: flex; align-items: center; gap: 8px;
+}
+.bk-summary-row .bk-sr-label i { width: 14px; color: #566079; }
+.bk-summary-row .bk-sr-value { font-size: .84rem; color: #fff; font-weight: 600; text-align: right; }
+.bk-status-pill {
+    display: inline-block; font-size: .68rem; font-weight: 700; padding: 3px 10px;
+    border-radius: 20px; text-transform: uppercase; letter-spacing: .03em;
+}
+.bk-status-pill--paid { background: rgba(0,201,167,.15); color: #00C9A7; }
+.bk-status-pill--pending { background: rgba(239,159,39,.15); color: #EF9F27; }
+.bk-status-pill--unpaid { background: rgba(226,85,75,.15); color: #e2554b; }
+.bk-ref-value { font-family: 'Courier New', monospace; font-size: .8rem; letter-spacing: .02em; }
+
+/* ----- live "Fully Booked" room-status pill (computed from today's bookings) ----- */
+.room-status-fullybooked { background: rgba(226,85,75,.15); color: #e2554b; }
+.room-status-unavailable { background: rgba(138,155,176,.15); color: #8A9BB0; }
 
 /* =================== PROFILE MODAL =================== */
 /* Append to your main stylesheet (same file as .bk-overlay / .bk-modal) */
