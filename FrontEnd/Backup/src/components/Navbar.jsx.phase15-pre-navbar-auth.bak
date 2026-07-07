@@ -1,0 +1,186 @@
+import { useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
+import ThemeToggle from './ThemeToggle';
+import logo from '../assets/logo/logoo.png';
+
+// ─────────────────────────────────────────────────────────────────────────
+// Navbar — the public site's promo banner + header + mobile nav drawer,
+// extracted out of MainLayout.jsx (Phase 6) into its own reusable component,
+// per the plan in components/README.md ("Navbar.jsx — public site header
+// (currently duplicated markup in index.html)").
+//
+// All state (theme, promo visibility, mobile nav open/closed, scrolled)
+// still lives in MainLayout — this component only receives values + handler
+// functions as props and renders markup. That keeps MainLayout as the
+// single place Phase 10 needs to touch to wire in real auth state (the
+// login-button / user-chip visibility / admin-dashboard-link TODOs called
+// out in Phase 6 still live in the JSX below, unchanged).
+//
+// PHASE 8 (part 3, ProfileModal) ADDITION: the user-chip DROPDOWN toggle
+// (open/close the `.user-chip-menu`, click-outside-to-close) is now wired
+// here as small self-contained UI state — it's just open/closed mechanics
+// for a `.user-chip-menu.open` CSS class (see original js/index.js lines
+// ~262–268), not auth *detection*, so it doesn't need to wait for Phase
+// 10's AuthContext. The chip itself still has `display: 'none'` below and
+// stays invisible until Phase 10 flips that — this just makes sure the
+// dropdown + "My Profile" button work correctly the moment it does, without
+// Navbar needing to be touched again. "My Profile" now opens <ProfileModal/>
+// (owned by MainLayout — see MainLayout.jsx and components/ProfileModal.jsx
+// for why it lives there) via the `onOpenProfile` prop. The "Log out"
+// button in this menu (`#logout-button`) is intentionally left unwired —
+// that's real auth-state teardown and stays a Phase 10 TODO; ProfileModal
+// has its own working logout button (`pfLogoutBtn`) that doesn't depend on
+// this menu at all.
+// ─────────────────────────────────────────────────────────────────────────
+function Navbar({
+  theme,
+  onToggleTheme,
+  promoVisible,
+  onDismissPromo,
+  mobileNavOpen,
+  onOpenMobileNav,
+  onCloseMobileNav,
+  scrolled,
+  onOpenProfile,
+}) {
+  const [chipMenuOpen, setChipMenuOpen] = useState(false);
+  const chipRef = useRef(null);
+
+  // Click-outside-to-close, matching the original's document-level
+  // click listener (js/index.js lines ~266–268).
+  useEffect(() => {
+    if (!chipMenuOpen) return;
+    function handleDocClick(e) {
+      if (chipRef.current && !chipRef.current.contains(e.target)) {
+        setChipMenuOpen(false);
+      }
+    }
+    document.addEventListener('click', handleDocClick);
+    return () => document.removeEventListener('click', handleDocClick);
+  }, [chipMenuOpen]);
+  return (
+    <>
+      {/* ANNOUNCEMENT / PROMO BANNER */}
+      <div
+        id="promo-banner"
+        className={`promo-banner${promoVisible ? '' : ' is-hidden'}`}
+      >
+        <p className="promo-text" id="promo-text-line">
+          <span className="promo-emoji">🎉</span>
+          Special Promo: 20% off all bookings this weekend!
+        </p>
+        <button
+          className="promo-close"
+          id="promoClose"
+          aria-label="Dismiss announcement"
+          onClick={onDismissPromo}
+        >
+          ✕
+        </button>
+      </div>
+
+      {/* HEADER */}
+      <header id="site-header" className={scrolled ? 'scrolled' : ''}>
+        <div className="logo">
+          <img src={logo} alt="Riverview Logo" />
+          <span className="logo-name">The Riverview</span>
+        </div>
+
+        <nav id="nav-menu">
+          <a href="#home" className="active">Home</a>
+          <a href="#rooms">Rooms</a>
+          <a href="#about">About</a>
+        </nav>
+
+        <div className="nav-buttons">
+          <ThemeToggle id="theme-toggle" theme={theme} onToggle={onToggleTheme} />
+
+          {/* Shown when no one is logged in — TODO Phase 10: hide when AuthContext has a user */}
+          <Link to="/login" className="btn-login" id="login-button">Log in</Link>
+
+          {/* Shown instead of "Log in" once a user is logged in — TODO Phase 10:
+              wire up visibility (currently always display:none) */}
+          <div
+            className="user-chip"
+            id="user-chip"
+            style={{ display: 'none' }}
+            ref={chipRef}
+            onClick={(e) => {
+              e.stopPropagation();
+              setChipMenuOpen((o) => !o);
+            }}
+          >
+            <div className="user-chip-avatar" id="user-chip-avatar">U</div>
+            <span className="user-chip-name" id="user-chip-name">Account</span>
+            <i className="fa-solid fa-chevron-down"></i>
+            <div className={`user-chip-menu${chipMenuOpen ? ' open' : ''}`} id="user-chip-menu">
+              <button
+                type="button"
+                onClick={() => {
+                  setChipMenuOpen(false);
+                  onOpenProfile?.();
+                }}
+              >
+                <i className="fa-solid fa-user"></i> My Profile
+              </button>
+              <button type="button" id="admin-dashboard-link" style={{ display: 'none' }}>
+                <i className="fa-solid fa-gauge"></i> Admin Dashboard
+              </button>
+              <button type="button" id="logout-button">
+                <i className="fa-solid fa-right-from-bracket"></i> Log out
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div
+          className={`hamburger${mobileNavOpen ? ' active' : ''}`}
+          id="hamburger"
+          aria-label="Open menu"
+          onClick={onOpenMobileNav}
+        >
+          <span></span><span></span><span></span>
+        </div>
+      </header>
+
+      {/* MOBILE NAV */}
+      <div className={`mobile-nav${mobileNavOpen ? ' open' : ''}`} id="mobile-nav">
+        <button className="mobile-nav-close" id="nav-close" onClick={onCloseMobileNav}>✕</button>
+        <a href="#home" onClick={onCloseMobileNav}>Home</a>
+        <a href="#rooms" onClick={onCloseMobileNav}>Rooms</a>
+        <a href="#about" onClick={onCloseMobileNav}>About</a>
+        <ThemeToggle
+          id="theme-toggle-mobile"
+          theme={theme}
+          onToggle={onToggleTheme}
+          style={{ marginTop: '1rem' }}
+        />
+        <button
+          className="btn-book"
+          id="mobile-book-btn"
+          style={{ fontSize: '1rem', padding: '.75rem 2rem', borderRadius: '8px', marginTop: '1rem' }}
+        >
+          Book Now
+        </button>
+        <button
+          className="btn-book"
+          id="mobile-logout-button"
+          style={{
+            display: 'none',
+            fontSize: '1rem',
+            padding: '.75rem 2rem',
+            borderRadius: '8px',
+            marginTop: '.5rem',
+            background: 'transparent',
+            border: '1px solid rgba(255,255,255,.3)',
+            color: '#fff',
+          }}
+        >
+          Log out
+        </button>
+      </div>
+    </>
+  );
+}
+
+export default Navbar;

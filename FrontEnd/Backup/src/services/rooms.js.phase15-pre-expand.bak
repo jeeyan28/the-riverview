@@ -1,0 +1,26 @@
+// ─────────────────────────────────────────────────────────────────────────
+// services/rooms.js — Phase 14. Wraps /api/rooms/* endpoints. Mirrors
+// Backend/routes (Rooms/Facilities route group) 1:1 — see
+// services/README.md.
+//
+// Only 2 functions this phase — exactly what Monitor.jsx needs:
+//   list          ← fetchRooms()                          (GET /api/rooms)
+//   updateStatus  ← autoExpireRoom()/endWalkInSession()/
+//                   handleAssignSubmit()'s room PUT calls   (PUT /api/rooms/:id, body: {status})
+//
+// Settings.jsx's own /api/rooms usage — creating/editing a room (multipart
+// FormData with an image), deleting one — is NOT wrapped yet. That's
+// intentionally deferred to the phase that migrates Settings.jsx (see this
+// phase's resume prompt); this module will grow a create()/update()/
+// remove() there rather than guessing their shape ahead of that work.
+// ─────────────────────────────────────────────────────────────────────────
+import { apiRequest } from './api';
+
+const BASE = '/api/rooms';
+
+export const roomsService = {
+  list: () => apiRequest(BASE, { fallbackMessage: 'Failed to load rooms' }),
+
+  /** @param {string} id @param {'Available'|'Occupied'|'Under Maintenance'|'Inactive'} status */
+  updateStatus: (id, status) => apiRequest(`${BASE}/${id}`, { method: 'PUT', body: { status }, fallbackMessage: 'Failed to reset room status.' }),
+};

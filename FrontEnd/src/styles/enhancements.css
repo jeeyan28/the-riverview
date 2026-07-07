@@ -1,0 +1,369 @@
+/* ============================================================
+   ENHANCEMENTS.CSS
+   A purely additive "polish" layer for The Riverview index page.
+   It never overrides brand colors, layout, or spacing tokens —
+   it only adds depth, motion, and micro-interactions on top of
+   the existing design in style.css. Nothing here renames or
+   removes any class/ID used by index.js.
+   ============================================================ */
+
+:root {
+    /* Motion + depth tokens, additive to the existing palette */
+    --ease-out: cubic-bezier(.16,.84,.44,1);
+    --ease-smooth: cubic-bezier(.4,0,.2,1);
+    --dur-fast: .2s;
+    --dur-med: .45s;
+    --dur-slow: .8s;
+    --glow-teal: 0 0 0 4px rgba(0,201,167,.14);
+    --shadow-soft: 0 1px 2px rgba(10,22,40,.04), 0 8px 24px rgba(10,22,40,.06);
+    --shadow-lift: 0 10px 30px rgba(10,22,40,.12), 0 2px 8px rgba(10,22,40,.08);
+    --shadow-deep: 0 24px 60px rgba(0,0,0,.35), 0 4px 16px rgba(0,0,0,.2);
+}
+
+/* ---------------------------------------------------------------
+   ACCESSIBILITY — reduced motion support (highest priority)
+--------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: .001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: .001ms !important;
+        scroll-behavior: auto !important;
+    }
+    .reveal { opacity: 1 !important; transform: none !important; }
+    .hero-bg, .hero-carousel, .hero-intro-avatar { transform: none !important; }
+}
+
+/* ---------------------------------------------------------------
+   GLOBAL — smooth anchor offset + focus visibility
+--------------------------------------------------------------- */
+html { scroll-padding-top: calc(var(--header-h, 68px) + var(--banner-h, 0px) + 16px); }
+
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible {
+    outline: 2px solid var(--teal);
+    outline-offset: 3px;
+    border-radius: 4px;
+    transition: outline-offset .15s var(--ease-out);
+}
+
+/* Page content settles in gently once fonts/layout are ready */
+body { animation: pageSettle .5s var(--ease-out) both; }
+@keyframes pageSettle {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+/* ---------------------------------------------------------------
+   SCROLL REVEAL — classes toggled by enhancements.js
+--------------------------------------------------------------- */
+.reveal {
+    opacity: 0;
+    transform: translateY(28px);
+    transition: opacity var(--dur-slow) var(--ease-out),
+                transform var(--dur-slow) var(--ease-out);
+    will-change: opacity, transform;
+}
+.reveal.is-visible { opacity: 1; transform: translateY(0); }
+
+.reveal-left  { transform: translateX(-32px); }
+.reveal-left.is-visible  { transform: translateX(0); }
+.reveal-right { transform: translateX(32px); }
+.reveal-right.is-visible { transform: translateX(0); }
+.reveal-scale { transform: scale(.94); }
+.reveal-scale.is-visible { transform: scale(1); }
+
+/* Staggered children (rooms, about-cards, space rows) */
+.reveal-stagger > * {
+    opacity: 0;
+    transform: translateY(24px);
+    transition: opacity var(--dur-med) var(--ease-out),
+                transform var(--dur-med) var(--ease-out);
+}
+.reveal-stagger.is-visible > * { opacity: 1; transform: translateY(0); }
+.reveal-stagger.is-visible > *:nth-child(1) { transition-delay: .04s; }
+.reveal-stagger.is-visible > *:nth-child(2) { transition-delay: .1s; }
+.reveal-stagger.is-visible > *:nth-child(3) { transition-delay: .16s; }
+.reveal-stagger.is-visible > *:nth-child(4) { transition-delay: .22s; }
+.reveal-stagger.is-visible > *:nth-child(5) { transition-delay: .28s; }
+.reveal-stagger.is-visible > *:nth-child(6) { transition-delay: .34s; }
+.reveal-stagger.is-visible > *:nth-child(7) { transition-delay: .4s; }
+.reveal-stagger.is-visible > *:nth-child(8) { transition-delay: .46s; }
+
+/* ---------------------------------------------------------------
+   HEADER — extra depth on the existing glass effect
+--------------------------------------------------------------- */
+header.scrolled { box-shadow: var(--shadow-soft), 0 1px 24px rgba(10,22,40,.06); }
+
+.logo img { transition: transform var(--dur-fast) var(--ease-out); }
+.logo:hover img { transform: rotate(-4deg) scale(1.04); }
+.logo-name { position: relative; }
+
+/* Nav pill links get a soft lift + underline sheen */
+nav a { position: relative; overflow: hidden; }
+nav a::after {
+    content: '';
+    position: absolute; left: 50%; bottom: 5px;
+    width: 0; height: 2px; border-radius: 2px;
+    background: currentColor; opacity: .55;
+    transform: translateX(-50%);
+    transition: width var(--dur-fast) var(--ease-out);
+}
+nav a:hover::after, nav a.active::after { width: 20px; }
+
+.btn-login, .btn-book, .theme-toggle, .promo-close {
+    position: relative; overflow: hidden;
+    transition: transform var(--dur-fast) var(--ease-out),
+                background var(--dur-fast) var(--ease-out),
+                border-color var(--dur-fast) var(--ease-out),
+                box-shadow var(--dur-fast) var(--ease-out),
+                opacity var(--dur-fast) var(--ease-out) !important;
+}
+.btn-login:hover, .btn-book:hover { transform: translateY(-1px); box-shadow: var(--shadow-soft); }
+.btn-login:active, .btn-book:active, .theme-toggle:active { transform: translateY(0) scale(.97); }
+.theme-toggle:hover { transform: rotate(12deg); }
+
+#themeIcon, #themeIconMobile { display: inline-block; transition: transform .4s var(--ease-smooth); }
+.theme-toggle:hover #themeIcon,
+.theme-toggle:hover #themeIconMobile { transform: rotate(20deg) scale(1.1); }
+
+.user-chip { transition: background var(--dur-fast); border-radius: 999px; }
+.user-chip-menu {
+    transition: opacity var(--dur-fast) var(--ease-out),
+                transform var(--dur-fast) var(--ease-out) !important;
+    box-shadow: var(--shadow-lift);
+}
+
+.hamburger span { transition: all .3s var(--ease-smooth) !important; }
+
+/* ---------------------------------------------------------------
+   RIPPLE (used by enhancements.js on primary interactive controls)
+--------------------------------------------------------------- */
+.rv-ripple-host { position: relative; overflow: hidden; }
+.rv-ripple {
+    position: absolute;
+    border-radius: 50%;
+    background: currentColor;
+    opacity: .28;
+    transform: scale(0);
+    animation: rvRippleAnim .55s var(--ease-out);
+    pointer-events: none;
+}
+@keyframes rvRippleAnim {
+    to { transform: scale(2.6); opacity: 0; }
+}
+
+/* ---------------------------------------------------------------
+   HERO — floating + parallax polish (transform/opacity only)
+--------------------------------------------------------------- */
+.hero-bg {
+    transition: transform .2s linear;
+    will-change: transform;
+}
+.hero-carousel {
+    transition: transform .2s var(--ease-smooth), box-shadow var(--dur-med) var(--ease-out);
+    will-change: transform;
+}
+.hero-carousel:hover { box-shadow: var(--shadow-deep); }
+
+.hero-intro-avatar {
+    animation: rvFloat 5s ease-in-out infinite;
+}
+@keyframes rvFloat {
+    0%, 100% { transform: translateY(0); }
+    50%      { transform: translateY(-4px); }
+}
+
+.hero-content > * { animation: rvRise .7s var(--ease-out) both; }
+.hero-intro   { animation-delay: .05s; }
+.hero-eyebrow { animation-delay: .12s; }
+.hero h1      { animation-delay: .18s; }
+.hero-sub     { animation-delay: .26s; }
+.hero-actions { animation-delay: .34s; }
+@keyframes rvRise {
+    from { opacity: 0; transform: translateY(18px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+.hero-carousel { animation: rvRise .8s var(--ease-out) .2s both; }
+
+.btn-primary-hero, .btn-ghost-hero {
+    position: relative; overflow: hidden;
+    transition: transform var(--dur-fast) var(--ease-out),
+                box-shadow var(--dur-fast) var(--ease-out),
+                background var(--dur-fast) var(--ease-out),
+                opacity var(--dur-fast) var(--ease-out) !important;
+}
+.btn-primary-hero:hover { transform: translateY(-2px); box-shadow: 0 10px 26px rgba(0,201,167,.35); }
+.btn-primary-hero:active { transform: translateY(0) scale(.98); }
+.btn-ghost-hero:hover { transform: translateY(-2px); border-color: rgba(0,201,167,.4); }
+.btn-ghost-hero:active { transform: translateY(0) scale(.98); }
+
+.hero-carousel-slide img { transition: transform 6s linear; }
+.hero-carousel-slide.is-active img { transform: scale(1.06); }
+.hero-carousel-dot { transition: background .2s ease, width .25s var(--ease-out), transform .2s var(--ease-out) !important; }
+.hero-carousel-dot:hover { transform: scale(1.2); }
+
+/* ---------------------------------------------------------------
+   ROOMS — richer card depth + micro-interactions
+--------------------------------------------------------------- */
+.room-card {
+    transition: transform var(--dur-med) var(--ease-out),
+                border-color var(--dur-med) var(--ease-out),
+                box-shadow var(--dur-med) var(--ease-out) !important;
+}
+.room-card:hover { box-shadow: var(--shadow-deep); }
+.room-card-badge { transition: transform var(--dur-fast) var(--ease-out); }
+.room-card:hover .room-card-badge { transform: translateY(-2px); }
+
+.room-feature-chip { transition: background var(--dur-fast), border-color var(--dur-fast), transform var(--dur-fast); }
+.room-card:hover .room-feature-chip { border-color: rgba(0,201,167,.25); }
+
+.btn-select {
+    position: relative; overflow: hidden;
+    transition: background var(--dur-fast) var(--ease-out),
+                border-color var(--dur-fast) var(--ease-out),
+                transform var(--dur-fast) var(--ease-out),
+                box-shadow var(--dur-fast) var(--ease-out) !important;
+}
+.btn-select:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(0,201,167,.18); }
+.btn-select:active { transform: translateY(0) scale(.98); }
+
+/* Subtle shimmer while rooms are loading */
+#room-grid > div[style*="Loading"] { animation: rvPulse 1.4s ease-in-out infinite; }
+@keyframes rvPulse { 0%,100% { opacity: .55; } 50% { opacity: 1; } }
+
+/* ---------------------------------------------------------------
+   BOOKING MODAL — glass sheen + interactive polish
+--------------------------------------------------------------- */
+.bk-overlay.open { animation: bkOverlayFade .25s var(--ease-out); }
+@keyframes bkOverlayFade { from { opacity: 0; } to { opacity: 1; } }
+
+.bk-modal {
+    box-shadow: var(--shadow-deep);
+    background-image: linear-gradient(180deg, rgba(255,255,255,.035), rgba(255,255,255,0) 140px);
+}
+
+.bk-close, .pf-close { transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out) !important; }
+.bk-close:hover, .pf-close:hover { transform: rotate(90deg); }
+
+.bk-price-card, .bk-day, .bk-slot {
+    transition: background .15s var(--ease-out), border-color .15s var(--ease-out),
+                transform .15s var(--ease-out), box-shadow .15s var(--ease-out) !important;
+}
+.bk-price-card:hover { box-shadow: 0 6px 18px rgba(0,201,167,.12); }
+.bk-slot:hover:not(.bk-slot--reserved) { box-shadow: 0 4px 12px rgba(0,201,167,.15); }
+.bk-day--selected, .bk-slot--selected { animation: rvSelectPop .25s var(--ease-out); }
+@keyframes rvSelectPop {
+    0% { transform: scale(.9); }
+    60% { transform: scale(1.04); }
+    100% { transform: scale(1); }
+}
+
+.bk-confirm, .bk-done, .bk-pax-btn {
+    position: relative; overflow: hidden;
+    transition: background var(--dur-fast) var(--ease-out),
+                opacity var(--dur-fast) var(--ease-out),
+                transform var(--dur-fast) var(--ease-out),
+                box-shadow var(--dur-fast) var(--ease-out) !important;
+}
+.bk-confirm:not(:disabled):hover { transform: translateY(-1px); box-shadow: 0 8px 22px rgba(0,201,167,.3); }
+.bk-confirm:not(:disabled):active { transform: translateY(0) scale(.98); }
+.bk-pax-btn:hover { transform: translateY(-1px); }
+.bk-pax-btn:active { transform: scale(.94); }
+
+/* Inputs — animated focus glow instead of a hard border snap */
+.bk-field-input, .pf-field input {
+    transition: border-color var(--dur-fast) var(--ease-out),
+                background var(--dur-fast) var(--ease-out),
+                box-shadow var(--dur-fast) var(--ease-out) !important;
+}
+.bk-field-input:focus { box-shadow: var(--glow-teal); }
+.pf-field input:focus { box-shadow: var(--glow-teal); }
+
+/* Validation shake — plays once when .has-error / --error classes are applied */
+.bk-field-input--error, .pf-field.has-error input {
+    animation: rvShake .35s var(--ease-out);
+}
+@keyframes rvShake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-4px); }
+    75% { transform: translateX(4px); }
+}
+
+.pf-tab { transition: color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out) !important; }
+.pf-submit, .pf-logout { transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out) !important; }
+.pf-submit:not(:disabled):hover { transform: translateY(-1px); box-shadow: 0 8px 20px rgba(0,201,167,.28); }
+.pf-submit:not(:disabled):active { transform: translateY(0) scale(.98); }
+.pf-avatar { transition: transform var(--dur-fast) var(--ease-out); }
+.pf-overlay.open .pf-avatar { animation: rvRise .5s var(--ease-out) .1s both; }
+
+.pf-toast { box-shadow: var(--shadow-deep) !important; }
+
+/* ---------------------------------------------------------------
+   SPACES SHOWCASE — image zoom + row lift
+--------------------------------------------------------------- */
+.space-row { transition: background var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out) !important; }
+.space-img { box-shadow: var(--shadow-soft); transition: box-shadow var(--dur-med) var(--ease-out); }
+.space-row:hover .space-img { box-shadow: var(--shadow-lift); }
+.space-row:hover .space-num { color: var(--teal); transition: color var(--dur-med) var(--ease-out); }
+.space-num { transition: color var(--dur-med) var(--ease-out); }
+
+/* ---------------------------------------------------------------
+   ABOUT — card lift + icon pop
+--------------------------------------------------------------- */
+.about-card {
+    transition: border-color var(--dur-med) var(--ease-out),
+                transform var(--dur-med) var(--ease-out),
+                box-shadow var(--dur-med) var(--ease-out) !important;
+}
+.about-card:hover { transform: translateY(-5px); box-shadow: 0 16px 34px rgba(0,0,0,.28); }
+.about-card-icon { transition: transform var(--dur-fast) var(--ease-out); }
+.about-card:hover .about-card-icon { transform: scale(1.12) rotate(-6deg); }
+
+/* ---------------------------------------------------------------
+   FOOTER — link underline sweep + icon lift
+--------------------------------------------------------------- */
+.footer-col > a {
+    position: relative; width: fit-content;
+}
+.footer-col > a::after {
+    content: ''; position: absolute; left: 0; bottom: -2px;
+    width: 0; height: 1px; background: var(--teal);
+    transition: width var(--dur-fast) var(--ease-out);
+}
+.footer-col > a:hover::after { width: 100%; }
+
+.social-icons a, .newsletter-form button {
+    transition: background var(--dur-fast) var(--ease-out),
+                color var(--dur-fast) var(--ease-out),
+                transform var(--dur-fast) var(--ease-out),
+                box-shadow var(--dur-fast) var(--ease-out) !important;
+}
+.social-icons a:hover { transform: translateY(-2px); box-shadow: var(--glow-teal); }
+.footer-back-top i { transition: transform var(--dur-fast) var(--ease-out); }
+.footer-back-top:hover i { transform: translateY(-2px); }
+.newsletter-form { transition: box-shadow var(--dur-fast) var(--ease-out); }
+.newsletter-form:focus-within { box-shadow: var(--glow-teal); }
+.newsletter-form input { transition: background var(--dur-fast) ease; }
+
+/* ---------------------------------------------------------------
+   MOBILE NAV — nicer entrance for links
+--------------------------------------------------------------- */
+.mobile-nav.open a {
+    animation: rvRise .4s var(--ease-out) both;
+}
+.mobile-nav.open a:nth-child(2) { animation-delay: .04s; }
+.mobile-nav.open a:nth-child(3) { animation-delay: .08s; }
+.mobile-nav.open a:nth-child(4) { animation-delay: .12s; }
+
+/* ---------------------------------------------------------------
+   RESPONSIVE — keep motion tasteful on small screens
+--------------------------------------------------------------- */
+@media (max-width: 768px) {
+    .reveal, .reveal-stagger > * { transform: translateY(18px); }
+    .hero-content > * { animation-duration: .5s; }
+}

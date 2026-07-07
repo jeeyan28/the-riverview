@@ -1,0 +1,298 @@
+import { useState } from 'react';
+
+// ─────────────────────────────────────────────────────────────────────────
+// Admin / Profile — migrated from admin.html's <div id="panel-profile">.
+// Part of Phase 9 (Page Migration continues past Phase 8's admin panels).
+//
+// IMPORTANT DISCOVERY — unlike Settings' Pricing/Promotion/Audit Log tabs
+// (Phase 8, part 10e) or Reports.jsx, this panel is NOT static. admin.js
+// itself has zero profile-related code (grepping it for any profile-*
+// element ID returns nothing), which could look like another
+// Reports.jsx-style honest-static-port situation — but admin.html actually
+// loads a SECOND script the earlier Settings/Reports investigation hadn't
+// needed to check: <script src="js/admin-profile.js">, right after
+// admin.js (see admin.html's closing script tags). That file has real,
+// working fetch wiring:
+//   - Reads the logged-in admin from localStorage/sessionStorage under the
+//     key 'riverview_user' (getStoredAdmin/getStorageArea) — the exact
+//     same key this migrated app's own Login.jsx already writes to on
+//     successful login (see Login.jsx's storage.setItem('riverview_user',
+//     ...) calls), so that data is already available here with no new
+//     plumbing.
+//   - PUT /api/users/:id with { firstname, lastname, phone } for "Save
+//     changes" (Backend/routes/userRoutes.js's router.put("/:id", ...) —
+//     confirmed it only reads firstname/lastname/phone off req.body, email
+//     is accepted by nothing there).
+//   - PUT /api/users/:id/password with { currentPassword, newPassword }
+//     for "Update password" (same file's router.put("/:id/password", ...)
+//     — requires currentPassword since editing your own account always
+//     hits the isSelf branch there).
+// Both routes require ensureAuthenticated (session cookie), so — unlike
+// admin-profile.js's original fetch calls, which omitted credentials
+// because admin.html and the API were served same-origin — these use
+// credentials:'include', matching every other fetch in this migrated app
+// (Vite dev server and the API are cross-origin).
+//
+// The email field is a legacy quirk worth calling out: admin.html renders
+// it as a normal editable text input, and admin-profile.js does pre-fill
+// it from the stored admin — but its save handler never puts email in the
+// PUT body, and the backend route doesn't accept it if it did. So in the
+// original, typing a new email into that field and clicking "Save
+// changes" silently does nothing to it. That's reproduced faithfully here
+// (the input stays editable, matching the original's actual behavior,
+// but its value is intentionally excluded from the save request) rather
+// than either disabling the field (which the original never did) or
+// quietly adding new backend support for changing email (which doesn't
+// exist).
+//
+// profile-role ("Super Admin · The Riverview") is a second legacy quirk:
+// admin-profile.js's renderAdminIdentity() updates profile-fullname,
+// profile-av, profile-meta-email, profile-meta-phone, and the four form
+// inputs from the stored admin object — but it never touches
+// #profile-role. That element keeps whatever static text admin.html
+// shipped with, forever, regardless of the logged-in admin's actual role.
+// Reproduced here as literal static text for the same reason — this is
+// the original's real behavior, not an oversight to silently fix.
+//
+// The metric-row (Total Logins / Bookings Managed / Reports Generated /
+// Account Created) IS static/decorative, same situation as Reports.jsx:
+// neither admin.js nor admin-profile.js references any of the mc-val
+// elements on this row, and no Backend route shapes a
+// logins-count/reports-count payload. Ported as an honest straight copy
+// of admin.html's hardcoded numbers.
+//
+// Not reproduced: admin-profile.js's renderAdminIdentity() call also
+// updates the SIDEBAR's #sb-admin-name/#sb-admin-av/#sb-admin-role (it's
+// one function driving both the sidebar and this panel in the original).
+// AdminLayout.jsx/AdminSidebar.jsx already have their own explicit
+// "Real logged-in admin name/avatar — Phase 10" deferral comment predating
+// this file, and wiring the sidebar is cross-cutting work belonging with
+// that AuthContext-era pass, not a one-page profile-panel migration — so
+// after a successful save here, this page updates its own local state and
+// the stored riverview_user object, but does not attempt to reach into
+// AdminSidebar. The sidebar keeps showing its existing placeholder name
+// until Phase 10.
+//
+// Also not reproduced: admin-profile.js's redirect-to-login.html when no
+// stored admin is found, and its #admin-logout-btn handler. No other
+// migrated admin page currently guards routes or wires logout either
+// (route guarding + logout are consistently Phase-10/AuthContext scope
+// project-wide) — this page follows that same precedent and simply falls
+// back to empty/placeholder identity values if riverview_user isn't
+// present, rather than introducing the first route guard ahead of that
+// phase.
+// ─────────────────────────────────────────────────────────────────────────
+
+const API_BASE_URL = 'http://localhost:3000';
+const STORAGE_KEY = 'riverview_user';
+
+function getStoredAdmin() {
+  const raw = localStorage.getItem(STORAGE_KEY) || sessionStorage.getItem(STORAGE_KEY);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+// Mirrors admin-profile.js's saveStoredAdmin/getStorageArea pair: write
+// back to whichever storage already held the value (localStorage if
+// "remember me" was checked at login, sessionStorage otherwise).
+function saveStoredAdmin(admin) {
+  const area = localStorage.getItem(STORAGE_KEY) ? localStorage : sessionStorage;
+  area.setItem(STORAGE_KEY, JSON.stringify(admin));
+}
+
+function fullName(admin) {
+  if (!admin) return 'Admin';
+  return [admin.firstname, admin.lastname].filter(Boolean).join(' ') || admin.name || 'Admin';
+}
+
+function initialsOf(admin) {
+  if (!admin) return 'A';
+  const initials = (admin.firstname?.[0] || '') + (admin.lastname?.[0] || '');
+  return (initials || fullName(admin).charAt(0)).toUpperCase();
+}
+
+const PROFILE_METRICS = [
+  { label: 'Total Logins', value: '142' },
+  { label: 'Bookings Managed', value: '388' },
+  { label: 'Reports Generated', value: '27' },
+  { label: 'Account Created', value: 'Jan 2026' },
+];
+
+function Profile() {
+  const [admin, setAdmin] = useState(() => getStoredAdmin());
+
+  const [firstname, setFirstname] = useState(admin?.firstname || '');
+  const [lastname, setLastname] = useState(admin?.lastname || '');
+  const [email, setEmail] = useState(admin?.email || '');
+  const [phone, setPhone] = useState(admin?.phone || '');
+  const [savingDetails, setSavingDetails] = useState(false);
+
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [savingPassword, setSavingPassword] = useState(false);
+
+  async function handleSaveDetails() {
+    if (!admin?._id) return;
+    setSavingDetails(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/users/${admin._id}`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        // email intentionally omitted — see file-header note.
+        body: JSON.stringify({ firstname, lastname, phone }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.message || 'Could not update your profile.');
+
+      const updated = { ...admin, firstname, lastname, phone };
+      setAdmin(updated);
+      saveStoredAdmin(updated);
+      alert('Profile updated.');
+    } catch (err) {
+      alert(err.message || 'Could not reach the server. Is it running?');
+    } finally {
+      setSavingDetails(false);
+    }
+  }
+
+  async function handleSavePassword() {
+    if (!admin?._id) return;
+    if (!currentPassword) return alert('Enter your current password.');
+    if (newPassword.length < 8) return alert('New password must be at least 8 characters.');
+    if (newPassword !== confirmPassword) return alert("New password and confirmation don't match.");
+
+    setSavingPassword(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/users/${admin._id}/password`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currentPassword, newPassword }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.message || 'Could not update your password.');
+
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      alert('Password updated.');
+    } catch (err) {
+      alert(err.message || 'Could not reach the server. Is it running?');
+    } finally {
+      setSavingPassword(false);
+    }
+  }
+
+  return (
+    <div className="panel active" id="panel-profile">
+      <div className="profile-hero">
+        <div className="profile-av" id="profile-av">{initialsOf(admin)}</div>
+        <div>
+          <div className="profile-name" id="profile-fullname">{fullName(admin)}</div>
+          {/* Static text — the original never wires this to the logged-in
+              admin's real role either. See file-header note. */}
+          <div className="profile-role" id="profile-role">Super Admin · The Riverview</div>
+          <div className="profile-meta">
+            <span className="pmeta"><i className="ti ti-mail"></i><span id="profile-meta-email">{admin?.email || ''}</span></span>
+            <span className="pmeta"><i className="ti ti-phone"></i><span id="profile-meta-phone">{admin?.phone || ''}</span></span>
+            <span className="pmeta"><i className="ti ti-map-pin"></i>San Rafael, Bulacan</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="p2col">
+        <div className="card">
+          <div className="card-head"><span className="card-title">Personal information</span></div>
+          <div className="pfield">
+            <label>First name</label>
+            <input type="text" id="profile-firstname" value={firstname} onChange={(e) => setFirstname(e.target.value)} />
+          </div>
+          <div className="pfield">
+            <label>Last name</label>
+            <input type="text" id="profile-lastname" value={lastname} onChange={(e) => setLastname(e.target.value)} />
+          </div>
+          <div className="pfield">
+            <label>Email address</label>
+            <input type="email" id="profile-email" value={email} onChange={(e) => setEmail(e.target.value)} />
+          </div>
+          <div className="pfield">
+            <label>Phone number</label>
+            <input type="tel" id="profile-phone" value={phone} onChange={(e) => setPhone(e.target.value)} />
+          </div>
+          <button
+            className="save-btn"
+            id="profile-save-details-btn"
+            style={{ marginTop: 6 }}
+            type="button"
+            disabled={savingDetails}
+            onClick={handleSaveDetails}
+          >
+            {savingDetails ? 'Saving…' : 'Save changes'}
+          </button>
+        </div>
+        <div className="card">
+          <div className="card-head"><span className="card-title">Change password</span></div>
+          <div className="pfield">
+            <label>Current password</label>
+            <input
+              type="password"
+              id="profile-current-password"
+              placeholder="Enter current password"
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+            />
+          </div>
+          <div className="pfield">
+            <label>New password</label>
+            <input
+              type="password"
+              id="profile-new-password"
+              placeholder="New password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+            />
+          </div>
+          <div className="pfield">
+            <label>Confirm new password</label>
+            <input
+              type="password"
+              id="profile-confirm-password"
+              placeholder="Confirm password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+            />
+          </div>
+          <button
+            className="save-btn"
+            id="profile-save-password-btn"
+            style={{ marginTop: 6 }}
+            type="button"
+            disabled={savingPassword}
+            onClick={handleSavePassword}
+          >
+            {savingPassword ? 'Updating…' : 'Update password'}
+          </button>
+        </div>
+      </div>
+
+      <div className="metric-row">
+        {PROFILE_METRICS.map((m) => (
+          <div className="mc" key={m.label}>
+            <div className="mc-label">{m.label}</div>
+            <div className="mc-val" style={m.label === 'Account Created' ? { fontSize: '1rem' } : undefined}>
+              {m.value}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export default Profile;

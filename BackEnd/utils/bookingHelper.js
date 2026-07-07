@@ -26,8 +26,18 @@ async function validateAndPriceBooking({ roomId, variantLabel, date, timeIn, dur
   if (!roomId || !date || !timeIn || !duration) {
     throw { status: 400, message: "roomId, date, timeIn and duration are required." };
   }
-  if (!Number.isFinite(duration) || duration < 1 || duration > 5) {
+  if (!Number.isFinite(duration) || duration <= 0) {
+    throw { status: 400, message: "Duration must be greater than 0." };
+  }
+  // The public/online path keeps the original whole-hour, 1-5hr rule. Admin/
+  // walk-in bookings (Manual Booking modal, Room Monitoring) may use much
+  // finer durations — down to a second — so staff can manage a session by
+  // hours, minutes, and seconds; capped at 24h just to keep things sane.
+  if (!isAdminBooking && (duration < 1 || duration > 5)) {
     throw { status: 400, message: "Duration must be between 1 and 5 hours." };
+  }
+  if (isAdminBooking && duration > 24) {
+    throw { status: 400, message: "Duration cannot exceed 24 hours." };
   }
 
   const room = await Room.findById(roomId);
@@ -43,9 +53,17 @@ async function validateAndPriceBooking({ roomId, variantLabel, date, timeIn, dur
 
   let unitPrice = room.price;
   if (room.variants && room.variants.length) {
-    const variant = room.variants.find(v => v.label === variantLabel);
-    if (!variant) throw { status: 400, message: "Selected pricing option not found." };
-    unitPrice = variant.price;
+    if (variantLabel) {
+      const variant = room.variants.find(v => v.label === variantLabel);
+      if (!variant) throw { status: 400, message: "Selected pricing option not found." };
+      unitPrice = variant.price;
+    } else {
+      // No specific pricing tier was chosen — this is normal for admin/walk-in
+      // bookings (Manual Booking modal, Room Monitoring) which don't expose a
+      // variant picker at all. Rather than failing the booking outright,
+      // default to the cheapest configured tier for this room.
+      unitPrice = Math.min(...room.variants.map(v => Number(v.price) || 0));
+    }
   }
   if (!Number.isFinite(unitPrice)) {
     throw { status: 400, message: "Could not determine price for this room/option." };

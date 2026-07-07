@@ -1,0 +1,405 @@
+import { useCallback, useEffect, useRef, useState } from 'react';
+import DataTable from '../../components/DataTable';
+import Modal from '../../components/Modal';
+
+// ─────────────────────────────────────────────────────────────────────────
+// Admin / Manage Users — migrated from admin.html's <div id="panel-users">
+// plus admin.js's renderUsersPanel/userRowHtml, the Add User modal
+// (ensureUserModal/openAddUserModal/submitAddUser), the Change Role modal
+// (ensureRoleModal/openRoleChangeModal/submitRoleChange), toggleUserStatus,
+// and deleteUserRow. Part of Phase 8 (Page Migration).
+//
+// admin.html's <div id="panel-logs"> ("Login History") is NOT a separate
+// build here — the original markup is itself just a static "not available
+// yet" notice (no login-audit endpoint exists; see that div's own comment
+// in admin.html), pointing the admin at this page's "Last Login" column
+// instead. App.jsx's /admin/logs route keeps its TempPage placeholder for
+// now since there's no real panel content to port — worth a one-line real
+// component swap in a later cleanup phase, but not page-migration work.
+//
+// 5 backend endpoints this page calls, all unchanged from the original:
+//   GET    /api/users              (?search=&role=)
+//   POST   /api/users              (create admin account)
+//   PUT    /api/users/:id/role
+//   PUT    /api/users/:id/status
+//   DELETE /api/users/:id
+//
+// ONE INTENTIONAL DEVIATION from the original, in the "manage this row?"
+// check (role-change / activate-deactivate / delete buttons vs. the plain
+// "—" placeholder): the original recomputed this client-side in
+// canManageRow() using a global `sessionAdmin` (populated once by
+// guardAdminPage() on admin.html load) and a local ROLE_LEVEL map — logic
+// that has no home yet here since AuthContext/useAuth doesn't exist until
+// Phase 10 (same deferral as every other admin page so far). Turns out
+// nothing needs rebuilding for it: Backend/routes/userRoutes.js's GET /
+// already computes and returns this exact rule per row as `canManage`
+// (`canManageTarget({ actor: req.user, target: u }).ok`) — the legacy
+// frontend just never consumed it. This page reads `row.canManage`
+// straight from the API response instead of re-deriving it, which is
+// simpler, can't drift out of sync with the server's own rule, and avoids
+// pulling AuthContext in early. The server still independently re-checks
+// canManageTarget on every role/status/delete route regardless.
+//
+// Permission gating (hasAdminPermission('admin:manage') hiding this whole
+// panel from non-Owner/Supervisor roles, and guardPermission() blocking
+// the Add User button) is deliberately NOT implemented yet, same deferral
+// noted on every admin page since Dashboard — no session role available
+// client-side until Phase 10's AuthContext. The route itself isn't gated
+// either, matching the explicit instruction for this phase. The server
+// still independently enforces admin:manage on every route below.
+// ─────────────────────────────────────────────────────────────────────────
+
+const API_BASE_URL = 'http://localhost:3000';
+
+const ROLE_LABELS = { user: 'User', staff: 'Staff', manager: 'Supervisor', super_admin: 'Owner' };
+const ROLE_BADGE_CLASS = { super_admin: 'pill-active', manager: 'pill-vacant', staff: 'pill-pending', user: 'pill-done' };
+
+function Users() {
+  /* ── filters ── */
+  const [search, setSearch] = useState('');
+  const [roleFilter, setRoleFilter] = useState('');
+  const searchDebounce = useRef(null);
+
+  /* ── data ── */
+  const [users, setUsers] = useState([]);
+  const [assignableRoles, setAssignableRoles] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+
+  /* ── modals ── */
+  const [addOpen, setAddOpen] = useState(false);
+  const [roleChangeTarget, setRoleChangeTarget] = useState(null); // the user row, or null
+
+  const fetchUsers = useCallback(async () => {
+    setLoading(true);
+    setLoadError(false);
+    try {
+      const params = new URLSearchParams();
+      if (search.trim()) params.set('search', search.trim());
+      if (roleFilter) params.set('role', roleFilter);
+      const qs = params.toString();
+      const res = await fetch(`${API_BASE_URL}/api/users${qs ? `?${qs}` : ''}`, { credentials: 'include' });
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).message || 'Failed to load users.');
+      const data = await res.json();
+      setUsers(Array.isArray(data.users) ? data.users : []);
+      setAssignableRoles(Array.isArray(data.assignableRoles) ? data.assignableRoles : []);
+    } catch (err) {
+      console.error(err);
+      setLoadError(true);
+    } finally {
+      setLoading(false);
+    }
+  }, [search, roleFilter]);
+
+  useEffect(() => {
+    fetchUsers();
+  }, [roleFilter]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Search is debounced 300ms, same as the original's debounce(renderUsersPanel, 300).
+  useEffect(() => {
+    clearTimeout(searchDebounce.current);
+    searchDebounce.current = setTimeout(fetchUsers, 300);
+    return () => clearTimeout(searchDebounce.current);
+  }, [search]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /* ── row actions ── */
+  async function toggleUserStatus(user) {
+    const makeActive = !user.isActive;
+    if (!window.confirm(makeActive ? 'Reactivate this account?' : 'Deactivate this account? They will be signed out and unable to log in.')) return;
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/users/${user._id}/status`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isActive: makeActive }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.message || 'Failed to update status.');
+      await fetchUsers();
+    } catch (err) {
+      alert(err.message);
+    }
+  }
+
+  async function deleteUser(user) {
+    if (!window.confirm(`Permanently delete ${user.firstname} ${user.lastname || ''}? This cannot be undone.`)) return;
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/users/${user._id}`, { method: 'DELETE', credentials: 'include' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.message || 'Failed to delete user.');
+      await fetchUsers();
+    } catch (err) {
+      alert(err.message);
+    }
+  }
+
+  const columns = [
+    { key: 'name', label: 'Name', render: (u) => `${u.firstname} ${u.lastname || ''}`.trim() },
+    { key: 'email', label: 'Email' },
+    {
+      key: 'role',
+      label: 'Role',
+      render: (u) => <span className={`pill ${ROLE_BADGE_CLASS[u.role] || 'pill-done'}`}>{u.roleLabel || ROLE_LABELS[u.role] || u.role}</span>,
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      render: (u) => (u.isActive ? <span className="pill pill-active">Active</span> : <span className="pill pill-overdue">Deactivated</span>),
+    },
+    {
+      key: 'lastLoginAt',
+      label: 'Last Login',
+      render: (u) => (u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleString() : 'Never'),
+    },
+    {
+      key: 'actions',
+      label: 'Actions',
+      render: (u) =>
+        u.canManage ? (
+          <div style={{ display: 'flex', gap: 4 }}>
+            <button className="card-action" title="Change role" onClick={() => setRoleChangeTarget(u)}>
+              <i className="ti ti-shield-cog"></i>
+            </button>
+            <button className="card-action" title={u.isActive ? 'Deactivate' : 'Activate'} onClick={() => toggleUserStatus(u)}>
+              <i className={`ti ti-${u.isActive ? 'lock' : 'lock-open'}`}></i>
+            </button>
+            <button className="card-action" title="Delete" style={{ color: 'var(--red)' }} onClick={() => deleteUser(u)}>
+              <i className="ti ti-trash"></i>
+            </button>
+          </div>
+        ) : (
+          <span style={{ color: 'var(--muted)', fontSize: '.75rem' }}>—</span>
+        ),
+    },
+  ];
+
+  return (
+    <div className="panel active" id="panel-users">
+      <div className="card">
+        <div className="card-head">
+          <span className="card-title">Manage Users</span>
+          <button className="card-action" onClick={() => setAddOpen(true)}>
+            <i className="ti ti-plus"></i> Add User
+          </button>
+        </div>
+        <div style={{ display: 'flex', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
+          <input
+            id="users-search"
+            type="text"
+            placeholder="Search name or email…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            style={{ flex: 1, minWidth: 200, background: 'var(--navy3)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 12px', color: 'var(--text)', fontSize: '.82rem', fontFamily: "'Inter',sans-serif", outline: 'none' }}
+          />
+          <select
+            id="users-role-filter"
+            value={roleFilter}
+            onChange={(e) => setRoleFilter(e.target.value)}
+            style={{ background: 'var(--navy3)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 12px', color: 'var(--text)', fontSize: '.82rem', fontFamily: "'Inter',sans-serif", outline: 'none' }}
+          >
+            <option value="">All roles</option>
+            <option value="super_admin">Owner</option>
+            <option value="manager">Supervisor</option>
+            <option value="staff">Staff</option>
+            <option value="user">User</option>
+          </select>
+        </div>
+        <DataTable
+          columns={columns}
+          rows={loadError ? [] : users}
+          loading={loading}
+          emptyMessage={loadError ? 'Failed to load users.' : 'No users found.'}
+          getRowKey={(u) => u._id}
+        />
+      </div>
+
+      <AddUserModal open={addOpen} onClose={() => setAddOpen(false)} assignableRoles={assignableRoles} onCreated={fetchUsers} />
+      <RoleChangeModal user={roleChangeTarget} assignableRoles={assignableRoles} onClose={() => setRoleChangeTarget(null)} onSaved={fetchUsers} />
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// AddUserModal — page-specific/single-use, same reasoning as Bookings.jsx's
+// ManualBookingModal/EditBookingModal (components/README.md's Modal.jsx
+// notes). Keeps the original's inline error div (um-error) instead of
+// alert(), since the original distinguished "validation problem, fix and
+// retry without losing your other fields" (inline) from "action already
+// happened, just acknowledge it" (alert, used for status/delete above).
+// ─────────────────────────────────────────────────────────────────────────
+function AddUserModal({ open, onClose, assignableRoles, onCreated }) {
+  const [firstname, setFirstname] = useState('');
+  const [lastname, setLastname] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [password, setPassword] = useState('');
+  const [role, setRole] = useState('');
+  const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  // Reset the form and default the role select whenever the modal (re)opens,
+  // matching openAddUserModal()'s field-clearing in the original.
+  useEffect(() => {
+    if (open) {
+      setFirstname('');
+      setLastname('');
+      setEmail('');
+      setPhone('');
+      setPassword('');
+      setRole(assignableRoles[0] || '');
+      setError('');
+    }
+  }, [open, assignableRoles]);
+
+  async function handleSubmit() {
+    setError('');
+    if (!firstname.trim() || !email.trim() || !password || !role) {
+      setError('First name, email, password, and role are required.');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/users`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          firstname: firstname.trim(),
+          lastname: lastname.trim(),
+          email: email.trim(),
+          phone: phone.trim(),
+          password,
+          role,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Failed to create user.');
+      onClose();
+      await onCreated();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="Add User"
+      actions={
+        <>
+          <button className="cancel-btn" onClick={onClose}>Cancel</button>
+          <button className="save-btn" disabled={submitting} onClick={handleSubmit}>
+            {submitting ? 'Creating…' : 'Create User'}
+          </button>
+        </>
+      }
+    >
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <input
+          type="text" placeholder="First name" value={firstname} onChange={(e) => setFirstname(e.target.value)}
+          style={{ background: 'var(--navy3)', border: '1px solid var(--border)', borderRadius: 8, padding: '9px 12px', color: 'var(--text)', fontFamily: "'Inter',sans-serif", outline: 'none' }}
+        />
+        <input
+          type="text" placeholder="Last name" value={lastname} onChange={(e) => setLastname(e.target.value)}
+          style={{ background: 'var(--navy3)', border: '1px solid var(--border)', borderRadius: 8, padding: '9px 12px', color: 'var(--text)', fontFamily: "'Inter',sans-serif", outline: 'none' }}
+        />
+        <input
+          type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)}
+          style={{ background: 'var(--navy3)', border: '1px solid var(--border)', borderRadius: 8, padding: '9px 12px', color: 'var(--text)', fontFamily: "'Inter',sans-serif", outline: 'none' }}
+        />
+        <input
+          type="text" placeholder="Phone (optional)" value={phone} onChange={(e) => setPhone(e.target.value)}
+          style={{ background: 'var(--navy3)', border: '1px solid var(--border)', borderRadius: 8, padding: '9px 12px', color: 'var(--text)', fontFamily: "'Inter',sans-serif", outline: 'none' }}
+        />
+        <input
+          type="password" placeholder="Temporary password (min 8 characters)" value={password} onChange={(e) => setPassword(e.target.value)}
+          style={{ background: 'var(--navy3)', border: '1px solid var(--border)', borderRadius: 8, padding: '9px 12px', color: 'var(--text)', fontFamily: "'Inter',sans-serif", outline: 'none' }}
+        />
+        <select
+          value={role} onChange={(e) => setRole(e.target.value)}
+          style={{ background: 'var(--navy3)', border: '1px solid var(--border)', borderRadius: 8, padding: '9px 12px', color: 'var(--text)', fontFamily: "'Inter',sans-serif", outline: 'none' }}
+        >
+          {assignableRoles.map((r) => (
+            <option key={r} value={r}>{ROLE_LABELS[r] || r}</option>
+          ))}
+        </select>
+        {error && <div style={{ color: 'var(--red)', fontSize: '.78rem' }}>{error}</div>}
+      </div>
+    </Modal>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// RoleChangeModal — page-specific/single-use, same reasoning as above.
+// `user` is the live row passed in from Users()'s own `users` state, so
+// re-opening it always reflects the current role/canManage state.
+// ─────────────────────────────────────────────────────────────────────────
+function RoleChangeModal({ user, assignableRoles, onClose, onSaved }) {
+  const [role, setRole] = useState('');
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      setRole(user.role);
+      setError('');
+    }
+  }, [user]);
+
+  async function handleSave() {
+    if (!user) return;
+    setError('');
+    setSaving(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/users/${user._id}/role`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Failed to change role.');
+      onClose();
+      await onSaved();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Modal
+      open={!!user}
+      onClose={onClose}
+      title="Change Role"
+      actions={
+        <>
+          <button className="cancel-btn" onClick={onClose}>Cancel</button>
+          <button className="save-btn" disabled={saving} onClick={handleSave}>
+            {saving ? 'Saving…' : 'Save'}
+          </button>
+        </>
+      }
+    >
+      {user && (
+        <>
+          <select
+            value={role} onChange={(e) => setRole(e.target.value)}
+            style={{ width: '100%', background: 'var(--navy3)', border: '1px solid var(--border)', borderRadius: 8, padding: '9px 12px', color: 'var(--text)', fontFamily: "'Inter',sans-serif", outline: 'none' }}
+          >
+            {assignableRoles.map((r) => (
+              <option key={r} value={r}>{ROLE_LABELS[r] || r}</option>
+            ))}
+          </select>
+          {error && <div style={{ color: 'var(--red)', fontSize: '.78rem', marginTop: 8 }}>{error}</div>}
+        </>
+      )}
+    </Modal>
+  );
+}
+
+export default Users;

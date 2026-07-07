@@ -1,0 +1,29 @@
+// ─────────────────────────────────────────────────────────────────────────
+// services/bookings.js — Phase 14. Wraps /api/bookings/* endpoints.
+// Mirrors Backend/routes (Bookings route group) 1:1 — see
+// services/README.md.
+//
+// Only 3 functions this phase — exactly what Monitor.jsx needs:
+//   listActive    ← fetchMonitorBookings()          (GET /api/bookings?status=Active)
+//   updateStatus  ← endWalkInSession()'s booking PUT (PUT /api/bookings/:id, body: {status})
+//   create        ← handleAssignSubmit()             (POST /api/bookings — walk-in session)
+//
+// Bookings.jsx's much larger surface (paginated/filtered list, approve,
+// reject, delete, the manual-booking and edit-booking modals) is NOT
+// wrapped yet — intentionally deferred to the phase that migrates
+// Bookings.jsx (see this phase's resume prompt), same reasoning as
+// rooms.js's deferred Settings.jsx functions.
+// ─────────────────────────────────────────────────────────────────────────
+import { apiRequest } from './api';
+
+const BASE = '/api/bookings';
+
+export const bookingsService = {
+  listActive: () => apiRequest(`${BASE}?status=Active`, { fallbackMessage: 'Failed to load bookings for the room monitor.' }),
+
+  /** @param {string} id @param {string} status - e.g. 'Done' */
+  updateStatus: (id, status) => apiRequest(`${BASE}/${id}`, { method: 'PUT', body: { status }, fallbackMessage: 'Failed to end the session.' }),
+
+  /** @param {{guestName:string, roomId:string, date:string, timeIn:string, duration:number, paymentMethod:string}} payload */
+  create: (payload) => apiRequest(BASE, { method: 'POST', body: payload, fallbackMessage: 'Failed to start the session.' }),
+};

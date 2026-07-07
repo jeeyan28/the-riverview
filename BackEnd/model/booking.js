@@ -14,7 +14,12 @@ const bookingSchema = new mongoose.Schema({
   variantLabel:  { type: String, default: null },
   date:          { type: String, required: true },
   timeIn:        { type: String, required: true },
-  duration:      { type: Number, required: true, min: 1, max: 5 },
+  // Public/online bookings are still restricted to whole hours between 1 and 5
+  // (enforced in utils/bookingHelper.js). Admin/walk-in bookings — in particular
+  // Room Monitoring — are allowed much finer-grained durations (down to 1 second,
+  // up to 24 hours) so staff can manage a session down to the hour/minute/second;
+  // that finer admin-only range is why the schema bound itself is loosened here.
+  duration:      { type: Number, required: true, min: 1 / 3600, max: 24 },
   amount:        { type: Number, required: true, min: 0 },
   // "Pending Payment Verification" / "Confirmed" / "Rejected" are the online-booking
   // lifecycle (down payment -> admin verifies screenshot -> Confirmed/Rejected).

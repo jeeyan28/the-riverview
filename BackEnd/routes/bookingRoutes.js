@@ -60,6 +60,51 @@ router.get("/availability", async (req, res) => {
   }
 });
 
+// ── Public month availability check — powers the calendar's day grid so it
+//    reflects THIS room's own bookings (a day that's fully booked for Room A
+//    should not appear open just because Room B is free that day). Returns,
+//    for every date in the given month that has at least one active booking,
+//    the list of reserved hour-ranges so the frontend can work out which days
+//    are fully booked for that specific room.
+router.get("/availability-month", async (req, res) => {
+  try {
+    const { roomId, year, month } = req.query; // month is 1-12
+    if (!roomId || !year || !month) {
+      return res.status(400).json({ message: "roomId, year and month are required." });
+    }
+
+    const y = Number(year);
+    const m = Number(month);
+    if (!Number.isInteger(y) || !Number.isInteger(m) || m < 1 || m > 12) {
+      return res.status(400).json({ message: "Invalid year or month." });
+    }
+
+    // Dates are stored as "YYYY-MM-DD" strings, so a plain lexical range over
+    // that same format is enough to bound the query to this month.
+    const lastDay = new Date(y, m, 0).getDate();
+    const startStr = `${y}-${String(m).padStart(2, "0")}-01`;
+    const endStr = `${y}-${String(m).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+
+    const bookings = await Booking.find({
+      room: roomId,
+      date: { $gte: startStr, $lte: endStr },
+      status: { $nin: ["Cancelled", "Rejected"] },
+    }).select("date timeIn duration");
+
+    // Group by date so the client gets { "2026-07-14": [{timeIn, duration}, ...] }
+    const byDate = {};
+    bookings.forEach((b) => {
+      if (!byDate[b.date]) byDate[b.date] = [];
+      byDate[b.date].push({ timeIn: b.timeIn, duration: b.duration });
+    });
+
+    res.json(byDate);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error." });
+  }
+});
+
 // ── Create a booking — requires a logged-in session (customer or admin).
 //
 //    Manual/screenshot payment has been removed entirely: the ONLY way a
@@ -183,13 +228,20 @@ router.put("/:id/reject", requirePermission(PERMISSIONS.BOOKING_MANAGE), async (
 
 // ── Update a booking (edit duration/payment method, or change status —
 //    e.g. Active/Done/Overdue/Cancelled) — admin only
+//    timeIn/date/guestName are additionally editable so Room Monitoring can
+//    "Edit" a live walk-in session — re-anchoring its start time to now and
+//    setting a fresh remaining duration (hours/minutes/seconds) rather than
+//    only being able to change the total original duration.
 router.put("/:id", requirePermission(PERMISSIONS.BOOKING_MANAGE), async (req, res) => {
   try {
-    const { status, duration, paymentMethod } = req.body;
+    const { status, duration, paymentMethod, timeIn, date, guestName } = req.body;
     const update = {};
     if (status !== undefined) update.status = status;
     if (duration !== undefined) update.duration = duration;
     if (paymentMethod !== undefined) update.paymentMethod = paymentMethod;
+    if (timeIn !== undefined) update.timeIn = timeIn;
+    if (date !== undefined) update.date = date;
+    if (guestName !== undefined) update.guestName = guestName;
 
     const booking = await Booking.findByIdAndUpdate(req.params.id, update, { new: true, runValidators: true });
     if (!booking) return res.status(404).json({ message: "Booking not found." });

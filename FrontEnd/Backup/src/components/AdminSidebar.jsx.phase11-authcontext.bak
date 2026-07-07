@@ -1,0 +1,108 @@
+import { NavLink } from 'react-router-dom';
+
+// ─────────────────────────────────────────────────────────────────────────
+// AdminSidebar — the admin tab navigation, extracted out of AdminLayout.jsx
+// (Phase 6) into its own component, per components/README.md
+// ("AdminSidebar.jsx — admin tab navigation (from admin.html)").
+//
+// Still a straight NavLink-per-panel list, same as when this lived inline
+// in AdminLayout — the only thing this extraction changes is the file it
+// lives in. Permission-based item hiding (data-requires-permission in the
+// old admin.html) is still deferred to Phase 10, same as noted in Phase 6.
+// ─────────────────────────────────────────────────────────────────────────
+
+const NAV_SECTIONS = [
+  {
+    label: 'Main',
+    items: [
+      { to: '/admin/dashboard', icon: 'ti-layout-dashboard', label: 'Dashboard' },
+      { to: '/admin/monitor', icon: 'ti-device-desktop-analytics', label: 'Room Monitor' },
+      { to: '/admin/bookings', icon: 'ti-calendar-event', label: 'Bookings' },
+      { to: '/admin/pos', icon: 'ti-cash-register', label: 'POS' },
+    ],
+  },
+  {
+    label: 'Insights',
+    items: [
+      { to: '/admin/analytics', icon: 'ti-chart-bar', label: 'Analytics' },
+      { to: '/admin/reports', icon: 'ti-file-analytics', label: 'Reports' },
+      { to: '/admin/forecasting', icon: 'ti-trending-up', label: 'Forecasting' },
+    ],
+  },
+  {
+    label: 'Admin',
+    items: [
+      { to: '/admin/users', icon: 'ti-users-group', label: 'Manage Users' },
+      { to: '/admin/logs', icon: 'ti-lock-access', label: 'Login History' },
+      { to: '/admin/settings', icon: 'ti-settings', label: 'Settings' },
+      { to: '/admin/profile', icon: 'ti-user-circle', label: 'Profile' },
+    ],
+  },
+];
+
+// Exported so AdminLayout can look up the matching page-title without
+// duplicating this list.
+export const PAGE_TITLES = {
+  dashboard: 'Dashboard',
+  monitor: 'Room Monitor',
+  bookings: 'Bookings',
+  pos: 'POS',
+  analytics: 'Analytics',
+  reports: 'Reports',
+  forecasting: 'Forecasting',
+  users: 'Manage Users',
+  logs: 'Login History',
+  settings: 'Settings',
+  profile: 'Profile',
+};
+
+function AdminSidebar({ onNavigate }) {
+  return (
+    <div id="sidebar">
+      <div className="sb-brand">
+        <div className="sb-logo">RV</div>
+        <div>
+          <div className="sb-title">Riverview</div>
+          <div className="sb-sub">Admin Panel</div>
+        </div>
+      </div>
+
+      <div className="sb-nav">
+        {NAV_SECTIONS.map((section) => (
+          <div key={section.label}>
+            <div className="sb-section">{section.label}</div>
+            {section.items.map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                className={({ isActive }) => `sb-item${isActive ? ' active' : ''}`}
+                onClick={() => onNavigate?.(PAGE_TITLES[item.to.split('/').pop()])}
+              >
+                <i className={`ti ${item.icon}`}></i>
+                {item.label}
+              </NavLink>
+            ))}
+          </div>
+        ))}
+      </div>
+
+      <div className="sb-bottom">
+        {/* TODO Phase 10: replace with real logged-in admin from AuthContext */}
+        <div className="admin-info-row">
+          <div className="admin-av" id="sb-admin-av">RA</div>
+          <div>
+            <div className="admin-name" id="sb-admin-name">Rivera Admin</div>
+            <div className="admin-role" id="sb-admin-role">Super Admin</div>
+          </div>
+          <i
+            className="ti ti-logout"
+            id="admin-logout-btn"
+            style={{ fontSize: 14, color: 'var(--muted)', marginLeft: 'auto', cursor: 'pointer' }}
+          ></i>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default AdminSidebar;
