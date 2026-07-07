@@ -2,4 +2,5 @@ node_modules/
 .env
 dist/
 build/
-.md
+PROJECT_PROGRESS.md
+FEATURE_REQUESTS.md
