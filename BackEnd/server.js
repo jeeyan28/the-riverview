@@ -96,7 +96,7 @@ app.use("/api/categories", require("./routes/categoryRoutes")); // Tier 4: room 
 app.use("/api/bookings", require("./routes/bookingRoutes"));
 app.use("/api/users", require("./routes/userRoutes"));
 app.use("/api/settings", require("./routes/settingsRoutes")); // operating hours, holidays, announcements
-app.use("/api/pos", require("./routes/posRoutes"));           // POS sales
+app.use("/api/forecast", require("./routes/forecastRoutes")); // Owner-only demand/revenue forecasting
 app.use("/api/payments/paymongo", require("./routes/paymongoRoutes").router); // automatic online payment (checkout + status)
 
 // ── Centralized error handler (catches multer file-type/size errors, etc.)

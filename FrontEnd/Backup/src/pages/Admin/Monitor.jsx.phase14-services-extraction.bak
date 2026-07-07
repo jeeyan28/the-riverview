@@ -1,0 +1,440 @@
+import { useEffect, useRef, useState } from 'react';
+import Modal from '../../components/Modal';
+import { useAuth } from '../../context/AuthContext';
+
+// ─────────────────────────────────────────────────────────────────────────
+// Admin / Room Monitor — migrated from admin.html's <div id="panel-monitor">
+// + admin.js's "ROOM MONITOR PANEL (Tier 2)" section (fetchMonitorBookings,
+// renderRoomMonitor, tickRoomMonitor, paintRoomMonitorGrid,
+// roomMonitorCardHtml, autoExpireRoom, endWalkInSession, the Assign Walk-in
+// modal, submitWalkInAssignment). Part of Phase 8 (Page Migration),
+// continuing after Admin Dashboard + Bookings.
+//
+// Walk-in occupancy only — online (PayMongo) bookings never appear here,
+// exactly as before: the client-side filter (source === 'walk-in' &&
+// status === 'Active') is kept as the original's own "belt-and-suspenders"
+// comment describes it, on top of the server's own ?status=Active filter.
+//
+// Behavior preserved 1:1:
+//   - A room's remaining time is derived purely from its live walk-in
+//     booking's date + timeIn + duration — never a separate client-only
+//     timer state — so it's still correct after a refresh.
+//   - A 1-second ticker (setInterval) repaints countdowns and, the first
+//     time any booking's remaining time hits zero, fires exactly one
+//     PUT /api/rooms/:id (status: Available) for it — tracked with a Set
+//     of already-handled booking ids so it can't double-fire while the
+//     request is in flight, and un-marked again on failure so the very
+//     next tick retries instead of silently giving up.
+//   - "Assign Walk-in" (Available rooms) creates a walk-in booking via the
+//     same POST /api/bookings admin/staff already use for Manual Booking
+//     (date/time defaulted to right now), then PUTs the room to Occupied.
+//   - "End Session" (Occupied rooms with a live walk-in) marks that
+//     booking Done and PUTs the room back to Available immediately,
+//     instead of waiting for the timer.
+//   - All 3 endpoints (GET /api/bookings?status=Active, PUT /api/rooms/:id,
+//     POST/PUT /api/bookings) are unchanged.
+//
+// Adapted only because this is now its own routed page instead of an
+// always-mounted panel: the 1s ticker starts on mount and is cleaned up in
+// this component's own effect cleanup (equivalent to the original's
+// stopRoomMonitorTicker(), which used to fire from switchPanel() whenever
+// you navigated to a different panel — React Router unmounting this page
+// on navigation now does that job instead).
+//
+// The original's Assign Walk-in modal didn't exist in admin.html's markup
+// at all — admin.js built it once into document.body on first use
+// (ensureAssignModal()). Here it's just ordinary JSX using the shared
+// <Modal/>, since React doesn't need the manual DOM-injection trick.
+//
+// Permission gating — PHASE 12. Direct port of roomMonitorCardHtml()'s
+// canManageRoom = hasAdminPermission('room:manage'): occupied rooms without
+// it show "In use" instead of an End Session button, Available rooms show
+// "No permission" instead of Assign Walk-in (exact same placeholder text
+// pairing as the original — not swapped). autoExpireRoom(), endWalkInSession(),
+// and the Assign Walk-in submit path each also re-check room:manage
+// themselves, matching the originals' own defense-in-depth (the buttons are
+// already hidden, but autoExpireRoom()/endWalkInSession()/
+// submitWalkInAssignment() guarded independently too, since
+// autoExpireRoom() in particular fires from the ticker, not a click).
+// ─────────────────────────────────────────────────────────────────────────
+
+const API_BASE_URL = 'http://localhost:3000';
+const MONITOR_WARNING_MS = 5 * 60 * 1000; // "almost over" — 5 minutes left
+
+const BASE_STATUS_CLASS = { Available: 'vacant', Occupied: 'occupied', 'Under Maintenance': 'overdue', Inactive: 'vacant' };
+
+function bookingStart(booking) {
+  const [h, m] = String(booking.timeIn).split(':').map(Number);
+  const start = new Date(booking.date + 'T00:00:00');
+  start.setHours(h || 0, m || 0, 0, 0);
+  return start;
+}
+function bookingEnd(booking) {
+  return new Date(bookingStart(booking).getTime() + booking.duration * 60 * 60 * 1000);
+}
+function formatTimeRemaining(ms) {
+  if (ms <= 0) return "Time's up";
+  const totalMin = Math.ceil(ms / 60000);
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  return h > 0 ? `${h}h ${m}m left` : `${m}m left`;
+}
+function activeWalkInBookings(bookings) {
+  return (bookings || []).filter((b) => b.source === 'walk-in' && b.status === 'Active');
+}
+function findRoomOccupancy(roomId, walkIns) {
+  const matches = walkIns.filter((b) => String(b.room?._id || b.room) === String(roomId));
+  if (!matches.length) return null;
+  return matches.reduce((latest, b) => (!latest || bookingEnd(b) > bookingEnd(latest) ? b : latest), null);
+}
+function todayDateStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+function nowTimeStr() {
+  const d = new Date();
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
+function Monitor() {
+  const { hasPermission, guardPermission } = useAuth();
+  const canManage = hasPermission('room:manage');
+
+  const [rooms, setRooms] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [walkIns, setWalkIns] = useState([]);
+  const [, forceTick] = useState(0); // re-render every second so countdowns move without re-deriving state
+
+  const expiredHandled = useRef(new Set());
+  const roomsRef = useRef(rooms);
+  const walkInsRef = useRef(walkIns);
+  roomsRef.current = rooms;
+  walkInsRef.current = walkIns;
+
+  const [assignRoom, setAssignRoom] = useState(null); // the room object the Assign modal is open for
+
+  async function fetchRooms() {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/rooms`, { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to load rooms');
+      const data = await res.json();
+      setRooms(Array.isArray(data) ? data : []);
+      return data;
+    } catch (err) {
+      console.error(err);
+      setRooms([]);
+      return [];
+    }
+  }
+
+  async function fetchMonitorBookings() {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/bookings?status=Active`, { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to load bookings for the room monitor.');
+      const data = await res.json();
+      const filtered = activeWalkInBookings(data);
+      setWalkIns(filtered);
+      return filtered;
+    } catch (err) {
+      console.error(err);
+      setWalkIns([]);
+      return [];
+    }
+  }
+
+  // Initial load + start the 1s ticker. Cleaned up on unmount — this is
+  // this page's equivalent of the original's stopRoomMonitorTicker(),
+  // which used to be called manually from switchPanel() on navigation.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      await Promise.all([fetchRooms(), fetchMonitorBookings()]);
+      if (!cancelled) setLoading(false);
+    })();
+
+    const tickHandle = setInterval(async () => {
+      // Check for newly-expired sessions and auto-reset their room, exactly
+      // as the original's tickRoomMonitor() did.
+      for (const b of walkInsRef.current) {
+        if (expiredHandled.current.has(b._id)) continue;
+        if (bookingEnd(b).getTime() - Date.now() <= 0) {
+          expiredHandled.current.add(b._id);
+          await autoExpireRoom(b);
+        }
+      }
+      forceTick((n) => n + 1); // repaint countdowns
+    }, 1000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(tickHandle);
+    };
+  }, []);
+
+  async function autoExpireRoom(booking) {
+    if (!hasPermission('room:manage')) return;
+    const roomId = booking.room?._id || booking.room;
+    const room = roomsRef.current.find((rm) => rm._id === roomId);
+    if (!room || room.status === 'Available') return;
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/rooms/${roomId}`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'Available' }),
+      });
+      if (!res.ok) throw new Error('Failed to reset room status.');
+      const updated = await res.json();
+      setRooms((prev) => prev.map((r) => (r._id === roomId ? { ...r, ...updated } : r)));
+    } catch (err) {
+      console.error(err);
+      expiredHandled.current.delete(booking._id); // let the next tick try again
+    }
+  }
+
+  async function endWalkInSession(bookingId, roomId) {
+    if (!guardPermission('room:manage')) return;
+    if (!confirm('End this session now? The room will be marked Available.')) return;
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/bookings/${bookingId}`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'Done' }),
+      });
+      if (!res.ok) throw new Error('Failed to end the session.');
+
+      const roomRes = await fetch(`${API_BASE_URL}/api/rooms/${roomId}`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'Available' }),
+      });
+      if (roomRes.ok) {
+        const updatedRoom = await roomRes.json();
+        setRooms((prev) => prev.map((r) => (r._id === roomId ? { ...r, ...updatedRoom } : r)));
+      }
+
+      expiredHandled.current.add(bookingId); // it's over — the ticker shouldn't touch it again
+      await fetchMonitorBookings();
+    } catch (err) {
+      console.error(err);
+      alert('Could not end this session.');
+    }
+  }
+
+  // Direct port of openAssignModal()'s guard — the button that calls this
+  // is already hidden without room:manage (see the room-card render below),
+  // but the original guarded the function itself too.
+  function openAssign(room) {
+    if (!guardPermission('room:manage')) return;
+    setAssignRoom(room);
+  }
+
+  async function handleAssignSubmit({ guestName, duration, paymentMethod }) {
+    if (!guardPermission('room:manage')) return;
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/bookings`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          guestName,
+          roomId: assignRoom._id,
+          date: todayDateStr(),
+          timeIn: nowTimeStr(),
+          duration,
+          paymentMethod,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || 'Failed to start the session.');
+      }
+
+      const roomRes = await fetch(`${API_BASE_URL}/api/rooms/${assignRoom._id}`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'Occupied' }),
+      });
+      if (roomRes.ok) {
+        const updatedRoom = await roomRes.json();
+        setRooms((prev) => prev.map((r) => (r._id === assignRoom._id ? { ...r, ...updatedRoom } : r)));
+      }
+
+      setAssignRoom(null);
+      await fetchMonitorBookings();
+    } catch (err) {
+      console.error(err);
+      alert(err.message || 'Could not start this walk-in session.');
+      throw err; // let the modal know submission failed, so it can stop showing "Starting…"
+    }
+  }
+
+  return (
+    <div className="panel active" id="panel-monitor">
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <span style={{ fontSize: '.78rem', color: 'var(--muted)' }}>Live monitoring — updates every minute</span>
+      </div>
+
+      <div className="room-grid" id="monitor-room-grid">
+        {loading ? (
+          <div style={{ textAlign: 'center', color: 'var(--muted)', padding: '24px 0', gridColumn: '1/-1' }}>Loading rooms…</div>
+        ) : rooms.length === 0 ? (
+          <div style={{ textAlign: 'center', color: 'var(--muted)', padding: '24px 0', gridColumn: '1/-1' }}>
+            No rooms yet — add facilities in Settings.
+          </div>
+        ) : (
+          rooms.map((r) => {
+            const occupancy = findRoomOccupancy(r._id, walkIns);
+            const remaining = occupancy ? bookingEnd(occupancy).getTime() - Date.now() : null;
+            const isExpired = occupancy && remaining <= 0;
+            const isWarning = occupancy && !isExpired && remaining <= MONITOR_WARNING_MS;
+
+            const stateClass = isExpired ? 'overdue' : isWarning ? 'warning' : BASE_STATUS_CLASS[r.status] || 'vacant';
+            const icoClass = r.status === 'Occupied' ? 'ico-teal' : r.status === 'Under Maintenance' ? 'ico-amber' : 'ico-blue';
+            const icoGlyph = r.status === 'Occupied' ? 'ti-circle-dashed' : r.status === 'Under Maintenance' ? 'ti-alert-triangle' : 'ti-circle-off';
+
+            const barPercent = occupancy
+              ? Math.max(0, Math.min(100, (remaining / (occupancy.duration * 60 * 60 * 1000)) * 100))
+              : r.status === 'Occupied' ? 60 : 0;
+            const barColor = isExpired ? 'var(--red)' : isWarning ? 'var(--amber)' : occupancy || r.status === 'Occupied' ? 'var(--teal)' : '#378ADD';
+
+            return (
+              <div className={`rm ${stateClass}`} key={r._id}>
+                <div className="rm-head">
+                  <div>
+                    <div className="rm-name">{r.name}</div>
+                    <div className="rm-type">{r.roomNumber}</div>
+                  </div>
+                  <div className={`rm-ico ${icoClass}`}><i className={`ti ${icoGlyph}`}></i></div>
+                </div>
+                <div className="rm-rows">
+                  <div className="rm-row"><span className="lbl">Status</span><span className="val">{r.status}</span></div>
+                  {occupancy ? (
+                    <>
+                      <div className="rm-row"><span className="lbl">Guest</span><span className="val">{occupancy.guestName}</span></div>
+                      <div className="rm-row">
+                        <span className="lbl">Time Left</span>
+                        <span className={`val rm-timer${isWarning ? ' warn' : ''}${isExpired ? ' expired' : ''}`}>
+                          {formatTimeRemaining(remaining)}
+                        </span>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="rm-row"><span className="lbl">Rate</span><span className="val">₱{r.price}/hr</span></div>
+                  )}
+                </div>
+                {isWarning && (
+                  <div className="rm-warn-badge"><i className="ti ti-alert-triangle"></i>Ending soon</div>
+                )}
+                <div className="rm-bar-wrap">
+                  <div className="rm-bar" style={{ width: `${barPercent}%`, background: barColor }}></div>
+                </div>
+                <div className="rm-actions">
+                  {occupancy ? (
+                    canManage ? (
+                      <button className="rm-btn danger" onClick={() => endWalkInSession(occupancy._id, r._id)}>End Session</button>
+                    ) : (
+                      <span style={{ fontSize: '.7rem', color: 'var(--muted)' }}>In use</span>
+                    )
+                  ) : r.status === 'Available' ? (
+                    canManage ? (
+                      <button className="rm-btn primary" onClick={() => openAssign(r)}>Assign Walk-in</button>
+                    ) : (
+                      <span style={{ fontSize: '.7rem', color: 'var(--muted)' }}>No permission</span>
+                    )
+                  ) : (
+                    <span style={{ fontSize: '.7rem', color: 'var(--muted)' }}>{r.status}</span>
+                  )}
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      <AssignWalkInModal room={assignRoom} onClose={() => setAssignRoom(null)} onSubmit={handleAssignSubmit} />
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// AssignWalkInModal — admin.html shipped no markup for this at all; the
+// original built it once into document.body on first use
+// (ensureAssignModal()). React doesn't need that trick — this is just
+// ordinary JSX using the shared <Modal/>, same .mfield/.modal-actions
+// conventions as Bookings.jsx's own modals.
+// ─────────────────────────────────────────────────────────────────────────
+function AssignWalkInModal({ room, onClose, onSubmit }) {
+  const [guestName, setGuestName] = useState('');
+  const [duration, setDuration] = useState('1');
+  const [paymentMethod, setPaymentMethod] = useState('Cash');
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (room) {
+      setGuestName('');
+      setDuration('1');
+      setPaymentMethod('Cash');
+    }
+  }, [room]);
+
+  async function handleSubmit() {
+    if (!guestName.trim()) {
+      alert('Please enter the guest name.');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await onSubmit({ guestName: guestName.trim(), duration: Number(duration), paymentMethod });
+    } catch {
+      // onSubmit already alerted; just stop the "Starting…" state below.
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <Modal open={!!room} onClose={onClose} title="Assign Walk-in">
+      {room && (
+        <>
+          <p style={{ margin: '-10px 0 16px', fontSize: '.78rem', color: 'var(--muted)' }}>{room.name} — {room.roomNumber}</p>
+          <div className="mfield">
+            <label>Guest Name</label>
+            <input type="text" placeholder="Walk-in guest name" value={guestName} onChange={(e) => setGuestName(e.target.value)} />
+          </div>
+          <div className="mfield">
+            <label>Duration</label>
+            <select value={duration} onChange={(e) => setDuration(e.target.value)}>
+              <option value="1">1 hour</option>
+              <option value="2">2 hours</option>
+              <option value="3">3 hours</option>
+              <option value="4">4 hours</option>
+              <option value="5">5 hours</option>
+            </select>
+          </div>
+          <div className="mfield">
+            <label>Payment Method</label>
+            <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)}>
+              <option value="Cash">Cash</option>
+              <option value="GCash">GCash</option>
+              <option value="Maya">Maya</option>
+            </select>
+          </div>
+          <div className="modal-actions">
+            <button className="btn-cancel" onClick={onClose}>Cancel</button>
+            <button className="btn-confirm" disabled={submitting} onClick={handleSubmit}>
+              {submitting ? 'Starting…' : 'Start Session'}
+            </button>
+          </div>
+        </>
+      )}
+    </Modal>
+  );
+}
+
+export default Monitor;

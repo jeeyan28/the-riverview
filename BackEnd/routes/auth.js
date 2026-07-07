@@ -8,7 +8,7 @@ const { loginLimiter, forgotPasswordLimiter } = require("../middleware/rateLimit
 const { ensureAuthenticated } = require("../middleware/adminAuth");
 const { sendPasswordResetEmail } = require("../utils/mailer");
 const { verifyGoogleIdToken } = require("../utils/googleVerify");
-const { isAdminRole, getEffectivePermissions } = require("../utils/permissions");
+const { isAdminRole, getEffectivePermissions, roleLabel } = require("../utils/permissions");
 
 // Fixed bcrypt hash of a random value, used only to burn CPU time when a user
 // doesn't exist, so login response time doesn't reveal whether the email is
@@ -24,6 +24,7 @@ function sanitizeUser(user) {
     email: user.email,
     phone: user.phone,
     role: user.role,
+    roleLabel: roleLabel(user.role),
     permissions: isAdminRole(user.role) ? getEffectivePermissions(user) : undefined,
   };
 }
