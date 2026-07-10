@@ -47,11 +47,14 @@ function sanitizeUser(user) {
   };
 }
 
-// Minimum password policy shared by register + reset, so the two paths can't drift.
+// Minimum password policy shared by register + reset, so the two paths can't
+// drift from each other. Mirrors Frontend/src/utils/password.js's
+// PASSWORD_REQUIREMENTS (same rules, same order: length, uppercase,
+// lowercase, number) — keep both in sync.
 function isPasswordStrongEnough(password) {
   if (typeof password !== "string" || password.length < 8) return false;
-  if (!/[a-z]/.test(password)) return false;
   if (!/[A-Z]/.test(password)) return false;
+  if (!/[a-z]/.test(password)) return false;
   if (!/[0-9]/.test(password)) return false;
   return true;
 }
@@ -74,26 +77,43 @@ function saveSession(req) {
 router.post("/register", registerOtpLimiter, async (req, res) => {
   try {
     const { password } = req.body;
-    const emailLower = (req.body.email || "").toLowerCase();
+    const emailRaw = String(req.body.email || "").trim();
+    const emailLower = emailRaw.toLowerCase();
 
     const firstNameNormalized = normalizeName(req.body.firstName);
     const lastNameNormalized = normalizeName(req.body.lastName);
     const firstNameError = validateName(req.body.firstName, "First name");
     const lastNameError = validateName(req.body.lastName, "Last name");
 
-    if (!emailLower || !password) {
-      return res.status(400).json({ message: "All fields are required." });
-    }
+    // Field-specific checks, in form order. Each missing/invalid field gets
+    // its own message (mirroring firstName/lastName's existing pattern)
+    // instead of a blanket "All fields are required." — that message was
+    // misleading whenever only one field was actually missing, or the
+    // problem wasn't a missing field at all (e.g. a malformed email). The
+    // generic message is now reserved for a payload with no email and no
+    // password at all (a genuinely empty/malformed request).
     if (firstNameError) {
       return res.status(400).json({ message: firstNameError, field: "firstName" });
     }
     if (lastNameError) {
       return res.status(400).json({ message: lastNameError, field: "lastName" });
     }
-
+    if (!emailRaw && !password) {
+      return res.status(400).json({ message: "All fields are required." });
+    }
+    if (!emailRaw) {
+      return res.status(400).json({ message: "Email is required.", field: "email" });
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailRaw)) {
+      return res.status(400).json({ message: "Enter a valid email address.", field: "email" });
+    }
+    if (!password) {
+      return res.status(400).json({ message: "Password is required.", field: "password" });
+    }
     if (!isPasswordStrongEnough(password)) {
       return res.status(400).json({
         message: "Password must be at least 8 characters and include uppercase, lowercase, and a number.",
+        field: "password",
       });
     }
 

@@ -6,7 +6,7 @@ import { useCountdownClock } from '../hooks/useCountdownClock';
 import PasswordInput from './PasswordInput';
 import PasswordRequirementsList from './PasswordRequirementsList';
 import { OTP_LENGTH, OTP_EXPIRY_SECONDS, RESEND_COOLDOWN_SECONDS, formatCountdown } from '../utils/otp';
-import { PASSWORD_REQUIREMENTS } from '../utils/password';
+import { isPasswordStrongEnough } from '../utils/password';
 import { API_BASE_URL } from '../services/api';
 
 const DEFAULT_SENT_COPY =
@@ -201,11 +201,7 @@ function ForgotPasswordModal({ open, onClose, onReturnToLogin }) {
   const secondsUntilResend = resendAvailableAt ? Math.max(0, Math.ceil((resendAvailableAt - now) / 1000)) : 0;
   const otpExpired = otpExpiresAt > 0 && secondsUntilExpiry === 0;
 
-  const passwordChecks = PASSWORD_REQUIREMENTS.map((req) => ({
-    ...req,
-    met: req.test(newPassword),
-  }));
-  const passwordValid = passwordChecks.every((c) => c.met);
+  const passwordValid = isPasswordStrongEnough(newPassword);
   const confirmMatches = confirmPassword.length > 0 && confirmPassword === newPassword;
   const canSubmitPassword = passwordValid && confirmMatches && !resetting;
 

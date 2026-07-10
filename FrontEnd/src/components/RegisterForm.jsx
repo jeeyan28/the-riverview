@@ -8,7 +8,7 @@ import { useCountdownClock } from '../hooks/useCountdownClock';
 import { useGoogleAuth } from '../hooks/useGoogleAuth';
 import { useAuth } from '../context/AuthContext';
 import { OTP_LENGTH, OTP_EXPIRY_SECONDS, RESEND_COOLDOWN_SECONDS, formatCountdown } from '../utils/otp';
-import { PASSWORD_REQUIREMENTS } from '../utils/password';
+import { isPasswordStrongEnough } from '../utils/password';
 import { validateName, normalizeName } from '../utils/name';
 import '../styles/register.css';
 
@@ -61,11 +61,7 @@ function RegisterForm({ onSwitchToLogin }) {
     setErrors((prev) => (prev[field] ? { ...prev, [field]: '' } : prev));
   }
 
-  const passwordChecks = PASSWORD_REQUIREMENTS.map((req) => ({
-    ...req,
-    met: req.test(password),
-  }));
-  const passwordValid = passwordChecks.every((c) => c.met);
+  const passwordValid = isPasswordStrongEnough(password);
 
   async function handleGoogleCredential(response) {
     try {
@@ -144,6 +140,11 @@ function RegisterForm({ onSwitchToLogin }) {
           ...prev,
           email: err.message || 'An account with this email already exists.',
         }));
+      } else if (err.field && Object.prototype.hasOwnProperty.call(errors, err.field)) {
+        // Backend now names which field it's rejecting (firstName, lastName,
+        // email, password) — show it inline next to that field instead of a
+        // generic toast, same as the 409 case above.
+        setErrors((prev) => ({ ...prev, [err.field]: err.message }));
       } else if (typeof err.status === 'number') {
         showToast(err.message || 'Registration failed. Try again.', 'error');
       } else {
