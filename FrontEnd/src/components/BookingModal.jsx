@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useAuth } from '../context/AuthContext';
 import {
   dateKey,
   getRoomCapacity,
@@ -12,39 +13,8 @@ import {
   computeDownPayment,
 } from '../utils/rooms';
 
-// ─────────────────────────────────────────────────────────────────────────
-// BookingModal — migrated from index.html's #booking-modal markup +
-// js/index.js's booking-modal section (openBooking through
-// handlePaymongoReturn, roughly lines 537–1206) — Home page, Phase 8,
-// part 2 of 3.
-//
-// This is a controlled component: Home.jsx owns whether it's open and
-// which room/PayMongo-return it's showing, via two props:
-//   - `room`       — the room object when opened via "Select Room", else null
-//   - `returnInfo` — { result: 'success'|'cancel', bookingId } when the
-//                    page loaded with ?paymongo=...&bookingId=... in the
-//                    URL, else null. Home.jsx reads this from
-//                    useSearchParams once on mount, exactly like the
-//                    original's handlePaymongoReturn() ran unconditionally
-//                    on every page load.
-// `open` (below) is just `!!room || !!returnInfo` — the overlay element
-// itself is always mounted (matching the original's always-in-DOM
-// #booking-modal, hidden via `display:none` until `.open` is added) so the
-// existing bkFadeIn/bkSlideUp CSS animations still play correctly.
-//
-// Auth notes (still local to this component, not AuthContext — that's
-// Phase 10): `getStoredUser`/`verifySession` below are copied 1:1 from the
-// same-named functions in the original js/index.js. This duplicates a few
-// lines already also inlined in Login.jsx/Register.jsx/ResetPassword.jsx;
-// per hooks/README.md and utils/README.md, de-duplicating this into a
-// shared hook is intentionally deferred to Phase 10 (useAuth.js) rather
-// than built speculatively now.
-//
-// API_BASE_URL is still hardcoded, matching every other page pre-Phase 9.
-// ─────────────────────────────────────────────────────────────────────────
 
 const API_BASE_URL = 'http://localhost:3000';
-const USER_KEY = 'riverview_user';
 const MAX_DURATION = 5;
 
 const MONTHS = [
@@ -53,36 +23,6 @@ const MONTHS = [
 ];
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
-function getStoredUser() {
-  const raw = localStorage.getItem(USER_KEY) || sessionStorage.getItem(USER_KEY);
-  if (!raw) return null;
-  try {
-    return JSON.parse(raw);
-  } catch {
-    return null;
-  }
-}
-
-// verifySession — migrated 1:1. Confirms with the server whether the
-// session cookie is still valid (the real source of truth — never trust
-// cached storage alone), keeping whichever storage area currently holds
-// the user in sync with the answer.
-async function verifySession() {
-  try {
-    const res = await fetch(`${API_BASE_URL}/api/auth/me`, { credentials: 'include' });
-    if (!res.ok) {
-      localStorage.removeItem(USER_KEY);
-      sessionStorage.removeItem(USER_KEY);
-      return null;
-    }
-    const data = await res.json();
-    const area = localStorage.getItem(USER_KEY) ? localStorage : sessionStorage;
-    area.setItem(USER_KEY, JSON.stringify(data.user));
-    return data.user;
-  } catch (err) {
-    return getStoredUser();
-  }
-}
 
 function formatHour(h) {
   const hh = h % 24;
@@ -178,6 +118,7 @@ function BookingSummaryCard({ booking }) {
 
 function BookingModal({ room, returnInfo, onClose, openHour, closeHour, settings }) {
   const open = !!room || !!returnInfo;
+  const { user: authUser, revalidate, logout } = useAuth();
 
   const [step, setStep] = useState('price'); // 'price' | 'calendar' | 'slots' | 'payment' | 'paymongoReturn'
   const [viewDate, setViewDate] = useState(new Date());
@@ -218,8 +159,8 @@ function BookingModal({ room, returnInfo, onClose, openHour, closeHour, settings
     setGuestCount(1);
     setPaxError('');
 
-    const user = getStoredUser();
-    setGuestName(user ? [user.firstname, user.lastname].filter(Boolean).join(' ') || user.name || '' : '');
+    const user = authUser;
+    setGuestName(user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : '');
     setGuestContact(user ? user.phone || user.email || '' : '');
   }, [room]);
 
@@ -249,7 +190,7 @@ function BookingModal({ room, returnInfo, onClose, openHour, closeHour, settings
       }
 
       // result === 'success' — poll briefly in case the webhook hasn't landed yet.
-      const user = await verifySession();
+      const user = await revalidate();
       if (cancelled) return;
       if (!user) {
         setPmReturn({ phase: 'needLogin', booking: null });
@@ -393,7 +334,7 @@ function BookingModal({ room, returnInfo, onClose, openHour, closeHour, settings
     if (paxError) return; // inline error is already shown next to the Pax field
 
     setConfirming(true);
-    const user = await verifySession();
+    const user = await revalidate();
     setConfirming(false);
 
     if (!user) {
@@ -442,8 +383,7 @@ function BookingModal({ room, returnInfo, onClose, openHour, closeHour, settings
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         if (res.status === 401) {
-          localStorage.removeItem(USER_KEY);
-          sessionStorage.removeItem(USER_KEY);
+          await logout();
           alert('Your session has expired. Please log in again to complete your booking.');
           window.location.href = '/login';
           return;

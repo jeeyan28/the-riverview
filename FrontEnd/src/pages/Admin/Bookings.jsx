@@ -10,74 +10,7 @@ import { useAuth } from '../../context/AuthContext';
 import { roomsService } from '../../services/rooms';
 import { bookingsService } from '../../services/bookings';
 
-// ─────────────────────────────────────────────────────────────────────────
-// Admin / Bookings — migrated from admin.html's <div id="panel-bookings">
-// plus its four companion modals (Manual Booking / Edit Booking / Booking
-// Details / Payment Screenshot) and every booking-management function in
-// admin.js (renderBookingsTable, approveBooking, rejectBooking,
-// updateBookingStatus, deleteBooking, openBookingDetailModal,
-// openEditBookingModal, saveBookingEdit, openModal/submitManualBooking,
-// openProofModal). Part of Phase 8 (Page Migration).
-//
-// All 7 backend endpoints this page calls are unchanged from the original:
-//   GET    /api/bookings              (search/status/paymentStatus/room/date)
-//   POST   /api/bookings              (manual/walk-in booking)
-//   PUT    /api/bookings/:id          (edit duration/paymentMethod/status)
-//   PUT    /api/bookings/:id/approve
-//   PUT    /api/bookings/:id/reject
-//   DELETE /api/bookings/:id
-//   GET    /api/rooms                 (room select options)
-//
-// Two real bugs fixed here (not redesigned, FIXED — the markup already
-// anticipated both, the JS wiring for them just never existed in admin.js):
-//   1. #bk-filter-room only ever rendered "All Rooms" — there was no code
-//      anywhere that populated it with actual room options, so the filter
-//      was permanently non-functional. Now populated from GET /api/rooms,
-//      same as the Manual Booking modal's room <select> already was.
-//   2. The whole booking calendar (#bkcal-grid / prev / next / today) had
-//      matching CSS (moved into admin.css — see that file's note) and
-//      matching markup, but ZERO javascript anywhere in admin.js: no month
-//      state, no day rendering, no click handling. It was dead UI. It's
-//      wired up here for real: dots mark days that have at least one
-//      booking (from the currently-loaded/filtered list), and clicking a
-//      day sets the exact-date filter (the same one '#bk-filter-date'
-//      already controlled) rather than duplicating a second filter path.
-//
-// Adapted for route-based architecture: Dashboard.jsx's "Add Booking" quick
-// action can't reach into this page's local state directly (separate
-// routed components, not two always-mounted panels anymore — see that
-// file's header comment), so it navigates here with ?openManualBooking=1
-// instead. This effect below checks for that param once on mount.
-//
-// Permission gating — PHASE 12. Direct port of renderBookingsTable()'s
-// canManage = hasAdminPermission('booking:manage'): View stays available to
-// everyone (read-only), but Approve/Reject/Resolve/Mark Done/Cancel/Edit/
-// Delete are only rendered for canManage — exact same split as the
-// original (View pushed unconditionally, the rest only inside the
-// `if (canManage)` block). The booking-detail modal's Confirm/Edit/Cancel
-// buttons are the same hasAdminPermission-driven show/hide as the
-// original's confirmBtn/editBtn/cancelBtn .style.display toggles. The
-// "Manual Booking" button and every mutating function (open/save/approve/
-// reject/updateStatus/delete) each also re-check guardPermission('booking:
-// manage') themselves — matching the originals' (openModal/
-// submitManualBooking/openEditBookingModal/saveBookingEdit/
-// updateBookingStatus/deleteBooking/approveBooking/rejectBooking) own
-// defense-in-depth, since the button-level hiding above doesn't cover
-// every path a handler can be reached from (e.g. Bookings.jsx's own
-// ?openManualBooking=1 arrival-from-Dashboard effect, which has no
-// equivalent in the original's always-mounted-panels model at all).
-//
-// PHASE 15: every fetch() call site below now goes through
-// services/bookings.js and services/rooms.js instead of calling fetch()
-// directly. No behavior changed — same endpoints, same payload shapes,
-// same guardPermission() call order (still checked first, before the
-// service call), same error message per call site. One consolidation
-// worth flagging: updateBookingStatus() and EditBookingModal.handleSave()
-// both PUT to /api/bookings/:id with different payload shapes ({status}
-// vs {duration, paymentMethod, status}) — both now call the same
-// bookingsService.update(id, payload), since it's genuinely the same
-// endpoint; see bookings.js's own header note.
-// ─────────────────────────────────────────────────────────────────────────
+
 
 const STATUS_PILL_CLASS = {
   Active: 'pill-active',
@@ -378,7 +311,7 @@ function Bookings() {
         const btnStyle = (color) => ({ border: 'none', background: 'none', fontSize: '.75rem', color, cursor: 'pointer', fontWeight: 600 });
         return (
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <button style={{ ...btnStyle('#c8d6e5'), fontWeight: 600 }} onClick={() => setDetailId(b._id)}>
+            <button style={btnStyle('var(--text)')} onClick={() => setDetailId(b._id)}>
               View
             </button>
             {canManage && (
@@ -394,7 +327,7 @@ function Bookings() {
                   </>
                 )}
                 {!isPendingVerification && b.status === 'Overdue' && (
-                  <button style={btnStyle('#ff6b6b')} onClick={() => updateBookingStatus(b._id, 'Done')}>
+                  <button style={btnStyle('var(--red)')} onClick={() => updateBookingStatus(b._id, 'Done')}>
                     Resolve
                   </button>
                 )}
@@ -408,7 +341,7 @@ function Bookings() {
                     Cancel
                   </button>
                 )}
-                <button style={btnStyle('#c8d6e5')} onClick={() => openEditBooking(b._id)}>
+                <button style={btnStyle('var(--text)')} onClick={() => openEditBooking(b._id)}>
                   Edit
                 </button>
                 <button style={btnStyle('var(--muted)')} onClick={() => deleteBooking(b._id)}>
@@ -424,23 +357,16 @@ function Bookings() {
 
   return (
     <div className="panel active" id="panel-bookings">
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+      <div className="bk-toolbar">
+        <div className="bk-filters">
           <input
             type="text"
+            className="bk-filter-input"
             placeholder="Search name or phone…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            style={{
-              fontSize: '.78rem', padding: '6px 10px', borderRadius: 8, border: '1px solid var(--border)',
-              background: 'var(--navy3)', color: '#c8d6e5', fontFamily: "'Inter',sans-serif", minWidth: 170,
-            }}
           />
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            style={{ fontSize: '.78rem', padding: '6px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--navy3)', color: '#c8d6e5', fontFamily: "'Inter',sans-serif" }}
-          >
+          <select className="bk-filter-input" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
             <option value="">All Status</option>
             <option value="Pending Payment Verification">Pending Payment Verification</option>
             <option value="Confirmed">Confirmed</option>
@@ -451,11 +377,7 @@ function Bookings() {
             <option value="Overdue">Overdue</option>
             <option value="Cancelled">Cancelled</option>
           </select>
-          <select
-            value={paymentFilter}
-            onChange={(e) => setPaymentFilter(e.target.value)}
-            style={{ fontSize: '.78rem', padding: '6px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--navy3)', color: '#c8d6e5', fontFamily: "'Inter',sans-serif" }}
-          >
+          <select className="bk-filter-input" value={paymentFilter} onChange={(e) => setPaymentFilter(e.target.value)}>
             <option value="">All Payment Status</option>
             <option value="Unpaid">Unpaid</option>
             <option value="Pending Verification">Pending Verification</option>
@@ -463,11 +385,7 @@ function Bookings() {
             <option value="Rejected">Rejected</option>
           </select>
           {/* FIXED: was permanently stuck at "All Rooms" in the original — see header comment */}
-          <select
-            value={roomFilter}
-            onChange={(e) => setRoomFilter(e.target.value)}
-            style={{ fontSize: '.78rem', padding: '6px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--navy3)', color: '#c8d6e5', fontFamily: "'Inter',sans-serif" }}
-          >
+          <select className="bk-filter-input" value={roomFilter} onChange={(e) => setRoomFilter(e.target.value)}>
             <option value="">All Rooms</option>
             {rooms.map((r) => (
               <option key={r._id} value={r._id}>
@@ -477,23 +395,16 @@ function Bookings() {
           </select>
           <input
             type="date"
+            className="bk-filter-input"
             title="Filter by exact date"
             value={dateFilter}
             onChange={(e) => setDateFilter(e.target.value)}
-            style={{ fontSize: '.78rem', padding: '6px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--navy3)', color: '#c8d6e5', fontFamily: "'Inter',sans-serif" }}
           />
-          <button
-            type="button"
-            onClick={clearFilters}
-            style={{ fontSize: '.78rem', padding: '6px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'none', color: 'var(--muted)', fontFamily: "'Inter',sans-serif", cursor: 'pointer' }}
-          >
+          <button type="button" className="bk-clear-btn" onClick={clearFilters}>
             Clear
           </button>
         </div>
-        <button
-          onClick={openManualBooking}
-          style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', background: 'rgba(0,201,167,.1)', border: '1px solid rgba(0,201,167,.3)', borderRadius: 9, fontSize: '.78rem', color: 'var(--teal)', cursor: 'pointer', fontFamily: "'Inter',sans-serif" }}
-        >
+        <button className="btn-teal" onClick={openManualBooking}>
           <i className="ti ti-plus"></i>Manual Booking
         </button>
       </div>
@@ -579,7 +490,7 @@ function Bookings() {
                 <>
                   <button
                     className="btn-cancel"
-                    style={{ color: 'var(--red)', borderColor: 'rgba(255,107,107,.3)' }}
+                    style={{ color: 'var(--red)', borderColor: 'rgba(225,29,72,.3)' }}
                     onClick={async () => { await rejectBooking(proofBooking._id); setProofId(null); }}
                   >
                     Reject
@@ -699,7 +610,7 @@ function Bookings() {
               {canManage && !['Cancelled', 'Rejected', 'Done'].includes(detailBooking.status) && (
                 <button
                   className="btn-cancel"
-                  style={{ color: 'var(--red)', borderColor: 'rgba(255,107,107,.3)' }}
+                  style={{ color: 'var(--red)', borderColor: 'rgba(225,29,72,.3)' }}
                   onClick={async () => {
                     if (!(await confirm('Cancel this booking? The guest will need to rebook if they still want the slot.', { danger: true, confirmText: 'Cancel Booking' }))) return;
                     await updateBookingStatus(detailBooking._id, 'Cancelled');

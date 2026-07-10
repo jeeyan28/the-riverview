@@ -58,4 +58,7 @@ export const bookingsService = {
   reject: (id) => apiRequest(`${BASE}/${id}/reject`, { method: 'PUT', fallbackMessage: 'Failed to reject booking.' }),
 
   remove: (id) => apiRequest(`${BASE}/${id}`, { method: 'DELETE', fallbackMessage: 'Failed to delete booking.' }),
+
+  /** Bookings for the current logged-in user — used by ProfileModal's booking history. */
+  mine: () => apiRequest(`${BASE}/mine`, { fallbackMessage: 'Failed to load your booking history.' }),
 };

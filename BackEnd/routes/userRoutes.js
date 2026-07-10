@@ -12,6 +12,7 @@ const {
   canAssignRole,
   assignableRoles,
 } = require("../utils/permissions");
+const { normalizeName, validateName } = require("../utils/nameValidation");
 
 // Anyone may edit their own profile; editing someone else's requires the
 // admin:manage permission AND passing the same role-hierarchy check used by
@@ -26,8 +27,8 @@ function canEditTarget(req, target) {
 function shapeUser(u) {
   return {
     _id: u._id,
-    firstname: u.firstname,
-    lastname: u.lastname,
+    firstName: u.firstName,
+    lastName: u.lastName,
     email: u.email,
     phone: u.phone,
     role: u.role,
@@ -50,7 +51,7 @@ router.get("/", requirePermission(PERMISSIONS.ADMIN_MANAGE), async (req, res) =>
     if (req.query.role) filter.role = req.query.role;
     if (req.query.search) {
       const rx = new RegExp(req.query.search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
-      filter.$or = [{ firstname: rx }, { lastname: rx }, { email: rx }];
+      filter.$or = [{ firstName: rx }, { lastName: rx }, { email: rx }];
     }
 
     const users = await User.find(filter).sort({ createdAt: -1 }).limit(500);
@@ -71,10 +72,18 @@ router.get("/", requirePermission(PERMISSIONS.ADMIN_MANAGE), async (req, res) =>
 // endpoint is specifically for the admin panel's "Manage Users" panel.
 router.post("/", requirePermission(PERMISSIONS.ADMIN_MANAGE), async (req, res) => {
   try {
-    const { firstname, lastname, phone, email, password, role } = req.body;
+    const { firstName, lastName, phone, email, password, role } = req.body;
 
-    if (!firstname || !email || !password || !role) {
-      return res.status(400).json({ message: "First name, email, password, and role are required." });
+    const firstNameError = validateName(firstName, "First name");
+    const lastNameError = validateName(lastName, "Last name");
+    if (firstNameError) {
+      return res.status(400).json({ message: firstNameError });
+    }
+    if (lastNameError) {
+      return res.status(400).json({ message: lastNameError });
+    }
+    if (!email || !password || !role) {
+      return res.status(400).json({ message: "First name, last name, email, password, and role are required." });
     }
     if (password.length < 8) {
       return res.status(400).json({ message: "Password must be at least 8 characters." });
@@ -87,8 +96,8 @@ router.post("/", requirePermission(PERMISSIONS.ADMIN_MANAGE), async (req, res) =
     if (existing) return res.status(409).json({ message: "Email already in use." });
 
     const user = await User.create({
-      firstname,
-      lastname: lastname || "",
+      firstName: normalizeName(firstName),
+      lastName: normalizeName(lastName),
       phone: phone || "",
       email: String(email).toLowerCase(),
       password,
@@ -161,7 +170,7 @@ router.delete("/:id", requirePermission(PERMISSIONS.ADMIN_MANAGE), async (req, r
   }
 });
 
-// ── Update profile details (firstname/lastname/phone)
+// ── Update profile details (firstName/lastName/phone)
 router.put("/:id", ensureAuthenticated, async (req, res) => {
   try {
     const target = await User.findById(req.params.id);
@@ -171,9 +180,30 @@ router.put("/:id", ensureAuthenticated, async (req, res) => {
       return res.status(403).json({ message: "You don't have permission to edit this account." });
     }
 
-    const { firstname, lastname, phone } = req.body;
-    if (firstname !== undefined) target.firstname = firstname;
-    if (lastname !== undefined) target.lastname = lastname;
+    // Google-linked accounts source their name/profile from Google (see
+    // /api/auth/google), not a manual edit form — block a self-edit here so
+    // the two paths can't drift. An admin editing someone else's account is
+    // still allowed through (e.g. to fix a typo), since that's not this rule's concern.
+    const isSelfEdit = req.session.userId === String(target._id);
+    if (isSelfEdit && target.googleId) {
+      return res.status(403).json({ message: "Your profile is managed by your Google account." });
+    }
+
+    const { firstName, lastName, phone } = req.body;
+    if (firstName !== undefined) {
+      const firstNameError = validateName(firstName, "First name");
+      if (firstNameError) {
+        return res.status(400).json({ message: firstNameError });
+      }
+      target.firstName = normalizeName(firstName);
+    }
+    if (lastName !== undefined) {
+      const lastNameError = validateName(lastName, "Last name");
+      if (lastNameError) {
+        return res.status(400).json({ message: lastNameError });
+      }
+      target.lastName = normalizeName(lastName);
+    }
     if (phone !== undefined) target.phone = phone;
     await target.save();
 

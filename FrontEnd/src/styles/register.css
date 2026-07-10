@@ -1,177 +1,36 @@
-/* ─── RESET ─── */
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html { font-size: 16px; }
-body {
-    font-family: 'Inter', sans-serif;
-    background: #0A1628;
-    color: #F8F6F1;
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-}
-a { text-decoration: none; color: inherit; }
+/* ─── SCOPE ───
+   RegisterForm now renders inside the shared Auth card (login-card), next
+   to LoginForm, which uses login.css. These two files define several of
+   the same class names (.field, .input-wrap, .custom-check, .btn-submit,
+   .divider, .btn-social) with different tokens, so everything here is
+   scoped under `.rf-scope` — the wrapper RegisterForm renders — to avoid
+   overriding LoginForm's styles or vice versa. */
 
-/* ─── TOKENS ─── */
-:root {
+.rf-scope {
     --navy:    #0A1628;
-    --navy-2:  #0f1e35;
-    --navy-3:  #162640;
-    --cream:   #F8F6F1;
-    --teal:    #00C9A7;
+    --surface-alt: #16243f;
+    --card-light: #1c2c4a;
+    --teal:    var(--accent, #00C9A7);
     --muted:   #8A9BB0;
-    --border:  rgba(255,255,255,.08);
+    --border:  rgba(255,255,255,.12);
     --error:   #ff6b6b;
-    --success: #00C9A7;
-}
 
-/* Header/logo/footer rules intentionally removed from this file — they were
-   an exact, unused duplicate of login.css's .auth-header/.auth-logo/
-   .auth-logo-name/.auth-footer rules. AuthLayout.jsx only ever imports
-   login.css for those (register.css is imported by Register.jsx for the
-   signup-form-specific rules below only). Flagged as dead code in this
-   file's original header comment ("can be deleted later in Phase 15
-   cleanup") — removed now as a safe, isolated cleanup with zero visual
-   impact, since these selectors were never reachable from register.css. */
-
-/* ─── LAYOUT ─── */
-.page-body {
-    flex: 1;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    min-height: 0;
-}
-
-/* ─── LEFT PANEL ─── */
-.left-panel {
-    position: relative;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-    justify-content: flex-start;
-    padding: 4rem;
-    min-height: 600px;
-}
-.left-bg {
-    position: absolute;
-    inset: 0;
-    opacity: .22;
-}
-.left-overlay {
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(
-        to top,
-        rgba(10,22,40,1) 0%,
-        rgba(10,22,40,.6) 50%,
-        rgba(10,22,40,.2) 100%
-    );
-}
-.left-content {
-    position: relative;
-    z-index: 1;
-}
-.left-eyebrow {
-    display: inline-flex;
-    align-items: center;
-    gap: .5rem;
-    font-size: .7rem;
-    font-weight: 600;
-    letter-spacing: .14em;
-    text-transform: uppercase;
-    color: var(--teal);
-    margin-bottom: 1rem;
-}
-.left-eyebrow::before {
-    content: '';
-    display: block;
-    width: 24px;
-    height: 2px;
-    background: var(--teal);
-    border-radius: 2px;
-}
-.left-content h2 {
-    font-family: 'Playfair Display', serif;
-    font-size: clamp(1.8rem, 3vw, 2.8rem);
-    font-weight: 700;
-    line-height: 1.15;
-    letter-spacing: -.02em;
-    margin-bottom: 1rem;
-    color: #fff;
-}
-.left-content h2 em {
-    font-style: italic;
-    color: var(--teal);
-}
-.left-content p {
-    font-size: .9rem;
-    color: var(--muted);
-    line-height: 1.7;
-    max-width: 360px;
-    font-weight: 300;
-    margin-bottom: 2rem;
-}
-
-/* ─── RIGHT PANEL ─── */
-.right-panel {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 3rem 2rem;
-    background: var(--navy);
-    overflow-y: auto;
-}
-
-.form-card {
-    width: 100%;
-    max-width: 440px;
-}
-
-.form-card-header {
-    margin-bottom: 2rem;
-}
-.form-card-header .section-label {
-    font-size: .7rem;
-    font-weight: 600;
-    letter-spacing: .14em;
-    text-transform: uppercase;
-    color: var(--teal);
-    margin-bottom: .6rem;
-}
-.form-card-header h1 {
-    font-family: 'Playfair Display', serif;
-    font-size: 2rem;
-    font-weight: 700;
-    color: #fff;
-    letter-spacing: -.02em;
-    line-height: 1.2;
-}
-.form-card-header p {
-    font-size: .875rem;
-    color: var(--muted);
-    margin-top: .5rem;
-    font-weight: 300;
+    font-family: 'Inter', sans-serif;
 }
 
 /* ─── FORM ─── */
-.signup-form {
+.rf-scope .signup-form {
     display: flex;
     flex-direction: column;
     gap: 1rem;
 }
 
-/* Two-col row */
-.field-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: .75rem;
-}
-
-.field {
+.rf-scope .field {
     display: flex;
     flex-direction: column;
     gap: .4rem;
 }
-.field label {
+.rf-scope .field label {
     font-size: .78rem;
     font-weight: 600;
     color: var(--muted);
@@ -179,10 +38,10 @@ a { text-decoration: none; color: inherit; }
     text-transform: uppercase;
 }
 
-.input-wrap {
+.rf-scope .input-wrap {
     position: relative;
 }
-.input-wrap .input-icon {
+.rf-scope .input-wrap .input-icon {
     position: absolute;
     left: 1rem;
     top: 50%;
@@ -193,67 +52,64 @@ a { text-decoration: none; color: inherit; }
     transition: color .2s;
 }
 
-.field input, .field select {
+.rf-scope .field input:not(.otp-input) {
     width: 100%;
-    background: var(--navy-2);
+    height: 56px;
+    background: var(--surface-alt);
     border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: .85rem 1rem .85rem 2.75rem;
+    border-radius: 16px;
+    padding: 0 1rem 0 2.75rem;
     color: #fff;
     font-family: 'Inter', sans-serif;
-    font-size: .9rem;
-    transition: border-color .2s, background .2s;
+    font-size: .96rem;
+    transition: border-color var(--dur-fast, .2s) var(--ease-out, ease),
+                background var(--dur-fast, .2s) var(--ease-out, ease),
+                box-shadow var(--dur-fast, .2s) var(--ease-out, ease);
     outline: none;
     appearance: none;
 }
-.field input::placeholder { color: #4a5d72; }
-.field input:focus,
-.field select:focus {
+.rf-scope .field input::placeholder { color: #4a5d72; }
+.rf-scope .field input:not(.otp-input):focus {
     border-color: var(--teal);
-    background: var(--navy-3);
+    background: var(--card-light);
+    box-shadow: var(--glow-teal, 0 0 0 4px rgba(0,201,167,.14));
 }
-.input-wrap:focus-within .input-icon { color: var(--teal); }
+.rf-scope .input-wrap:focus-within .input-icon { color: var(--teal); }
+.rf-scope .input-wrap:has(.toggle-pw) input { padding-right: 2.75rem; }
 
-/* Password strength bar */
-.strength-bar-wrap {
-    display: flex;
-    gap: 4px;
-    margin-top: .35rem;
-}
-.strength-seg {
-    flex: 1;
-    height: 3px;
-    border-radius: 2px;
-    background: rgba(255,255,255,.08);
-    transition: background .3s;
-}
-.strength-label {
-    font-size: .7rem;
-    color: var(--muted);
-    margin-top: .25rem;
-    min-height: 1em;
-    transition: color .3s;
-}
-
-/* strength states */
-.str-1 .strength-seg:nth-child(1) { background: #ff6b6b; }
-.str-2 .strength-seg:nth-child(1),
-.str-2 .strength-seg:nth-child(2) { background: #ffb347; }
-.str-3 .strength-seg:nth-child(1),
-.str-3 .strength-seg:nth-child(2),
-.str-3 .strength-seg:nth-child(3) { background: #ffd700; }
-.str-4 .strength-seg { background: var(--teal); }
-
-.field-error {
+.rf-scope .field-error {
     font-size: .75rem;
     color: var(--error);
     display: none;
 }
-.field.has-error input,
-.field.has-error select { border-color: var(--error); }
-.field.has-error .field-error { display: block; }
+.rf-scope .field.has-error input { border-color: var(--error); }
+.rf-scope .field.has-error .field-error { display: block; }
 
-.toggle-pw {
+.rf-scope .password-requirements {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: .3rem;
+}
+.rf-scope .password-requirements li {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    font-size: .76rem;
+    line-height: 1.3;
+    color: var(--error);
+    transition: color .15s ease;
+}
+.rf-scope .password-requirements li.met { color: var(--teal); }
+.rf-scope .password-requirements .requirement-icon {
+    font-size: .7rem;
+    line-height: 1;
+    min-width: 1em;
+}
+
+.rf-scope .toggle-pw {
     position: absolute;
     right: .9rem;
     top: 50%;
@@ -267,54 +123,55 @@ a { text-decoration: none; color: inherit; }
     transition: color .2s;
     line-height: 1;
 }
-.toggle-pw:hover { color: var(--teal); }
+.rf-scope .toggle-pw:hover { color: var(--teal); }
 
 /* Terms checkbox */
-.terms-row {
+.rf-scope .terms-row {
     display: flex;
     align-items: flex-start;
     gap: .6rem;
 }
-.custom-check {
-    width: 17px;
-    height: 17px;
-    min-width: 17px;
+.rf-scope .custom-check {
+    width: 18px;
+    height: 18px;
+    min-width: 18px;
     border: 1.5px solid var(--border);
-    border-radius: 4px;
-    background: var(--navy-2);
+    border-radius: 5px;
+    background: var(--surface-alt);
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: border-color .2s, background .2s;
+    transition: border-color var(--dur-fast, .2s) var(--ease-out, ease),
+                background var(--dur-fast, .2s) var(--ease-out, ease);
     margin-top: 2px;
 }
-.custom-check.checked {
+.rf-scope .custom-check.checked {
     background: var(--teal);
     border-color: var(--teal);
 }
-.custom-check svg { display: none; }
-.custom-check.checked svg { display: block; }
-#terms-input { display: none; }
-.terms-label {
+.rf-scope .custom-check svg { display: none; }
+.rf-scope .custom-check.checked svg { display: block; }
+.rf-scope #terms-input { display: none; }
+.rf-scope .terms-label {
     font-size: .82rem;
     color: var(--muted);
     cursor: pointer;
     user-select: none;
     line-height: 1.5;
 }
-.terms-label a { color: var(--teal); font-weight: 600; }
-.terms-label a:hover { text-decoration: underline; }
+.rf-scope .terms-label a { color: var(--teal); font-weight: 600; }
+.rf-scope .terms-label a:hover { text-decoration: underline; }
 
 /* Divider */
-.divider {
+.rf-scope .divider {
     display: flex;
     align-items: center;
     gap: .75rem;
-    color: #2a3d55;
+    color: var(--muted);
     font-size: .75rem;
 }
-.divider::before, .divider::after {
+.rf-scope .divider::before, .rf-scope .divider::after {
     content: '';
     flex: 1;
     height: 1px;
@@ -322,28 +179,40 @@ a { text-decoration: none; color: inherit; }
 }
 
 /* Submit */
-.btn-submit {
+.rf-scope .btn-submit {
     width: 100%;
-    padding: .9rem;
+    height: 56px;
     background: var(--teal);
     color: var(--navy);
     font-family: 'Inter', sans-serif;
-    font-size: .9rem;
+    font-size: .95rem;
     font-weight: 700;
-    border-radius: 10px;
+    border-radius: 16px;
     border: none;
     cursor: pointer;
     letter-spacing: .02em;
-    transition: opacity .2s, transform .15s;
+    transition: opacity var(--dur-fast, .2s) var(--ease-out, ease),
+                transform var(--dur-fast, .2s) var(--ease-out, ease),
+                box-shadow var(--dur-fast, .2s) var(--ease-out, ease);
     position: relative;
     overflow: hidden;
 }
-.btn-submit:hover { opacity: .88; }
-.btn-submit:active { transform: scale(.98); }
-.btn-submit.loading { pointer-events: none; }
-.btn-submit .btn-text { transition: opacity .2s; }
-.btn-submit.loading .btn-text { opacity: 0; }
-.btn-spinner {
+.rf-scope .btn-submit:hover {
+    opacity: .88;
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-soft, 0 8px 24px rgba(10,22,40,.06));
+}
+.rf-scope .btn-submit:active { transform: scale(.98); }
+.rf-scope .btn-submit:disabled {
+    opacity: .4;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+.rf-scope .btn-submit.loading { pointer-events: none; }
+.rf-scope .btn-submit .btn-text { transition: opacity .2s; }
+.rf-scope .btn-submit.loading .btn-text { opacity: 0; }
+.rf-scope .btn-spinner {
     position: absolute;
     inset: 0;
     display: flex;
@@ -352,80 +221,60 @@ a { text-decoration: none; color: inherit; }
     opacity: 0;
     transition: opacity .2s;
 }
-.btn-submit.loading .btn-spinner { opacity: 1; }
-.spinner-ring {
+.rf-scope .btn-submit.loading .btn-spinner { opacity: 1; }
+.rf-scope .spinner-ring {
     width: 20px;
     height: 20px;
     border: 2px solid rgba(10,22,40,.3);
     border-top-color: var(--navy);
     border-radius: 50%;
-    animation: spin .7s linear infinite;
+    animation: rf-spin .7s linear infinite;
 }
-@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes rf-spin { to { transform: rotate(360deg); } }
 
 /* Social */
-.btn-social {
+.rf-scope .btn-social {
     width: 100%;
-    padding: .8rem;
-    background: var(--navy-2);
+    height: 56px;
+    background: var(--surface-alt);
     border: 1px solid var(--border);
-    border-radius: 10px;
+    border-radius: 16px;
     color: #fff;
     font-family: 'Inter', sans-serif;
-    font-size: .85rem;
+    font-size: .92rem;
     font-weight: 500;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
     gap: .6rem;
-    transition: background .2s, border-color .2s;
+    transition: background var(--dur-fast, .2s) var(--ease-out, ease),
+                border-color var(--dur-fast, .2s) var(--ease-out, ease),
+                transform var(--dur-fast, .2s) var(--ease-out, ease),
+                box-shadow var(--dur-fast, .2s) var(--ease-out, ease);
 }
-.btn-social:hover { background: var(--navy-3); border-color: rgba(255,255,255,.14); }
+.rf-scope .btn-social:hover {
+    background: var(--card-light);
+    border-color: rgba(255,255,255,.18);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-soft, 0 8px 24px rgba(10,22,40,.06));
+}
 
-.login-row {
+.rf-scope .login-row {
     text-align: center;
     font-size: .83rem;
     color: var(--muted);
 }
-.login-row a { color: var(--teal); font-weight: 600; }
-.login-row a:hover { text-decoration: underline; }
-
-/* ─── TOAST ─── */
-.toast {
-    position: fixed;
-    bottom: 2rem;
-    left: 50%;
-    transform: translateX(-50%) translateY(20px);
-    background: var(--navy-3);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: .85rem 1.5rem;
-    font-size: .85rem;
-    color: #fff;
-    display: flex;
-    align-items: center;
-    gap: .6rem;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity .3s, transform .3s;
-    z-index: 999;
-    white-space: nowrap;
+.rf-scope .login-row a,
+.rf-scope .login-row .link-button {
+    color: var(--teal);
+    font-weight: 600;
+    background: none;
+    border: none;
+    padding: 0;
+    font-family: inherit;
+    font-size: inherit;
+    cursor: pointer;
 }
-.toast.show {
-    opacity: 1;
-    transform: translateX(-50%) translateY(0);
-}
-.toast.error { border-color: rgba(255,107,107,.3); }
-.toast .toast-icon { font-size: 1rem; }
-
-/* ─── FOOTER ─── */
-/* (removed — unused duplicate of login.css's .auth-footer, see note above) */
-
-/* ─── RESPONSIVE ─── */
-@media (max-width: 820px) {
-    .page-body { grid-template-columns: 1fr; }
-    .left-panel { display: none; }
-    .right-panel { padding: 2.5rem 1.5rem; align-items: flex-start; padding-top: 3rem; }
-    .field-row { grid-template-columns: 1fr; }
-}
+.rf-scope .login-row a:hover,
+.rf-scope .login-row .link-button:hover { text-decoration: underline; }

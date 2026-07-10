@@ -92,6 +92,7 @@ app.use(session({
 // ── Routes
 app.use("/api/auth", require("./routes/auth"));
 app.use("/api/rooms", require("./routes/roomRoutes"));
+app.use("/api/room-sessions", require("./routes/roomSessionRoutes")); // Room Monitoring — independent of Booking (FEATURE_REQUESTS.md Priority 1)
 app.use("/api/categories", require("./routes/categoryRoutes")); // Tier 4: room categories
 app.use("/api/bookings", require("./routes/bookingRoutes"));
 app.use("/api/users", require("./routes/userRoutes"));

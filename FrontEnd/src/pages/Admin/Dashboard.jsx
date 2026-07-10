@@ -2,46 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import DataTable from '../../components/DataTable';
 
-// ─────────────────────────────────────────────────────────────────────────
-// Admin / Dashboard — migrated from admin.html's <div id="panel-dashboard">
-// + admin.js's renderDashboard()/enhanceDashboardStaticMarkup(). Part of
-// Phase 8 (Page Migration), continuing after Home/Login/Register/Forgot/
-// Reset/Profile modal (see components/README.md, pages/README.md).
-//
-// Kept exactly as the original:
-//   - The four metric cards (Today's Bookings, Active Sessions, Today's
-//     Revenue, Overdue Rooms) were HARDCODED numbers in admin.html itself
-//     (14 / 7 / ₱6,450 / 2) — admin.js's renderDashboard() never touched
-//     them. That's a real gap (there's no live endpoint this data comes
-//     from yet — Today's Revenue in particular needs POS/sales data, which
-//     is a later phase), so rather than quietly inventing a computation
-//     here, the same static placeholders are preserved with a clear label.
-//     Wiring these to real data is a good candidate for a small dedicated
-//     fix-up once the POS/Analytics phases exist.
-//   - Recent Bookings (first 5, most-recent-first — the API already sorts
-//     by createdAt desc) and Room Status ARE live, fetched exactly like
-//     the original (GET /api/bookings, GET /api/rooms).
-//
-// Adapted for the route-based architecture (this used to be one of many
-// always-mounted <div class="panel"> elements toggled by switchPanel();
-// now it's its own routed page — see AdminSidebar.jsx / App.jsx):
-//   - "Add Booking" quick action used to call the page-global openModal()
-//     which opened the (also always-mounted) Manual Booking modal in
-//     place. Since Dashboard and Bookings are now separate page components,
-//     this instead navigates to /admin/bookings?openManualBooking=1;
-//     Bookings.jsx checks that query param on mount and opens its own
-//     Manual Booking modal automatically. Same end result (you land on a
-//     ready-to-fill booking form), one extra navigation step.
-//   - "Monitor Rooms" / "Export Report" / "Login Logs" used to call
-//     switchPanel('monitor'|'reports'|'logs'); now they just navigate to
-//     those routes directly.
-//
-// Permission gating (hasAdminPermission('booking:manage') hiding the "Add
-// Booking" button, etc.) is deliberately NOT implemented yet — same
-// deferral as AdminLayout.jsx/AdminSidebar.jsx ("Permission-gated sidebar
-// items — Phase 10"), since there's no AuthContext/session role available
-// client-side until then. Every button is shown for now.
-// ─────────────────────────────────────────────────────────────────────────
+
 
 const API_BASE_URL = 'http://localhost:3000'; // matches every other page pre-Phase 9
 

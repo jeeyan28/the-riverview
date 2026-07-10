@@ -1,7 +1,6 @@
 const express = require("express");
 const router = express.Router();
 const Room = require("../model/room");
-const Category = require("../model/category");
 const upload = require("../middleware/upload");
 const { requirePermission } = require("../middleware/adminAuth");
 const { PERMISSIONS } = require("../utils/permissions");
@@ -17,24 +16,6 @@ function parseFeatures(features) {
     return features.split(",").map(f => f.trim()).filter(Boolean);
   }
   return [];
-}
-
-// Resolves a category id from the request body into { category, categoryName }
-// ready to spread into a Room doc. Treats "", "null", and undefined as "clear
-// the category" rather than an error, since the facility form's dropdown can
-// legitimately be left on "No category". Throws only for a genuinely bad id.
-async function resolveCategory(categoryId) {
-  if (categoryId === undefined) return undefined; // caller should skip the field entirely
-  if (!categoryId || categoryId === "null" || categoryId === "undefined") {
-    return { category: null, categoryName: "" };
-  }
-  const category = await Category.findById(categoryId);
-  if (!category) {
-    const err = new Error("Selected category does not exist.");
-    err.status = 400;
-    throw err;
-  }
-  return { category: category._id, categoryName: category.name };
 }
 
 function parseVariants(variants) {
@@ -60,14 +41,7 @@ router.get("/", async (req, res) => {
   try {
     const filter = {};
     if (req.query.status) filter.status = req.query.status;
-    // "uncategorized" is a magic value the admin UI uses to filter for rooms
-    // that predate Tier 4 and haven't been assigned a category yet.
-    if (req.query.category === "uncategorized") {
-      filter.category = null;
-    } else if (req.query.category) {
-      filter.category = req.query.category;
-    }
-    const rooms = await Room.find(filter).sort({ name: 1 }).populate("category");
+    const rooms = await Room.find(filter).sort({ name: 1 });
     res.json(rooms);
   } catch (err) {
     console.error(err);
@@ -77,7 +51,7 @@ router.get("/", async (req, res) => {
 
 router.get("/:id", async (req, res) => {
   try {
-    const room = await Room.findById(req.params.id).populate("category");
+    const room = await Room.findById(req.params.id);
     if (!room) return res.status(404).json({ message: "Room not found." });
     res.json(room);
   } catch (err) {
@@ -89,13 +63,11 @@ router.get("/:id", async (req, res) => {
 // Everything below changes room data — manager/super_admin only
 router.post("/", requirePermission(PERMISSIONS.ROOM_MANAGE), upload.single("image"), async (req, res) => {
   try {
-    const { name, roomNumber, description, price, status, features, variants, category, capacity } = req.body;
+    const { name, roomNumber, description, price, status, features, variants, capacity } = req.body;
 
     if (!name || !roomNumber) {
       return res.status(400).json({ message: "name and roomNumber are required." });
     }
-
-    const categoryFields = await resolveCategory(category); // { category, categoryName } | undefined
 
     const room = new Room({
       name,
@@ -107,11 +79,9 @@ router.post("/", requirePermission(PERMISSIONS.ROOM_MANAGE), upload.single("imag
       variants: parseVariants(variants),
       capacity: Number(capacity) || 0,
       image: req.file ? req.file.path : (req.body.image || ""),
-      ...(categoryFields || { category: null, categoryName: "" })
     });
 
     await room.save();
-    await room.populate("category");
     res.status(201).json(room);
   } catch (err) {
     console.error(err);
@@ -121,11 +91,12 @@ router.post("/", requirePermission(PERMISSIONS.ROOM_MANAGE), upload.single("imag
 
 router.put("/:id", requirePermission(PERMISSIONS.ROOM_MANAGE), upload.single("image"), async (req, res) => {
   try {
-    const { name, roomNumber, description, price, status, features, variants, category, capacity } = req.body;
+    const { name, description, price, status, features, variants, capacity } = req.body;
 
+    // Room No. is locked after creation (FEATURE_REQUESTS.md Priority 1) —
+    // silently ignored here even if sent.
     const update = {};
     if (name !== undefined) update.name = name;
-    if (roomNumber !== undefined) update.roomNumber = roomNumber;
     if (description !== undefined) update.description = description;
     if (price !== undefined) update.price = Number(price) || 0;
     if (status !== undefined) update.status = status;
@@ -134,13 +105,7 @@ router.put("/:id", requirePermission(PERMISSIONS.ROOM_MANAGE), upload.single("im
     if (capacity !== undefined) update.capacity = Number(capacity) || 0;
     if (req.file) update.image = req.file.path;
 
-    if (category !== undefined) {
-      const categoryFields = await resolveCategory(category); // { category, categoryName }
-      Object.assign(update, categoryFields);
-    }
-
-    const room = await Room.findByIdAndUpdate(req.params.id, update, { new: true, runValidators: true })
-      .populate("category");
+    const room = await Room.findByIdAndUpdate(req.params.id, update, { new: true, runValidators: true });
     if (!room) return res.status(404).json({ message: "Room not found." });
 
     res.json(room);

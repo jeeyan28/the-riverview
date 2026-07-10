@@ -2,18 +2,6 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import { API_BASE_URL } from '../services/api';
 
 // ─────────────────────────────────────────────────────────────────────────
-// AuthContext — Phase 11. Single source of truth for "who is logged in,"
-// replacing the independent localStorage.getItem('riverview_user') /
-// sessionStorage.getItem('riverview_user') reads that used to live
-// separately in index.js, admin.js, admin-profile.js, login.js, and
-// register.js (see context/README.md, written in Phase 10).
-//
-// This ports js/admin.js's real ADMIN AUTH GUARD block (guardAdminPage(),
-// hasAdminPermission(), applyRoleVisibility()/applyRoleGate(),
-// guardPermission()) into React, rather than inventing a new permission
-// system. See the design-decision note below for the one deliberate
-// change from the original.
-//
 // ── DESIGN DECISION: source of truth on mount ──────────────────────────
 // admin.js's guardAdminPage() always called GET /api/auth/me on every
 // admin page load — it never trusted the cached localStorage/sessionStorage
@@ -60,15 +48,6 @@ import { API_BASE_URL } from '../services/api';
 
 const STORAGE_KEY = 'riverview_user';
 
-// Mirrors Backend/utils/permissions.js ROLE_LABELS / ROLE_LEVEL. Confirmed
-// against that file directly while writing this (Phase 11) — unchanged
-// from admin.js's own copy, no drift between the three. ROLE_PERMISSIONS
-// itself is deliberately NOT re-mirrored here: sanitizeUser() already puts
-// a real `permissions` array on the user object for admin roles, so
-// checking `user.permissions.includes(...)` is both simpler and immune to
-// the client/server drift admin.js's big comment above ROLE_PERMISSIONS
-// was worried about. ROLE_LABELS/ROLE_LEVEL are kept only as a fallback
-// and for role-hierarchy UI (e.g. Users.jsx's assignable-role dropdown).
 const ROLE_LABELS = { user: 'User', staff: 'Staff', manager: 'Supervisor', super_admin: 'Owner' };
 const ROLE_LEVEL = { user: 0, staff: 1, manager: 2, super_admin: 3 };
 const ADMIN_ROLES = ['staff', 'manager', 'super_admin'];
@@ -144,6 +123,9 @@ export function AuthProvider({ children }) {
     if (!res.ok) {
       const err = new Error(data.message || 'Login failed.');
       err.status = res.status; // preserves the 423 account-locked check Login.jsx makes
+      // Part 8: lets LoginForm branch to its "resend verification" state
+      // instead of just showing the message as a dead-end toast.
+      err.unverified = !!data.unverified;
       throw err;
     }
     setUser(data.user);
@@ -182,6 +164,83 @@ export function AuthProvider({ children }) {
       // so this line never runs), rather than duck-typing on
       // `instanceof TypeError`.
       const err = new Error(data.message || 'Registration failed.');
+      err.status = res.status;
+      throw err;
+    }
+    return data;
+  }, []);
+
+  // Part 5: confirms a PendingRegistration's OTP and (per routes/auth.js)
+  // creates the real, verified User in the same call. Mirrors register()'s
+  // err.status attachment so RegisterForm.jsx can branch on it the same way.
+  const verifyRegistrationOtp = useCallback(async (email, otp) => {
+    const res = await fetch(`${API_BASE_URL}/api/auth/register/verify-otp`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, otp }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const err = new Error(data.message || 'Verification failed.');
+      err.status = res.status;
+      throw err;
+    }
+    return data;
+  }, []);
+
+  // Part 6: requests a fresh OTP for a PendingRegistration (server enforces
+  // the 60s cooldown and the 5/hour per-email cap either way — this is just
+  // the call, not the throttling itself).
+  const resendRegistrationOtp = useCallback(async (email) => {
+    const res = await fetch(`${API_BASE_URL}/api/auth/register/resend-otp`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const err = new Error(data.message || 'Could not resend the code.');
+      err.status = res.status;
+      throw err;
+    }
+    return data;
+  }, []);
+
+  // Part 8: resend a verification code for an existing-but-unverified
+  // account (shown from LoginForm's "Please verify your email" state).
+  // Distinct from resendRegistrationOtp above, which targets a
+  // PendingRegistration that no longer exists once an account is created.
+  const resendAccountVerification = useCallback(async (email) => {
+    const res = await fetch(`${API_BASE_URL}/api/auth/resend-verification`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const err = new Error(data.message || 'Could not resend the code.');
+      err.status = res.status;
+      throw err;
+    }
+    return data;
+  }, []);
+
+  // Part 8 counterpart to verifyRegistrationOtp: confirms the code sent by
+  // resendAccountVerification and flips the account to isVerified. Does
+  // not log the user in — LoginForm re-submits the login form afterward.
+  const verifyAccountOtp = useCallback(async (email, otp) => {
+    const res = await fetch(`${API_BASE_URL}/api/auth/verify-account-otp`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, otp }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const err = new Error(data.message || 'Verification failed.');
       err.status = res.status;
       throw err;
     }
@@ -247,11 +306,31 @@ export function AuthProvider({ children }) {
       login,
       loginWithGoogle,
       register,
+      verifyRegistrationOtp,
+      resendRegistrationOtp,
+      resendAccountVerification,
+      verifyAccountOtp,
       logout,
       updateUser,
       revalidate,
     }),
-    [user, initializing, isAdmin, hasPermission, guardPermission, login, loginWithGoogle, register, logout, updateUser, revalidate]
+    [
+      user,
+      initializing,
+      isAdmin,
+      hasPermission,
+      guardPermission,
+      login,
+      loginWithGoogle,
+      register,
+      verifyRegistrationOtp,
+      resendRegistrationOtp,
+      resendAccountVerification,
+      verifyAccountOtp,
+      logout,
+      updateUser,
+      revalidate,
+    ]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

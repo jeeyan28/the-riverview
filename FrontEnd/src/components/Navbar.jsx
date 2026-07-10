@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import ThemeToggle from './ThemeToggle';
 import logo from '../assets/logo/logoo.png';
 import { useAuth } from '../context/AuthContext';
 
@@ -10,9 +9,13 @@ import { useAuth } from '../context/AuthContext';
 // per the plan in components/README.md ("Navbar.jsx — public site header
 // (currently duplicated markup in index.html)").
 //
-// All state (theme, promo visibility, mobile nav open/closed, scrolled)
-// still lives in MainLayout — this component only receives values + handler
+// All state (promo visibility, mobile nav open/closed, scrolled) still
+// lives in MainLayout — this component only receives values + handler
 // functions as props and renders markup, same as Phase 6/7.
+//
+// Dark/light theme toggle removed (site is dark-only now): ThemeToggle
+// import, both instances (desktop + mobile), and the theme/onToggleTheme
+// props all deleted.
 //
 // PHASE 8 (part 3, ProfileModal) ADDITION: the user-chip DROPDOWN toggle
 // (open/close the `.user-chip-menu`, click-outside-to-close) was wired here
@@ -31,9 +34,12 @@ import { useAuth } from '../context/AuthContext';
 //     when logged in — exact inverse pair, matching the original's
 //     `loginBtn.style.display = loggedIn ? 'none' : ''` /
 //     `chip.style.display = loggedIn ? 'flex' : 'none'`.
-//   - Chip avatar/name derive from `user.firstname || user.name`, falling
-//     back to an "U"/"Account" placeholder — same fallback chain as the
-//     original's `(user.firstname || user.name || user.email || 'U')`.
+//   - Chip avatar/name derive from `firstName`/`lastName`, falling back to
+//     an "U"/"Account" placeholder — same fallback chain as the original's
+//     `(user.firstname || user.name || user.email || 'U')`, updated for
+//     the split firstName/lastName fields. The `user.name` fallback in
+//     that original chain was already dead code (User never had a `name`
+//     field) and isn't reproduced here.
 //   - `#admin-dashboard-link` shown only for staff/manager/super_admin,
 //     i.e. AuthContext's `isAdmin` (same ADMIN_ROLES list admin.js already
 //     used) — matches the original's separate isAdmin flag rather than
@@ -60,8 +66,6 @@ import { useAuth } from '../context/AuthContext';
 //     that's precisely the duplicated logic Phase 11 centralized.
 // ─────────────────────────────────────────────────────────────────────────
 function Navbar({
-  theme,
-  onToggleTheme,
   promoVisible,
   onDismissPromo,
   mobileNavOpen,
@@ -112,8 +116,9 @@ function Navbar({
   }, []);
 
   const loggedIn = !!user;
-  const chipInitial = (user?.firstname || user?.name || user?.email || 'U').trim().charAt(0).toUpperCase() || 'U';
-  const chipName = user?.firstname || user?.name || 'Account';
+  const chipFullName = user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : '';
+  const chipInitial = (chipFullName || user?.email || 'U').trim().charAt(0).toUpperCase() || 'U';
+  const chipName = chipFullName || 'Account';
 
   async function handleLogout() {
     setChipMenuOpen(false);
@@ -168,8 +173,6 @@ function Navbar({
         </nav>
 
         <div className="nav-buttons">
-          <ThemeToggle id="theme-toggle" theme={theme} onToggle={onToggleTheme} />
-
           {/* Shown only when no one is logged in — matches original's
               loginBtn.style.display = loggedIn ? 'none' : ''. */}
           <Link
@@ -193,7 +196,13 @@ function Navbar({
               setChipMenuOpen((o) => !o);
             }}
           >
-            <div className="user-chip-avatar" id="user-chip-avatar">{chipInitial}</div>
+            <div className="user-chip-avatar" id="user-chip-avatar">
+              {user?.profilePicture ? (
+                <img src={user.profilePicture} alt="" referrerPolicy="no-referrer" />
+              ) : (
+                chipInitial
+              )}
+            </div>
             <span className="user-chip-name" id="user-chip-name">{chipName}</span>
             <i className="fa-solid fa-chevron-down"></i>
             <div className={`user-chip-menu${chipMenuOpen ? ' open' : ''}`} id="user-chip-menu">
@@ -242,12 +251,6 @@ function Navbar({
         <a href="#home" onClick={onCloseMobileNav}>Home</a>
         <a href="#rooms" onClick={onCloseMobileNav}>Rooms</a>
         <a href="#about" onClick={onCloseMobileNav}>About</a>
-        <ThemeToggle
-          id="theme-toggle-mobile"
-          theme={theme}
-          onToggle={onToggleTheme}
-          style={{ marginTop: '1rem' }}
-        />
         <button
           className="btn-book"
           id="mobile-book-btn"

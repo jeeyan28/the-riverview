@@ -15,6 +15,10 @@ import { useState } from 'react';
 // component (Login.jsx / Register.jsx / ResetPassword.jsx, built in
 // Phase 8) rather than being baked in here.
 //
+// `children`, if passed, renders between `.input-wrap` and `.field-error`
+// — this is how RegisterForm's password-strength meter/checklist slots in
+// without forking the show/hide toggle logic back out into its own copy.
+//
 // Example (as Login.jsx will use it):
 //   <div className="field" id="field-password">
 //     <div className="password-row">
@@ -25,7 +29,7 @@ import { useState } from 'react';
 //       autoComplete="current-password" value={password} onChange={...} error={pwError} />
 //   </div>
 // ─────────────────────────────────────────────────────────────────────────
-function PasswordInput({ id, name, placeholder, autoComplete, value, onChange, error }) {
+function PasswordInput({ id, name, placeholder, autoComplete, value, onChange, error, children }) {
   const [visible, setVisible] = useState(false);
 
   return (
@@ -50,6 +54,7 @@ function PasswordInput({ id, name, placeholder, autoComplete, value, onChange, e
           {visible ? '🙈' : '👁'}
         </button>
       </div>
+      {children}
       <span className="field-error" style={{ display: error ? 'block' : 'none' }}>
         {error}
       </span>

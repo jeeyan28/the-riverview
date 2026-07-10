@@ -1,15 +1,4 @@
-/* ─────────────────────────────────────────────────────────────────────────
-   ConfirmDialog styles — ported 1:1 from the legacy js/ui-modal.js's
-   injectStyles() (UIModal.confirm()). Class names, values, and transitions
-   are kept identical to the original so the dialog is visually unchanged
-   from what admin.js used to render — only the delivery mechanism changed
-   (React component + Promise-based hook, instead of vanilla DOM + a
-   dynamically-injected <style> tag).
 
-   Only the .uimodal-input rules were omitted here since ConfirmDialog never
-   needs a text input (that's UIModal.prompt()'s job, out of scope for this
-   component, which only replaces UIModal.confirm() call sites).
-   ───────────────────────────────────────────────────────────────────────── */
 .uimodal-overlay {
     position: fixed; inset: 0; z-index: 9999; display: flex; align-items: center; justify-content: center;
     padding: 20px; background: rgba(6,10,18,.72); backdrop-filter: blur(3px);
@@ -17,29 +6,29 @@
 }
 .uimodal-overlay.uimodal-show { opacity: 1; }
 .uimodal-box {
-    width: 100%; max-width: 400px; background: #0e1728; border: 1px solid rgba(255,255,255,.08);
-    border-radius: 16px; padding: 24px; box-shadow: 0 20px 60px rgba(0,0,0,.45);
-    font-family: 'Inter', sans-serif; color: #e9eff7;
+    width: 100%; max-width: 400px; background: var(--navy2); border: 1px solid var(--border);
+    border-radius: 16px; padding: 24px; box-shadow: 0 20px 60px rgba(16,24,40,.25);
+    font-family: var(--font-body); color: var(--text);
     transform: translateY(8px) scale(.98); transition: transform .15s ease;
 }
 .uimodal-overlay.uimodal-show .uimodal-box { transform: translateY(0) scale(1); }
 .uimodal-icon {
     width: 40px; height: 40px; border-radius: 11px; display: flex; align-items: center; justify-content: center;
-    margin-bottom: 14px; background: rgba(0,201,167,.12); color: #00C9A7; flex-shrink: 0;
+    margin-bottom: 14px; background: var(--teal-soft); color: var(--teal); flex-shrink: 0;
 }
-.uimodal-icon.uimodal-danger { background: rgba(255,107,107,.12); color: #ff6b6b; }
+.uimodal-icon.uimodal-danger { background: rgba(225,29,72,.12); color: var(--red); }
 .uimodal-title {
-    font-family: 'Playfair Display', serif; font-size: 1.08rem; font-weight: 700; margin: 0 0 8px; color: #fff;
+    font-family: var(--font-display); font-size: 1.08rem; font-weight: 700; margin: 0 0 8px; color: var(--text);
 }
-.uimodal-message { font-size: .86rem; line-height: 1.55; color: #c8d6e5; margin: 0; white-space: pre-wrap; }
+.uimodal-message { font-size: .86rem; line-height: 1.55; color: var(--muted); margin: 0; white-space: pre-wrap; }
 .uimodal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
 .uimodal-btn {
-    padding: 9px 18px; border-radius: 9px; border: 1px solid rgba(255,255,255,.08); background: transparent;
-    color: #c8d6e5; font-size: .8rem; cursor: pointer; font-family: 'Inter', sans-serif; font-weight: 500;
+    padding: 9px 18px; border-radius: 9px; border: 1px solid var(--border); background: transparent;
+    color: var(--text); font-size: .8rem; cursor: pointer; font-family: var(--font-body); font-weight: 500;
     transition: background .12s ease;
 }
-.uimodal-btn:hover { background: rgba(255,255,255,.06); }
-.uimodal-btn-primary { border: none; background: #00C9A7; color: #04241f; font-weight: 600; }
-.uimodal-btn-primary:hover { background: #00e0ba; }
-.uimodal-btn-danger { border: none; background: #ff6b6b; color: #2a0808; font-weight: 600; }
-.uimodal-btn-danger:hover { background: #ff8484; }
+.uimodal-btn:hover { background: var(--navy3); }
+.uimodal-btn-primary { border: none; background: var(--teal); color: #fff; font-weight: 600; }
+.uimodal-btn-primary:hover { background: #d92e5c; }
+.uimodal-btn-danger { border: none; background: var(--red); color: #fff; font-weight: 600; }
+.uimodal-btn-danger:hover { background: #be123c; }

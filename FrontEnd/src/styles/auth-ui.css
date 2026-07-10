@@ -26,7 +26,9 @@ header:not(.scrolled) .user-chip i { color: #fff; }
     font-size: .8rem;
     display: flex; align-items: center; justify-content: center;
     flex-shrink: 0;
+    overflow: hidden;
 }
+.user-chip-avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
 .user-chip-name {
     font-size: .85rem;
     font-weight: 500;
@@ -74,7 +76,12 @@ header:not(.scrolled) .user-chip i { color: #fff; }
 }
 .user-chip-menu a:hover,
 .user-chip-menu button:hover { background: var(--card-light); }
-.user-chip-menu button { color: #d1483f; }
+/* Only Logout gets the warning color, and only on hover — matches
+   ProfileModal.jsx's .pf-logout pattern. Previously `.user-chip-menu
+   button { color: #d1483f; }` targeted every button in this menu
+   (My Profile / Admin Dashboard / Log out are all <button> elements
+   in Navbar.jsx, not just Logout), turning all three red by default. */
+#logout-button:hover { color: #e2554b; }
 
 /* ─── Profile page specifics (page shell reuses login.css) ─── */
 .profile-avatar-lg {
@@ -105,4 +112,3 @@ header:not(.scrolled) .user-chip i { color: #fff; }
 .profile-tab.active { color: #0A1628; border-color: #00C9A7; }
 .profile-panel { display: none; }
 .profile-panel.active { display: block; }
-
