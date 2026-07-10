@@ -172,6 +172,20 @@ router.post("/", ensureAuthenticated, paymentProofUpload.single("paymentScreensh
   }
 });
 
+// ── Get bookings for the logged-in user — powers the profile page's
+//    Booking History panel. Any authenticated user (not admin-only), and
+//    scoped to their own bookings only. Placed before GET /:id so "mine"
+//    isn't swallowed as an :id param.
+router.get("/mine", ensureAuthenticated, async (req, res) => {
+  try {
+    const bookings = await Booking.find({ bookedBy: req.user._id }).sort({ createdAt: -1 });
+    res.json(bookings);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error." });
+  }
+});
+
 // ── Get a single booking — used by the public booking page to render the
 //    professional booking summary (room/date/time/duration/pax/payment
 //    status/reference) right after checkout. Only the guest who made the

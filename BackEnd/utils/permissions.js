@@ -123,8 +123,15 @@ function canAssignRole({ actor, targetRole }) {
   if (!ROLE_LEVEL.hasOwnProperty(targetRole)) {
     return { ok: false, message: "Unknown role." };
   }
-  if (targetRole === "super_admin" && actor.role !== "super_admin") {
-    return { ok: false, message: "Only an Owner can assign the Owner role." };
+  // Owner role is a special case: only an Owner may hand it out, but an
+  // Owner CAN hand it out (including to create another Owner) — so this is
+  // checked on its own, before the generic strictly-lower-than-yours rule
+  // below, which would otherwise also block super_admin -> super_admin.
+  if (targetRole === "super_admin") {
+    if (actor.role !== "super_admin") {
+      return { ok: false, message: "Only an Owner can assign the Owner role." };
+    }
+    return { ok: true };
   }
   if (roleLevel(targetRole) >= roleLevel(actor.role)) {
     return { ok: false, message: "You cannot assign a role equal to or higher than your own." };
@@ -136,7 +143,13 @@ function canAssignRole({ actor, targetRole }) {
 // admin UI so nobody is even offered a choice the server would reject.
 function assignableRoles(actorRole) {
   const level = roleLevel(actorRole);
-  return Object.keys(ROLE_LEVEL).filter((role) => role !== "user" && roleLevel(role) < level);
+  return Object.keys(ROLE_LEVEL).filter((role) => {
+    if (role === "user") return false;
+    // Mirrors canAssignRole()'s special case: Owner is the one role that's
+    // assignable at the actor's OWN level, and only for an Owner actor.
+    if (role === "super_admin") return actorRole === "super_admin";
+    return roleLevel(role) < level;
+  });
 }
 
 module.exports = {

@@ -1,57 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Chart } from 'chart.js/auto';
 
-// ─────────────────────────────────────────────────────────────────────────
-// Admin / Forecasting — migrated from admin.html's <div id="panel-forecasting">
-// plus admin.js's renderForecastPanel() (the "FORECASTING (Owner only)"
-// section, right after Manage Users). Phase 10 (Page Migration) — this was
-// the one real panel left unmigrated after Phase 9 (Profile); /admin/logs
-// stays a TempPage permanently by design (see App.jsx's routing comment),
-// so this completes panel migration.
-//
-// UNLIKE Analytics.jsx, this panel is real, live data: GET /api/forecast
-// (Backend/routes/forecastRoutes.js) buckets the last 60 days of bookings
-// + POS sales by day, fits a simple linear regression to revenue and
-// booking-count, and returns that 60-day history plus a 14-day projection
-// and top-5 room demand. No mock data here, ported 1:1 from
-// renderForecastPanel() — same peso formatting, same trend-word mapping,
-// same chart configs/colors, same "last actual point repeated as first
-// projection point" trick so the dashed projection line connects visually
-// to the solid history line instead of leaving a gap.
-//
-// Chart.js: same `chart.js/auto` npm import Analytics.jsx already
-// established this phase for Vite (replacing the old CDN <script> global).
-// Both charts are created in an effect keyed on `data` (once the forecast
-// response arrives) and destroyed on cleanup/re-run, same reasoning as
-// Analytics.jsx: this component can mount/unmount/re-mount across route
-// visits, and Chart.js throws if you reuse a canvas with a stale instance
-// still attached.
-//
-// Loading/error state: the original didn't have a page-level loading
-// skeleton (the panel just showed "—" / "Loading…" placeholder text in the
-// static HTML until renderForecastPanel() overwrote it, and only wrote an
-// error into the one fc-revenue-trend-sub element on failure). Reworked
-// here as real React state (`loading` / `error`) since this is now an
-// always-fresh mount rather than a lazily-first-rendered panel — but the
-// *content* of the error path is preserved: a 403 from requirePermission
-// (Owner-only route) surfaces its server message ("You do not have
-// permission to do that.") exactly as the original's catch block would
-// have shown it, just now in a full-width notice instead of one metric's
-// subtitle, since without a loaded chart there's nothing else to render.
-//
-// DEFERRED, same as every other admin page so far: permission gating.
-// admin.html gated this whole panel two ways — data-requires-permission=
-// "forecasting:view" on the outer <div> (hide-if-lacking, via
-// applyRoleVisibility()) and a client-side guardPermission('forecasting:
-// view', …) check at the top of renderForecastPanel() (alert-and-return
-// before fetching). Neither is implemented yet — no session role/
-// permission list available client-side until Phase 11's AuthContext.
-// Today, every authenticated admin sees this route and fires the fetch;
-// the server's requirePermission(PERMISSIONS.FORECASTING_VIEW) middleware
-// still independently enforces Owner-only access and returns a 403 with a
-// clear message, which is what actually stops a non-Owner here for now
-// (rendered via the `error` state below, not a client-side pre-check).
-// ─────────────────────────────────────────────────────────────────────────
+
 
 const API_BASE_URL = 'http://localhost:3000';
 
@@ -119,8 +69,8 @@ function Forecasting() {
           {
             label: 'Actual',
             data: [...revenueHistory, ...new Array(projLabels.length).fill(null)],
-            borderColor: '#00C9A7',
-            backgroundColor: 'rgba(0,201,167,.1)',
+            borderColor: '#EF3E6D',
+            backgroundColor: 'rgba(239,62,109,.1)',
             fill: true,
             tension: 0.3,
             pointRadius: 0,
@@ -139,12 +89,12 @@ function Forecasting() {
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        plugins: { legend: { labels: { color: '#c8d6e5' } } },
+        plugins: { legend: { labels: { color: '#1A1D29' } } },
         scales: {
-          x: { grid: { display: false }, ticks: { color: '#8A9BB0', font: { size: 10 }, maxTicksLimit: 10 } },
+          x: { grid: { display: false }, ticks: { color: '#6B7280', font: { size: 10 }, maxTicksLimit: 10 } },
           y: {
-            grid: { color: 'rgba(255,255,255,.06)' },
-            ticks: { color: '#8A9BB0', font: { size: 11 }, callback: (v) => '₱' + v.toLocaleString() },
+            grid: { color: 'rgba(16,24,40,.06)' },
+            ticks: { color: '#6B7280', font: { size: 11 }, callback: (v) => '₱' + v.toLocaleString() },
           },
         },
       },
@@ -184,10 +134,10 @@ function Forecasting() {
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        plugins: { legend: { labels: { color: '#c8d6e5' } } },
+        plugins: { legend: { labels: { color: '#1A1D29' } } },
         scales: {
-          x: { grid: { display: false }, ticks: { color: '#8A9BB0', font: { size: 10 }, maxTicksLimit: 10 } },
-          y: { grid: { color: 'rgba(255,255,255,.06)' }, ticks: { color: '#8A9BB0', font: { size: 11 } } },
+          x: { grid: { display: false }, ticks: { color: '#6B7280', font: { size: 10 }, maxTicksLimit: 10 } },
+          y: { grid: { color: 'rgba(16,24,40,.06)' }, ticks: { color: '#6B7280', font: { size: 11 } } },
         },
       },
     });

@@ -1,54 +1,12 @@
+import { useEffect, useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
-// ─────────────────────────────────────────────────────────────────────────
-// AdminSidebar — the admin tab navigation, extracted out of AdminLayout.jsx
-// (Phase 6) into its own component (Phase 7). Phase 11 wires the two
-// pieces that were deferred since then:
-//
-//   1. Real logged-in admin name/avatar/role (sb-admin-name/sb-admin-av/
-//      sb-admin-role) — was hardcoded "Rivera Admin" / "RA" / "Super
-//      Admin". Now sourced from AuthContext's `user`, same fields
-//      guardAdminPage() used: `${user.firstname} ${user.lastname}`.trim(),
-//      initials from firstname[0]+lastname[0], and user.roleLabel (falling
-//      back to the ROLE_LABELS mirror inside AuthContext if roleLabel is
-//      ever missing — matches admin.js's own `user.roleLabel ||
-//      ROLE_LABELS[user.role] || user.role` fallback chain exactly).
-//
-//   2. Permission- and role-gated sidebar items. A follow-up audit found
-//      admin.html actually gates sidebar buttons with TWO attributes,
-//      checked in two separate passes by admin.js's applyRoleVisibility():
-//        - data-requires-permission (checked via hasAdminPermission()):
-//          POS -> "pos:access", Reports -> "reports:view",
-//          Forecasting -> "forecasting:view", Manage Users -> "admin:manage",
-//          Settings -> "settings:view".
-//        - data-requires-role="role1,role2" (checked via an allow-list
-//          against the session role): Dashboard, Analytics, and Login
-//          History all require "manager,super_admin".
-//      Monitor, Bookings, and Profile have no gate in the original and
-//      stay visible to every admin role. NAV_SECTIONS below has two
-//      optional fields to reproduce both mechanisms: `permission` (checked
-//      against AuthContext's hasPermission(), itself reading the real
-//      server-provided user.permissions array) and `roles` (checked
-//      directly against user.role, which AuthContext already exposes raw
-//      — no need to duplicate admin.js's ROLE_PERMISSIONS table in React,
-//      matching the same reasoning AuthContext's own header comment gives
-//      for not re-mirroring it). applyRoleGate() in the original defaulted
-//      ungated + un-annotated elements to visible, which an absent
-//      `permission`/`roles` field reproduces here for free.
-//
-// Logout: admin.js's #admin-logout-btn handler POSTed /api/auth/logout,
-// cleared both storage keys, then hard-redirected to login.html. That's
-// now AuthContext's logout() — this component just calls it and then
-// client-side navigates (no full reload needed; see AdminLayout.jsx's
-// route-guard note for why a <Navigate/>-style client redirect is enough
-// post-Phase-11, unlike Login.jsx's post-login redirect which still needs
-// a full reload for unrelated reasons documented there).
-// ─────────────────────────────────────────────────────────────────────────
+// Icon-only collapse state, remembered per admin via localStorage (client-
+// side only — no backend field for this, it's a pure UI preference).
+const SIDEBAR_COLLAPSED_KEY = 'rv_admin_sidebar_collapsed';
 
-// Role slugs allowed for every data-requires-role="manager,super_admin" item
-// in admin.html (Dashboard, Analytics, Login History). Kept as one shared
-// constant rather than repeating the array literal three times.
+
 const MANAGER_UP = ['manager', 'super_admin'];
 
 const NAV_SECTIONS = [
@@ -96,12 +54,17 @@ export const PAGE_TITLES = {
 
 function fullName(user) {
   if (!user) return 'Admin';
-  return `${user.firstname || ''} ${user.lastname || ''}`.trim() || 'Admin';
+  const name = `${user.firstName || ''} ${user.lastName || ''}`.trim();
+  return name || 'Admin';
 }
 
 function initialsOf(user) {
   if (!user) return 'A';
-  const initials = (user.firstname?.[0] || '') + (user.lastname?.[0] || '');
+  const initials = [user.firstName, user.lastName]
+    .filter(Boolean)
+    .map((w) => w[0])
+    .slice(0, 2)
+    .join('');
   return (initials || 'A').toUpperCase();
 }
 
@@ -109,19 +72,48 @@ function AdminSidebar({ onNavigate }) {
   const { user, roleLabel, hasPermission, logout } = useAuth();
   const navigate = useNavigate();
 
+  const [collapsed, setCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === '1';
+    } catch {
+      return false;
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(SIDEBAR_COLLAPSED_KEY, collapsed ? '1' : '0');
+    } catch {
+      // Storage unavailable (private mode, etc.) — collapse still works
+      // for the session, it just won't persist.
+    }
+  }, [collapsed]);
+
   async function handleLogout() {
     await logout();
     navigate('/login', { replace: true });
   }
 
   return (
-    <div id="sidebar">
+    <div id="sidebar" className={collapsed ? 'collapsed' : ''}>
+      <button
+        type="button"
+        className="sb-toggle-btn"
+        onClick={() => setCollapsed((c) => !c)}
+        title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+      >
+        <i className={`ti ${collapsed ? 'ti-chevron-right' : 'ti-chevron-left'}`}></i>
+      </button>
+
       <div className="sb-brand">
         <div className="sb-logo">RV</div>
-        <div>
-          <div className="sb-title">Riverview</div>
-          <div className="sb-sub">Admin Panel</div>
-        </div>
+        {!collapsed && (
+          <div>
+            <div className="sb-title">Riverview</div>
+            <div className="sb-sub">Admin Panel</div>
+          </div>
+        )}
       </div>
 
       <div className="sb-nav">
@@ -141,7 +133,9 @@ function AdminSidebar({ onNavigate }) {
           if (visibleItems.length === 0 && section.items.length > 0) {
             // Still render the heading with no items beneath it, matching
             // that original per-button (not per-section) hiding behavior.
-            return (
+            // Skipped entirely when collapsed — no room, and no items to
+            // label anyway.
+            return collapsed ? null : (
               <div key={section.label}>
                 <div className="sb-section">{section.label}</div>
               </div>
@@ -149,16 +143,17 @@ function AdminSidebar({ onNavigate }) {
           }
           return (
             <div key={section.label}>
-              <div className="sb-section">{section.label}</div>
+              {!collapsed && <div className="sb-section">{section.label}</div>}
               {visibleItems.map((item) => (
                 <NavLink
                   key={item.to}
                   to={item.to}
                   className={({ isActive }) => `sb-item${isActive ? ' active' : ''}`}
                   onClick={() => onNavigate?.(PAGE_TITLES[item.to.split('/').pop()])}
+                  title={collapsed ? item.label : undefined}
                 >
                   <i className={`ti ${item.icon}`}></i>
-                  {item.label}
+                  {!collapsed && item.label}
                 </NavLink>
               ))}
             </div>
@@ -168,16 +163,21 @@ function AdminSidebar({ onNavigate }) {
 
       <div className="sb-bottom">
         <div className="admin-info-row">
-          <div className="admin-av" id="sb-admin-av">{initialsOf(user)}</div>
-          <div>
-            <div className="admin-name" id="sb-admin-name">{fullName(user)}</div>
-            <div className="admin-role" id="sb-admin-role">{roleLabel || 'Admin'}</div>
+          <div className="admin-av" id="sb-admin-av" title={collapsed ? fullName(user) : undefined}>
+            {initialsOf(user)}
           </div>
+          {!collapsed && (
+            <div>
+              <div className="admin-name" id="sb-admin-name">{fullName(user)}</div>
+              <div className="admin-role" id="sb-admin-role">{roleLabel || 'Admin'}</div>
+            </div>
+          )}
           <i
             className="ti ti-logout"
             id="admin-logout-btn"
             onClick={handleLogout}
-            style={{ fontSize: 14, color: 'var(--muted)', marginLeft: 'auto', cursor: 'pointer' }}
+            title="Logout"
+            style={{ fontSize: 14, color: 'var(--muted)', marginLeft: collapsed ? 0 : 'auto', cursor: 'pointer' }}
           ></i>
         </div>
       </div>

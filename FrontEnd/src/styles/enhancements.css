@@ -1,12 +1,3 @@
-/* ============================================================
-   ENHANCEMENTS.CSS
-   A purely additive "polish" layer for The Riverview index page.
-   It never overrides brand colors, layout, or spacing tokens —
-   it only adds depth, motion, and micro-interactions on top of
-   the existing design in style.css. Nothing here renames or
-   removes any class/ID used by index.js.
-   ============================================================ */
-
 :root {
     /* Motion + depth tokens, additive to the existing palette */
     --ease-out: cubic-bezier(.16,.84,.44,1);
@@ -37,7 +28,7 @@
 /* ---------------------------------------------------------------
    GLOBAL — smooth anchor offset + focus visibility
 --------------------------------------------------------------- */
-html { scroll-padding-top: calc(var(--header-h, 68px) + var(--banner-h, 0px) + 16px); }
+html { scroll-behavior: smooth; scroll-padding-top: calc(var(--header-h, 68px) + var(--banner-h, 0px) + 16px); }
 
 a:focus-visible,
 button:focus-visible,
@@ -114,7 +105,7 @@ nav a::after {
 }
 nav a:hover::after, nav a.active::after { width: 20px; }
 
-.btn-login, .btn-book, .theme-toggle, .promo-close {
+.btn-login, .btn-book, .promo-close {
     position: relative; overflow: hidden;
     transition: transform var(--dur-fast) var(--ease-out),
                 background var(--dur-fast) var(--ease-out),
@@ -123,12 +114,7 @@ nav a:hover::after, nav a.active::after { width: 20px; }
                 opacity var(--dur-fast) var(--ease-out) !important;
 }
 .btn-login:hover, .btn-book:hover { transform: translateY(-1px); box-shadow: var(--shadow-soft); }
-.btn-login:active, .btn-book:active, .theme-toggle:active { transform: translateY(0) scale(.97); }
-.theme-toggle:hover { transform: rotate(12deg); }
-
-#themeIcon, #themeIconMobile { display: inline-block; transition: transform .4s var(--ease-smooth); }
-.theme-toggle:hover #themeIcon,
-.theme-toggle:hover #themeIconMobile { transform: rotate(20deg) scale(1.1); }
+.btn-login:active, .btn-book:active { transform: translateY(0) scale(.97); }
 
 .user-chip { transition: background var(--dur-fast); border-radius: 999px; }
 .user-chip-menu {
@@ -164,10 +150,9 @@ nav a:hover::after, nav a.active::after { width: 20px; }
     will-change: transform;
 }
 .hero-carousel {
-    transition: transform .2s var(--ease-smooth), box-shadow var(--dur-med) var(--ease-out);
+    transition: transform .2s var(--ease-smooth);
     will-change: transform;
 }
-.hero-carousel:hover { box-shadow: var(--shadow-deep); }
 
 .hero-intro-avatar {
     animation: rvFloat 5s ease-in-out infinite;
@@ -202,10 +187,7 @@ nav a:hover::after, nav a.active::after { width: 20px; }
 .btn-ghost-hero:hover { transform: translateY(-2px); border-color: rgba(0,201,167,.4); }
 .btn-ghost-hero:active { transform: translateY(0) scale(.98); }
 
-.hero-carousel-slide img { transition: transform 6s linear; }
-.hero-carousel-slide.is-active img { transform: scale(1.06); }
-.hero-carousel-dot { transition: background .2s ease, width .25s var(--ease-out), transform .2s var(--ease-out) !important; }
-.hero-carousel-dot:hover { transform: scale(1.2); }
+.hero-carousel-card:not(.is-active):hover { transform-origin: center; filter: brightness(1.08); }
 
 /* ---------------------------------------------------------------
    ROOMS — richer card depth + micro-interactions
@@ -294,10 +276,38 @@ nav a:hover::after, nav a.active::after { width: 20px; }
     75% { transform: translateX(4px); }
 }
 
-.pf-tab { transition: color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out) !important; }
-.pf-submit, .pf-logout { transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out) !important; }
-.pf-submit:not(:disabled):hover { transform: translateY(-1px); box-shadow: 0 8px 20px rgba(0,201,167,.28); }
-.pf-submit:not(:disabled):active { transform: translateY(0) scale(.98); }
+.pf-tab {
+    transition: color var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out),
+                box-shadow var(--dur-fast) var(--ease-out) !important;
+}
+
+/* Password show/hide toggle + unmet-requirements checklist (PasswordInput.jsx
+   + PASSWORD_REQUIREMENTS, reused from Registration/Reset-Password). */
+.pf-field .input-wrap{position:relative;}
+.pf-field .input-wrap .input-icon{display:none;}
+.pf-field .input-wrap input{padding-right:34px;}
+.pf-field .input-wrap .toggle-pw{
+  position:absolute;right:10px;top:50%;transform:translateY(-50%);
+  background:none;border:none;color:var(--muted);cursor:pointer;font-size:.85rem;padding:2px;line-height:1;
+}
+.pf-field .input-wrap .toggle-pw:hover{color:var(--teal);}
+.pf-field .field-error{font-size:.72rem;color:#ff6b6b;display:none;margin-top:4px;}
+.pf-field .password-requirements{
+  list-style:none;margin:6px 0 0;padding:0;display:flex;flex-direction:column;gap:4px;
+}
+.pf-field .password-requirements li{display:flex;align-items:center;gap:6px;font-size:.72rem;color:#ff6b6b;line-height:1.3;transition:color .15s ease;}
+.pf-field .password-requirements li.met{color:var(--teal);}
+.pf-field .password-requirements .requirement-icon{font-size:.66rem;line-height:1;min-width:1em;}
+.pf-tab.active { box-shadow: var(--shadow-soft); }
+.pf-panel.active { animation: pfPanelIn var(--dur-med) var(--ease-smooth); }
+@keyframes pfPanelIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+.pf-btn, .pf-logout { transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out) !important; }
+.pf-btn:not(:disabled):hover { transform: translateY(-1px); }
+.pf-btn-solid:not(:disabled):hover { box-shadow: 0 8px 20px rgba(0,201,167,.28); }
+.pf-btn:not(:disabled):active { transform: translateY(0) scale(.98); }
 .pf-avatar { transition: transform var(--dur-fast) var(--ease-out); }
 .pf-overlay.open .pf-avatar { animation: rvRise .5s var(--ease-out) .1s both; }
 

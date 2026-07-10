@@ -6,159 +6,6 @@ import { useAuth } from '../../context/AuthContext';
 import { roomsService } from '../../services/rooms';
 import { settingsService } from '../../services/settings';
 
-// ─────────────────────────────────────────────────────────────────────────
-// Admin / Settings — migrated from admin.html's <div id="panel-settings">,
-// the biggest single panel in the app (6 sub-tabs). Because of its size
-// this is being built across several parts of Phase 8 rather than in one
-// go — see each tab's own note below for which part covers it.
-//
-// PART 10a covers:
-//   - The set-tabs / set-subpanel tab-switching shell itself (all 6 tabs
-//     render and are clickable; only Facilities has real content so far)
-//   - FACILITIES tab — full CRUD, migrated from renderFacilities/
-//     openFacilityModal/closeFacilityModal/setFacilityImagePreview/
-//     renderVariantRows/renderFeatureChips/readFacilityForm/saveFacility/
-//     removeFacility/quickDeleteFacility/duplicateFacility in admin.js,
-//     plus the #facility-modal markup in admin.html. Backend: GET/POST/PUT/
-//     DELETE /api/rooms (Backend/routes/roomRoutes.js) — all unchanged.
-//
-// PART 10b (this build) covers:
-//   - Operating Schedule + Holiday & Closure Dates — these render INSIDE
-//     the same set-facilities subpanel as FacilitiesTab, underneath the
-//     facility grid, per the original admin.html markup (they are NOT a
-//     separate tab). Migrated from loadOperatingSettings/renderHolidayList/
-//     the #op-save-btn click handler/deleteHoliday in admin.js, plus the
-//     "Operating Schedule" and "Holiday & Closure Dates" cards in
-//     admin.html. Both live in one new sibling component,
-//     OperatingScheduleAndHolidays, since the original loadOperatingSettings()
-//     fetches both from the same GET /api/settings/admin call and
-//     re-fetches both together after any mutation. Backend: PUT
-//     /api/settings/operating-hours, POST /api/settings/holidays, DELETE
-//     /api/settings/holidays/:id (Backend/routes/settingsRoutes.js) — all
-//     unchanged. Day-pill toggling was a generic delegated listener in the
-//     original (any .day-pill click just toggles .on) — reimplemented here
-//     as per-pill onClick state toggles, same visual behavior.
-//   - Add Date / holiday name+date entry stays as window.prompt() (not a
-//     new form/modal) — a faithful port of the original's plain prompt()
-//     flow, consistent with how quickDelete/handleRemove above already use
-//     window.confirm rather than a custom dialog.
-//
-// PART 10c (this build) covers:
-//   - ANNOUNCEMENTS tab — the homepage promo-banner list. Migrated from
-//     renderAnnouncementsList/the #add-announcement-btn handler/
-//     toggleAnnouncement/deleteAnnouncement in admin.js, plus the
-//     #set-announcements markup in admin.html. Same GET /api/settings/admin
-//     call as Part 10b's OperatingScheduleAndHolidays (this view needs
-//     inactive/expired announcements too, which the public GET /api/settings
-//     filters out) — but a separate fetch here since it's a different tab
-//     that mounts/unmounts independently, not a shared-lifecycle sibling.
-//     Backend: POST /api/settings/announcements, PUT
-//     /api/settings/announcements/:id, DELETE
-//     /api/settings/announcements/:id (Backend/routes/settingsRoutes.js) —
-//     all unchanged. New/title/message entry stays as window.prompt(),
-//     same rationale as the holiday date entry in Part 10b.
-//
-// PART 10d (this build) covers:
-//   - PAYMENT METHODS tab — the down-payment step's GCash/Maya/etc buttons
-//     + QR codes. Migrated from renderPaymentMethodsList/
-//     openPaymentMethodModal/closePaymentMethodModal/savePaymentMethod/
-//     removePaymentMethod/togglePaymentMethodActive in admin.js, plus the
-//     #set-payment-methods panel and #payment-method-modal markup in
-//     admin.html. Reuses the shared Modal and ImageUploadPreview
-//     components, same as Facilities' image upload in Part 10a. The
-//     Available-to-guests on/off switch is a new small inline toggle
-//     (matching the existing .toggle/.toggle-thumb CSS, not previously
-//     used by any React page yet) rather than admin.html's raw
-//     classList.toggle('on')/('off') pair. Backend: POST
-//     /api/settings/payment-methods, PUT /api/settings/payment-methods/:id
-//     (both multipart, field name "qrImage", via paymentMethodQrUpload —
-//     Cloudinary-backed), DELETE /api/settings/payment-methods/:id
-//     (Backend/routes/settingsRoutes.js) — all unchanged.
-//   - qrImage is run through resolveImageUrl(), same as Facilities'
-//     room.image — safe for both cases the original's resolvePaymentQrUrl()
-//     handled: new Cloudinary uploads are already-absolute URLs that
-//     resolveImageUrl() passes through untouched, so only the two legacy
-//     seeded defaults (relative paths like "assets/pictures/gcash-qr.png",
-//     meant to resolve against the old static Frontend folder, not this
-//     backend) would render incorrectly here — a pre-existing seed-data
-//     quirk, not something this migration introduces or can fix.
-//
-// PART 10e (this build) covers, completing Settings.jsx:
-//   - PRICING tab — migrated from the #set-pricing markup in admin.html.
-//   - PROMOTION tab — migrated from the #set-promotion markup in
-//     admin.html. Note: the original "New Promo" button carries an
-//     onclick="openModal()" — that function is real in admin.js, but it's
-//     the unrelated Manual Booking modal (#modal / #mb-room), reused here
-//     by leftover/mistaken markup, not a promo-creation modal. There is no
-//     promo modal anywhere in admin.html or admin.js. Wiring "New Promo"
-//     to the Manual Booking modal would be reproducing a bug, not a
-//     feature, so this button intentionally has no onClick, same as every
-//     button on Reports.jsx.
-//   - AUDIT LOG tab — migrated from the #set-audit markup in admin.html.
-//   All three are entirely static/decorative in the original — no
-//   render*()/fetch wiring in admin.js, no corresponding backend routes
-//   (confirmed: nothing pricing/promo/promotion/audit-shaped in any
-//   Backend/routes file). Same situation as Reports.jsx: hardcoded
-//   names/values/dates ported as an honest straight copy, buttons and
-//   toggles intentionally inert (no onClick/state) because the original's
-//   toggles were only a generic classList.toggle('on')/('off') with no
-//   read or persistence anywhere — reproducing that as dead client-only
-//   React state would misrepresent it as real settings that save, so
-//   these render as static visual toggles instead (matching Reports.jsx's
-//   precedent of intentionally-inert controls over inventing behavior).
-//   This completes Settings.jsx — all 6 tabs (Facilities, Pricing,
-//   Promotion, Announcements, Payment Methods, Audit Log) are now fully
-//   migrated.
-//
-// Permission gating — PHASE 12. Facilities: direct port of
-// hasAdminPermission('room:manage') hiding the Edit/Duplicate/Delete
-// facility actions behind a "View only" label for non-managers, plus
-// guardPermission('room:manage') re-checked in openFacilityModal (add and
-// edit)/saveFacility/removeFacility/quickDeleteFacility/duplicateFacility
-// themselves (defense-in-depth, matching the originals — "Add Facility"
-// has no data-requires-permission in admin.html, so the button stays
-// visible and only the click is guarded). Operating Schedule/Holidays,
-// Announcements, and Payment Methods: direct port of each
-// guardPermission('settings:manage', <per-action message>) call, one per
-// mutating action, each with the exact message the original used (op-save,
-// add/remove holiday, add/toggle/delete announcement, add/edit/remove
-// payment method) — see each component's own handlers below.
-//
-// PHASE 15: every fetch() call site below now goes through
-// services/rooms.js and the new services/settings.js instead of calling
-// fetch() directly. No behavior changed — same endpoints, same payload
-// shapes, same guardPermission() call (still checked first, before the
-// service call, exactly as before), same error message per call site. See
-// each service module's own header comment for the couple of
-// message-wording quirks that were deliberately preserved rather than
-// "cleaned up" (rooms.js's duplicate()-vs-saveFacility() note, and
-// settings.js's updatePaymentMethod() fallbackMessage note).
-//
-// TAB-SCOPE TRIM (prior session): re-verified against a current copy of
-// admin.html and found its #panel-settings tab bar ships only 3
-// <button class="set-tab"> elements — Facilities, Announcements, Audit
-// Log. The Pricing, Promotion, and Payment Methods .set-subpanel divs
-// still exist in admin.html's DOM, but with no matching tab button,
-// admin.js's tab-switcher can never activate them — they're unreachable
-// in the app as it exists today. SETTINGS_TABS below was trimmed to match.
-// At that time PricingTab, PromotionTab, and PaymentMethodsTab were left
-// defined but unreferenced, in case a tab button was restored later.
-//
-// CLEANUP (this session, product decision): all three — PricingTab,
-// PromotionTab, PaymentMethodsTab, plus their supporting constants
-// (PRICING_BASE_RATES, ACTIVE_PROMOTIONS) and emptyPaymentMethodForm() —
-// have now been deleted outright, including PaymentMethodsTab despite it
-// being real, backend-wired functionality (not decorative like
-// Pricing/Promotion) whose tab button's disappearance from admin.html
-// still looks like an accidental regression upstream, not an intentional
-// removal. If that upstream regression is ever fixed and the tab button
-// restored, this component will need to be re-built from
-// Backend/routes/settingsRoutes.js's payment-methods endpoints and
-// services/settings.js's existing addPaymentMethod/updatePaymentMethod/
-// removePaymentMethod calls (those service functions were left in place —
-// see services/settings.js — since nothing else in this cleanup task
-// touched them).
-// ─────────────────────────────────────────────────────────────────────────
 
 const SETTINGS_TABS = [
   { key: 'facilities', label: 'Facilities' },
@@ -1044,7 +891,7 @@ function AnnouncementsTab() {
             <div className="card" style={{ padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 12 }} key={a._id}>
               <span style={{ fontSize: '1.2rem' }}>{a.emoji || '📣'}</span>
               <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 600, fontSize: '.85rem', color: '#fff' }}>{a.title}</div>
+                <div style={{ fontWeight: 600, fontSize: '.85rem', color: 'var(--text)' }}>{a.title}</div>
                 <div style={{ fontSize: '.78rem', color: 'var(--muted)' }}>{a.message}</div>
               </div>
               <span className={`pill ${a.isActive ? 'pill-active' : 'pill-pending'}`}>
@@ -1110,4 +957,4 @@ function AuditLogTab() {
   );
 }
 
-export default Settings;  
+export default Settings;

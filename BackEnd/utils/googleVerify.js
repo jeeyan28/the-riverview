@@ -18,6 +18,7 @@ async function verifyGoogleIdToken(idToken) {
     firstname: payload.given_name || "",
     lastname: payload.family_name || "",
     googleId: payload.sub,
+    picture: payload.picture || "",
     emailVerified: !!payload.email_verified,
   };
 }

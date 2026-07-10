@@ -4,98 +4,23 @@ import ConfirmDialog from '../../components/ConfirmDialog';
 import { useConfirm } from '../../hooks/useConfirm';
 import { useAuth } from '../../context/AuthContext';
 import { roomsService } from '../../services/rooms';
-import { bookingsService } from '../../services/bookings';
+import { roomSessionsService } from '../../services/roomSessions';
 
-// ─────────────────────────────────────────────────────────────────────────
-// Admin / Room Monitor — migrated from admin.html's <div id="panel-monitor">
-// + admin.js's "ROOM MONITOR PANEL (Tier 2)" section (fetchMonitorBookings,
-// renderRoomMonitor, tickRoomMonitor, paintRoomMonitorGrid,
-// roomMonitorCardHtml, autoExpireRoom, deleteWalkInSession, ensureAssignModal,
-// openAssignModal, openManualMonitorModal, openEditMonitorModal,
-// submitWalkInAssignment). Part of Phase 8 (Page Migration).
-//
-// Rewritten this session to match admin.js's current Room Monitoring design
-// (the previous port matched an older version of this feature — see
-// MIGRATION_PROGRESS.md). Room Monitoring no longer asks for a typed-in
-// Guest Name at all: a room is identified purely by its Room No., which is
-// either fixed (Assign/Edit) or chosen from a dropdown (Manual Add).
-// Duration is entered as separate Hours / Minutes / Seconds fields (plus
-// quick-preset buttons) so staff can manage a session down to the second.
-//
-// Behavior preserved 1:1:
-//   - A room's remaining time is derived purely from its live walk-in
-//     booking's date + timeIn + duration — never a separate client-only
-//     timer state — so it's still correct after a refresh.
-//   - A 1-second ticker (setInterval) repaints countdowns (HH:MM:SS,
-//     precise to the second) and, the first time any booking's remaining
-//     time hits zero, fires exactly one PUT /api/rooms/:id
-//     (status: Available) for it — tracked with a Set of already-handled
-//     booking ids so it can't double-fire while the request is in flight,
-//     and un-marked again on failure so the very next tick retries instead
-//     of silently giving up.
-//   - "Assign Walk-in" (a specific vacant room's card) and "Manual Add"
-//     (panel-level button, room chosen from a dropdown of Available rooms)
-//     both create a walk-in booking via the same POST /api/bookings
-//     admin/staff already use for Manual Booking (date/time defaulted to
-//     right now), then PUT the room to Occupied. guestName is still
-//     required by the schema, so it's auto-filled from the room's own
-//     number, same as the original.
-//   - "Edit" (an occupied room's card) re-anchors the session to right now
-//     and applies the freshly-chosen duration/payment method via a single
-//     PUT /api/bookings/:id — the simplest way to let staff set an exact
-//     "time left".
-//   - "Delete" (an occupied room's card) marks that booking Done and PUTs
-//     the room back to Available immediately, instead of waiting for the
-//     timer.
-//   - All endpoints (GET /api/bookings?status=Active, PUT /api/rooms/:id,
-//     POST/PUT /api/bookings) are unchanged.
-//
-// Adapted only because this is now its own routed page instead of an
-// always-mounted panel: the 1s ticker starts on mount and is cleaned up in
-// this component's own effect cleanup (equivalent to the original's
-// stopRoomMonitorTicker(), which used to fire from switchPanel() whenever
-// you navigated to a different panel — React Router unmounting this page
-// on navigation now does that job instead).
-//
-// The original's Assign/Edit modal didn't exist in admin.html's markup at
-// all — admin.js built it once into document.body on first use
-// (ensureAssignModal()), and one modal covers all three entry points
-// (Assign Walk-in / Manual Add / Edit). Here it's just ordinary JSX using
-// the shared <Modal/>, since React doesn't need the manual DOM-injection
-// trick, but it's still the one component covering all three modes.
-//
-// Permission gating — PHASE 12. Direct port of roomMonitorCardHtml()'s
-// canManageRoom = hasAdminPermission('room:manage'): occupied rooms without
-// it show "In use" instead of Edit/Delete, Available rooms show
-// "No permission" instead of Assign Walk-in (exact same placeholder text
-// pairing as the original). autoExpireRoom(), deleteWalkInSession(), and
-// the modal's submit path each also re-check room:manage themselves,
-// matching the originals' own defense-in-depth (the buttons are already
-// hidden, but autoExpireRoom() in particular fires from the ticker, not a
-// click).
-//
-// deleteWalkInSession now uses the shared <ConfirmDialog/> (via
-// useConfirm()) instead of native window.confirm() — ports the original's
-// UIModal.confirm() styling/behavior. Same fix applied across Bookings.jsx
-// and Users.jsx in the same pass; see components/ConfirmDialog.jsx.
-// ─────────────────────────────────────────────────────────────────────────
 
-const MONITOR_WARNING_MS = 5 * 60 * 1000; // "almost over" — 5 minutes left
+const MONITOR_WARNING_MS = 5 * 60 * 1000;  // timer turns yellow at ≤5 min
+const MONITOR_CRITICAL_MS = 60 * 1000;     // timer turns red at ≤1 min
 
-const BASE_STATUS_CLASS = { Available: 'vacant', Occupied: 'occupied', 'Under Maintenance': 'overdue', Inactive: 'vacant' };
+const BASE_STATUS_CLASS = { Available: 'available', Occupied: 'occupied', 'Under Maintenance': 'overdue', Inactive: 'vacant' };
 
-function bookingStart(booking) {
-  const [h, m] = String(booking.timeIn).split(':').map(Number);
-  const start = new Date(booking.date + 'T00:00:00');
-  start.setHours(h || 0, m || 0, 0, 0);
-  return start;
+function sessionStart(session) {
+  return new Date(session.startTime);
 }
-function bookingEnd(booking) {
-  return new Date(bookingStart(booking).getTime() + booking.duration * 60 * 60 * 1000);
+function sessionEnd(session) {
+  return new Date(sessionStart(session).getTime() + session.duration * 60 * 60 * 1000);
 }
-// Precise HH:MM:SS countdown, ticking every second — direct port of
-// formatTimeRemaining() in admin.js. Expiration itself is signaled by the
-// "expired" state class + "Time's up" badge on the card, not by this string.
+function formatStartTime(session) {
+  return sessionStart(session).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
 function formatTimeRemaining(ms) {
   const totalSeconds = Math.max(0, Math.floor(ms / 1000));
   const h = Math.floor(totalSeconds / 3600);
@@ -103,21 +28,10 @@ function formatTimeRemaining(ms) {
   const s = totalSeconds % 60;
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
-function activeWalkInBookings(bookings) {
-  return (bookings || []).filter((b) => b.source === 'walk-in' && b.status === 'Active');
-}
-function findRoomOccupancy(roomId, walkIns) {
-  const matches = walkIns.filter((b) => String(b.room?._id || b.room) === String(roomId));
+function findRoomOccupancy(roomId, sessions) {
+  const matches = sessions.filter((s) => s.status === 'Active' && String(s.room?._id || s.room) === String(roomId));
   if (!matches.length) return null;
-  return matches.reduce((latest, b) => (!latest || bookingEnd(b) > bookingEnd(latest) ? b : latest), null);
-}
-function todayDateStr() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
-function nowTimeStr() {
-  const d = new Date();
-  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  return matches.reduce((latest, s) => (!latest || sessionEnd(s) > sessionEnd(latest) ? s : latest), null);
 }
 
 function Monitor() {
@@ -127,20 +41,14 @@ function Monitor() {
 
   const [rooms, setRooms] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [walkIns, setWalkIns] = useState([]);
-  const [, forceTick] = useState(0); // re-render every second so countdowns move without re-deriving state
+  const [sessions, setSessions] = useState([]);
+  const [, forceTick] = useState(0); // re-render every second so countdowns move
 
-  const expiredHandled = useRef(new Set());
-  const roomsRef = useRef(rooms);
-  const walkInsRef = useRef(walkIns);
-  roomsRef.current = rooms;
-  walkInsRef.current = walkIns;
-
-  // modal: null (closed) | { mode: 'add'|'edit', fixedRoom: room|null, booking: booking|null }
-  // fixedRoom set + mode 'add'  → "Assign Walk-in" on a specific vacant room card
-  // fixedRoom null + mode 'add' → "Manual Add" — room chosen from a dropdown
-  // fixedRoom set + mode 'edit' → "Edit" on an occupied room card
+  // modal: null (closed) | { mode: 'start'|'extend', fixedRoom: room, session: session|null }
+  // 'start'  — Available room's "Edit" button — starts a brand-new session
+  // 'extend' — Occupied room's "Extend" button — re-anchors remaining time
   const [modal, setModal] = useState(null);
+  const [showAddRoom, setShowAddRoom] = useState(false);
 
   async function fetchRooms() {
     try {
@@ -154,42 +62,30 @@ function Monitor() {
     }
   }
 
-  async function fetchMonitorBookings() {
+  // Fetches every session (Active + Finished) — the card grid derives both
+  // current occupancy and each room's last-finished-session from this one list.
+  async function fetchMonitorSessions() {
     try {
-      const data = await bookingsService.listActive();
-      const filtered = activeWalkInBookings(data);
-      setWalkIns(filtered);
-      return filtered;
+      const data = await roomSessionsService.list();
+      const list = Array.isArray(data) ? data : [];
+      setSessions(list);
+      return list;
     } catch (err) {
       console.error(err);
-      setWalkIns([]);
+      setSessions([]);
       return [];
     }
   }
 
-  // Initial load + start the 1s ticker. Cleaned up on unmount — this is
-  // this page's equivalent of the original's stopRoomMonitorTicker(),
-  // which used to be called manually from switchPanel() on navigation.
   useEffect(() => {
     let cancelled = false;
     (async () => {
       setLoading(true);
-      await Promise.all([fetchRooms(), fetchMonitorBookings()]);
+      await Promise.all([fetchRooms(), fetchMonitorSessions()]);
       if (!cancelled) setLoading(false);
     })();
 
-    const tickHandle = setInterval(async () => {
-      // Check for newly-expired sessions and auto-reset their room, exactly
-      // as the original's tickRoomMonitor() did.
-      for (const b of walkInsRef.current) {
-        if (expiredHandled.current.has(b._id)) continue;
-        if (bookingEnd(b).getTime() - Date.now() <= 0) {
-          expiredHandled.current.add(b._id);
-          await autoExpireRoom(b);
-        }
-      }
-      forceTick((n) => n + 1); // repaint countdowns
-    }, 1000);
+    const tickHandle = setInterval(() => forceTick((n) => n + 1), 1000);
 
     return () => {
       cancelled = true;
@@ -197,34 +93,18 @@ function Monitor() {
     };
   }, []);
 
-  async function autoExpireRoom(booking) {
-    if (!hasPermission('room:manage')) return;
-    const roomId = booking.room?._id || booking.room;
-    const room = roomsRef.current.find((rm) => rm._id === roomId);
-    if (!room || room.status === 'Available') return;
-
-    try {
-      const updated = await roomsService.updateStatus(roomId, 'Available');
-      setRooms((prev) => prev.map((r) => (r._id === roomId ? { ...r, ...updated } : r)));
-    } catch (err) {
-      console.error(err);
-      expiredHandled.current.delete(booking._id); // let the next tick try again
-    }
-  }
-
-  // "Delete" on an occupied room card — end the session early instead of
-  // waiting for the timer to run out on its own.
-  async function deleteWalkInSession(bookingId, roomId) {
+  // "End Session" on an occupied room card — finishes it early (or after it
+  // has hit 0, since reaching 0 no longer ends it automatically). Marks the
+  // session Finished (kept, not deleted) and frees up the room immediately.
+  async function endSession(sessionId, roomId) {
     if (!guardPermission('room:manage')) return;
-    if (!(await confirm('Remove this room from monitoring now? The room will be marked Available.', { confirmText: 'Remove' }))) return;
+    if (!(await confirm('End this session now? The room will be marked Available.', { confirmText: 'End Session' }))) return;
     try {
-      await bookingsService.updateStatus(bookingId, 'Done');
+      await roomSessionsService.finish(sessionId);
 
-      // Soft-fail on purpose, matching the original's `if (roomRes.ok)`
-      // check: a failed room reset here doesn't abort ending the session
-      // (the booking is already marked Done above) — it just means the
-      // room card won't repaint as Available until the next successful
-      // update.
+      // Soft-fail on purpose: the session is already marked Finished above —
+      // a failed room reset here just means the card won't repaint as
+      // Available until the next successful update.
       try {
         const updatedRoom = await roomsService.updateStatus(roomId, 'Available');
         setRooms((prev) => prev.map((r) => (r._id === roomId ? { ...r, ...updatedRoom } : r)));
@@ -232,59 +112,36 @@ function Monitor() {
         /* soft-fail — see comment above */
       }
 
-      expiredHandled.current.add(bookingId); // it's over — the ticker shouldn't touch it again
-      await fetchMonitorBookings();
+      await fetchMonitorSessions();
     } catch (err) {
       console.error(err);
       alert('Could not end this session.');
     }
   }
 
-  // Direct ports of the three entry points' guards — the buttons that call
-  // these are already hidden without room:manage (see the room-card render
-  // below), but the originals guarded the functions themselves too.
-  function openAssignModal(room) {
+  function openStartSessionModal(room) {
     if (!guardPermission('room:manage')) return;
-    setModal({ mode: 'add', fixedRoom: room, booking: null });
+    setModal({ mode: 'start', fixedRoom: room, session: null });
   }
-  function openManualMonitorModal() {
+  function openExtendModal(session, room) {
     if (!guardPermission('room:manage')) return;
-    setModal({ mode: 'add', fixedRoom: null, booking: null });
-  }
-  function openEditMonitorModal(booking, room) {
-    if (!guardPermission('room:manage')) return;
-    setModal({ mode: 'edit', fixedRoom: room, booking });
+    setModal({ mode: 'extend', fixedRoom: room, session });
   }
 
-  async function handleModalSubmit({ mode, roomId, bookingId, totalHours, paymentMethod }) {
+  async function handleModalSubmit({ mode, roomId, sessionId, totalHours, paymentMethod }) {
     if (!guardPermission('room:manage')) return;
 
-    if (mode === 'edit') {
-      // Re-anchor the session to right now and give it the freshly chosen
-      // remaining duration — the simplest way to let staff set an exact
-      // "time left" via hours/minutes/seconds.
-      await bookingsService.update(bookingId, {
-        date: todayDateStr(),
-        timeIn: nowTimeStr(),
+    if (mode === 'extend') {
+      // Re-anchor to right now with the freshly chosen remaining duration —
+      // the simplest way to let staff set an exact "time left".
+      await roomSessionsService.update(sessionId, {
+        startTime: new Date().toISOString(),
         duration: totalHours,
         paymentMethod,
       });
     } else {
-      const room = rooms.find((r) => r._id === roomId);
-      // Admin/staff sessions hitting POST /bookings automatically get
-      // source: "walk-in", status: "Active", paymentStatus: "Paid" — see
-      // bookingRoutes.js — so we don't send (and couldn't override) those.
-      // guestName is still required by the schema, so it's auto-filled
-      // from the room's own number — Room Monitoring identifies rooms,
-      // not guests.
-      await bookingsService.create({
-        guestName: `Room ${room ? room.roomNumber : ''}`.trim() || 'Room Monitoring',
-        roomId,
-        date: todayDateStr(),
-        timeIn: nowTimeStr(),
-        duration: totalHours,
-        paymentMethod,
-      });
+      // mode === 'start'
+      await roomSessionsService.create({ roomId, duration: totalHours, paymentMethod });
 
       // Reflect the room as occupied right away rather than waiting for a refetch.
       try {
@@ -296,7 +153,32 @@ function Monitor() {
     }
 
     setModal(null);
-    await fetchMonitorBookings();
+    await fetchMonitorSessions();
+  }
+
+  // FEATURE_REQUESTS.md Priority 0 — create a Room from within Room
+  // Monitoring itself. Name, Room No., and Rate (price) are collected;
+  // status/capacity keep their existing defaults and can be adjusted later
+  // via Settings.
+  async function handleAddRoom({ name, roomNumber, price }) {
+    if (!guardPermission('room:manage')) return;
+    await roomsService.create({ name, roomNumber, price });
+    await fetchRooms();
+  }
+
+  // "Delete" beside an Available room's "Edit" button — removes the Room
+  // itself (DELETE /api/rooms/:id). Only offered while Available, since an
+  // Occupied room has no Edit button to sit beside in the first place.
+  async function deleteRoom(roomId) {
+    if (!guardPermission('room:manage')) return;
+    if (!(await confirm('Delete this room permanently? This cannot be undone.', { confirmText: 'Delete' }))) return;
+    try {
+      await roomsService.remove(roomId);
+      setRooms((prev) => prev.filter((r) => r._id !== roomId));
+    } catch (err) {
+      console.error(err);
+      alert(err.message || 'Could not delete this room.');
+    }
   }
 
   return (
@@ -304,12 +186,11 @@ function Monitor() {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <span style={{ fontSize: '.78rem', color: 'var(--muted)' }}>Live monitoring — updates every second</span>
         {canManage && (
-          <button
-            onClick={openManualMonitorModal}
-            style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 14px', background: 'rgba(0,201,167,.1)', border: '1px solid rgba(0,201,167,.3)', borderRadius: '9px', fontSize: '.78rem', color: 'var(--teal)', cursor: 'pointer', fontFamily: "'Inter',sans-serif" }}
-          >
-            <i className="ti ti-plus"></i>Manual Add
-          </button>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button className="btn-teal" onClick={() => setShowAddRoom(true)}>
+              <i className="ti ti-building-plus"></i>New Room
+            </button>
+          </div>
         )}
       </div>
 
@@ -318,30 +199,34 @@ function Monitor() {
           <div style={{ textAlign: 'center', color: 'var(--muted)', padding: '24px 0', gridColumn: '1/-1' }}>Loading rooms…</div>
         ) : rooms.length === 0 ? (
           <div style={{ textAlign: 'center', color: 'var(--muted)', padding: '24px 0', gridColumn: '1/-1' }}>
-            No rooms yet — add facilities in Settings.
+            No rooms yet — click New Room above to add one.
           </div>
         ) : (
           rooms.map((r) => {
-            const occupancy = findRoomOccupancy(r._id, walkIns);
-            const remaining = occupancy ? bookingEnd(occupancy).getTime() - Date.now() : null;
-            const isExpired = occupancy && remaining <= 0;
-            const isWarning = occupancy && !isExpired && remaining <= MONITOR_WARNING_MS;
+            const occupancy = findRoomOccupancy(r._id, sessions);
+            const remaining = occupancy ? sessionEnd(occupancy).getTime() - Date.now() : null;
 
-            // "expired" is its own state (distinct from the static "Under
-            // Maintenance" -> 'overdue' mapping below) so a truly timed-out
-            // session can blink red without also making every
-            // maintenance-flagged room blink.
-            const stateClass = isExpired ? 'expired' : isWarning ? 'warning' : BASE_STATUS_CLASS[r.status] || 'vacant';
-            const icoClass = r.status === 'Occupied' ? 'ico-teal' : r.status === 'Under Maintenance' ? 'ico-amber' : 'ico-blue';
+            // Reaching 0 no longer ends the session automatically — the card
+            // turns red and blinks (see blinkClass) and keeps counting until
+            // staff steps in.
+            const isPastEnd = occupancy && remaining <= 0;
+            const isCritical = occupancy && !isPastEnd && remaining <= MONITOR_CRITICAL_MS;
+            const isWarning = occupancy && !isPastEnd && !isCritical && remaining <= MONITOR_WARNING_MS;
+
+            const stateClass = (isPastEnd || isCritical) ? 'expired' : isWarning ? 'warning' : BASE_STATUS_CLASS[r.status] || 'vacant';
+            // Past-end (remaining <= 0) blinks in addition to being red, so it
+            // stands out from the merely-critical (≤1 min, still counting) state.
+            const blinkClass = isPastEnd ? ' blink-expired' : '';
+            const icoClass = r.status === 'Occupied' ? 'ico-teal' : r.status === 'Under Maintenance' ? 'ico-amber' : r.status === 'Available' ? 'ico-green' : 'ico-blue';
             const icoGlyph = r.status === 'Occupied' ? 'ti-circle-dashed' : r.status === 'Under Maintenance' ? 'ti-alert-triangle' : 'ti-circle-off';
 
             const barPercent = occupancy
               ? Math.max(0, Math.min(100, (remaining / (occupancy.duration * 60 * 60 * 1000)) * 100))
               : r.status === 'Occupied' ? 60 : 0;
-            const barColor = isExpired ? 'var(--red)' : isWarning ? 'var(--amber)' : occupancy || r.status === 'Occupied' ? 'var(--teal)' : '#378ADD';
+            const barColor = (isPastEnd || isCritical) ? 'var(--red)' : isWarning ? 'var(--amber)' : occupancy || r.status === 'Occupied' ? 'var(--teal)' : 'var(--blue)';
 
             return (
-              <div className={`rm ${stateClass}`} key={r._id}>
+              <div className={`rm ${stateClass}${blinkClass}`} key={r._id}>
                 <div className="rm-head">
                   <div>
                     <div className="rm-name">{r.name}</div>
@@ -350,15 +235,18 @@ function Monitor() {
                   <div className={`rm-ico ${icoClass}`}><i className={`ti ${icoGlyph}`}></i></div>
                 </div>
                 <div className="rm-rows">
-                  <div className="rm-row"><span className="lbl">Status</span><span className="val">{r.status}</span></div>
+                  <div className="rm-row">
+                    <span className="lbl">Status</span>
+                    <span className={`rm-status-pill status-${stateClass}`}><span className="dot"></span>{r.status}</span>
+                  </div>
                   {occupancy ? (
                     <>
-                      {/* "Room No." replaces the old "Guest" row — Room Monitoring
-                          tracks rooms, not guest identities. */}
                       <div className="rm-row"><span className="lbl">Room No.</span><span className="val">{r.roomNumber}</span></div>
+                      <div className="rm-row"><span className="lbl">Payment Method</span><span className="val">{occupancy.paymentMethod || '—'}</span></div>
+                      <div className="rm-row"><span className="lbl">Start Time</span><span className="val">{formatStartTime(occupancy)}</span></div>
                       <div className="rm-row">
                         <span className="lbl">Time Left</span>
-                        <span className={`val rm-timer${isWarning ? ' warn' : ''}${isExpired ? ' expired' : ''}`}>
+                        <span className={`val rm-timer${isWarning ? ' warn' : ''}${(isPastEnd || isCritical) ? ' expired' : ''}`}>
                           {formatTimeRemaining(remaining)}
                         </span>
                       </div>
@@ -367,11 +255,9 @@ function Monitor() {
                     <div className="rm-row"><span className="lbl">Rate</span><span className="val">₱{r.price}/hr</span></div>
                   )}
                 </div>
-                {isExpired ? (
-                  <div className="rm-expired-badge"><i className="ti ti-alarm"></i>Time's up</div>
-                ) : isWarning ? (
+                {(isWarning || isCritical) && (
                   <div className="rm-warn-badge"><i className="ti ti-alert-triangle"></i>Ending soon</div>
-                ) : null}
+                )}
                 <div className="rm-bar-wrap">
                   <div className="rm-bar" style={{ width: `${barPercent}%`, background: barColor }}></div>
                 </div>
@@ -379,20 +265,23 @@ function Monitor() {
                   {occupancy ? (
                     canManage ? (
                       <>
-                        <button className="rm-btn" onClick={() => openEditMonitorModal(occupancy, r)}><i className="ti ti-edit"></i>Edit</button>
-                        <button className="rm-btn danger" onClick={() => deleteWalkInSession(occupancy._id, r._id)}><i className="ti ti-trash"></i>Delete</button>
+                        <button className="rm-btn" onClick={() => openExtendModal(occupancy, r)}><i className="ti ti-edit"></i>Extend</button>
+                        <button className="rm-btn danger" onClick={() => endSession(occupancy._id, r._id)}><i className="ti ti-trash"></i>End Session</button>
                       </>
                     ) : (
-                      <span style={{ fontSize: '.7rem', color: 'var(--muted)' }}>In use</span>
+                      <span style={{ fontSize: '.82rem', color: 'var(--muted)' }}>In use</span>
                     )
                   ) : r.status === 'Available' ? (
                     canManage ? (
-                      <button className="rm-btn primary" onClick={() => openAssignModal(r)}><i className="ti ti-plus"></i>Assign Walk-in</button>
+                      <>
+                        <button className="rm-btn primary" onClick={() => openStartSessionModal(r)}><i className="ti ti-edit"></i>Edit</button>
+                        <button className="rm-btn danger" onClick={() => deleteRoom(r._id)}><i className="ti ti-trash"></i>Delete Room</button>
+                      </>
                     ) : (
-                      <span style={{ fontSize: '.7rem', color: 'var(--muted)' }}>No permission</span>
+                      <span style={{ fontSize: '.82rem', color: 'var(--muted)' }}>No permission</span>
                     )
                   ) : (
-                    <span style={{ fontSize: '.7rem', color: 'var(--muted)' }}>{r.status}</span>
+                    <span style={{ fontSize: '.82rem', color: 'var(--muted)' }}>{r.status}</span>
                   )}
                 </div>
               </div>
@@ -401,7 +290,8 @@ function Monitor() {
         )}
       </div>
 
-      <AssignWalkInModal modal={modal} rooms={rooms} onClose={() => setModal(null)} onSubmit={handleModalSubmit} />
+      <SessionModal modal={modal} onClose={() => setModal(null)} onSubmit={handleModalSubmit} />
+      <AddRoomModal open={showAddRoom} onClose={() => setShowAddRoom(false)} onSubmit={handleAddRoom} existingNames={[...new Set(rooms.map((r) => r.name))]} />
 
       <ConfirmDialog {...confirmProps} />
     </div>
@@ -409,11 +299,164 @@ function Monitor() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// AssignWalkInModal — admin.html shipped no markup for this at all; the
-// original built it once into document.body on first use
-// (ensureAssignModal()), and one modal covers all three entry points
-// (Assign Walk-in / Manual Add / Edit). Here it's ordinary JSX using the
-// shared <Modal/>, same .mfield/.modal-actions conventions as Bookings.jsx.
+// AddRoomModal — FEATURE_REQUESTS.md Priority 0: create a new Room (Name
+// + Room No.) from within Room Monitoring. Only collects the two fields
+// Room.js actually requires; everything else keeps its schema default.
+//
+// FEATURE_REQUESTS.md Priority 3 — Name is an editable dropdown (add new /
+// delete existing option). Options are stored client-side in localStorage
+// (seeded from existing room names) rather than via Settings, per the
+// "Room Monitoring must not depend on Settings" architecture decision.
+// ─────────────────────────────────────────────────────────────────────────
+const ROOM_NAME_PRESETS_KEY = 'roomMonitor.roomNamePresets';
+
+function loadRoomNamePresets(existingNames) {
+  let stored = [];
+  try {
+    stored = JSON.parse(localStorage.getItem(ROOM_NAME_PRESETS_KEY) || '[]');
+    if (!Array.isArray(stored)) stored = [];
+  } catch {
+    stored = [];
+  }
+  return [...new Set([...stored, ...existingNames])].sort((a, b) => a.localeCompare(b));
+}
+
+function saveRoomNamePresets(options) {
+  localStorage.setItem(ROOM_NAME_PRESETS_KEY, JSON.stringify(options));
+}
+
+function AddRoomModal({ open, onClose, onSubmit, existingNames }) {
+  const [name, setName] = useState('');
+  const [roomNumber, setRoomNumber] = useState('');
+  const [price, setPrice] = useState('');
+  const [nameOptions, setNameOptions] = useState([]);
+  const [addingNew, setAddingNew] = useState(false);
+  const [newOptionInput, setNewOptionInput] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setName('');
+      setRoomNumber('');
+      setPrice('');
+      setAddingNew(false);
+      setNewOptionInput('');
+      setNameOptions(loadRoomNamePresets(existingNames));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  function handleSelectName(value) {
+    if (value === '__add_new__') {
+      setAddingNew(true);
+      return;
+    }
+    setAddingNew(false);
+    setName(value);
+  }
+
+  function handleAddOption() {
+    const trimmed = newOptionInput.trim();
+    if (!trimmed) return;
+    setNameOptions((prev) => {
+      if (prev.includes(trimmed)) return prev;
+      const next = [...prev, trimmed].sort((a, b) => a.localeCompare(b));
+      saveRoomNamePresets(next);
+      return next;
+    });
+    setName(trimmed);
+    setAddingNew(false);
+    setNewOptionInput('');
+  }
+
+  function handleDeleteOption(option) {
+    if (!window.confirm(`Remove "${option}" from the Name list? This only affects the dropdown, not any existing room.`)) return;
+    setNameOptions((prev) => {
+      const next = prev.filter((o) => o !== option);
+      saveRoomNamePresets(next);
+      return next;
+    });
+    if (name === option) setName('');
+  }
+
+  async function handleSubmit() {
+    const trimmedName = name.trim();
+    const trimmedRoomNumber = roomNumber.trim();
+    if (!trimmedName || !trimmedRoomNumber) {
+      alert('Please enter both Room No. and Name.');
+      return;
+    }
+    const trimmedPrice = price.trim();
+    if (trimmedPrice && (Number.isNaN(Number(trimmedPrice)) || Number(trimmedPrice) < 0)) {
+      alert('Rate must be a valid non-negative number.');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await onSubmit({ name: trimmedName, roomNumber: trimmedRoomNumber, price: trimmedPrice ? Number(trimmedPrice) : 0 });
+      onClose();
+    } catch (err) {
+      console.error(err);
+      alert(err.message || 'Could not create this room.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <Modal open={open} onClose={onClose} title="New Room — Room Monitoring">
+      <div className="mfield">
+        <label>Name</label>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <select value={name} onChange={(e) => handleSelectName(e.target.value)} style={{ flex: 1 }}>
+            <option value="">Select a name…</option>
+            {nameOptions.map((opt) => (
+              <option key={opt} value={opt}>{opt}</option>
+            ))}
+            <option value="__add_new__">+ Add new option…</option>
+          </select>
+          {name && nameOptions.includes(name) && (
+            <button type="button" className="rm-btn danger" style={{ flex: '0 0 auto', padding: '7px 10px' }} onClick={() => handleDeleteOption(name)} title={`Remove "${name}" from list`}>
+              <i className="ti ti-trash"></i>
+            </button>
+          )}
+        </div>
+        {addingNew && (
+          <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+            <input
+              type="text"
+              value={newOptionInput}
+              onChange={(e) => setNewOptionInput(e.target.value)}
+              placeholder="New room name"
+              style={{ flex: 1 }}
+              autoFocus
+            />
+            <button type="button" className="rm-btn primary" style={{ flex: '0 0 auto', padding: '7px 12px' }} onClick={handleAddOption}>Add</button>
+          </div>
+        )}
+      </div>
+      <div className="mfield">
+        <label>Rate (₱/hr)</label>
+        <input type="number" min="0" step="1" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="e.g. 150" />
+      </div>
+      <div className="mfield">
+        <label>Room No.</label>
+        <input type="text" value={roomNumber} onChange={(e) => setRoomNumber(e.target.value)} placeholder="e.g. 101" />
+      </div>
+      <div className="modal-actions">
+        <button className="btn-cancel" onClick={onClose}>Cancel</button>
+        <button className="btn-confirm" disabled={submitting} onClick={handleSubmit}>
+          {submitting ? 'Adding…' : 'Add Room'}
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// SessionModal — covers Start and Extend. Always targets a single
+// fixedRoom — there is no room or category picker, since those are locked
+// after room creation.
 // ─────────────────────────────────────────────────────────────────────────
 const DURATION_PRESETS = [
   { label: '15m', mins: 15 },
@@ -423,42 +466,82 @@ const DURATION_PRESETS = [
   { label: '3h', mins: 180 },
 ];
 
-function AssignWalkInModal({ modal, rooms, onClose, onSubmit }) {
-  const [roomId, setRoomId] = useState('');
-  const [hours, setHours] = useState('1');
-  const [minutes, setMinutes] = useState('0');
-  const [seconds, setSeconds] = useState('0');
+// Extend uses a smaller absolute-duration preset set plus an "Add Time"
+// control (hours/minutes only — no seconds) that adds on top of whatever
+// duration is already showing, rather than replacing it.
+const EXTEND_PRESETS = [
+  { label: '1hr', mins: 60 },
+  { label: '2hr', mins: 120 },
+  { label: '3hr', mins: 180 },
+];
+
+function SessionModal({ modal, onClose, onSubmit }) {
+  const [hours, setHours] = useState('');
+  const [minutes, setMinutes] = useState('');
+  const [seconds, setSeconds] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('Cash');
   const [submitting, setSubmitting] = useState(false);
+  const [addTimeOpen, setAddTimeOpen] = useState(false);
+  const [addHours, setAddHours] = useState('');
+  const [addMinutes, setAddMinutes] = useState('');
 
-  const isEdit = modal?.mode === 'edit';
-  const isManual = !!modal && modal.mode === 'add' && !modal.fixedRoom;
-  const availableRooms = rooms.filter((r) => r.status === 'Available');
+  const isExtend = modal?.mode === 'extend';
 
-  // Prefill exactly as the original's openAssignModal() / openManualMonitorModal() /
-  // openEditMonitorModal() did, each time the modal is opened for a new target.
+  // Prefill on every open, matching each mode's source of truth. Start mode
+  // begins empty — staff must explicitly enter a duration — while Extend
+  // still pre-fills the session's real remaining time.
   useEffect(() => {
     if (!modal) return;
 
-    if (modal.fixedRoom) setRoomId(modal.fixedRoom._id);
-    else setRoomId(availableRooms[0]?._id || '');
+    setAddTimeOpen(false);
+    setAddHours('');
+    setAddMinutes('');
 
-    if (modal.mode === 'edit' && modal.booking) {
-      const remainingMs = Math.max(0, bookingEnd(modal.booking).getTime() - Date.now());
+    if (modal.mode === 'extend' && modal.session) {
+      const remainingMs = Math.max(0, sessionEnd(modal.session).getTime() - Date.now());
       setDurationFromHours(remainingMs > 0 ? remainingMs / 3600000 : 1 / 3600);
-      setPaymentMethod(modal.booking.paymentMethod || 'Cash');
+      setPaymentMethod(modal.session.paymentMethod || 'Cash');
     } else {
-      setDurationFromHours(1);
+      setHours('');
+      setMinutes('');
+      setSeconds('');
       setPaymentMethod('Cash');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modal]);
 
   function setDurationFromHours(totalHours) {
-    const totalSeconds = Math.max(1, Math.round((totalHours || 0) * 3600));
+    const totalSeconds = Math.max(1, Math.min(24 * 3600, Math.round((totalHours || 0) * 3600)));
     setHours(String(Math.floor(totalSeconds / 3600)));
     setMinutes(String(Math.floor((totalSeconds % 3600) / 60)));
     setSeconds(String(totalSeconds % 60));
+  }
+
+  // Normalizes the H/M/S fields the instant any one of them changes, so what's
+  // displayed always matches the real total duration.
+  function handleHmsChange(field, rawValue) {
+    const current = { hours: Number(hours) || 0, minutes: Number(minutes) || 0, seconds: Number(seconds) || 0 };
+    current[field] = Math.max(0, Number(rawValue) || 0);
+    const totalSeconds = Math.max(0, Math.min(24 * 3600, current.hours * 3600 + current.minutes * 60 + current.seconds));
+    setHours(String(Math.floor(totalSeconds / 3600)));
+    setMinutes(String(Math.floor((totalSeconds % 3600) / 60)));
+    setSeconds(String(totalSeconds % 60));
+  }
+
+  // "Add Time" only collects hours/minutes, but adds on top of the current
+  // total (which may still carry real leftover seconds from the prefilled
+  // remaining time) — that precision isn't lost, it's just not editable here.
+  function handleAddTime() {
+    const deltaSeconds = (Math.max(0, Number(addHours) || 0) * 3600) + (Math.max(0, Number(addMinutes) || 0) * 60);
+    if (!deltaSeconds) return;
+    const currentSeconds = (Number(hours) || 0) * 3600 + (Number(minutes) || 0) * 60 + (Number(seconds) || 0);
+    const totalSeconds = Math.max(1, Math.min(24 * 3600, currentSeconds + deltaSeconds));
+    setHours(String(Math.floor(totalSeconds / 3600)));
+    setMinutes(String(Math.floor((totalSeconds % 3600) / 60)));
+    setSeconds(String(totalSeconds % 60));
+    setAddTimeOpen(false);
+    setAddHours('');
+    setAddMinutes('');
   }
 
   function collectDurationHours() {
@@ -469,13 +552,9 @@ function AssignWalkInModal({ modal, rooms, onClose, onSubmit }) {
   }
 
   async function handleSubmit() {
-    if (!roomId) {
-      alert('Please choose a Room No.');
-      return;
-    }
     const totalHours = collectDurationHours();
-    if (!totalHours || totalHours <= 0) {
-      alert('Please set a duration greater than zero.');
+    if (!totalHours || totalHours < 1 / 3600) {
+      alert('Duration must be at least 1 second.');
       return;
     }
     if (totalHours > 24) {
@@ -485,7 +564,13 @@ function AssignWalkInModal({ modal, rooms, onClose, onSubmit }) {
 
     setSubmitting(true);
     try {
-      await onSubmit({ mode: modal.mode, roomId, bookingId: modal.booking?._id, totalHours, paymentMethod });
+      await onSubmit({
+        mode: modal.mode,
+        roomId: modal.fixedRoom._id,
+        sessionId: modal.session?._id,
+        totalHours,
+        paymentMethod,
+      });
     } catch (err) {
       console.error(err);
       alert(err.message || 'Could not save this room monitoring session.');
@@ -495,64 +580,90 @@ function AssignWalkInModal({ modal, rooms, onClose, onSubmit }) {
   }
 
   const fixedRoomLabel = modal?.fixedRoom ? `Room No. ${modal.fixedRoom.roomNumber} — ${modal.fixedRoom.name}` : '';
+  const fixedRoomRate = modal?.fixedRoom ? `₱${modal.fixedRoom.price}/hr` : '';
+  // FEATURE_REQUESTS.md Priority 4 — Extend is a quick time-only popup: no
+  // rate, no payment method (it keeps the session's existing paymentMethod,
+  // prefilled above), just the duration. Room context moves into the title
+  // instead of a separate label line.
+  const title = isExtend ? `Extend Session — ${modal?.fixedRoom?.name || ''}` : 'Start Session';
 
   return (
-    <Modal open={!!modal} onClose={onClose} title={isEdit ? 'Edit Room Monitoring' : isManual ? 'Manual Add — Room Monitoring' : 'Assign Walk-in'}>
+    <Modal open={!!modal} onClose={onClose} title={title}>
       {modal && (
         <>
-          {isManual ? (
-            <div className="mfield">
-              <label>Room No.</label>
-              <select value={roomId} onChange={(e) => setRoomId(e.target.value)}>
-                {availableRooms.length ? (
-                  availableRooms.map((r) => (
-                    <option key={r._id} value={r._id}>{r.roomNumber} — {r.name}</option>
-                  ))
-                ) : (
-                  <option value="">No available rooms</option>
-                )}
-              </select>
-            </div>
-          ) : (
-            <p style={{ margin: '-10px 0 16px', fontSize: '.78rem', color: 'var(--muted)' }}>{fixedRoomLabel}</p>
+          {!isExtend && (
+            <>
+              <p style={{ margin: '-10px 0 4px', fontSize: '.78rem', color: 'var(--muted)' }}>{fixedRoomLabel}</p>
+              <p style={{ margin: '0 0 16px', fontSize: '.78rem', color: 'var(--muted)' }}>Rate: {fixedRoomRate}</p>
+            </>
           )}
 
           <div className="mfield">
             <label>Duration (Hours / Minutes / Seconds)</label>
-            <div style={{ display: 'flex', gap: '8px' }}>
+
+            {isExtend && (
+              <>
+                <div className="aw-preset-row">
+                  {EXTEND_PRESETS.map((p) => (
+                    <button key={p.label} type="button" className="aw-preset-btn" onClick={() => setDurationFromHours(p.mins / 60)}>{p.label}</button>
+                  ))}
+                  <button type="button" className="aw-preset-btn aw-preset-btn--add" onClick={() => setAddTimeOpen((v) => !v)}>+ Add Time</button>
+                </div>
+                {addTimeOpen && (
+                  <div className="aw-addtime-row">
+                    <div style={{ flex: 1 }}>
+                      <input type="number" min="0" step="1" value={addHours} onChange={(e) => setAddHours(e.target.value)} placeholder="0" />
+                      <div className="aw-unit-lbl">Hours</div>
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <input type="number" min="0" step="1" value={addMinutes} onChange={(e) => setAddMinutes(e.target.value)} placeholder="0" />
+                      <div className="aw-unit-lbl">Minutes</div>
+                    </div>
+                    <button type="button" className="aw-addtime-btn" onClick={handleAddTime}>Add</button>
+                  </div>
+                )}
+              </>
+            )}
+
+            <div style={{ display: 'flex', gap: '8px', marginTop: isExtend ? '10px' : 0 }}>
               <div style={{ flex: 1 }}>
-                <input type="number" min="0" max="24" step="1" value={hours} onChange={(e) => setHours(e.target.value)} />
+                <input type="number" min="0" step="1" value={hours} onChange={(e) => handleHmsChange('hours', e.target.value)} />
                 <div className="aw-unit-lbl">Hours</div>
               </div>
               <div style={{ flex: 1 }}>
-                <input type="number" min="0" max="59" step="1" value={minutes} onChange={(e) => setMinutes(e.target.value)} />
+                <input type="number" min="0" step="1" value={minutes} onChange={(e) => handleHmsChange('minutes', e.target.value)} />
                 <div className="aw-unit-lbl">Minutes</div>
               </div>
               <div style={{ flex: 1 }}>
-                <input type="number" min="0" max="59" step="1" value={seconds} onChange={(e) => setSeconds(e.target.value)} />
+                <input type="number" min="0" step="1" value={seconds} onChange={(e) => handleHmsChange('seconds', e.target.value)} />
                 <div className="aw-unit-lbl">Seconds</div>
               </div>
             </div>
-            <div style={{ display: 'flex', gap: '6px', marginTop: '9px', flexWrap: 'wrap' }}>
-              {DURATION_PRESETS.map((p) => (
-                <button key={p.label} type="button" className="aw-preset-btn" onClick={() => setDurationFromHours(p.mins / 60)}>{p.label}</button>
-              ))}
-            </div>
+
+            {!isExtend && (
+              <div className="aw-preset-row" style={{ marginTop: '9px' }}>
+                {DURATION_PRESETS.map((p) => (
+                  <button key={p.label} type="button" className="aw-preset-btn" onClick={() => setDurationFromHours(p.mins / 60)}>{p.label}</button>
+                ))}
+              </div>
+            )}
           </div>
 
-          <div className="mfield">
-            <label>Payment Method</label>
-            <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)}>
-              <option value="Cash">Cash</option>
-              <option value="GCash">GCash</option>
-              <option value="Maya">Maya</option>
-            </select>
-          </div>
+          {!isExtend && (
+            <div className="mfield">
+              <label>Payment Method</label>
+              <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)}>
+                <option value="Cash">Cash</option>
+                <option value="GCash">GCash</option>
+                <option value="Maya">Maya</option>
+              </select>
+            </div>
+          )}
 
           <div className="modal-actions">
             <button className="btn-cancel" onClick={onClose}>Cancel</button>
             <button className="btn-confirm" disabled={submitting} onClick={handleSubmit}>
-              {submitting ? (isEdit ? 'Saving…' : 'Starting…') : (isEdit ? 'Save Changes' : 'Start Session')}
+              {submitting ? (isExtend ? 'Saving…' : 'Starting…') : (isExtend ? 'Save Changes' : 'Start Session')}
             </button>
           </div>
         </>

@@ -2,67 +2,13 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import DataTable from '../../components/DataTable';
 import Modal from '../../components/Modal';
 import ConfirmDialog from '../../components/ConfirmDialog';
+import PasswordInput from '../../components/PasswordInput';
+import PasswordRequirementsList from '../../components/PasswordRequirementsList';
 import { useConfirm } from '../../hooks/useConfirm';
 import { useAuth } from '../../context/AuthContext';
 import { usersService } from '../../services/users';
+import { PASSWORD_REQUIREMENTS } from '../../utils/password';
 
-// ─────────────────────────────────────────────────────────────────────────
-// Admin / Manage Users — migrated from admin.html's <div id="panel-users">
-// plus admin.js's renderUsersPanel/userRowHtml, the Add User modal
-// (ensureUserModal/openAddUserModal/submitAddUser), the Change Role modal
-// (ensureRoleModal/openRoleChangeModal/submitRoleChange), toggleUserStatus,
-// and deleteUserRow. Part of Phase 8 (Page Migration).
-//
-// admin.html's <div id="panel-logs"> ("Login History") is NOT a separate
-// build here — the original markup is itself just a static "not available
-// yet" notice (no login-audit endpoint exists; see that div's own comment
-// in admin.html), pointing the admin at this page's "Last Login" column
-// instead. App.jsx's /admin/logs route keeps its TempPage placeholder for
-// now since there's no real panel content to port — worth a one-line real
-// component swap in a later cleanup phase, but not page-migration work.
-//
-// 5 backend endpoints this page calls, all unchanged from the original:
-//   GET    /api/users              (?search=&role=)
-//   POST   /api/users              (create admin account)
-//   PUT    /api/users/:id/role
-//   PUT    /api/users/:id/status
-//   DELETE /api/users/:id
-//
-// ONE INTENTIONAL DEVIATION from the original, in the "manage this row?"
-// check (role-change / activate-deactivate / delete buttons vs. the plain
-// "—" placeholder): the original recomputed this client-side in
-// canManageRow() using a global `sessionAdmin` (populated once by
-// guardAdminPage() on admin.html load) and a local ROLE_LEVEL map — logic
-// that has no home yet here since AuthContext/useAuth doesn't exist until
-// Phase 10 (same deferral as every other admin page so far). Turns out
-// nothing needs rebuilding for it: Backend/routes/userRoutes.js's GET /
-// already computes and returns this exact rule per row as `canManage`
-// (`canManageTarget({ actor: req.user, target: u }).ok`) — the legacy
-// frontend just never consumed it. This page reads `row.canManage`
-// straight from the API response instead of re-deriving it, which is
-// simpler, can't drift out of sync with the server's own rule, and avoids
-// pulling AuthContext in early. The server still independently re-checks
-// canManageTarget on every role/status/delete route regardless.
-//
-// Permission gating — PHASE 12. Direct port of renderUsersPanel()'s
-// guardPermission('admin:manage', "You don't have permission to manage
-// users.") — re-checked here on every fetchUsers() call (initial load,
-// search, and role-filter changes all funnel through it, same as the
-// original) — and openAddUserModal()'s identical guard before the "Add
-// User" modal opens. Scope note: this only ports the two guardPermission
-// call sites in admin.js. It does NOT add a route-level redirect the way
-// Pos.jsx's pos:access gate does — the original's equivalent protection
-// was admin.html's <div id="panel-users" data-requires-permission=
-// "admin:manage"> (whole-panel hide, driven by the html attribute, not a
-// hasAdminPermission/guardPermission call site) plus AdminSidebar already
-// filtering this nav item (Phase 11). Direct URL entry to /admin/users
-// without admin:manage today falls through to guardPermission's alert with
-// no data loaded — a blank page, not a redirect — same rough shape as the
-// original leaving panel-users' static "Loading…" markup stuck in place
-// when its own guard failed. A tighter route-level redirect (matching
-// Pos.jsx) is a reasonable follow-up if wanted, flagged in this phase's
-// resume prompt rather than added here to stay in scope.
-// ─────────────────────────────────────────────────────────────────────────
 
 const ROLE_LABELS = { user: 'User', staff: 'Staff', manager: 'Supervisor', super_admin: 'Owner' };
 const ROLE_BADGE_CLASS = { super_admin: 'pill-active', manager: 'pill-vacant', staff: 'pill-pending', user: 'pill-done' };
@@ -148,7 +94,7 @@ function Users() {
   }
 
   async function deleteUser(user) {
-    if (!(await confirm(`Permanently delete ${user.firstname} ${user.lastname || ''}? This cannot be undone.`, { danger: true, confirmText: 'Delete' }))) return;
+    if (!(await confirm(`Permanently delete ${user.firstName} ${user.lastName}? This cannot be undone.`, { danger: true, confirmText: 'Delete' }))) return;
     try {
       await usersService.remove(user._id);
       await fetchUsers();
@@ -158,7 +104,7 @@ function Users() {
   }
 
   const columns = [
-    { key: 'name', label: 'Name', render: (u) => `${u.firstname} ${u.lastname || ''}`.trim() },
+    { key: 'name', label: 'Name', render: (u) => `${u.firstName} ${u.lastName}` },
     { key: 'email', label: 'Email' },
     {
       key: 'role',
@@ -254,8 +200,8 @@ function Users() {
 // happened, just acknowledge it" (alert, used for status/delete above).
 // ─────────────────────────────────────────────────────────────────────────
 function AddUserModal({ open, onClose, assignableRoles, onCreated }) {
-  const [firstname, setFirstname] = useState('');
-  const [lastname, setLastname] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
@@ -263,12 +209,15 @@ function AddUserModal({ open, onClose, assignableRoles, onCreated }) {
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
+  const passwordChecks = PASSWORD_REQUIREMENTS.map((req) => ({ ...req, met: req.test(password) }));
+  const passwordValid = passwordChecks.every((c) => c.met);
+
   // Reset the form and default the role select whenever the modal (re)opens,
   // matching openAddUserModal()'s field-clearing in the original.
   useEffect(() => {
     if (open) {
-      setFirstname('');
-      setLastname('');
+      setFirstName('');
+      setLastName('');
       setEmail('');
       setPhone('');
       setPassword('');
@@ -279,15 +228,19 @@ function AddUserModal({ open, onClose, assignableRoles, onCreated }) {
 
   async function handleSubmit() {
     setError('');
-    if (!firstname.trim() || !email.trim() || !password || !role) {
-      setError('First name, email, password, and role are required.');
+    if (!firstName.trim() || !lastName.trim() || !email.trim() || !password || !role) {
+      setError('First name, last name, email, password, and role are required.');
+      return;
+    }
+    if (!passwordValid) {
+      setError('Password does not meet all requirements.');
       return;
     }
     setSubmitting(true);
     try {
       await usersService.create({
-        firstname: firstname.trim(),
-        lastname: lastname.trim(),
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
         email: email.trim(),
         phone: phone.trim(),
         password,
@@ -318,11 +271,11 @@ function AddUserModal({ open, onClose, assignableRoles, onCreated }) {
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         <input
-          type="text" placeholder="First name" value={firstname} onChange={(e) => setFirstname(e.target.value)}
+          type="text" placeholder="First name" value={firstName} onChange={(e) => setFirstName(e.target.value)}
           style={{ background: 'var(--navy3)', border: '1px solid var(--border)', borderRadius: 8, padding: '9px 12px', color: 'var(--text)', fontFamily: "'Inter',sans-serif", outline: 'none' }}
         />
         <input
-          type="text" placeholder="Last name" value={lastname} onChange={(e) => setLastname(e.target.value)}
+          type="text" placeholder="Last name" value={lastName} onChange={(e) => setLastName(e.target.value)}
           style={{ background: 'var(--navy3)', border: '1px solid var(--border)', borderRadius: 8, padding: '9px 12px', color: 'var(--text)', fontFamily: "'Inter',sans-serif", outline: 'none' }}
         />
         <input
@@ -333,10 +286,18 @@ function AddUserModal({ open, onClose, assignableRoles, onCreated }) {
           type="text" placeholder="Phone (optional)" value={phone} onChange={(e) => setPhone(e.target.value)}
           style={{ background: 'var(--navy3)', border: '1px solid var(--border)', borderRadius: 8, padding: '9px 12px', color: 'var(--text)', fontFamily: "'Inter',sans-serif", outline: 'none' }}
         />
-        <input
-          type="password" placeholder="Temporary password (min 8 characters)" value={password} onChange={(e) => setPassword(e.target.value)}
-          style={{ background: 'var(--navy3)', border: '1px solid var(--border)', borderRadius: 8, padding: '9px 12px', color: 'var(--text)', fontFamily: "'Inter',sans-serif", outline: 'none' }}
-        />
+        <div className="aum-password-wrap">
+          <PasswordInput
+            id="add-user-password"
+            name="password"
+            placeholder="Temporary password"
+            autoComplete="new-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          >
+            <PasswordRequirementsList password={password} />
+          </PasswordInput>
+        </div>
         <select
           value={role} onChange={(e) => setRole(e.target.value)}
           style={{ background: 'var(--navy3)', border: '1px solid var(--border)', borderRadius: 8, padding: '9px 12px', color: 'var(--text)', fontFamily: "'Inter',sans-serif", outline: 'none' }}

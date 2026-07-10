@@ -13,44 +13,10 @@ import heroImg8 from '../assets/pictures/RiverView_8.jpg';
 import billiardsImg from '../assets/images/billiards.png';
 import courtImg from '../assets/images/court.png';
 import fallbackRoomImg from '../assets/pictures/Billiard.jpg';
+import heroBgImg from '../assets/images/main.png';
 
 // ─────────────────────────────────────────────────────────────────────────
 // Home — migrated from index.html + js/index.js (Phase 8, parts 1 & 2 of 3).
-//
-// Part 1 covered the STATIC/PUBLIC parts of the old single-page index.html:
-// the hero image carousel, the live room grid (GET /api/rooms + the
-// "Fully Booked" live-status upgrade), the Spaces showcase, and the About
-// section. The header/footer/promo-banner/mobile-nav were already
-// extracted into <Navbar/>/<Footer/> during Phases 6–7 and live in
-// MainLayout, not here.
-//
-// Part 2 (this update) wires up the booking modal (steps: price →
-// calendar → slots → payment → PayMongo return), built as
-// <BookingModal/> in components/. Two things drive it from here:
-//   - `bookingRoom` — set by handleSelectRoom() (was a documented no-op,
-//     now opens the modal for real). The hero's "Book a Space" button
-//     intentionally still does nothing on click — that matches the
-//     ORIGINAL's behavior too (it's a bare `<a href="#">` in index.html
-//     with no click handler in js/index.js beyond a decorative ripple
-//     effect; only each room card's "Select Room" ever opened the modal).
-//   - `paymongoReturn` — read once on mount from the URL's
-//     ?paymongo=success|cancel&bookingId=... query params (useSearchParams),
-//     mirroring handlePaymongoReturn()'s unconditional run on every
-//     index.html page load. The URL is cleared immediately after reading,
-//     same as the original's `window.history.replaceState(...)`.
-//
-// Part 3 (profile modal — details + change password) is now built as
-// <ProfileModal/>, but it does NOT live here: it's rendered from
-// MainLayout.jsx and opened via Navbar.jsx's user-chip "My Profile" button,
-// since that header (and the modal it opens) is shared by every page
-// MainLayout wraps, not just Home. See components/ProfileModal.jsx's
-// header comment for the full reasoning.
-//
-// Still NOT part of this phase:
-//   - Wiring live announcement-banner text (from useSiteSettings' `settings`)
-//     into <Navbar/> — it still shows Phase 6's static banner text.
-//   - Real logged-in/logged-out header state (the user-chip is still
-//     `display:none` in Navbar.jsx) — Phase 10 (AuthContext).
 //
 // API_BASE_URL is still hardcoded, matching every other page pre-Phase 9.
 // ─────────────────────────────────────────────────────────────────────────
@@ -65,6 +31,16 @@ const HERO_SLIDES = [
   { src: heroImg7, alt: 'Billiards' },
   { src: heroImg8, alt: 'Court 2' },
 ];
+
+// Shortest signed distance from `index` to `current` around the circular
+// slide order, e.g. with 5 slides: -2, -1, 0, 1, 2. Powers the coverflow
+// stack below — 0 is the big centered photo, ±1/±2 recede to the sides.
+function getOffset(index, current, total) {
+  let diff = index - current;
+  if (diff > total / 2) diff -= total;
+  if (diff < -total / 2) diff += total;
+  return diff;
+}
 
 function HeroCarousel() {
   const [current, setCurrent] = useState(0);
@@ -95,14 +71,6 @@ function HeroCarousel() {
 
   return (
     <div className="hero-carousel" id="heroCarousel" onMouseEnter={stop} onMouseLeave={start}>
-      <div className="hero-carousel-track" id="heroCarouselTrack">
-        {HERO_SLIDES.map((slide, i) => (
-          <div key={slide.src} className={`hero-carousel-slide${i === current ? ' is-active' : ''}`}>
-            <img src={slide.src} alt={slide.alt} />
-          </div>
-        ))}
-      </div>
-
       <button
         type="button"
         className="hero-carousel-arrow hero-carousel-arrow-prev"
@@ -111,6 +79,37 @@ function HeroCarousel() {
       >
         <i className="fa-solid fa-chevron-left"></i>
       </button>
+
+      <div className="hero-carousel-stage" id="heroCarouselTrack">
+        {HERO_SLIDES.map((slide, i) => {
+          const offset = getOffset(i, current, HERO_SLIDES.length);
+          const abs = Math.abs(offset);
+          const isActive = offset === 0;
+          const cardStyle = {
+            transform: `translateX(${offset * 42}%) scale(${1 - abs * 0.16})`,
+            opacity: 1 - abs * 0.3,
+            zIndex: 10 - abs,
+          };
+
+          return (
+            <button
+              type="button"
+              key={slide.src}
+              className={`hero-carousel-card${isActive ? ' is-active' : ''}`}
+              style={cardStyle}
+              aria-label={isActive ? undefined : `Go to ${slide.alt}`}
+              aria-current={isActive ? 'true' : undefined}
+              tabIndex={isActive ? -1 : 0}
+              onClick={() => goTo(i)}
+            >
+              <span className="hero-carousel-frame">
+                <img src={slide.src} alt={slide.alt} />
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
       <button
         type="button"
         className="hero-carousel-arrow hero-carousel-arrow-next"
@@ -119,18 +118,6 @@ function HeroCarousel() {
       >
         <i className="fa-solid fa-chevron-right"></i>
       </button>
-
-      <div className="hero-carousel-dots" id="heroCarouselDots">
-        {HERO_SLIDES.map((slide, i) => (
-          <button
-            key={slide.src}
-            type="button"
-            className={`hero-carousel-dot${i === current ? ' is-active' : ''}`}
-            aria-label={`Go to slide ${i + 1}`}
-            onClick={() => goTo(i)}
-          />
-        ))}
-      </div>
     </div>
   );
 }
@@ -289,6 +276,33 @@ function Home() {
     setBookingRoom(room);
   }
 
+  // Scroll-reveal — toggles `.is-visible` on `.reveal`/`.reveal-stagger`
+  // elements as they enter the viewport. This is the JS half of the
+  // `.reveal` system already defined in enhancements.css (that file's own
+  // comment says "classes toggled by enhancements.js" — that script never
+  // made it into the React migration, so the classes below were inert
+  // until now). Runs once on mount; each element animates in once, then
+  // is unobserved.
+  useEffect(() => {
+    const els = document.querySelectorAll('.reveal, .reveal-stagger');
+    if (!els.length) return;
+
+    const io = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('is-visible');
+            io.unobserve(entry.target);
+          }
+        });
+      },
+      { threshold: 0.15, rootMargin: '0px 0px -40px 0px' }
+    );
+
+    els.forEach((el) => io.observe(el));
+    return () => io.disconnect();
+  }, []);
+
   // Closes the modal regardless of which flow opened it — mirrors
   // closeBooking() in the original (a single close path for both the
   // room-booking flow and the PayMongo-return flow).
@@ -301,7 +315,7 @@ function Home() {
     <>
       {/* HERO */}
       <section className="hero" id="home">
-        <div className="hero-bg"></div>
+        <div className="hero-bg" style={{ '--hero-bg-image': `url(${heroBgImg})` }}></div>
 
         <div className="hero-inner">
           <div className="hero-content">
@@ -322,7 +336,7 @@ function Home() {
 
       {/* ROOMS */}
       <section id="rooms">
-        <div className="rooms-header">
+        <div className="rooms-header reveal">
           <div>
             <div className="section-label" style={{ color: 'var(--teal)' }}>Book a Space</div>
             <h2>Choose Your Room</h2>
@@ -330,7 +344,7 @@ function Home() {
           <p>All rooms available. Walk-ins welcome — reservations recommended on weekends.</p>
         </div>
 
-        <div className="room-grid" id="room-grid">
+        <div className="rooms-grid reveal-stagger" id="room-grid">
           {rooms === null && !loadError && (
             <div style={{ textAlign: 'center', color: '#888', padding: '32px 0', width: '100%' }}>
               Loading rooms…
@@ -361,13 +375,13 @@ function Home() {
       {/* SPACES SHOWCASE */}
       <section style={{ background: 'var(--surface-alt)' }}>
         <div className="spaces">
-          <div className="spaces-header">
+          <div className="spaces-header reveal">
             <div className="section-label">Our Spaces</div>
             <h2>Designed for play,<br />built to last.</h2>
             <p>Every space at The Riverview is kept clean, well-lit, and ready to go — whether it's your first visit or your fiftieth.</p>
           </div>
 
-          <div className="spaces-list">
+          <div className="spaces-list reveal-stagger">
             <div className="space-row">
               <div className="space-img">
                 <img src={billiardsImg} alt="Billiards" />
@@ -411,13 +425,13 @@ function Home() {
       {/* ABOUT */}
       <section id="about">
         <div className="about-inner">
-          <div className="about-left">
+          <div className="about-left reveal-left">
             <div className="section-label">About Us</div>
             <h2>Fun comes first.<br />Always.</h2>
             <p>At The Riverview, we believe the best nights are the ones you didn't plan. Play billiards, shoot hoops, belt out your favorite songs — we've got every kind of good time covered. A cozy, vibrant atmosphere with great vibes and even better company. Come as you are.</p>
           </div>
 
-          <div className="about-right">
+          <div className="about-right reveal-stagger">
             <div className="about-card">
               <div className="about-card-icon">🕐</div>
               <h4>Open Daily</h4>

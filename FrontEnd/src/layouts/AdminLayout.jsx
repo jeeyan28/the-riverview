@@ -4,40 +4,6 @@ import '../styles/admin.css';
 import AdminSidebar from '../components/AdminSidebar';
 import { useAuth } from '../context/AuthContext';
 
-// ─────────────────────────────────────────────────────────────────────────
-// AdminLayout — admin sidebar + topbar shell. Phase 6 built this with the
-// sidebar markup inline; Phase 7 extracted the sidebar out into
-// <AdminSidebar/> (src/components/AdminSidebar.jsx). Phase 11 adds the
-// route guard described below. The topbar stays here (components/README
-// only called out AdminSidebar specifically, and the topbar's live clock
-// is the only bit of state on this page besides the guard).
-//
-// ── ROUTE GUARD (Phase 11) ──────────────────────────────────────────────
-// admin.js's guardAdminPage() ran on every admin page load and hard-
-// redirected with `window.location.href = 'login.html'` if GET
-// /api/auth/me failed or came back with a non-admin role. No migrated
-// page has guarded a route before now — this implements that behavior
-// once, centrally, here (wrapping <Outlet/>) rather than per-page, since
-// every /admin/* route needs the identical check.
-//
-// AuthContext.jsx already fires that /api/auth/me revalidation once on
-// mount (see its header comment for why /api/auth/me is the source of
-// truth rather than the cached storage value alone). This layout just
-// reads the result:
-//   - `initializing` true  -> still waiting on that first check; render a
-//     lightweight loading state instead of either the panel or a
-//     premature redirect (a logged-in admin doing a hard refresh on e.g.
-//     /admin/settings must not get bounced to /login just because the
-//     network call hasn't resolved yet).
-//   - `initializing` false, not an admin (`isAdmin` false — covers both
-//     "not logged in at all" and "logged in as a plain `user`") -> redirect
-//     to /login, via React Router's <Navigate/> rather than
-//     window.location.href. A client-side navigate is enough here (unlike
-//     Login.jsx's post-login redirect, there's no app-wide state that
-//     needs a full reload to pick up — AuthContext is already the shared
-//     state) and it avoids an unnecessary full page reload.
-//   - otherwise -> render the real shell + <Outlet/>.
-// ─────────────────────────────────────────────────────────────────────────
 
 function AdminLayout() {
   // AdminSidebar reads `user`/`logout` itself via useAuth() directly — this
@@ -94,8 +60,8 @@ function AdminLayout() {
               rel="noreferrer"
               style={{
                 cursor: 'pointer',
-                background: 'rgba(0,201,167,.1)',
-                borderColor: 'rgba(0,201,167,.3)',
+                background: 'rgba(239,62,109,.08)',
+                borderColor: 'rgba(239,62,109,.25)',
                 color: 'var(--teal)',
                 textDecoration: 'none',
               }}
