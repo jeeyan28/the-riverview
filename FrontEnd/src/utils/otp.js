@@ -5,7 +5,7 @@
 // Must match BackEnd/utils/otp.js — there's no per-request value to read
 // these from, since the expiry/cooldown/limits are fixed constants.
 export const OTP_LENGTH = 6;
-export const OTP_EXPIRY_SECONDS = 10 * 60;
+export const OTP_EXPIRY_SECONDS = 5 * 60;
 export const RESEND_COOLDOWN_SECONDS = 60;
 export const MAX_RESEND_ATTEMPTS = 5;   // mirrors backend MAX_OTP_REQUESTS_PER_WINDOW
 export const MAX_VERIFY_ATTEMPTS = 5;   // mirrors backend MAX_OTP_VERIFY_ATTEMPTS

@@ -6,7 +6,7 @@ const crypto = require("crypto");
 // subset of these and must be kept in sync manually — there's no shared
 // package to import across BackEnd/Frontend.
 const OTP_LENGTH = 6;
-const OTP_TTL_MS = 10 * 60 * 1000;              // how long a generated OTP stays valid
+const OTP_TTL_MS = 5 * 60 * 1000;              // how long a generated OTP stays valid
 const RESEND_COOLDOWN_MS = 60 * 1000;           // "Resend Code" cooldown
 const OTP_REQUEST_WINDOW_MS = 60 * 60 * 1000;   // rolling window for the per-email request cap
 const MAX_OTP_REQUESTS_PER_WINDOW = 5;          // max OTP-issuing requests per email per window

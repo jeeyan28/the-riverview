@@ -23,9 +23,9 @@ const COPY = {
     eyebrow: "Account Recovery",
     heading: "Your verification code",
     intro: () =>
-      `Use the code below to reset the password on your Riverview account. This code expires in <strong style="color:#ffffff;">10 minutes</strong>.`,
+      `Use the code below to reset the password on your Riverview account. This code expires in <strong style="color:#ffffff;">5 minutes</strong>.`,
     textIntro: () =>
-      `Use this code to reset the password on your Riverview account (expires in 10 minutes):`,
+      `Use this code to reset the password on your Riverview account (expires in 5 minutes):`,
     subject: "Your Riverview verification code",
     footnote: "If you didn't request this, you can safely ignore this email — your password will not change.",
   },
