@@ -197,12 +197,10 @@ nav a:hover::after, nav a.active::after { width: 20px; }
                 border-color var(--dur-med) var(--ease-out),
                 box-shadow var(--dur-med) var(--ease-out) !important;
 }
-.room-card:hover { box-shadow: var(--shadow-deep); }
-.room-card-badge { transition: transform var(--dur-fast) var(--ease-out); }
-.room-card:hover .room-card-badge { transform: translateY(-2px); }
+.room-card:hover { box-shadow: 0 12px 28px rgba(10,22,40,.1); }
 
-.room-feature-chip { transition: background var(--dur-fast), border-color var(--dur-fast), transform var(--dur-fast); }
-.room-card:hover .room-feature-chip { border-color: rgba(0,201,167,.25); }
+.room-tag { transition: background var(--dur-fast), border-color var(--dur-fast), transform var(--dur-fast); }
+.room-card:hover .room-tag { border-color: rgba(23,138,79,.3); }
 
 .btn-select {
     position: relative; overflow: hidden;
@@ -211,7 +209,7 @@ nav a:hover::after, nav a.active::after { width: 20px; }
                 transform var(--dur-fast) var(--ease-out),
                 box-shadow var(--dur-fast) var(--ease-out) !important;
 }
-.btn-select:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(0,201,167,.18); }
+.btn-select:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(23,138,79,.25); }
 .btn-select:active { transform: translateY(0) scale(.98); }
 
 /* Subtle shimmer while rooms are loading */
@@ -314,13 +312,10 @@ nav a:hover::after, nav a.active::after { width: 20px; }
 .pf-toast { box-shadow: var(--shadow-deep) !important; }
 
 /* ---------------------------------------------------------------
-   SPACES SHOWCASE — image zoom + row lift
+   SPACES SHOWCASE — image zoom on row hover
 --------------------------------------------------------------- */
-.space-row { transition: background var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out) !important; }
-.space-img { box-shadow: var(--shadow-soft); transition: box-shadow var(--dur-med) var(--ease-out); }
-.space-row:hover .space-img { box-shadow: var(--shadow-lift); }
-.space-row:hover .space-num { color: var(--teal); transition: color var(--dur-med) var(--ease-out); }
-.space-num { transition: color var(--dur-med) var(--ease-out); }
+.space-img img { transition: transform var(--dur-med) var(--ease-out); }
+.space-row:hover .space-img img { transform: scale(1.04); }
 
 /* ---------------------------------------------------------------
    ABOUT — card lift + icon pop

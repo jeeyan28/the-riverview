@@ -99,6 +99,20 @@ export function clearMonthAvailability(roomId, year, month /* 1-12 */) {
   delete monthAvailabilityCache[`${roomId}|${year}-${month}`];
 }
 
+// coveredHours — shared by isDayFullyBooked/getFreeSlotCount below so both
+// derive from the same per-hour occupancy array instead of two separate
+// implementations drifting apart.
+function coveredHours(dayBookings, openHour, closeHour) {
+  const covered = new Array(Math.max(0, closeHour - openHour)).fill(false);
+  (dayBookings || []).forEach((b) => {
+    const start = parseInt(String(b.timeIn).split(':')[0], 10);
+    for (let h = start; h < start + b.duration; h++) {
+      if (h >= openHour && h < closeHour) covered[h - openHour] = true;
+    }
+  });
+  return covered;
+}
+
 // isDayFullyBooked — migrated 1:1 from js/index.js. A day is "fully
 // booked" for a room if every operating hour from openHour to closeHour is
 // covered by at least one active booking. openHour/closeHour are passed in
@@ -106,15 +120,20 @@ export function clearMonthAvailability(roomId, year, month /* 1-12 */) {
 // pure function.
 export function isDayFullyBooked(dayBookings, openHour, closeHour) {
   if (!dayBookings || !dayBookings.length) return false;
-  const covered = new Array(closeHour - openHour).fill(false);
-  dayBookings.forEach((b) => {
-    const start = parseInt(String(b.timeIn).split(':')[0], 10);
-    for (let h = start; h < start + b.duration; h++) {
-      if (h >= openHour && h < closeHour) covered[h - openHour] = true;
-    }
-  });
-  return covered.every(Boolean);
+  return coveredHours(dayBookings, openHour, closeHour).every(Boolean);
 }
+
+// getFreeSlotCount — number of still-open 1-hour slots for a room on a
+// given day, within [openHour, closeHour). Powers the Date Selection
+// calendar's per-day "N slots" label and its Available/Few Slots split.
+export function getFreeSlotCount(dayBookings, openHour, closeHour) {
+  return coveredHours(dayBookings, openHour, closeHour).filter((covered) => !covered).length;
+}
+
+// FEW_SLOTS_THRESHOLD — a day with this many or fewer free hourly slots
+// (but more than 0) renders as "Few slots" instead of "Available" on the
+// Date Selection calendar.
+export const FEW_SLOTS_THRESHOLD = 2;
 
 // isHolidayDate — migrated 1:1 from js/index.js. `holidays` is
 // useSiteSettings' `settings.holidays` array.

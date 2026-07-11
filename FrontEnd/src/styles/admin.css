@@ -8,8 +8,6 @@
   --navy3:#F7F8FA;        /* secondary surface — inputs, subtle hover */
   --navy4:#EEF0F5;        /* deeper hover/active surface */
   --border-soft:rgba(16,24,40,.05);
-  --teal:#EF3E6D;         /* primary brand accent (was teal, now pink/red) */
-  --teal-soft:rgba(239,62,109,.10);
   --blue:#2563EB;
   --amber:#F5A524;
   --pink:#EF3E6D;
@@ -26,16 +24,18 @@
 
 body{
   margin:0;
-  background:var(--navy1);
-  font-family:var(--font-body);
   -webkit-font-smoothing:antialiased;
 }
 
 #app{
   display:flex;min-height:100vh;background:var(--navy1);
+  font-family:var(--font-body);
   --text:#1A1D29;
   --muted:#6B7280;
   --border:rgba(16,24,40,.08);
+  --teal:#EF3E6D;         /* admin accent (pink/red) — scoped here, not :root,
+    so it doesn't override the homepage's green --teal token */
+  --teal-soft:rgba(239,62,109,.10);
 }
 
 /* ── SIDEBAR ── */

@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { resolveImageUrl } from '../utils/resolveImageUrl';
+import fallbackRoomImg from '../assets/pictures/Billiard.jpg';
 import {
   dateKey,
   getRoomCapacity,
@@ -7,7 +9,8 @@ import {
   clearReservedHours,
   loadMonthAvailability,
   clearMonthAvailability,
-  isDayFullyBooked,
+  getFreeSlotCount,
+  FEW_SLOTS_THRESHOLD,
   isHolidayDate,
   isOperatingDay,
   computeDownPayment,
@@ -44,7 +47,45 @@ function maxDurationFrom(h, closeHour, reserved) {
 function priceOptionsFor(room) {
   return room.variants && room.variants.length
     ? room.variants
-    : [{ label: 'Standard', price: room.price || 0, pax: '' }];
+    : [{
+        label: 'Standard',
+        price: room.price || 0,
+        pax: '',
+        image: room.image || '',
+        description: room.description || '',
+        features: room.features || [],
+      }];
+}
+
+// STEPS — the 6-stage progress indicator shown in the Booking UI reference.
+// 'price' (Room), 'calendar' (Date), 'slots' (Time), 'details' (Details),
+// 'review' (Review), and 'payment' are all real internal steps.
+const STEPS = [
+  { key: 'price', label: 'Room' },
+  { key: 'calendar', label: 'Date' },
+  { key: 'slots', label: 'Time' },
+  { key: 'details', label: 'Details' },
+  { key: 'review', label: 'Review' },
+  { key: 'payment', label: 'Payment' },
+];
+const STEP_INDEX = { price: 1, calendar: 2, slots: 3, details: 4, review: 5, payment: 6 };
+
+function BookingStepper({ step }) {
+  const activeIndex = STEP_INDEX[step] || 1;
+  return (
+    <div className="bk-stepper">
+      {STEPS.map((s, i) => {
+        const num = i + 1;
+        const state = num < activeIndex ? 'done' : num === activeIndex ? 'active' : 'upcoming';
+        return (
+          <div className={`bk-step-dot bk-step-dot--${state}`} key={s.key}>
+            <span className="bk-step-dot-num">{state === 'done' ? <i className="fa-solid fa-check"></i> : num}</span>
+            <span className="bk-step-dot-label">{s.label}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
 // BookingSummaryCard — migrated 1:1 from renderBookingSummary() in
@@ -120,7 +161,7 @@ function BookingModal({ room, returnInfo, onClose, openHour, closeHour, settings
   const open = !!room || !!returnInfo;
   const { user: authUser, revalidate, logout } = useAuth();
 
-  const [step, setStep] = useState('price'); // 'price' | 'calendar' | 'slots' | 'payment' | 'paymongoReturn'
+  const [step, setStep] = useState('price'); // 'price' | 'calendar' | 'slots' | 'details' | 'payment' | 'paymongoReturn'
   const [viewDate, setViewDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(null); // { y, m, d }
   const [selectedVariant, setSelectedVariant] = useState(null);
@@ -285,8 +326,12 @@ function BookingModal({ room, returnInfo, onClose, openHour, closeHour, settings
     if (e.target === e.currentTarget) onClose();
   }
 
-  function handleSelectOption(opt) {
+  function handleChooseOption(opt) {
     setSelectedVariant(opt);
+  }
+
+  function handleContinueFromPrice() {
+    if (!selectedVariant) return;
     setViewDate(new Date());
     setStep('calendar');
   }
@@ -317,12 +362,19 @@ function BookingModal({ room, returnInfo, onClose, openHour, closeHour, settings
     setSelectedHour(h);
   }
 
+  function handleContinueFromSlots() {
+    if (selectedHour === null) return;
+    setStep('details');
+  }
+
   // confirmBooking — STEP 1 of confirming: validates guest details + pax
   // capacity, re-verifies the session with the server (not just cached
-  // storage — see original's comment on why), then moves to the
-  // down-payment step. Migrated 1:1, including the plain alert() for the
-  // name/contact check (kept as-is rather than switched to a toast, to
-  // match the original's exact UX for this one validation).
+  // storage — see original's comment on why), then moves to the Review
+  // step (details are re-validated here, before anything is shown back to
+  // the guest for confirmation; Review's own Continue just advances to
+  // payment, no re-validation needed). Migrated 1:1, including the plain
+  // alert() for the name/contact check (kept as-is rather than switched to
+  // a toast, to match the original's exact UX for this one validation).
   async function confirmBooking() {
     const trimmedName = guestName.trim();
     const trimmedContact = guestContact.trim();
@@ -348,6 +400,13 @@ function BookingModal({ room, returnInfo, onClose, openHour, closeHour, settings
     // only ever displays the down payment (first-hour rate), computed
     // separately below from selectedVariant.price. Not carried over here
     // since it would be genuinely dead state.
+    setStep('review');
+  }
+
+  // proceedToPayment — Review step's Continue. Everything (name/contact,
+  // pax, session) was already validated moving into Review via
+  // confirmBooking() above, so this just advances the step.
+  function proceedToPayment() {
     setStep('payment');
   }
 
@@ -437,29 +496,44 @@ function BookingModal({ room, returnInfo, onClose, openHour, closeHour, settings
       const isToday = thisDate.getTime() === today.getTime();
       const beyondWindow = thisDate > latestBookable;
       const cutoffBlocked = isToday && todayCutoffLocked;
-      const fullyBooked = isDayFullyBooked(monthBookings[dStr], openHour, closeHour);
       const holiday = isHolidayDate(dStr, settings?.holidays);
       const closedDay = !isOperatingDay(thisDate, settings?.operatingHours);
-      const blocked = holiday || closedDay || beyondWindow || cutoffBlocked || fullyBooked;
       const past = thisDate < today;
 
+      const freeSlots = getFreeSlotCount(monthBookings[dStr], openHour, closeHour);
+      const fullyBooked = freeSlots === 0;
+      const unavailable = holiday || closedDay || beyondWindow || cutoffBlocked;
+      const blocked = unavailable || fullyBooked;
+      const fewSlots = !unavailable && !fullyBooked && freeSlots <= FEW_SLOTS_THRESHOLD;
+
+      let variant = null; // no dot for past dates with nothing to report
       let title = '';
-      if (blocked && !past) {
-        title = holiday
-          ? 'Closed for a holiday/closure'
-          : beyondWindow
-          ? `Bookings only open ${maxAdvanceDays} days in advance`
-          : cutoffBlocked
-          ? `Booking cutoff — must book at least ${cutoffHours}h before opening`
-          : fullyBooked
-          ? 'Fully booked for this room'
-          : 'Closed on this day of the week';
+      if (!past) {
+        if (unavailable) {
+          variant = 'unavailable';
+          title = holiday
+            ? 'Closed for a holiday/closure'
+            : beyondWindow
+            ? `Bookings only open ${maxAdvanceDays} days in advance`
+            : cutoffBlocked
+            ? `Booking cutoff — must book at least ${cutoffHours}h before opening`
+            : 'Closed on this day of the week';
+        } else if (fullyBooked) {
+          variant = 'full';
+          title = 'Fully booked for this room';
+        } else if (fewSlots) {
+          variant = 'few';
+        } else {
+          variant = 'available';
+        }
       }
 
       days.push({
         d, y, m, isToday,
         disabled: past || blocked,
-        variant: past || blocked ? (fullyBooked ? 'full' : blocked ? 'holiday' : null) : 'open',
+        variant,
+        freeSlots,
+        showSlots: !past && !unavailable && !fullyBooked,
         title,
       });
     }
@@ -474,11 +548,20 @@ function BookingModal({ room, returnInfo, onClose, openHour, closeHour, settings
     ? `${WEEKDAYS[new Date(selectedDate.y, selectedDate.m, selectedDate.d).getDay()]}, ${MONTHS[selectedDate.m]} ${selectedDate.d}`
     : '';
   const selectedOptionLabel = selectedVariant ? `${selectedVariant.label} · ₱${selectedVariant.price}/hr` : '';
-  const summaryText =
-    selectedHour !== null
-      ? `${formatHour(selectedHour)} – ${formatHour(selectedHour + selectedDuration)} (${selectedDuration}h)`
-      : 'No time selected yet';
-  const confirmAmount = selectedHour !== null ? selectedVariant.price * selectedDuration : 0;
+  const startTimeLabel = selectedHour !== null ? formatHour(selectedHour) : '—';
+  const endTimeLabel = selectedHour !== null ? formatHour(selectedHour + selectedDuration) : '—';
+  const durationLabel = `${selectedDuration} hour${selectedDuration === 1 ? '' : 's'}`;
+
+  // Review step — full date (with year) since, unlike the Time step's
+  // in-context label, Review is a standalone confirmation summary.
+  const reviewDateLabel = selectedDate
+    ? `${MONTHS[selectedDate.m]} ${selectedDate.d}, ${selectedDate.y} (${WEEKDAYS[new Date(selectedDate.y, selectedDate.m, selectedDate.d).getDay()]})`
+    : '—';
+  // Reuses computeDownPayment (utils/rooms.js) — same first-hour-rate rule
+  // already used on the Payment step, not a second implementation.
+  const reviewSubtotal = selectedVariant ? selectedVariant.price * selectedDuration : 0;
+  const reviewDownPayment = selectedVariant ? computeDownPayment(selectedVariant.price) : 0;
+  const reviewRemainingBalance = Math.max(0, reviewSubtotal - reviewDownPayment);
 
   return (
     <div
@@ -503,24 +586,57 @@ function BookingModal({ room, returnInfo, onClose, openHour, closeHour, settings
           </div>
         </div>
 
+        {step !== 'paymongoReturn' && <BookingStepper step={step} />}
+
         <div className="bk-body">
-          {/* STEP 1: PRICE / OPTION */}
+          {/* STEP 1: ROOM SELECTION */}
           {step === 'price' && room && (
             <div className="bk-step" id="bkStepPrice">
-              <div className="bk-slots-head">
-                <p>Choose a pricing option to get started.</p>
-              </div>
-              <div className="bk-price-list" id="bkPriceList">
-                {priceItems.map((opt, i) => (
-                  <div className="bk-price-card" key={i} onClick={() => handleSelectOption(opt)}>
-                    <div>
-                      <p className="bk-price-name">{opt.label}</p>
-                      <p className="bk-price-sub">{opt.pax || ''}</p>
+              <p className="bk-choose-label">Choose a room</p>
+              <div className="bk-room-list" id="bkPriceList">
+                {priceItems.map((opt, i) => {
+                  const optImage = opt.image || room.image;
+                  const cardImage = optImage ? resolveImageUrl(optImage) : fallbackRoomImg;
+                  const optDescription = opt.description || room.description;
+                  const optFeatures = opt.features && opt.features.length ? opt.features : room.features;
+                  const isSelected =
+                    !!selectedVariant && selectedVariant.label === opt.label && selectedVariant.price === opt.price;
+
+                  return (
+                    <div
+                      className={'bk-room-option' + (isSelected ? ' bk-room-option--selected' : '')}
+                      key={i}
+                      onClick={() => handleChooseOption(opt)}
+                    >
+                      <div className="bk-room-option-img">
+                        <img src={cardImage} alt={opt.label} />
+                      </div>
+                      <div className="bk-room-option-body">
+                        <div className="bk-room-option-top">
+                          <p className="bk-room-option-name">{opt.label}</p>
+                          <span className={'bk-radio' + (isSelected ? ' bk-radio--selected' : '')}></span>
+                        </div>
+                        {opt.pax && (
+                          <p className="bk-room-option-pax"><i className="fa-solid fa-users"></i> {opt.pax}</p>
+                        )}
+                        {optDescription && <p className="bk-room-option-desc">{optDescription}</p>}
+                        {optFeatures && optFeatures.length > 0 && (
+                          <ul className="bk-room-option-amenities">
+                            {optFeatures.map((f, fi) => (
+                              <li key={fi}><i className="fa-solid fa-check"></i>{f}</li>
+                            ))}
+                          </ul>
+                        )}
+                        <span className="bk-room-option-price">₱{opt.price}/hr</span>
+                      </div>
                     </div>
-                    <span className="bk-price-amt">₱{opt.price}/hr</span>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
+
+              <button className="bk-confirm bk-continue" disabled={!selectedVariant} onClick={handleContinueFromPrice}>
+                Continue <i className="fa-solid fa-arrow-right"></i>
+              </button>
             </div>
           )}
 
@@ -566,21 +682,27 @@ function BookingModal({ room, returnInfo, onClose, openHour, closeHour, settings
                       'bk-day' +
                       (day.disabled ? ' bk-day--disabled' : ' bk-day--open') +
                       (day.isToday ? ' bk-day--today' : '') +
+                      (day.variant === 'available' ? ' bk-day--available' : '') +
+                      (day.variant === 'few' ? ' bk-day--few' : '') +
                       (day.variant === 'full' ? ' bk-day--full' : '') +
-                      (day.variant === 'holiday' ? ' bk-day--holiday' : '')
+                      (day.variant === 'unavailable' ? ' bk-day--unavailable' : '')
                     }
                     title={day.title || undefined}
                     onClick={!day.disabled ? () => handleSelectDate(day.y, day.m, day.d) : undefined}
                   >
-                    {day.d}
+                    <span className="bk-day-num">{day.d}</span>
+                    {day.showSlots && (
+                      <span className="bk-day-slots">{day.freeSlots} slot{day.freeSlots === 1 ? '' : 's'}</span>
+                    )}
                   </div>
                 ))}
               </div>
 
               <div className="bk-legend">
-                <span><i className="bk-dot bk-dot--open"></i> Available</span>
+                <span><i className="bk-dot bk-dot--available"></i> Available</span>
+                <span><i className="bk-dot bk-dot--few"></i> Few slots</span>
                 <span><i className="bk-dot bk-dot--full"></i> Fully booked</span>
-                <span><i className="bk-dot bk-dot--past"></i> Unavailable</span>
+                <span><i className="bk-dot bk-dot--unavailable"></i> Unavailable</span>
               </div>
             </div>
           )}
@@ -597,6 +719,7 @@ function BookingModal({ room, returnInfo, onClose, openHour, closeHour, settings
                 <p>{selectedOptionLabel}</p>
               </div>
 
+              <p className="bk-choose-label">Available Time</p>
               <div className="bk-slots-grid" id="bkSlotsGrid">
                 {(() => {
                   const now = new Date();
@@ -622,7 +745,8 @@ function BookingModal({ room, returnInfo, onClose, openHour, closeHour, settings
                         title={isPast ? 'This time has already passed today' : undefined}
                         onClick={fits ? () => handleSelectHour(h) : undefined}
                       >
-                        {formatHour(h)}
+                        <span className="bk-slot-time">{formatHour(h)}</span>
+                        <span className="bk-slot-status">{fits ? 'Available' : 'Unavailable'}</span>
                       </div>
                     );
                   }
@@ -631,7 +755,7 @@ function BookingModal({ room, returnInfo, onClose, openHour, closeHour, settings
               </div>
 
               <div className="bk-duration-picker">
-                <span>Duration:</span>
+                <span>Duration (Maximum {MAX_DURATION} hours)</span>
                 <div className="bk-duration-options" id="bkDurationOptions">
                   {Array.from({ length: MAX_DURATION }, (_, i) => i + 1).map((dur) => (
                     <div
@@ -645,9 +769,35 @@ function BookingModal({ room, returnInfo, onClose, openHour, closeHour, settings
                 </div>
               </div>
 
+              <div className="bk-time-summary" id="bkTimeSummary">
+                <div>
+                  <p className="bk-summary-label">Start Time</p>
+                  <p className="bk-summary-value">{startTimeLabel}</p>
+                </div>
+                <div>
+                  <p className="bk-summary-label">End Time</p>
+                  <p className="bk-summary-value">{endTimeLabel}</p>
+                </div>
+                <div>
+                  <p className="bk-summary-label">Duration</p>
+                  <p className="bk-summary-value">{durationLabel}</p>
+                </div>
+              </div>
+
+              <button className="bk-confirm bk-continue" disabled={selectedHour === null} onClick={handleContinueFromSlots}>
+                Continue <i className="fa-solid fa-arrow-right"></i>
+              </button>
+            </div>
+          )}
+
+          {/* STEP 4: DETAILS */}
+          {step === 'details' && room && selectedVariant && selectedDate && selectedHour !== null && (
+            <div className="bk-step" id="bkStepDetails">
+              <p className="bk-choose-label bk-choose-label--heading">Your Information</p>
+
               <div className="bk-guest-fields">
                 <div className="bk-field">
-                  <label className="bk-field-label" htmlFor="bkGuestName">Full name</label>
+                  <label className="bk-field-label" htmlFor="bkGuestName">Full Name</label>
                   <input
                     type="text"
                     id="bkGuestName"
@@ -658,7 +808,7 @@ function BookingModal({ room, returnInfo, onClose, openHour, closeHour, settings
                   />
                 </div>
                 <div className="bk-field">
-                  <label className="bk-field-label" htmlFor="bkGuestContact">Phone number or email</label>
+                  <label className="bk-field-label" htmlFor="bkGuestContact">Phone Number or Email</label>
                   <input
                     type="text"
                     id="bkGuestContact"
@@ -670,7 +820,7 @@ function BookingModal({ room, returnInfo, onClose, openHour, closeHour, settings
                 </div>
                 <div className="bk-field">
                   <label className="bk-field-label" htmlFor="bkGuestCount">
-                    Number of guests (Pax)
+                    Number of Guests (Pax)
                     <span className="bk-field-hint" id="bkGuestCountHint">{cap ? `Max ${cap} pax` : ''}</span>
                   </label>
                   <div className="bk-pax-stepper">
@@ -697,41 +847,119 @@ function BookingModal({ room, returnInfo, onClose, openHour, closeHour, settings
                 </div>
                 <div className="bk-field">
                   <label className="bk-field-label" htmlFor="bkGuestNote">
-                    Comment / special request <span className="bk-field-optional">(optional)</span>
+                    Special Request <span className="bk-field-optional">(Optional)</span>
                   </label>
                   <textarea
                     id="bkGuestNote"
                     className="bk-field-input bk-field-textarea"
                     rows="2"
-                    placeholder="e.g. birthday setup, extra chairs"
+                    placeholder="e.g. extra chairs, birthday setup, etc."
                     value={guestNote}
                     onChange={(e) => setGuestNote(e.target.value)}
                   />
                 </div>
               </div>
 
-              <div className="bk-summary" id="bkSummary">
-                <div>
-                  <p className="bk-summary-label">Selected</p>
-                  <p className="bk-summary-value" id="bkSummaryText">{summaryText}</p>
-                </div>
+              <div className="bk-detail-actions">
+                <button className="bk-back-btn" onClick={() => setStep('slots')}>
+                  <i className="fa-solid fa-arrow-left"></i> Back
+                </button>
                 <button
-                  className="bk-confirm"
+                  className="bk-confirm bk-continue"
                   id="bkConfirm"
-                  disabled={selectedHour === null || confirming}
+                  disabled={confirming}
                   onClick={confirmBooking}
                 >
-                  Confirm ₱{confirmAmount}
+                  Continue <i className="fa-solid fa-arrow-right"></i>
                 </button>
               </div>
             </div>
           )}
 
-          {/* STEP 4: DOWN PAYMENT */}
+          {/* STEP 5: REVIEW */}
+          {step === 'review' && room && selectedVariant && selectedDate && selectedHour !== null && (
+            <div className="bk-step" id="bkStepReview">
+              <button className="bk-back" onClick={() => setStep('details')}>
+                <i className="fa-solid fa-arrow-left"></i> Back to details
+              </button>
+
+              <p className="bk-choose-label bk-choose-label--heading">Review your reservation</p>
+
+              <div className="bk-review-room">
+                <div className="bk-review-room-img">
+                  <img
+                    src={
+                      (selectedVariant.image || room.image)
+                        ? resolveImageUrl(selectedVariant.image || room.image)
+                        : fallbackRoomImg
+                    }
+                    alt={selectedVariant.label}
+                  />
+                </div>
+                <div className="bk-review-room-body">
+                  <p className="bk-review-room-name">{selectedVariant.label}</p>
+                  <p className="bk-review-room-facility">{room.name}</p>
+                  {selectedVariant.pax && (
+                    <p className="bk-room-option-pax"><i className="fa-solid fa-users"></i> {selectedVariant.pax}</p>
+                  )}
+                </div>
+              </div>
+
+              <div className="bk-summary-card" style={{ display: 'block' }}>
+                <div className="bk-summary-row">
+                  <span className="bk-sr-label"><i className="fa-solid fa-calendar-days"></i> Date</span>
+                  <span className="bk-sr-value">{reviewDateLabel}</span>
+                </div>
+                <div className="bk-summary-row">
+                  <span className="bk-sr-label"><i className="fa-solid fa-clock"></i> Time</span>
+                  <span className="bk-sr-value">{startTimeLabel}</span>
+                </div>
+                <div className="bk-summary-row">
+                  <span className="bk-sr-label"><i className="fa-solid fa-hourglass-half"></i> Duration</span>
+                  <span className="bk-sr-value">{durationLabel}</span>
+                </div>
+                <div className="bk-summary-row">
+                  <span className="bk-sr-label"><i className="fa-solid fa-users"></i> Guests (Pax)</span>
+                  <span className="bk-sr-value">{guestCount || 1}</span>
+                </div>
+                <div className="bk-summary-row">
+                  <span className="bk-sr-label"><i className="fa-solid fa-peso-sign"></i> Rate</span>
+                  <span className="bk-sr-value">₱{selectedVariant.price}/hr</span>
+                </div>
+              </div>
+
+              <div className="bk-review-cost">
+                <div className="bk-review-cost-row">
+                  <span>Subtotal ({durationLabel})</span>
+                  <span>₱{reviewSubtotal.toLocaleString()}</span>
+                </div>
+                <div className="bk-review-cost-row bk-review-cost-row--accent">
+                  <span>Downpayment (1 hour)</span>
+                  <span>₱{reviewDownPayment.toLocaleString()}</span>
+                </div>
+                <div className="bk-review-cost-row bk-review-cost-row--balance">
+                  <span>Remaining Balance</span>
+                  <span>₱{reviewRemainingBalance.toLocaleString()}</span>
+                </div>
+                <p className="bk-review-note">The downpayment is required to confirm your booking.</p>
+              </div>
+
+              <div className="bk-detail-actions">
+                <button className="bk-back-btn" onClick={() => setStep('details')}>
+                  <i className="fa-solid fa-arrow-left"></i> Back
+                </button>
+                <button className="bk-confirm bk-continue" onClick={proceedToPayment}>
+                  Proceed to Payment <i className="fa-solid fa-arrow-right"></i>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 6: DOWN PAYMENT */}
           {step === 'payment' && room && selectedVariant && (
             <div className="bk-step" id="bkStepPayment">
-              <button className="bk-back" onClick={() => setStep('slots')}>
-                <i className="fa-solid fa-arrow-left"></i> Back to time selection
+              <button className="bk-back" onClick={() => setStep('review')}>
+                <i className="fa-solid fa-arrow-left"></i> Back to review
               </button>
 
               <div className="bk-slots-head">
