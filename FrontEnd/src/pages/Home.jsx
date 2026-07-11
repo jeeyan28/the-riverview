@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useSiteSettings } from '../hooks/useSiteSettings';
 import { resolveImageUrl } from '../utils/resolveImageUrl';
-import { getRoomCapacity, dateKey, fetchReservedHours } from '../utils/rooms';
+import { dateKey, fetchReservedHours } from '../utils/rooms';
 import BookingModal from '../components/BookingModal';
 
 import heroImg4 from '../assets/pictures/RiverView_4.jpg';
@@ -40,6 +40,19 @@ function getOffset(index, current, total) {
   if (diff > total / 2) diff -= total;
   if (diff < -total / 2) diff += total;
   return diff;
+}
+
+// Keyword-based icon lookup for each facility feature tag — visual only,
+// falls back to a generic check icon for anything unrecognized.
+function getFeatureIcon(feature = '') {
+  const f = feature.toLowerCase();
+  if (f.includes('air') || f.includes('aircon')) return 'fa-snowflake';
+  if (f.includes('drink') || f.includes('bar')) return 'fa-martini-glass-citrus';
+  if (f.includes('wifi')) return 'fa-wifi';
+  if (f.includes('sound') || f.includes('music') || f.includes('speaker')) return 'fa-volume-high';
+  if (f.includes('tv') || f.includes('screen') || f.includes('projector')) return 'fa-tv';
+  if (f.includes('parking')) return 'fa-square-parking';
+  return 'fa-circle-check';
 }
 
 function HeroCarousel() {
@@ -123,13 +136,12 @@ function HeroCarousel() {
 }
 
 function RoomCard({ room, liveStatus, onSelect }) {
-  const hasVariants = room.variants && room.variants.length > 0;
   const cardImage = room.image ? resolveImageUrl(room.image) : fallbackRoomImg;
-  const capacity = getRoomCapacity(room);
-
-  const priceItems = hasVariants
-    ? room.variants
-    : [{ label: 'Standard', price: room.price || 0, pax: '' }];
+  const hasVariants = room.variants && room.variants.length > 0;
+  const startingPrice = hasVariants
+    ? Math.min(...room.variants.map((v) => v.price || 0))
+    : room.price || 0;
+  const roomTypeCount = hasVariants ? room.variants.length : 0;
 
   // Status badge: starts on the admin-set status, and is upgraded to
   // "Fully Booked" once refreshLiveRoomStatuses() (in the parent) resolves
@@ -148,36 +160,30 @@ function RoomCard({ room, liveStatus, onSelect }) {
     <div className="room-card" data-room-id={room._id}>
       <div className="room-card-img">
         <img src={cardImage} alt={room.name} />
+        <span className={`room-card-status ${statusClass}`}>{statusLabel}</span>
       </div>
       <div className="room-card-body">
         <h3>{room.name}</h3>
-        {capacity && (
-          <p className="room-card-capacity">
-            <i className="fa-solid fa-users"></i> Up to {capacity} guests
-          </p>
-        )}
-        <ul className="price-list">
-          {priceItems.map((v, i) => (
-            <li key={i}>
-              <span className="price-name">
-                {v.label}
-                {v.pax && <span className="price-pax"> · {v.pax}</span>}
+        <span className="price-amt">Starting at ₱{startingPrice}/hr</span>
+
+        {(roomTypeCount > 0 || (room.features && room.features.length > 0)) && (
+          <div className="room-card-tags">
+            {roomTypeCount > 0 && (
+              <span className="room-tag">
+                <i className="fa-solid fa-layer-group"></i>
+                {roomTypeCount} Room Type{roomTypeCount > 1 ? 's' : ''}
               </span>
-              <span className="price-amt">₱{v.price}/hr</span>
-            </li>
-          ))}
-        </ul>
-        <p className="room-card-desc">{room.description || ''}</p>
-        {room.features && room.features.length > 0 && (
-          <div className="room-card-features">
-            {room.features.map((f, i) => (
-              <span className="room-feature-chip" key={i}>{f}</span>
+            )}
+            {room.features && room.features.map((f, i) => (
+              <span className="room-tag" key={i}><i className={`fa-solid ${getFeatureIcon(f)}`}></i>{f}</span>
             ))}
           </div>
         )}
-        <span className={`room-card-status ${statusClass}`}>{statusLabel}</span>
+
+        <p className="room-card-desc">{room.description || ''}</p>
+
         <a href="#" className="btn-select" onClick={(e) => { e.preventDefault(); onSelect(room); }}>
-          Select Room
+          <i className="fa-solid fa-calendar-check"></i> Book Now
         </a>
       </div>
     </div>
@@ -338,10 +344,15 @@ function Home() {
       <section id="rooms">
         <div className="rooms-header reveal">
           <div>
-            <div className="section-label" style={{ color: 'var(--teal)' }}>Book a Space</div>
+            <div className="section-label">Book Your Space</div>
             <h2>Choose Your Room</h2>
           </div>
-          <p>All rooms available. Walk-ins welcome — reservations recommended on weekends.</p>
+          <div className="rooms-header-right">
+            <p>Walk-ins welcome.<br />Reservations recommended on weekends.</p>
+            <a href="#rooms" className="btn-view-all" onClick={(e) => e.preventDefault()}>
+              View All Rooms <i className="fa-solid fa-chevron-right"></i>
+            </a>
+          </div>
         </div>
 
         <div className="rooms-grid reveal-stagger" id="room-grid">
@@ -372,8 +383,18 @@ function Home() {
         </div>
       </section>
 
+      {/* SECTION DIVIDER — visual break between Rooms and Our Spaces only;
+          no functionality, purely to separate the two room-listing sections. */}
+      <section className="section-divider">
+        <div className="section-divider-inner reveal">
+          <span className="section-divider-label">The Riverview Experience</span>
+          <h3>More than just rooms.</h3>
+          <p>Take a closer look at what makes every space here worth coming back to.</p>
+        </div>
+      </section>
+
       {/* SPACES SHOWCASE */}
-      <section style={{ background: 'var(--surface-alt)' }}>
+      <section className="spaces-showcase" style={{ background: 'var(--surface-alt)' }}>
         <div className="spaces">
           <div className="spaces-header reveal">
             <div className="section-label">Our Spaces</div>
@@ -381,41 +402,34 @@ function Home() {
             <p>Every space at The Riverview is kept clean, well-lit, and ready to go — whether it's your first visit or your fiftieth.</p>
           </div>
 
-          <div className="spaces-list reveal-stagger">
+          <div className="spaces-rows reveal-stagger">
             <div className="space-row">
+              <div className="space-text">
+                <h3>Billiards Room</h3>
+                <p>Multiple tables, great lighting, and a chill atmosphere. Perfect for a quick session or a long evening with friends.</p>
+              </div>
               <div className="space-img">
                 <img src={billiardsImg} alt="Billiards" />
               </div>
-              <div className="space-text">
-                <div className="space-num">01</div>
-                <div className="space-info">
-                  <h3>Billiards Room</h3>
-                  <p>Multiple tables, great lighting, and a chill atmosphere. Perfect for a quick session or a long evening with friends.</p>
-                </div>
-              </div>
             </div>
-            <div className="space-row">
+
+            <div className="space-row space-row-reverse">
+              <div className="space-text">
+                <h3>Basketball Court</h3>
+                <p>Full-size court with proper flooring. Includes scoreboard, timer, and sound system for official games.</p>
+              </div>
               <div className="space-img">
                 <img src={courtImg} alt="Basketball Court" />
               </div>
-              <div className="space-text">
-                <div className="space-num">02</div>
-                <div className="space-info">
-                  <h3>Basketball Court</h3>
-                  <p>Full-size court with proper flooring. Includes scoreboard, timer, and sound system for official games.</p>
-                </div>
-              </div>
             </div>
+
             <div className="space-row">
+              <div className="space-text">
+                <h3>KTV Room</h3>
+                <p>Private rooms with updated song libraries. Bring your barkada, bring your voice. No judgment here.</p>
+              </div>
               <div className="space-img">
                 <img src={billiardsImg} alt="KTV Room" />
-              </div>
-              <div className="space-text">
-                <div className="space-num">03</div>
-                <div className="space-info">
-                  <h3>KTV Room</h3>
-                  <p>Private rooms with updated song libraries. Bring your barkada, bring your voice. No judgment here.</p>
-                </div>
               </div>
             </div>
           </div>

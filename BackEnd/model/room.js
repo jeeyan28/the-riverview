@@ -3,7 +3,13 @@ const mongoose = require("mongoose");
 const variantSchema = new mongoose.Schema({
   label: { type: String, trim: true },
   price: { type: Number, min: 0 },
-  pax:   { type: String, trim: true } // e.g. "6 pax", "Up to 15"
+  pax:   { type: String, trim: true }, // e.g. "6 pax", "Up to 15"
+  // Optional per-variant overrides for the Booking UI's Room Selection step.
+  // Empty/unset means "inherit from the parent room" (image/description/
+  // features) — see priceOptionsFor() in BookingModal.jsx.
+  image:       { type: String, default: "" },
+  description: { type: String, default: "" },
+  features:    [{ type: String }]
 }, { _id: false });
 
 const roomSchema = new mongoose.Schema({

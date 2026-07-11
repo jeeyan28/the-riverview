@@ -28,7 +28,10 @@ function parseVariants(variants) {
       .map(v => ({
         label: String(v.label || "").trim(),
         price: Number(v.price) || 0,
-        pax: String(v.pax || "").trim()
+        pax: String(v.pax || "").trim(),
+        image: String(v.image || "").trim(),
+        description: String(v.description || "").trim(),
+        features: Array.isArray(v.features) ? v.features.map(f => String(f).trim()).filter(Boolean) : []
       }))
       .filter(v => v.label !== "" || v.price > 0);
   } catch (_) {
