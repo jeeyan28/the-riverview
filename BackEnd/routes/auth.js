@@ -20,6 +20,7 @@ const {
 const { verifyGoogleIdToken } = require("../utils/googleVerify");
 const { normalizeName, validateName } = require("../utils/nameValidation");
 const { isAdminRole, getEffectivePermissions, roleLabel } = require("../utils/permissions");
+const { isPasswordStrongEnough, PASSWORD_POLICY_MESSAGE } = require("../utils/passwordPolicy");
 
 // Fixed bcrypt hash of a random value, used only to burn CPU time when a user
 // doesn't exist, so login response time doesn't reveal whether the email is
@@ -45,18 +46,6 @@ function sanitizeUser(user) {
     // accounts. Only ever populated when isGoogleAccount is true.
     profilePicture: user.googleId ? user.googleProfilePicture || "" : "",
   };
-}
-
-// Minimum password policy shared by register + reset, so the two paths can't
-// drift from each other. Mirrors Frontend/src/utils/password.js's
-// PASSWORD_REQUIREMENTS (same rules, same order: length, uppercase,
-// lowercase, number) — keep both in sync.
-function isPasswordStrongEnough(password) {
-  if (typeof password !== "string" || password.length < 8) return false;
-  if (!/[A-Z]/.test(password)) return false;
-  if (!/[a-z]/.test(password)) return false;
-  if (!/[0-9]/.test(password)) return false;
-  return true;
 }
 
 // Promise wrapper so we can `await` session regeneration/save cleanly below.
@@ -112,7 +101,7 @@ router.post("/register", registerOtpLimiter, async (req, res) => {
     }
     if (!isPasswordStrongEnough(password)) {
       return res.status(400).json({
-        message: "Password must be at least 8 characters and include uppercase, lowercase, and a number.",
+        message: PASSWORD_POLICY_MESSAGE,
         field: "password",
       });
     }
@@ -627,7 +616,7 @@ router.post("/reset-password", forgotPasswordLimiter, async (req, res) => {
 
   if (!isPasswordStrongEnough(password)) {
     return res.status(400).json({
-      message: "Password must be at least 8 characters and include uppercase, lowercase, and a number.",
+      message: PASSWORD_POLICY_MESSAGE,
     });
   }
 

@@ -1,50 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { API_BASE_URL } from '../services/api';
 
-// ─────────────────────────────────────────────────────────────────────────
-// ── DESIGN DECISION: source of truth on mount ──────────────────────────
-// admin.js's guardAdminPage() always called GET /api/auth/me on every
-// admin page load — it never trusted the cached localStorage/sessionStorage
-// value alone. This context does the same, for two concrete reasons found
-// by re-checking both ends before writing this file:
-//
-//   1. Backend/routes/auth.js's sanitizeUser() (what login/register/google
-//      responses AND /api/auth/me all return) already includes `role`,
-//      `roleLabel`, and — for admin roles — a real `permissions` array
-//      straight from utils/permissions.js's getEffectivePermissions(). So
-//      the object Login.jsx/Register.jsx already write to storage under
-//      'riverview_user' is the *same shape* /api/auth/me returns — good,
-//      no missing-fields problem either way.
-//   2. But the stored copy is still just a display cache written once at
-//      login time. It goes stale the moment a session is revoked
-//      server-side (logout in another tab, an Owner deactivating the
-//      account, the cookie expiring) or a Supervisor/Owner changes this
-//      user's role from the Manage Users panel mid-session. admin.js's own
-//      comment on ROLE_PERMISSIONS says the client copy "can never grant
-//      real access" specifically because every route re-checks
-//      server-side — trusting a possibly-stale cached role for UI gating
-//      undermines that guarantee's whole point (someone could look like a
-//      Supervisor in the sidebar for the rest of a long session after
-//      being demoted to Staff).
-//
-// So: on mount, this context hydrates FAST from storage (so the UI has
-// something to paint immediately, avoiding a blank flash) but immediately
-// fires GET /api/auth/me in the background and replaces `user` with
-// whatever comes back — including replacing it with null (logged out) if
-// the call fails. That /api/auth/me response is what everything in the
-// app should treat as authoritative; the storage read is a paint-time
-// convenience only, exactly as admin.js's own comment already described
-// the storage value ("a UX convenience only").
-//
-// ── DESIGN DECISION: route guarding ─────────────────────────────────────
-// guardAdminPage() redirected with `window.location.href = 'login.html'`
-// on any failure. No migrated page currently guards a route (this is new
-// behavior for the React app). Implemented centrally, once, in
-// AdminLayout.jsx (wrapping <Outlet/>) rather than per-page — see that
-// file's header comment for the redirect itself. This context only
-// exposes the pieces AdminLayout needs to decide: `user`, `initializing`,
-// and `isAdmin`.
-// ─────────────────────────────────────────────────────────────────────────
 
 const STORAGE_KEY = 'riverview_user';
 

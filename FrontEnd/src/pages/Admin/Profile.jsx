@@ -3,9 +3,7 @@ import { useAuth } from '../../context/AuthContext';
 import PasswordInput from '../../components/PasswordInput';
 import PasswordRequirementsList from '../../components/PasswordRequirementsList';
 import { PASSWORD_REQUIREMENTS } from '../../utils/password';
-
-
-const API_BASE_URL = 'http://localhost:3000';
+import { API_BASE_URL } from '../../services/api';
 
 function displayName(admin) {
   if (!admin) return 'Admin';

@@ -3,44 +3,7 @@
    The Riverview
    ========================================================== */
 
-:root{
-    --bg:#0D1726;
-    --card:rgba(16,24,40,.58);
-
-    --text:#F8FAFC;
-    --muted:#94A3B8;
-
-    --accent:#19D8C3;
-    --accent2:#26E6D1;
-
-    --border:rgba(255,255,255,.08);
-
-    --shadow:
-        0 30px 80px rgba(0,0,0,.42);
-
-    --blur:28px;
-
-    --transition:.28s cubic-bezier(.22,.61,.36,1);
-}
-
-*,
-*::before,
-*::after{
-    box-sizing:border-box;
-}
-
-html,
-body,
-#root{
-    width:100%;
-    min-height:100%;
-}
-
 body{
-
-    margin:0;
-
-    font-family:'Inter',sans-serif;
 
     background:var(--bg);
 
@@ -49,36 +12,34 @@ body{
     overflow-x:hidden;
 }
 
-a{
-    color:inherit;
-    text-decoration:none;
-}
 /*Login Page*/
 .login-page{
+    --bg:#0D1726;
+    --card:rgba(16,24,40,.58);
 
-    /* admin.css declares its own unscoped :root { --text; --muted; --border }
-       with completely different (light-theme) values. Because App.jsx
-       eagerly imports every Admin page, admin.css bundles globally on
-       every route, including this one — whichever :root rule loads later
-       wins. Re-declaring these three tokens directly on .login-page beats
-       any inherited :root value regardless of load order, so this page
-       stays correct no matter what admin.css does. */
-    --text:#F8FAFC;
-
+    --text:#ffffff;
     --muted:#94A3B8;
+
+    --accent:#19D8C3;
+    --accent2:#26E6D1;
 
     --border:rgba(255,255,255,.08);
 
-    position:relative;
+    --shadow:0 30px 80px rgba(0,0,0,.42);
 
-    width:100%;
+    --blur:28px;
 
-    min-height:100vh;
+    --transition:.28s cubic-bezier(.22,.61,.36,1);
 
-    overflow:hidden;
+    position: relative;
+    width: 100%;
+    min-height: 100vh;
+    overflow: hidden;
 
-    background:#0D1726;
+    background: var(--bg);
+    color: var(--text);
 }
+
 /*Background*/
 .login-background{
 

@@ -1,22 +1,28 @@
 // Thin wrapper around the PayMongo REST API (https://api.paymongo.com) for
-// the automatic online-payment flow. Uses the hosted "Checkout Session" —
-// the simplest integration: we create a session server-side, redirect the
-// customer to PayMongo's own payment page, and PayMongo tells us (via
-// webhook) the moment it's paid. No card/GCash/Maya data ever touches our
-// server directly.
+// the embedded online-payment flow:
+//   - Card is tokenized CLIENT-SIDE (BookingModal.jsx, using PAYMONGO_PUBLIC_KEY)
+//     into a Payment Method id — raw card numbers never reach this server.
+//   - GCash / Maya / QRPh Payment Methods carry no sensitive data, so those
+//     are created here, server-side, from just a type + billing info.
+//   - Either kind of Payment Method is then attached to a Payment Intent.
+//     Card may resolve immediately ("succeeded") or need a 3D Secure
+//     challenge; e-wallets always need the customer to authorize in
+//     PayMongo's redirect page. Both cases are surfaced as
+//     `next_action.redirect.url` for the frontend to open in a popup.
 //
-// Requires these in .env (see .env.example):
-//   PAYMONGO_SECRET_KEY   — starts with sk_test_... (or sk_live_... in production)
+// Requires these in .env:
+//   PAYMONGO_SECRET_KEY    — starts with sk_test_... (sk_live_... in production)
+//   PAYMONGO_PUBLIC_KEY    — starts with pk_test_... — safe to expose, served
+//                            to the frontend via GET /api/payments/paymongo/config
 //   PAYMONGO_WEBHOOK_SECRET — the "Signing secret" shown when you register the
 //                             webhook endpoint in the PayMongo Dashboard
-//
-// You don't have a PayMongo account yet — sign up (free) at
-// https://dashboard.paymongo.com/signup, then grab your TEST secret key from
-// Developers > API Keys. Test mode lets you run the whole flow with fake
-// GCash/card payments before you're even verified/live.
 
 const crypto = require("crypto");
 
+// Base URL for every server-side PayMongo call in this file. Mirrors the
+// same literal hardcoded in Frontend/src/components/BookingModal.jsx for
+// client-side card tokenization — keep both in sync (separate runtimes, no
+// shared module possible).
 const PAYMONGO_API_BASE = "https://api.paymongo.com/v1";
 
 function getSecretKey() {
@@ -30,9 +36,21 @@ function getSecretKey() {
   return key;
 }
 
+function getPublicKey() {
+  const key = process.env.PAYMONGO_PUBLIC_KEY;
+  if (!key) {
+    throw new Error(
+      "PAYMONGO_PUBLIC_KEY is not set. Copy your test publishable key from " +
+      "Developers > API Keys in the PayMongo Dashboard and add it to your .env."
+    );
+  }
+  return key;
+}
+
 function authHeader() {
   // PayMongo uses HTTP Basic Auth with the secret key as the username and an
-  // empty password.
+  // empty password. All calls in this file act on the server's behalf, so
+  // they always use the secret key — never the public key.
   const token = Buffer.from(`${getSecretKey()}:`).toString("base64");
   return `Basic ${token}`;
 }
@@ -58,52 +76,90 @@ async function paymongoRequest(path, { method = "GET", body } = {}) {
   return json;
 }
 
-// Creates a Checkout Session for a single line item (the booking's down
-// payment) and returns the full PayMongo response. `amountPesos` is a whole
-// peso amount — PayMongo's API wants centavos (amount * 100), same as
-// Stripe's smallest-unit convention.
-async function createCheckoutSession({
-  amountPesos,
-  description,
-  referenceNumber, // our own bookingId, so we can find it again from a webhook payload
-  successUrl,
-  cancelUrl,
-  customerEmail,
-  customerName,
-}) {
+// PayMongo rejects a statement_descriptor that's entirely numeric (e.g. a
+// bare room number like "101"). Prefix it so it always contains at least
+// one non-digit character; falls back to "Booking" if nothing usable was
+// passed in.
+function sanitizeStatementDescriptor(value) {
+  const trimmed = (value || "").toString().trim();
+  const isNumericOnly = /^\d+$/.test(trimmed);
+  const safe = !trimmed ? "Booking" : isNumericOnly ? `Room ${trimmed}` : trimmed;
+  return safe.slice(0, 22);
+}
+
+// Creates a Payment Intent for the booking's down payment. `amountPesos` is
+// a whole peso amount — PayMongo's API wants centavos (amount * 100), same
+// as Stripe's smallest-unit convention. `request_three_d_secure: "automatic"`
+// lets PayMongo decide whether a card needs a 3DS challenge; when it doesn't,
+// attach() below resolves straight to "succeeded" with no popup at all.
+// `metadata` (optional) is an object of string values PayMongo stores on the
+// intent and hands back unchanged on every later read/webhook. Used to carry
+// the prospective booking's details (guest info, room/date/time, pricing)
+// so the Booking itself doesn't have to exist until payment actually
+// succeeds — see finalizeBookingFromPayment() in utils/bookingHelper.js.
+async function createPaymentIntent({ amountPesos, description, statementDescriptor, metadata }) {
   const payload = {
     data: {
       attributes: {
-        send_email_receipt: !!customerEmail,
-        show_description: true,
-        show_line_items: true,
-        line_items: [
-          {
-            currency: "PHP",
-            amount: Math.round(amountPesos * 100),
-            description: description || "Booking down payment",
-            name: description || "Booking down payment",
-            quantity: 1,
-          },
-        ],
-        payment_method_types: ["gcash", "paymaya", "card", "qrph"],
+        amount: Math.round(amountPesos * 100),
+        currency: "PHP",
+        capture_type: "automatic",
+        payment_method_allowed: ["card", "gcash", "paymaya", "qrph"],
+        payment_method_options: { card: { request_three_d_secure: "automatic" } },
         description: description || "Booking down payment",
-        reference_number: referenceNumber,
-        success_url: successUrl,
-        cancel_url: cancelUrl,
-        billing: customerEmail || customerName ? {
-          name: customerName || undefined,
-          email: customerEmail || undefined,
-        } : undefined,
+        statement_descriptor: sanitizeStatementDescriptor(statementDescriptor),
+        metadata: metadata || undefined,
       },
     },
   };
-
-  return paymongoRequest("/checkout_sessions", { method: "POST", body: payload });
+  return paymongoRequest("/payment_intents", { method: "POST", body: payload });
 }
 
-async function retrieveCheckoutSession(checkoutSessionId) {
-  return paymongoRequest(`/checkout_sessions/${checkoutSessionId}`);
+async function retrievePaymentIntent(paymentIntentId) {
+  return paymongoRequest(`/payment_intents/${paymentIntentId}`);
+}
+
+// Creates a Payment Method for GCash/Maya/QRPh — no card fields are ever
+// accepted here, so this is safe to call with data straight from req.body.
+// (Card Payment Methods are created client-side instead — see
+// PAYMONGO_PUBLIC_KEY above — and only their resulting `pm_...` id is ever
+// sent to this server.)
+async function createWalletPaymentMethod({ type, billing }) {
+  if (!["gcash", "paymaya", "qrph"].includes(type)) {
+    throw new Error(`createWalletPaymentMethod does not support type "${type}".`);
+  }
+  const payload = {
+    data: {
+      attributes: {
+        type,
+        billing: billing ? { name: billing.name || undefined, email: billing.email || undefined } : undefined,
+      },
+    },
+  };
+  return paymongoRequest("/payment_methods", { method: "POST", body: payload });
+}
+
+// Attaches a Payment Method (card, tokenized client-side, or an e-wallet
+// created just above) to a Payment Intent. `clientKey` is the intent's own
+// client_key (returned by createPaymentIntent and mirrored onto the booking
+// so it's available here without another round trip). Resulting
+// `data.attributes.status` is one of:
+//   "succeeded"              — done, no popup needed (typical for card w/o 3DS)
+//   "awaiting_next_action"   — open `next_action.redirect.url` in a popup
+//   "processing"             — check back shortly (retrievePaymentIntent)
+//   "awaiting_payment_method"— this attempt failed (e.g. card declined); the
+//                              same intent can be attached again with a new method
+async function attachPaymentIntent({ paymentIntentId, paymentMethodId, clientKey, returnUrl }) {
+  const payload = {
+    data: {
+      attributes: {
+        payment_method: paymentMethodId,
+        client_key: clientKey,
+        return_url: returnUrl,
+      },
+    },
+  };
+  return paymongoRequest(`/payment_intents/${paymentIntentId}/attach`, { method: "POST", body: payload });
 }
 
 // Verifies the `Paymongo-Signature` header against the raw request body.
@@ -145,7 +201,11 @@ function verifyWebhookSignature(rawBody, signatureHeader) {
 }
 
 module.exports = {
-  createCheckoutSession,
-  retrieveCheckoutSession,
+  PAYMONGO_API_BASE,
+  getPublicKey,
+  createPaymentIntent,
+  retrievePaymentIntent,
+  createWalletPaymentMethod,
+  attachPaymentIntent,
   verifyWebhookSignature,
 };

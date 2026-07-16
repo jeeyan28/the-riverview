@@ -1,6 +1,14 @@
 const mongoose = require("mongoose");
 
 const bookingSchema = new mongoose.Schema({
+  // Customer-facing reservation reference — generated once at creation
+  // (see saveWithReservationCode() in utils/bookingHelper.js), immutable
+  // afterward, and used everywhere a booking is displayed (receipt,
+  // booking success screen, admin list/search). Never the Mongo `_id`.
+  // Format: PPP-YYMMDD-NNNNN (e.g. BIL-260718-00123) — PPP = first 3
+  // letters of the facility name, YYMMDD = creation date, NNNNN = a
+  // running number that resets daily per facility.
+  reservationCode: { type: String, required: true, unique: true, immutable: true },
   guestName:     { type: String, required: true, trim: true },
   guestContact:  { type: String, default: "" },
   guestEmail:    { type: String, default: "", trim: true },
@@ -26,11 +34,11 @@ const bookingSchema = new mongoose.Schema({
   // "Pending" / "Active" / "Done" / "Overdue" remain for admin-created walk-in /
   // manual bookings (Manual Booking modal / Room Monitoring), which skip payment
   // verification entirely. "Cancelled" applies to either path.
-  // "Awaiting Online Payment" = an automatic PayMongo checkout session has
-  // been created for this booking but the customer hasn't finished paying
-  // (or PayMongo's webhook hasn't confirmed it) yet. It auto-advances to
-  // "Confirmed" the moment PayMongo confirms payment (no admin review) —
-  // see routes/paymongoRoutes.js.
+  // "Awaiting Online Payment" = a PayMongo Payment Intent has been created
+  // for this booking but the customer hasn't finished paying (or PayMongo's
+  // webhook hasn't confirmed it) yet. It auto-advances to "Confirmed" the
+  // moment PayMongo confirms payment (no admin review) — see
+  // routes/paymongoRoutes.js.
   status:        {
     type: String,
     enum: ["Pending", "Pending Payment Verification", "Awaiting Online Payment", "Confirmed", "Rejected", "Active", "Done", "Overdue", "Cancelled"],
@@ -53,17 +61,28 @@ const bookingSchema = new mongoose.Schema({
   // "manual" = old GCash/Maya-style flow: customer scans a QR and uploads a
   // screenshot for an admin to review (paymentProofUpload/paymentScreenshot
   // above — kept fully intact for any future manual method). "paymongo" =
-  // new automatic flow: customer pays through a PayMongo-hosted Checkout
-  // Session and the booking is confirmed automatically by PayMongo's webhook,
-  // with no screenshot and no admin review. See routes/paymongoRoutes.js.
+  // embedded flow: card is entered directly in BookingModal.jsx (tokenized
+  // client-side, never touches this server) or GCash/Maya/QRPh is
+  // authorized in a popup; the booking is confirmed automatically by
+  // PayMongo's webhook, with no screenshot and no admin review.
+  // See routes/paymongoRoutes.js.
   paymentProvider: { type: String, enum: ["manual", "paymongo"], default: "manual" },
-  // PayMongo Checkout Session id (e.g. "cs_..."), set when a booking is
-  // created through the automatic-payment path. Used to match incoming
+  // PayMongo Payment Intent id (e.g. "pi_..."), set when a booking is
+  // created through the embedded-payment path. Used to match incoming
   // webhook events back to this booking, and as a fallback to re-query
   // PayMongo's API directly if the webhook is delayed.
-  paymongoCheckoutSessionId: { type: String, default: "" },
+  // No `default: ""` — left unset for non-PayMongo (walk-in) bookings so the
+  // unique+sparse index below only applies to bookings that actually went
+  // through PayMongo, and can't collide on an empty string.
+  paymongoPaymentIntentId: { type: String, index: { unique: true, sparse: true } },
+  // The intent's own client_key — not secret (PayMongo hands this to
+  // clients by design). No longer populated on new bookings (the booking
+  // itself is now only created after payment already succeeded, so there's
+  // nothing left to attach); field kept for any pre-existing bookings/tooling
+  // that reads it.
+  paymongoClientKey: { type: String, default: "" },
   // Populated once PayMongo reports which underlying payment settled the
-  // checkout session (informational / support use only).
+  // payment intent (informational / support use only).
   paymongoPaymentId: { type: String, default: "" },
   // "online" = customer self-service booking through the public site (requires down
   // payment + screenshot verification, OR an automatic PayMongo payment).

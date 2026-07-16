@@ -1,4 +1,11 @@
 const nodemailer = require("nodemailer");
+const { OTP_TTL_MS } = require("./otp");
+
+// Single source for the "expires in N minutes" text shown in both email
+// variants below — derived from OTP_TTL_MS (utils/otp.js) instead of two
+// separately hardcoded literals, so the copy can't drift from the real
+// expiry again.
+const OTP_TTL_MINUTES = Math.round(OTP_TTL_MS / 60000);
 
 // Uses a Gmail account + App Password (requires 2-Step Verification on that
 // Google account): https://myaccount.google.com/apppasswords
@@ -23,9 +30,9 @@ const COPY = {
     eyebrow: "Account Recovery",
     heading: "Your verification code",
     intro: () =>
-      `Use the code below to reset the password on your Riverview account. This code expires in <strong style="color:#ffffff;">5 minutes</strong>.`,
+      `Use the code below to reset the password on your Riverview account. This code expires in <strong style="color:#ffffff;">${OTP_TTL_MINUTES} minutes</strong>.`,
     textIntro: () =>
-      `Use this code to reset the password on your Riverview account (expires in 5 minutes):`,
+      `Use this code to reset the password on your Riverview account (expires in ${OTP_TTL_MINUTES} minutes):`,
     subject: "Your Riverview verification code",
     footnote: "If you didn't request this, you can safely ignore this email — your password will not change.",
   },
@@ -33,9 +40,9 @@ const COPY = {
     eyebrow: "Verify Your Email",
     heading: "Confirm your email address",
     intro: () =>
-      `Use the code below to finish creating your Riverview account. This code expires in <strong style="color:#ffffff;">10 minutes</strong>.`,
+      `Use the code below to finish creating your Riverview account. This code expires in <strong style="color:#ffffff;">${OTP_TTL_MINUTES} minutes</strong>.`,
     textIntro: () =>
-      `Use this code to finish creating your Riverview account (expires in 10 minutes):`,
+      `Use this code to finish creating your Riverview account (expires in ${OTP_TTL_MINUTES} minutes):`,
     subject: "Verify your email for Riverview",
     footnote: "If you didn't request this, you can safely ignore this email — no account will be created.",
   },

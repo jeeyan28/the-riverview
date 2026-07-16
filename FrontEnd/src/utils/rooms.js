@@ -2,7 +2,7 @@
 // and by BookingModal.jsx's calendar/slots (same original functions in
 // js/index.js, split out so both consumers share one copy instead of
 // duplicating them across pages).
-const API_BASE_URL = 'http://localhost:3000';
+import { API_BASE_URL } from '../services/api';
 
 // dateKey — migrated 1:1 from js/index.js. Formats a Date's year/month
 // (0-indexed)/day into the "YYYY-MM-DD" string the backend's availability
@@ -126,14 +126,13 @@ export function isDayFullyBooked(dayBookings, openHour, closeHour) {
 // getFreeSlotCount — number of still-open 1-hour slots for a room on a
 // given day, within [openHour, closeHour). Powers the Date Selection
 // calendar's per-day "N slots" label and its Available/Few Slots split.
+// The Available/Few-Slots cutoff itself is admin-configurable (Settings >
+// Operating Schedule, operatingHours.fewSlotsThreshold — see
+// BackEnd/model/settings.js) and read directly off `settings` by callers,
+// not defined here.
 export function getFreeSlotCount(dayBookings, openHour, closeHour) {
   return coveredHours(dayBookings, openHour, closeHour).filter((covered) => !covered).length;
 }
-
-// FEW_SLOTS_THRESHOLD — a day with this many or fewer free hourly slots
-// (but more than 0) renders as "Few slots" instead of "Available" on the
-// Date Selection calendar.
-export const FEW_SLOTS_THRESHOLD = 2;
 
 // isHolidayDate — migrated 1:1 from js/index.js. `holidays` is
 // useSiteSettings' `settings.holidays` array.
@@ -147,6 +146,33 @@ export function isOperatingDay(dateObj, operatingHours) {
   const oh = operatingHours;
   if (!oh || !Array.isArray(oh.openDays) || !oh.openDays.length) return true;
   return oh.openDays.includes(dateObj.getDay());
+}
+
+// getFacilityAvailability — single facility-level Available/Fully Booked
+// summary for the Booking Modal's Room Selection step. Same rule as
+// Home.jsx's refreshLiveRoomStatuses(): fully booked only if every
+// remaining operating hour today is already reserved. `reserved` is
+// today's reserved-hours array (fetchReservedHours), openHour/closeHour
+// come from useSiteSettings.
+//
+// Future: once Room gets a numberOfRooms field, pass totalRooms and
+// overlappingConfirmedBookings to switch to a real "X of Y Rooms
+// Available" count (availableRooms = totalRooms - overlappingConfirmedBookings)
+// — no call-site rewrite needed, just start passing the extra params.
+export function getFacilityAvailability(reserved, openHour, closeHour, opts = {}) {
+  const { totalRooms, overlappingConfirmedBookings, now = new Date() } = opts;
+
+  if (totalRooms != null && overlappingConfirmedBookings != null) {
+    const availableRooms = totalRooms - overlappingConfirmedBookings;
+    return availableRooms > 0 ? 'Available' : 'Fully Booked';
+  }
+
+  const currentHour = Math.max(openHour, now.getHours());
+  let fullyBooked = currentHour < closeHour;
+  for (let h = currentHour; h < closeHour && fullyBooked; h++) {
+    if (!reserved.includes(h)) fullyBooked = false;
+  }
+  return fullyBooked ? 'Fully Booked' : 'Available';
 }
 
 // computeDownPayment — migrated 1:1 from js/index.js. Mirrors the

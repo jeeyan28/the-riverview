@@ -581,6 +581,7 @@ function OperatingScheduleAndHolidays() {
   const [closeTime, setCloseTime] = useState('22:00');
   const [maxAdvanceDays, setMaxAdvanceDays] = useState('30');
   const [cutoffHours, setCutoffHours] = useState('2');
+  const [fewSlotsThreshold, setFewSlotsThreshold] = useState('2');
   const [openDays, setOpenDays] = useState(DEFAULT_OPEN_DAYS_BEFORE_LOAD);
   const [holidays, setHolidays] = useState([]);
 
@@ -595,6 +596,7 @@ function OperatingScheduleAndHolidays() {
       setCloseTime(oh.closeTime || '22:00');
       setMaxAdvanceDays(String(oh.maxAdvanceDays || 30));
       setCutoffHours(String(oh.bookingCutoffHours ?? 2));
+      setFewSlotsThreshold(String(oh.fewSlotsThreshold ?? 2));
       // Same fallback as the original loadOperatingSettings(): all 7 days
       // on if the server document has no openDays array yet.
       setOpenDays(Array.isArray(oh.openDays) ? oh.openDays : [0, 1, 2, 3, 4, 5, 6]);
@@ -626,6 +628,7 @@ function OperatingScheduleAndHolidays() {
         openDays,
         maxAdvanceDays: Number(maxAdvanceDays),
         bookingCutoffHours: Number(cutoffHours),
+        fewSlotsThreshold: Number(fewSlotsThreshold),
       });
       setSaveState('saved');
       setTimeout(() => setSaveState('idle'), 1500);
@@ -713,6 +716,18 @@ function OperatingScheduleAndHolidays() {
                 <option value="4">4</option>
               </select>
               <span>hours before facility opens</span>
+            </div>
+          </div>
+          <div className="sched-field">
+            <label>Few Slots Threshold</label>
+            <div className="sched-inline">
+              <select value={fewSlotsThreshold} onChange={(e) => setFewSlotsThreshold(e.target.value)}>
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+                <option value="4">4</option>
+              </select>
+              <span>or fewer free hourly slots shows as "Few Slots"</span>
             </div>
           </div>
         </div>

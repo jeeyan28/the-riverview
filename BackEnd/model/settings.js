@@ -30,6 +30,12 @@ const operatingHoursSchema = new mongoose.Schema({
   openDays:  { type: [Number], default: [0, 1, 2, 3, 4, 5, 6] },
   maxAdvanceDays:      { type: Number, default: 30 },
   bookingCutoffHours:  { type: Number, default: 2 },
+  // A day with this many or fewer free hourly slots (but more than 0) shows
+  // as "Few Slots" instead of "Available" on the booking page's Date
+  // Selection calendar. Was a Frontend-only hardcoded constant
+  // (utils/rooms.js's FEW_SLOTS_THRESHOLD) — moved here so it's
+  // admin-configurable (Settings > Operating Schedule) instead.
+  fewSlotsThreshold:   { type: Number, default: 2 },
 }, { _id: false });
 
 // A customer-facing down-payment option shown on the booking page (e.g.

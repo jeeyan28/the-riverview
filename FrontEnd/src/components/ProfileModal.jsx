@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { bookingsService } from '../services/bookings';
+import { API_BASE_URL } from '../services/api';
 import PasswordInput from './PasswordInput';
 import { PASSWORD_REQUIREMENTS } from '../utils/password';
 
@@ -10,8 +11,6 @@ import { PASSWORD_REQUIREMENTS } from '../utils/password';
 // Segmented tabs: "Profile" (details + change password, session-based
 // accounts only) and "Booking history". Session state/verification comes
 // from AuthContext (useAuth) — see that file for revalidate()/logout().
-
-const API_BASE_URL = 'http://localhost:3000';
 
 const EMPTY_DETAILS = { firstName: '', lastName: '', phone: '', email: '' };
 const EMPTY_PASSWORD = { currentPassword: '', newPassword: '', confirmPassword: '' };
@@ -258,9 +257,6 @@ function ProfileModal({ open, onClose }) {
               </div>
 
               <form id="pfDetailsForm" noValidate className="pf-fields" onSubmit={handleDetailsSubmit}>
-                {isGoogleAccount && (
-                  <p className="pf-history-empty">Your name is managed by your Google account.</p>
-                )}
                 <div className="pf-field">
                   <label htmlFor="pfFirstName">First name</label>
                   <input
@@ -268,7 +264,6 @@ function ProfileModal({ open, onClose }) {
                     id="pfFirstName"
                     placeholder="First name"
                     value={details.firstName}
-                    disabled={isGoogleAccount}
                     onChange={(e) => setDetails((d) => ({ ...d, firstName: e.target.value }))}
                   />
                 </div>
@@ -279,7 +274,6 @@ function ProfileModal({ open, onClose }) {
                     id="pfLastName"
                     placeholder="Last name"
                     value={details.lastName}
-                    disabled={isGoogleAccount}
                     onChange={(e) => setDetails((d) => ({ ...d, lastName: e.target.value }))}
                   />
                 </div>
@@ -297,28 +291,25 @@ function ProfileModal({ open, onClose }) {
                       id="pfPhone"
                       placeholder="9XX XXX XXXX"
                       value={details.phone}
-                      disabled={isGoogleAccount}
                       onChange={(e) => setDetails((d) => ({ ...d, phone: e.target.value }))}
                     />
                   </div>
                 </div>
 
-                {!isGoogleAccount && (
-                  <div className="pf-modal-actions">
-                    <button type="button" className="pf-btn pf-btn-ghost" onClick={handleClose}>
-                      Close
-                    </button>
-                    <button
-                      type="submit"
-                      className={`pf-btn pf-btn-solid${savingDetails ? ' loading' : ''}`}
-                      id="pfSaveDetailsBtn"
-                      disabled={savingDetails}
-                    >
-                      <span className="pf-btn-text">Save</span>
-                      <span className="pf-spinner"></span>
-                    </button>
-                  </div>
-                )}
+                <div className="pf-modal-actions">
+                  <button type="button" className="pf-btn pf-btn-ghost" onClick={handleClose}>
+                    Close
+                  </button>
+                  <button
+                    type="submit"
+                    className={`pf-btn pf-btn-solid${savingDetails ? ' loading' : ''}`}
+                    id="pfSaveDetailsBtn"
+                    disabled={savingDetails}
+                  >
+                    <span className="pf-btn-text">Save</span>
+                    <span className="pf-spinner"></span>
+                  </button>
+                </div>
               </form>
             </div>
 

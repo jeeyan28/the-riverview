@@ -44,7 +44,7 @@ router.get("/", async (req, res) => {
   try {
     const filter = {};
     if (req.query.status) filter.status = req.query.status;
-    const rooms = await Room.find(filter).sort({ name: 1 });
+    const rooms = await Room.find(filter).populate("category").sort({ name: 1 });
     res.json(rooms);
   } catch (err) {
     console.error(err);
@@ -66,21 +66,42 @@ router.get("/:id", async (req, res) => {
 // Everything below changes room data — manager/super_admin only
 router.post("/", requirePermission(PERMISSIONS.ROOM_MANAGE), upload.single("image"), async (req, res) => {
   try {
-    const { name, roomNumber, description, price, status, features, variants, capacity } = req.body;
+    const {
+      category,
+      name,
+      roomNumber,
+      description,
+      price,
+      status,
+      features,
+      variants,
+      capacity,
+    } = req.body;
 
-    if (!name || !roomNumber) {
-      return res.status(400).json({ message: "name and roomNumber are required." });
+    if (!category || !name || !roomNumber) {
+      return res.status(400).json({
+        message: "category, name and roomNumber are required."
+      });
     }
 
     const room = new Room({
+      category,
+
       name,
       roomNumber,
+
       description: description || "",
+
       price: Number(price) || 0,
+
       status: status || "Available",
+
       features: parseFeatures(features),
+
       variants: parseVariants(variants),
+
       capacity: Number(capacity) || 0,
+
       image: req.file ? req.file.path : (req.body.image || ""),
     });
 
@@ -94,11 +115,21 @@ router.post("/", requirePermission(PERMISSIONS.ROOM_MANAGE), upload.single("imag
 
 router.put("/:id", requirePermission(PERMISSIONS.ROOM_MANAGE), upload.single("image"), async (req, res) => {
   try {
-    const { name, description, price, status, features, variants, capacity } = req.body;
+    const {
+      category,
+      name,
+      description,
+      price,
+      status,
+      features,
+      variants,
+      capacity,
+    } = req.body;
 
     // Room No. is locked after creation (FEATURE_REQUESTS.md Priority 1) —
     // silently ignored here even if sent.
     const update = {};
+    if (category !== undefined) update.category = category;
     if (name !== undefined) update.name = name;
     if (description !== undefined) update.description = description;
     if (price !== undefined) update.price = Number(price) || 0;

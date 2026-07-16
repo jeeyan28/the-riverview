@@ -4,6 +4,7 @@ import { useSiteSettings } from '../hooks/useSiteSettings';
 import { resolveImageUrl } from '../utils/resolveImageUrl';
 import { dateKey, fetchReservedHours } from '../utils/rooms';
 import BookingModal from '../components/BookingModal';
+import { API_BASE_URL } from '../services/api';
 
 import heroImg4 from '../assets/pictures/RiverView_4.jpg';
 import heroImg5 from '../assets/pictures/RiverView_5.jpg';
@@ -15,13 +16,6 @@ import courtImg from '../assets/images/court.png';
 import fallbackRoomImg from '../assets/pictures/Billiard.jpg';
 import heroBgImg from '../assets/images/main.png';
 
-// ─────────────────────────────────────────────────────────────────────────
-// Home — migrated from index.html + js/index.js (Phase 8, parts 1 & 2 of 3).
-//
-// API_BASE_URL is still hardcoded, matching every other page pre-Phase 9.
-// ─────────────────────────────────────────────────────────────────────────
-
-const API_BASE_URL = 'http://localhost:3000';
 const HERO_CAROUSEL_INTERVAL_MS = 4000;
 
 const HERO_SLIDES = [
@@ -160,7 +154,6 @@ function RoomCard({ room, liveStatus, onSelect }) {
     <div className="room-card" data-room-id={room._id}>
       <div className="room-card-img">
         <img src={cardImage} alt={room.name} />
-        <span className={`room-card-status ${statusClass}`}>{statusLabel}</span>
       </div>
       <div className="room-card-body">
         <h3>{room.name}</h3>
@@ -197,19 +190,21 @@ function Home() {
   const [liveStatuses, setLiveStatuses] = useState({}); // { [roomId]: 'Fully Booked' }
 
   const [bookingRoom, setBookingRoom] = useState(null); // room object, or null when closed
-  const [paymongoReturn, setPaymongoReturn] = useState(null); // { result, bookingId }, or null
+  const [paymongoReturn, setPaymongoReturn] = useState(null); // { result, paymentIntentId }, or null
   const [searchParams, setSearchParams] = useSearchParams();
 
   // handlePaymongoReturn (URL-reading half) — migrated 1:1 from js/index.js.
   // Runs once on mount, exactly like the original's unconditional
   // `handlePaymongoReturn();` call at the bottom of index.js. Cleans the
   // URL immediately so refreshing/sharing it doesn't re-trigger this.
+  // Reads `paymentIntentId` (not `bookingId`) — no Booking exists until
+  // payment actually succeeds, so the PayMongo return URL can't carry one.
   useEffect(() => {
     const result = searchParams.get('paymongo');
-    const bookingId = searchParams.get('bookingId');
-    if (!result || !bookingId) return;
+    const paymentIntentId = searchParams.get('paymentIntentId');
+    if (!result || !paymentIntentId) return;
 
-    setPaymongoReturn({ result, bookingId });
+    setPaymongoReturn({ result, paymentIntentId });
     setSearchParams({}, { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

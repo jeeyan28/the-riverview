@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { apiRequest } from '../services/api';
 
 // useSiteSettings — migrated from the SITE_SETTINGS global + loadSiteSettings()
 // + applyOperatingHours() in the old js/index.js ("LIVE SITE SETTINGS" section).
@@ -21,7 +22,6 @@ import { useEffect, useState } from 'react';
 // no announcements) if the request fails, so the homepage never breaks
 // because this endpoint is briefly unreachable.
 const DEFAULT_SETTINGS = { operatingHours: null, holidays: [], announcements: [], paymentMethods: [] };
-const API_BASE_URL = 'http://localhost:3000';
 
 function parseHourFromTimeStr(str, fallback) {
   if (!str || typeof str !== 'string') return fallback;
@@ -33,6 +33,7 @@ export function useSiteSettings() {
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
   const [openHour, setOpenHour] = useState(7);
   const [closeHour, setCloseHour] = useState(24);
+  const [fewSlotsThreshold, setFewSlotsThreshold] = useState(2);
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
@@ -40,9 +41,7 @@ export function useSiteSettings() {
 
     async function loadSiteSettings() {
       try {
-        const res = await fetch(`${API_BASE_URL}/api/settings`);
-        if (!res.ok) return;
-        const data = await res.json();
+        const data = await apiRequest('/api/settings');
         if (cancelled) return;
 
         setSettings(data);
@@ -56,6 +55,9 @@ export function useSiteSettings() {
           if (close <= open) close += 24;
           setOpenHour(open);
           setCloseHour(close);
+          if (Number.isFinite(Number(oh.fewSlotsThreshold))) {
+            setFewSlotsThreshold(Number(oh.fewSlotsThreshold));
+          }
         }
       } catch (err) {
         console.error(err);
@@ -70,5 +72,5 @@ export function useSiteSettings() {
     };
   }, []);
 
-  return { settings, openHour, closeHour, loaded };
+  return { settings, openHour, closeHour, fewSlotsThreshold, loaded };
 }

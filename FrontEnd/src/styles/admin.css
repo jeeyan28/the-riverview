@@ -1,29 +1,47 @@
-/* ══════════════════════════════════════════
+  /* ══════════════════════════════════════════
+    THE RIVERVIEW — ADMIN PANEL
+    ══════════════════════════════════════════ */
+
+ /* ══════════════════════════════════════════
    THE RIVERVIEW — ADMIN PANEL
+   Theme Variables
    ══════════════════════════════════════════ */
 
 :root{
-  --navy1:#F4F5FA;        /* page background */
-  --navy2:#FFFFFF;        /* surface — cards, sidebar, topbar */
-  --navy3:#F7F8FA;        /* secondary surface — inputs, subtle hover */
-  --navy4:#EEF0F5;        /* deeper hover/active surface */
+  /* Backgrounds */
+  --navy1:#F4F5FA;
+  --navy2:#FFFFFF;
+  --navy3:#F7F8FA;
+  --navy4:#EEF0F5;
+
+  /* Text */
+  --text:#1A1D29;
+  --muted:#6B7280;
+
+  /* Borders */
+  --border:rgba(16,24,40,.08);
   --border-soft:rgba(16,24,40,.05);
+
+  /* Brand */
   --blue:#2563EB;
   --amber:#F5A524;
   --pink:#EF3E6D;
   --red:#E11D48;
   --green:#16A34A;
+
+  /* Typography */
   --font-body:'Inter',sans-serif;
-  --font-display:'Inter',sans-serif; /* was Playfair Display serif — the
-    reference's headings/logotype are a clean bold sans, not a serif. */
-  --shadow-sm:0 1px 3px rgba(16,24,40,.06),0 1px 2px rgba(16,24,40,.04);
+  --font-display:'Inter',sans-serif;
+
+  /* Shadows */
+  --shadow-sm:0 1px 3px rgba(16,24,40,.06),
+              0 1px 2px rgba(16,24,40,.04);
+
   --shadow-md:0 4px 16px rgba(16,24,40,.08);
 }
 
-*{box-sizing:border-box;}
 
 body{
-  margin:0;
   -webkit-font-smoothing:antialiased;
 }
 
