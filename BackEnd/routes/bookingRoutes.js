@@ -6,7 +6,7 @@ const Settings = require("../model/settings");
 const { requirePermission, ensureAuthenticated } = require("../middleware/adminAuth");
 const { paymentProofUpload } = require("../middleware/upload");
 const { PERMISSIONS, isAdminRole } = require("../utils/permissions");
-const { validateAndPriceBooking, computeDownPayment } = require("../utils/bookingHelper");
+const { validateAndPriceBooking, computeDownPayment, saveWithReservationCode } = require("../utils/bookingHelper");
 
 // ── List all bookings — admin only. Supports the Booking Management search/filter UI:
 //    ?search=   matches guest name or contact (case-insensitive, partial)
@@ -25,7 +25,7 @@ router.get("/", requirePermission(PERMISSIONS.BOOKING_VIEW), async (req, res) =>
       // Escape regex metacharacters so a search like "juan (2)" doesn't throw.
       const safe = req.query.search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       const re = new RegExp(safe, "i");
-      filter.$or = [{ guestName: re }, { guestContact: re }];
+      filter.$or = [{ guestName: re }, { guestContact: re }, { reservationCode: re }];
     }
 
     const bookings = await Booking.find(filter).sort({ createdAt: -1 });
@@ -164,7 +164,7 @@ router.post("/", ensureAuthenticated, paymentProofUpload.single("paymentScreensh
       downPayment: 0,
     });
 
-    await booking.save();
+    await saveWithReservationCode(booking, room.name);
     res.status(201).json(booking);
   } catch (err) {
     console.error(err);

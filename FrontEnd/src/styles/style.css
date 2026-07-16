@@ -605,6 +605,8 @@ nav a:hover, nav a.active { color: var(--text-main); background: var(--card-ligh
 .bk-step-dot--done .bk-step-dot-num { background: rgba(0,201,167,.18); color: #00C9A7; border-color: rgba(0,201,167,.4); }
 
 .bk-choose-label { font-size: .8rem; color: #8b93a6; margin-bottom: .8rem; }
+.bk-choose-label-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: .8rem; }
+.bk-choose-label-row .bk-choose-label { margin-bottom: 0; }
 .bk-choose-label--heading { font-size: .92rem; font-weight: 700; color: #fff; margin-bottom: 1rem; }
 
 .bk-detail-actions { display: flex; gap: .7rem; margin-top: 1.3rem; }
@@ -631,6 +633,7 @@ nav a:hover, nav a.active { color: var(--text-main); background: var(--card-ligh
 
 .bk-room-option-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
 .bk-room-option-top { display: flex; align-items: flex-start; justify-content: space-between; gap: .5rem; }
+.bk-room-option-name-wrap { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .bk-room-option-name { color: #fff; font-size: .9rem; font-weight: 600; }
 
 .bk-radio {
@@ -776,24 +779,37 @@ nav a:hover, nav a.active { color: var(--text-main); background: var(--card-ligh
 .bk-pax-btn:hover { background: rgba(0,201,167,.12); border-color: rgba(0,201,167,.4); color: #00C9A7; }
 .bk-pax-input { text-align: center; flex: 1; }
 
-/* ----- down-payment / online-payment step ----- */
-.bk-downpayment-summary { flex-direction: column; align-items: flex-start; gap: .4rem; }
-.bk-downpayment-note {
-    display: flex; align-items: center; gap: 6px;
-    font-size: .74rem; color: #8b93a6;
+/* ----- payment step (down payment + method selection) ----- */
+.bk-downpayment-card {
+    position: relative;
+    border: 1px solid rgba(255,255,255,.08); border-radius: 14px;
+    padding: 16px 18px; margin-top: 4px;
+    background: rgba(255,255,255,.03);
 }
-.bk-downpayment-note i { color: #00C9A7; }
-.bk-online-pay-card {
-    border: 1px solid rgba(0,201,167,.2); border-radius: 14px; padding: 18px;
-    margin-top: 16px; background: rgba(0,201,167,.05);
+.bk-downpayment-card-dot {
+    position: absolute; top: 14px; right: 16px;
+    width: 7px; height: 7px; border-radius: 50%; background: #e2554b;
 }
-.bk-online-pay-title {
-    font-family: 'Playfair Display', serif; font-weight: 700; color: #fff;
-    font-size: 1rem; margin: 0 0 6px; display: flex; align-items: center; gap: 8px;
+.bk-downpayment-amount { font-size: 1.6rem; font-weight: 700; color: #fff; margin: .2rem 0 0; }
+.bk-downpayment-duration { font-size: .76rem; color: #8b93a6; margin: .15rem 0 0; }
+
+.bk-payment-methods { margin-top: 18px; }
+.bk-payment-methods-label { font-size: .78rem; color: #8b93a6; font-weight: 600; display: block; margin-bottom: 10px; }
+.bk-payment-methods-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.bk-payment-method-tile {
+    display: flex; align-items: center; gap: 10px;
+    padding: .8rem .9rem; border-radius: 12px; text-align: left;
+    background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.1);
+    color: #dfe3ec; font-size: .84rem; font-weight: 500; cursor: pointer;
+    transition: background .15s, border-color .15s;
 }
-.bk-online-pay-title i { color: #00C9A7; }
-.bk-online-pay-sub { font-size: .8rem; color: #8b93a6; margin: 0 0 14px; }
-.bk-online-pay-card .bk-confirm { width: 100%; }
+.bk-payment-method-tile i { font-size: .95rem; color: #8b93a6; transition: color .15s; }
+.bk-payment-method-tile:hover { border-color: rgba(0,201,167,.4); }
+.bk-payment-method-tile--selected { background: rgba(0,201,167,.08); border-color: #00C9A7; color: #fff; }
+.bk-payment-method-tile--selected i { color: #00C9A7; }
+.bk-payment-method-tile--disabled { opacity: .35; pointer-events: none; }
+.bk-payment-redirect-note { font-size: .78rem; color: #8b93a6; margin: 12px 0 0; }
+.bk-online-pay-sub { font-size: .8rem; color: #8b93a6; margin: 12px 0 0; }
 
 /* ----- reservation review (step 5) ----- */
 .bk-review-room { display: flex; gap: .9rem; margin-bottom: 1.1rem; }
@@ -842,7 +858,33 @@ nav a:hover, nav a.active { color: var(--text-main); background: var(--card-ligh
 .bk-status-pill--paid { background: rgba(0,201,167,.15); color: #00C9A7; }
 .bk-status-pill--pending { background: rgba(239,159,39,.15); color: #EF9F27; }
 .bk-status-pill--unpaid { background: rgba(226,85,75,.15); color: #e2554b; }
+.bk-status-pill--available { background: rgba(0,201,167,.15); color: #00C9A7; }
+.bk-status-pill--occupied { background: rgba(239,159,39,.15); color: #EF9F27; }
+.bk-status-pill--maintenance { background: rgba(226,85,75,.15); color: #e2554b; }
+.bk-status-pill--fullybooked { background: rgba(226,85,75,.15); color: #e2554b; }
+.bk-status-pill--inactive { background: rgba(255,255,255,.08); color: #8b93a6; }
 .bk-ref-value { font-family: 'Courier New', monospace; font-size: .8rem; letter-spacing: .02em; }
+
+/* ----- booking success screen (paymongoReturn confirmed phase) ----- */
+.bk-success-card {
+    text-align: left; background: rgba(255,255,255,.03);
+    border: 1px solid rgba(255,255,255,.08); border-radius: 14px;
+    padding: 18px 20px; margin: 1rem 0 1.4rem;
+}
+.bk-success-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 14px 18px;
+    padding-bottom: 14px; border-bottom: 1px solid rgba(255,255,255,.08);
+}
+.bk-success-item { display: flex; flex-direction: column; gap: 4px; }
+.bk-success-code { font-family: 'Courier New', monospace; font-size: .92rem; font-weight: 700; color: #00C9A7; letter-spacing: .02em; }
+.bk-success-cost {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 14px 18px;
+    padding-top: 14px;
+}
+.bk-success-paid { font-size: 1rem; font-weight: 700; color: #00C9A7; }
+.bk-success-balance { font-size: 1rem; font-weight: 700; color: #EF9F27; }
+.bk-success-note { font-size: .78rem; color: #8b93a6 !important; margin-top: 1rem !important; }
+.bk-success-note i { color: #00C9A7; margin-right: 4px; }
 
 /* =================== PROFILE MODAL =================== */
 /* Append to your main stylesheet (same file as .bk-overlay / .bk-modal) */

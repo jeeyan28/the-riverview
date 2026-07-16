@@ -1,32 +1,82 @@
 const express = require("express");
 const router = express.Router();
 const Booking = require("../model/booking");
-const Room = require("../model/room");
 const { ensureAuthenticated } = require("../middleware/adminAuth");
-const { validateAndPriceBooking, computeDownPayment } = require("../utils/bookingHelper");
-const { createCheckoutSession, retrieveCheckoutSession, verifyWebhookSignature } = require("../utils/paymongo");
+const { validateAndPriceBooking, computeDownPayment, finalizeBookingFromPayment } = require("../utils/bookingHelper");
+const {
+  getPublicKey,
+  createPaymentIntent,
+  retrievePaymentIntent,
+  createWalletPaymentMethod,
+  attachPaymentIntent,
+  verifyWebhookSignature,
+} = require("../utils/paymongo");
 const { isAdminRole } = require("../utils/permissions");
 
-// Where to send the customer back to after PayMongo's hosted checkout page.
-// Falls back to the first configured frontend origin (see server.js's CORS
-// allowedOrigins) if PAYMONGO_RETURN_BASE_URL isn't set separately.
+// Where PayMongo sends the popup back to once a 3D Secure challenge or an
+// e-wallet authorization page is done. Falls back to the first configured
+// frontend origin (see server.js's CORS allowedOrigins) if
+// PAYMONGO_RETURN_BASE_URL isn't set separately. The literal fallback below
+// must match Frontend/vite.config.js's dev server port (currently 5501).
 function getReturnBaseUrl() {
   return (
     process.env.PAYMONGO_RETURN_BASE_URL ||
     (process.env.APP_BASE_URL || "").split(",")[0]?.trim() ||
-    "http://localhost:5500"
+    "http://localhost:5501"
   );
 }
 
-// ── Create an automatic online-payment checkout — logged-in customers only.
-//    Mirrors POST /api/bookings (same validation, same down-payment math)
-//    but instead of requiring a screenshot upload, it:
-//      1. creates the booking as "Awaiting Online Payment" / paymentProvider "paymongo"
-//      2. opens a PayMongo Checkout Session for the down payment
-//      3. returns the checkout_url for the frontend to redirect the customer to
-//    The booking is only ever moved to "Confirmed"/"Paid" automatically, by
-//    the webhook below — never by this endpoint, and never by an admin click.
-router.post("/checkout", ensureAuthenticated, async (req, res) => {
+function isPaidPaymentIntent(intentAttrs) {
+  if (!intentAttrs) return false;
+  if (intentAttrs.status === "succeeded") return true;
+  return Array.isArray(intentAttrs.payments) && intentAttrs.payments.some(p => p?.attributes?.status === "paid");
+}
+
+// PayMongo requires billing.email for GCash/Maya/QRPh Payment Methods, but
+// the booking form only collects a single "Phone Number or Email" field
+// (guestContact) — it's frequently a phone number, not an email. Falls back
+// to the logged-in account's own email (always present — User.email is a
+// required, unique schema field) so wallet payments never lack one.
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+function resolveGuestEmail({ guestEmail, guestContact, accountEmail }) {
+  if (guestEmail && EMAIL_RE.test(guestEmail)) return guestEmail;
+  if (guestContact && EMAIL_RE.test(guestContact)) return guestContact;
+  return accountEmail || "";
+}
+
+// PayMongo metadata values must be strings. Carries everything
+// finalizeBookingFromPayment() needs to create the Booking later, once
+// payment has actually succeeded — nothing is written to Mongo at intent
+// creation time.
+function toBookingMetadata(fields) {
+  const out = {};
+  Object.entries(fields).forEach(([k, v]) => {
+    out[k] = v === undefined || v === null ? "" : String(v);
+  });
+  return out;
+}
+
+// ── Publishable key for the frontend's client-side card tokenization.
+//    Not secret — safe to serve unauthenticated, same as any pk_ key.
+router.get("/config", (req, res) => {
+  try {
+    res.json({ publicKey: getPublicKey() });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error." });
+  }
+});
+
+// ── Create a PayMongo Payment Intent for the prospective booking's down
+//    payment — logged-in customers only. Same validation/pricing as
+//    POST /api/bookings, but no Booking is created here: the room/date/time
+//    slot must NOT be held (and no Reservation Code generated) until payment
+//    actually succeeds. Everything needed to create the Booking afterward
+//    travels as the intent's own metadata instead (see toBookingMetadata()
+//    above and finalizeBookingFromPayment() in utils/bookingHelper.js),
+//    consumed by POST /intent/:paymentIntentId/attach, GET /status/:id, or
+//    the webhook — whichever confirms payment first.
+router.post("/intent", ensureAuthenticated, async (req, res) => {
   try {
     const { guestName, guestContact, guestEmail, guestCount: guestCountRaw, specialRequests, roomId, variantLabel, date, timeIn, duration: durationRaw } = req.body;
     const duration = Number(durationRaw);
@@ -48,57 +98,37 @@ router.post("/checkout", ensureAuthenticated, async (req, res) => {
     // source of truth this mirrors.
     const downPayment = computeDownPayment(unitPrice);
 
-    const booking = new Booking({
-      guestName,
-      guestContact: guestContact || "",
-      guestEmail: guestEmail || "",
-      guestCount: Number.isFinite(guestCount) && guestCount > 0 ? guestCount : 1,
-      specialRequests: specialRequests || "",
-      room: room._id,
-      roomLabel: room.roomNumber || room.name,
-      variantLabel: variantLabel || null,
-      date,
-      timeIn,
-      duration,
-      amount,
-      paymentMethod: "PayMongo",
-      paymentProvider: "paymongo",
-      bookedBy: req.session.userId,
-      source: "online",
-      status: "Awaiting Online Payment",
-      paymentStatus: "Unpaid",
-      downPayment,
-    });
-    await booking.save();
-
-    const base = getReturnBaseUrl();
-    let session;
+    let intent;
     try {
-      session = await createCheckoutSession({
+      intent = await createPaymentIntent({
         amountPesos: downPayment,
         description: `Down payment — ${room.roomNumber || room.name} (${date} ${timeIn})`,
-        referenceNumber: String(booking._id),
-        successUrl: `${base}/index.html?paymongo=success&bookingId=${booking._id}`,
-        cancelUrl: `${base}/index.html?paymongo=cancel&bookingId=${booking._id}`,
-        customerEmail: guestEmail || undefined,
-        customerName: guestName,
+        statementDescriptor: room.roomNumber || room.name,
+        metadata: toBookingMetadata({
+          guestName: guestName.trim(),
+          guestContact: (guestContact || "").trim(),
+          guestEmail: resolveGuestEmail({ guestEmail, guestContact, accountEmail: req.user.email }),
+          guestCount,
+          specialRequests: (specialRequests || "").trim(),
+          roomId: room._id,
+          variantLabel: variantLabel || "",
+          date,
+          timeIn,
+          duration,
+          amount,
+          downPayment,
+          bookedBy: req.session.userId,
+        }),
       });
     } catch (paymongoErr) {
-      // Roll back the booking we just created so a failed PayMongo call
-      // (e.g. missing/invalid API key while you're still setting this up)
-      // doesn't leave a dangling "Awaiting Online Payment" slot blocking
-      // the calendar.
-      await Booking.findByIdAndDelete(booking._id);
-      console.error("PayMongo checkout session creation failed:", paymongoErr);
+      console.error("PayMongo payment intent creation failed:", paymongoErr);
       return res.status(502).json({ message: paymongoErr.message || "Could not start online payment. Please try again." });
     }
 
-    booking.paymongoCheckoutSessionId = session.data.id;
-    await booking.save();
-
     res.status(201).json({
-      bookingId: booking._id,
-      checkoutUrl: session.data.attributes.checkout_url,
+      paymentIntentId: intent.data.id,
+      clientKey: intent.data.attributes.client_key,
+      amount: downPayment,
     });
   } catch (err) {
     console.error(err);
@@ -106,73 +136,160 @@ router.post("/checkout", ensureAuthenticated, async (req, res) => {
   }
 });
 
-// ── Poll a booking's payment status — used by the frontend right after the
-//    customer is redirected back from PayMongo's checkout page, in case the
-//    webhook hasn't landed yet. Also re-verifies directly against PayMongo's
-//    API rather than trusting the redirect alone.
-router.get("/status/:bookingId", ensureAuthenticated, async (req, res) => {
+// ── Attach a Payment Method to the Payment Intent created by POST /intent.
+//    Card: `paymentMethodId` — already tokenized client-side by the browser
+//      (see GET /config + BookingModal.jsx), so raw card data never reaches
+//      this endpoint at all.
+//    GCash / Maya / QRPh: `paymentMethodType` — created here server-side,
+//      since there's no sensitive card data involved for those.
+//    Can be called more than once for the same intent (e.g. a declined
+//    card, or the customer picks a different method) — PayMongo keeps the
+//    intent open until it succeeds. The Booking (and Reservation Code) is
+//    only ever created here the moment PayMongo confirms payment — see
+//    finalizeBookingFromPayment() in utils/bookingHelper.js.
+router.post("/intent/:paymentIntentId/attach", ensureAuthenticated, async (req, res) => {
   try {
-    const booking = await Booking.findById(req.params.bookingId);
-    if (!booking) return res.status(404).json({ message: "Booking not found." });
+    const { paymentIntentId } = req.params;
+    const { paymentMethodId, paymentMethodType } = req.body;
 
-    // Only the guest who made it (or an admin) should be able to poll this.
-    if (String(booking.bookedBy) !== String(req.user._id) && !isAdminRole(req.user.role)) {
+    // Idempotent: a Booking may already exist for this intent if a previous
+    // attach call, the status poll, or the webhook got there first.
+    const existingBooking = await Booking.findOne({ paymongoPaymentIntentId: paymentIntentId });
+    if (existingBooking) {
+      if (String(existingBooking.bookedBy) !== String(req.user._id)) {
+        return res.status(403).json({ message: "Not allowed." });
+      }
+      return res.json({ status: "succeeded", bookingId: existingBooking._id, reservationCode: existingBooking.reservationCode });
+    }
+
+    let intent;
+    try {
+      intent = await retrievePaymentIntent(paymentIntentId);
+    } catch (e) {
+      return res.status(e.status || 502).json({ message: e.message || "Could not find this payment. Please try again." });
+    }
+    const metadata = intent?.data?.attributes?.metadata || {};
+    if (String(metadata.bookedBy) !== String(req.user._id)) {
       return res.status(403).json({ message: "Not allowed." });
     }
-
-    if (booking.paymentStatus === "Paid" || !booking.paymongoCheckoutSessionId) {
-      return res.json({ status: booking.status, paymentStatus: booking.paymentStatus });
+    if (!paymentMethodId && !paymentMethodType) {
+      return res.status(400).json({ message: "paymentMethodId or paymentMethodType is required." });
     }
 
-    // Not confirmed yet locally — ask PayMongo directly as a fallback in case
-    // our webhook is delayed or hasn't been configured yet.
-    const session = await retrieveCheckoutSession(booking.paymongoCheckoutSessionId);
-    const paymentIntent = session?.data?.attributes?.payment_intent;
-    const isPaid = paymentIntent?.attributes?.status === "succeeded" ||
-      (Array.isArray(paymentIntent?.attributes?.payments) &&
-        paymentIntent.attributes.payments.some(p => p?.attributes?.status === "paid"));
-
-    if (isPaid && booking.paymentStatus !== "Paid") {
-      booking.status = "Confirmed";
-      booking.paymentStatus = "Paid";
-      const paidPayment = paymentIntent?.attributes?.payments?.find(p => p?.attributes?.status === "paid");
-      if (paidPayment) booking.paymongoPaymentId = paidPayment.id;
-      await booking.save();
+    let methodId = paymentMethodId;
+    if (!methodId) {
+      let walletMethod;
+      try {
+        walletMethod = await createWalletPaymentMethod({
+          type: paymentMethodType,
+          billing: { name: metadata.guestName, email: metadata.guestEmail || req.user.email },
+        });
+      } catch (e) {
+        return res.status(e.status || 502).json({ message: e.message || "Could not start that payment method. Please try again." });
+      }
+      methodId = walletMethod.data.id;
     }
 
-    res.json({ status: booking.status, paymentStatus: booking.paymentStatus });
+    const base = getReturnBaseUrl();
+    let attachResult;
+    try {
+      attachResult = await attachPaymentIntent({
+        paymentIntentId,
+        paymentMethodId: methodId,
+        clientKey: intent.data.attributes.client_key,
+        returnUrl: `${base}/index.html?paymongo=success&paymentIntentId=${paymentIntentId}`,
+      });
+    } catch (e) {
+      return res.status(e.status || 502).json({ message: e.message || "Payment could not be processed. Please try again." });
+    }
+
+    const attrs = attachResult.data.attributes;
+
+    if (isPaidPaymentIntent(attrs)) {
+      const paidPayment = attrs.payments?.find(p => p?.attributes?.status === "paid");
+      try {
+        const booking = await finalizeBookingFromPayment({
+          paymentIntentId,
+          metadata: attrs.metadata || metadata,
+          paidPaymentId: paidPayment?.id || "",
+        });
+        return res.json({ status: "succeeded", bookingId: booking._id, reservationCode: booking.reservationCode });
+      } catch (e) {
+        if (e.slotUnavailable) {
+          // Availability Safety Check failed after a successful charge —
+          // another confirmed reservation took the slot in the meantime.
+          // No Booking/Reservation Code is created. Flagged for manual
+          // follow-up (refund) since there's no refund call wired up yet.
+          console.error(`PayMongo payment ${paymentIntentId} succeeded but the slot is no longer available — needs manual review/refund.`);
+          return res.status(409).json({ status: "paid_slot_unavailable", message: e.message });
+        }
+        throw e;
+      }
+    }
+
+    if (attrs.status === "awaiting_next_action" && attrs.next_action?.redirect?.url) {
+      return res.json({ status: "awaiting_next_action", redirectUrl: attrs.next_action.redirect.url });
+    }
+
+    if (attrs.status === "processing") {
+      return res.json({ status: "processing" });
+    }
+
+    // "awaiting_payment_method" — this attempt failed (e.g. card declined).
+    // The intent itself is still open, so the customer can pick another method.
+    return res.status(402).json({ status: "failed", message: "That payment method was declined. Please try another." });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Server error." });
   }
 });
 
-// ── Cancel an unpaid PayMongo checkout — called when the customer lands back
-//    on cancel_url (or backs out) so their held slot doesn't stay blocked
-//    forever waiting for a payment that isn't coming. No-ops safely if the
-//    booking already got paid in the meantime (race with the webhook).
-router.post("/cancel/:bookingId", ensureAuthenticated, async (req, res) => {
+// ── Poll payment status by Payment Intent id — used by the frontend while a
+//    3DS/e-wallet popup is open, and right after it closes, in case the
+//    webhook hasn't landed yet. If no Booking exists yet for this intent,
+//    checks directly with PayMongo and — the moment it's paid — creates the
+//    Booking itself (finalizeBookingFromPayment() is idempotent, so this
+//    races safely against attach()/the webhook doing the same thing).
+router.get("/status/:paymentIntentId", ensureAuthenticated, async (req, res) => {
   try {
-    const booking = await Booking.findById(req.params.bookingId);
-    if (!booking) return res.status(404).json({ message: "Booking not found." });
+    const { paymentIntentId } = req.params;
 
-    if (String(booking.bookedBy) !== String(req.user._id) && !isAdminRole(req.user.role)) {
+    const booking = await Booking.findOne({ paymongoPaymentIntentId: paymentIntentId });
+    if (booking) {
+      if (String(booking.bookedBy) !== String(req.user._id) && !isAdminRole(req.user.role)) {
+        return res.status(403).json({ message: "Not allowed." });
+      }
+      return res.json({ status: booking.status, paymentStatus: booking.paymentStatus, bookingId: booking._id, reservationCode: booking.reservationCode });
+    }
+
+    let intent;
+    try {
+      intent = await retrievePaymentIntent(paymentIntentId);
+    } catch (e) {
+      return res.status(e.status || 502).json({ message: e.message || "Could not check payment status." });
+    }
+    const attrs = intent?.data?.attributes;
+    const metadata = attrs?.metadata || {};
+    if (String(metadata.bookedBy) !== String(req.user._id) && !isAdminRole(req.user.role)) {
       return res.status(403).json({ message: "Not allowed." });
     }
-    if (booking.paymentProvider !== "paymongo") {
-      return res.status(400).json({ message: "Not an online-payment booking." });
+
+    if (!isPaidPaymentIntent(attrs)) {
+      // No Booking/slot is held while payment is still pending — nothing to
+      // report but the intent's own not-yet-paid state.
+      return res.json({ status: "Awaiting Online Payment", paymentStatus: "Unpaid" });
     }
 
-    if (booking.paymentStatus === "Paid") {
-      // Already paid (e.g. webhook landed a moment before this call) — do
-      // not cancel a booking that's actually been paid for.
-      return res.json({ status: booking.status, paymentStatus: booking.paymentStatus });
+    try {
+      const paidPayment = attrs.payments?.find(p => p?.attributes?.status === "paid");
+      const created = await finalizeBookingFromPayment({ paymentIntentId, metadata, paidPaymentId: paidPayment?.id || "" });
+      return res.json({ status: created.status, paymentStatus: created.paymentStatus, bookingId: created._id, reservationCode: created.reservationCode });
+    } catch (e) {
+      if (e.slotUnavailable) {
+        return res.status(409).json({ status: "paid_slot_unavailable", paymentStatus: "Paid", message: e.message });
+      }
+      throw e;
     }
-    if (booking.status === "Awaiting Online Payment") {
-      booking.status = "Cancelled";
-      await booking.save();
-    }
-    res.json({ status: booking.status, paymentStatus: booking.paymentStatus });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Server error." });
@@ -180,7 +297,7 @@ router.post("/cancel/:bookingId", ensureAuthenticated, async (req, res) => {
 });
 
 // ── Webhook receiver — PayMongo calls this automatically the moment a
-//    Checkout Session is paid. This is what makes payment "automatic": no
+//    Payment Intent succeeds. This is what makes payment "automatic": no
 //    admin ever needs to click Approve for a PayMongo booking.
 //
 //    IMPORTANT: this route is mounted in server.js with express.raw(), NOT
@@ -207,24 +324,34 @@ async function webhookHandler(req, res) {
     const eventType = event?.data?.attributes?.type;
     const resource = event?.data?.attributes?.data;
 
-    if (eventType === "checkout_session.payment.paid") {
-      const checkoutSessionId = resource?.id;
-      if (!checkoutSessionId) return;
+    if (eventType === "payment_intent.succeeded" || eventType === "payment.paid") {
+      // For "payment_intent.succeeded" the resource IS the payment intent.
+      // For "payment.paid" the resource is a payment, whose own attributes
+      // carry the parent intent's id — handle both shapes.
+      const paymentIntentId = eventType === "payment_intent.succeeded"
+        ? resource?.id
+        : resource?.attributes?.payment_intent_id;
+      if (!paymentIntentId) return;
 
-      const booking = await Booking.findOne({ paymongoCheckoutSessionId: checkoutSessionId });
-      if (!booking) {
-        console.warn(`PayMongo webhook: no booking found for checkout session ${checkoutSessionId}`);
-        return;
-      }
-      if (booking.paymentStatus === "Paid") return; // already processed (webhook can be delivered more than once)
+      // The Booking may not exist yet (it's only created on confirmed
+      // payment now) — retrieve the intent fresh for its authoritative
+      // metadata rather than trusting the webhook payload's shape.
+      const intent = await retrievePaymentIntent(paymentIntentId);
+      const attrs = intent?.data?.attributes;
+      if (!isPaidPaymentIntent(attrs)) return;
 
-      booking.status = "Confirmed";
-      booking.paymentStatus = "Paid";
-      const paymentIntent = resource?.attributes?.payment_intent;
-      const paidPayment = paymentIntent?.attributes?.payments?.find(p => p?.attributes?.status === "paid");
-      if (paidPayment) booking.paymongoPaymentId = paidPayment.id;
-      booking.reviewedAt = new Date(); // auto-"reviewed" by PayMongo, not an admin — reviewedBy stays unset
-      await booking.save();
+      const paidPayment = attrs.payments?.find(p => p?.attributes?.status === "paid");
+      await finalizeBookingFromPayment({
+        paymentIntentId,
+        metadata: attrs.metadata || {},
+        paidPaymentId: paidPayment?.id || (eventType === "payment.paid" ? resource?.id : ""),
+      }).catch((e) => {
+        if (e.slotUnavailable) {
+          console.error(`PayMongo webhook: payment ${paymentIntentId} succeeded but the slot is no longer available — needs manual review/refund.`);
+          return;
+        }
+        throw e;
+      });
     }
   } catch (err) {
     console.error("Error processing PayMongo webhook:", err);

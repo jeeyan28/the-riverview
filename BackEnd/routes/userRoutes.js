@@ -13,6 +13,7 @@ const {
   assignableRoles,
 } = require("../utils/permissions");
 const { normalizeName, validateName } = require("../utils/nameValidation");
+const { isPasswordStrongEnough, PASSWORD_POLICY_MESSAGE } = require("../utils/passwordPolicy");
 
 // Anyone may edit their own profile; editing someone else's requires the
 // admin:manage permission AND passing the same role-hierarchy check used by
@@ -85,8 +86,8 @@ router.post("/", requirePermission(PERMISSIONS.ADMIN_MANAGE), async (req, res) =
     if (!email || !password || !role) {
       return res.status(400).json({ message: "First name, last name, email, password, and role are required." });
     }
-    if (password.length < 8) {
-      return res.status(400).json({ message: "Password must be at least 8 characters." });
+    if (!isPasswordStrongEnough(password)) {
+      return res.status(400).json({ message: PASSWORD_POLICY_MESSAGE });
     }
 
     const assignCheck = canAssignRole({ actor: req.user, targetRole: role });
@@ -180,15 +181,6 @@ router.put("/:id", ensureAuthenticated, async (req, res) => {
       return res.status(403).json({ message: "You don't have permission to edit this account." });
     }
 
-    // Google-linked accounts source their name/profile from Google (see
-    // /api/auth/google), not a manual edit form — block a self-edit here so
-    // the two paths can't drift. An admin editing someone else's account is
-    // still allowed through (e.g. to fix a typo), since that's not this rule's concern.
-    const isSelfEdit = req.session.userId === String(target._id);
-    if (isSelfEdit && target.googleId) {
-      return res.status(403).json({ message: "Your profile is managed by your Google account." });
-    }
-
     const { firstName, lastName, phone } = req.body;
     if (firstName !== undefined) {
       const firstNameError = validateName(firstName, "First name");
@@ -227,8 +219,8 @@ router.put("/:id/password", ensureAuthenticated, async (req, res) => {
     }
 
     const { currentPassword, newPassword } = req.body;
-    if (!newPassword || newPassword.length < 8) {
-      return res.status(400).json({ message: "New password must be at least 8 characters." });
+    if (!isPasswordStrongEnough(newPassword)) {
+      return res.status(400).json({ message: PASSWORD_POLICY_MESSAGE });
     }
 
     const isSelf = req.session.userId === req.params.id;

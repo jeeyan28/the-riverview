@@ -48,7 +48,7 @@ router.get("/admin", requirePermission(PERMISSIONS.SETTINGS_VIEW), async (req, r
 // ── Update operating hours — manager/super_admin only
 router.put("/operating-hours", requirePermission(PERMISSIONS.SETTINGS_MANAGE), async (req, res) => {
   try {
-    const { openTime, closeTime, openDays, maxAdvanceDays, bookingCutoffHours } = req.body;
+    const { openTime, closeTime, openDays, maxAdvanceDays, bookingCutoffHours, fewSlotsThreshold } = req.body;
     const settings = await Settings.getSingleton();
 
     if (openTime !== undefined) settings.operatingHours.openTime = openTime;
@@ -60,6 +60,7 @@ router.put("/operating-hours", requirePermission(PERMISSIONS.SETTINGS_MANAGE), a
     }
     if (maxAdvanceDays !== undefined) settings.operatingHours.maxAdvanceDays = Number(maxAdvanceDays) || 30;
     if (bookingCutoffHours !== undefined) settings.operatingHours.bookingCutoffHours = Number(bookingCutoffHours) || 0;
+    if (fewSlotsThreshold !== undefined) settings.operatingHours.fewSlotsThreshold = Math.max(0, Number(fewSlotsThreshold) || 0);
 
     settings.updatedBy = req.user._id;
     settings.updatedAt = new Date();

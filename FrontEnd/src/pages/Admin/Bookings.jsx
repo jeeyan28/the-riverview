@@ -35,6 +35,9 @@ function shortStatusLabel(status) {
   return SHORT_STATUS[status] || status;
 }
 
+// Fallback only — for bookings created before `reservationCode` existed.
+// Every new booking gets a real reservationCode from the server
+// (see saveWithReservationCode() in bookingHelper.js) and that's used instead.
 function shortBookingId(b) {
   const year = b.createdAt ? new Date(b.createdAt).getFullYear() : new Date().getFullYear();
   const tail = String(b._id || '').slice(-6).toUpperCase();
@@ -274,6 +277,7 @@ function Bookings() {
   }
 
   const columns = [
+    { key: 'reservationCode', label: 'Reservation Code', render: (b) => b.reservationCode || shortBookingId(b) },
     { key: 'guestName', label: 'Customer' },
     { key: 'guestContact', label: 'Phone', render: (b) => b.guestContact || '—' },
     { key: 'variantLabel', label: 'Service', render: (b) => b.variantLabel || 'Standard' },
@@ -362,7 +366,7 @@ function Bookings() {
           <input
             type="text"
             className="bk-filter-input"
-            placeholder="Search name or phone…"
+            placeholder="Search name, phone, or reservation code…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -410,49 +414,6 @@ function Bookings() {
       </div>
 
       {/* FIXED: calendar had matching CSS/markup but zero JS anywhere — see header comment */}
-      <div className="card" id="bk-calendar-card" style={{ padding: '14px 16px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <button type="button" className="bkcal-nav-btn" onClick={() => changeMonth(-1)}>
-              <i className="ti ti-chevron-left"></i>
-            </button>
-            <span className="bkcal-month-label">{monthLabel}</span>
-            <button type="button" className="bkcal-nav-btn" onClick={() => changeMonth(1)}>
-              <i className="ti ti-chevron-right"></i>
-            </button>
-          </div>
-          <button type="button" className="bkcal-today-btn" onClick={() => setCalendarViewDate(new Date())}>
-            Today
-          </button>
-        </div>
-        <div className="bkcal-weekdays">
-          {WEEKDAY_LABELS.map((w) => (
-            <span className="bkcal-weekday-label" key={w}>{w}</span>
-          ))}
-        </div>
-        <div className="bkcal-grid">
-          {calendarCells.map((cell, i) =>
-            cell ? (
-              <div
-                key={cell.key}
-                className={
-                  'bkcal-day' +
-                  (cell.isToday ? ' is-today' : '') +
-                  (cell.key === dateFilter ? ' is-selected' : '') +
-                  (cell.count > 0 ? ' has-bookings' : '')
-                }
-                onClick={() => setDateFilter(dateFilter === cell.key ? '' : cell.key)}
-                title={cell.count > 0 ? `${cell.count} booking${cell.count > 1 ? 's' : ''}` : 'No bookings'}
-              >
-                <span>{cell.day}</span>
-                {cell.count > 0 && <span className="bkcal-dot">{cell.count}</span>}
-              </div>
-            ) : (
-              <div key={`empty-${i}`} className="bkcal-day bkcal-day--empty"></div>
-            )
-          )}
-        </div>
-      </div>
 
       <div className="card" style={{ padding: 0, overflow: 'hidden', overflowX: 'auto' }}>
         <DataTable
@@ -515,7 +476,7 @@ function Bookings() {
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
               <div>
                 <div className="modal-lg-title">Booking Details</div>
-                <p className="modal-lg-sub" style={{ marginBottom: 0 }}>Booking ID: {shortBookingId(detailBooking)}</p>
+                <p className="modal-lg-sub" style={{ marginBottom: 0 }}>Reservation Code: {detailBooking.reservationCode || shortBookingId(detailBooking)}</p>
               </div>
               <span className={`pill ${STATUS_PILL_CLASS[detailBooking.status] || 'pill-pending'}`}>
                 {shortStatusLabel(detailBooking.status)}

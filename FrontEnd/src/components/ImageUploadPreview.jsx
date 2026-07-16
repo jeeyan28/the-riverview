@@ -1,222 +1,142 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
-import PasswordInput from './PasswordInput';
-import Toast from './Toast';
-import { useToast } from '../hooks/useToast';
-import { useGoogleAuth } from '../hooks/useGoogleAuth';
-import { useAuth } from '../context/AuthContext';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
-// ─────────────────────────────────────────────────────────────────────────
-// LoginForm — extracted from the old standalone Login page so it can be
-// swapped with RegisterForm inside the shared Auth card (see
-// pages/Login.jsx). Markup, validation, and API calls are unchanged.
-// ─────────────────────────────────────────────────────────────────────────
+export default function ImageUploadPreview({
+  icon = 'ti-photo',
+  title = 'Click to upload image',
+  subtitle = 'PNG, JPG',
+  accept = 'image/*',
+  maxSizeMB = 10,
+  maxHeight = 120,
+  value = '',
+  onFileSelect,
+}) {
+  const inputRef = useRef(null);
 
-function redirectAfterLogin(user) {
-  const isAdmin = ['staff', 'manager', 'super_admin'].includes(user.role);
-  // Full navigation (not client-side route) preserved intentionally here —
-  // matches the original window.location.href behavior, which also forces
-  // a full reload so any app-wide auth state picks up the new session.
-  window.location.href = isAdmin ? '/admin/dashboard' : '/';
-}
+  const [preview, setPreview] = useState('');
 
-function LoginForm({ onSwitchToRegister }) {
-  const { login, loginWithGoogle } = useAuth();
-  const { toast, showToast } = useToast();
-
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [remember, setRemember] = useState(false);
-  const [emailError, setEmailError] = useState('');
-  const [passwordError, setPasswordError] = useState('');
-  const [loading, setLoading] = useState(false);
-
-  async function handleGoogleCredential(response) {
-    try {
-      // The original always wrote to localStorage here regardless of the
-      // "remember me" checkbox — passing rememberMe=true unconditionally
-      // preserves that.
-      const user = await loginWithGoogle(response.credential, true);
-      showToast('Welcome! Redirecting…', 'success');
-      setTimeout(() => redirectAfterLogin(user), 1200);
-    } catch (err) {
-      showToast(err.message || 'Google sign-in failed.', 'error');
+  useEffect(() => {
+    if (typeof value === 'string') {
+      setPreview(value);
     }
-  }
+  }, [value]);
 
-  const { triggerSignIn } = useGoogleAuth(handleGoogleCredential);
-
-  function handleGoogleClick() {
-    const ok = triggerSignIn();
-    if (!ok) {
-      showToast('Google sign-in is still loading — try again in a second.', 'error');
-    }
-  }
-
-  async function handleSubmit(e) {
-    e.preventDefault();
-
-    const trimmedEmail = email.trim();
-    const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail);
-    const passOk = password.length >= 8;
-
-    setEmailError(emailOk ? '' : 'Enter a valid email address.');
-    setPasswordError(passOk ? '' : 'Password must be at least 8 characters.');
-    if (!emailOk || !passOk) return;
-
-    setLoading(true);
-    try {
-      const user = await login(trimmedEmail, password, remember);
-      const isAdmin = ['staff', 'manager', 'super_admin'].includes(user.role);
-      showToast(
-        isAdmin ? 'Welcome, Admin! Redirecting…' : `Welcome back, ${user.firstname}!`,
-        'success'
-      );
-      setTimeout(() => redirectAfterLogin(user), 1200);
-    } catch (err) {
-      // login() attaches a numeric `.status` for any server-rejected
-      // attempt — its absence means the fetch itself never got a response.
-      if (typeof err.status === 'number') {
-        showToast(err.message, 'error');
-      } else {
-        showToast('Could not reach the server. Is it running?', 'error');
+  useEffect(() => {
+    return () => {
+      if (preview?.startsWith('blob:')) {
+        URL.revokeObjectURL(preview);
       }
-    } finally {
-      setLoading(false);
+    };
+  }, [preview]);
+
+  const helper = useMemo(
+    () => `${subtitle} • Max ${maxSizeMB}MB`,
+    [subtitle, maxSizeMB]
+  );
+
+  function chooseFile() {
+    inputRef.current?.click();
+  }
+
+  function handleFile(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > maxSizeMB * 1024 * 1024) {
+      alert(`Image must be smaller than ${maxSizeMB}MB.`);
+      e.target.value = '';
+      return;
     }
+
+    if (!file.type.startsWith('image/')) {
+      alert('Please select a valid image.');
+      e.target.value = '';
+      return;
+    }
+
+    const objectUrl = URL.createObjectURL(file);
+
+    setPreview((old) => {
+      if (old?.startsWith('blob:')) URL.revokeObjectURL(old);
+      return objectUrl;
+    });
+
+    onFileSelect?.(file);
   }
 
   return (
     <>
-      <form className="login-form" onSubmit={handleSubmit} noValidate>
+      <input
+        ref={inputRef}
+        type="file"
+        accept={accept}
+        hidden
+        onChange={handleFile}
+      />
 
-        {/* Email */}
-        <div className={`field${emailError ? ' has-error' : ''}`} id="field-email">
-          <label htmlFor="email">Email address</label>
-          <div className="input-wrap">
-            <input
-              type="email"
-              id="email"
-              name="email"
-              placeholder="you@email.com"
-              autoComplete="email"
-              value={email}
-              onChange={(e) => {
-                setEmail(e.target.value);
-                setEmailError('');
-              }}
-            />
-            <span className="input-icon">✉</span>
-          </div>
-          <span className="field-error" style={{ display: emailError ? 'block' : 'none' }}>
-            {emailError || 'Enter a valid email address.'}
-          </span>
-        </div>
-
-        {/* Password */}
-        <div className={`field${passwordError ? ' has-error' : ''}`} id="field-password">
-          <div className="password-row">
-            <label htmlFor="password">Password</label>
-            <Link to="/forgot-password" className="forgot-link">
-              Forgot password?
-            </Link>
-          </div>
-          <PasswordInput
-            id="password"
-            name="password"
-            placeholder="Enter your password"
-            autoComplete="current-password"
-            value={password}
-            onChange={(e) => {
-              setPassword(e.target.value);
-              setPasswordError('');
+      <div
+        className="image-upload-preview"
+        onClick={chooseFile}
+        style={{
+          cursor: 'pointer',
+          border: '2px dashed var(--border,#d9d9d9)',
+          borderRadius: 12,
+          overflow: 'hidden',
+          minHeight: maxHeight,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: '#fafafa',
+          transition: '.2s',
+        }}
+      >
+        {preview ? (
+          <img
+            src={preview}
+            alt="Preview"
+            style={{
+              width: '100%',
+              maxHeight,
+              objectFit: 'cover',
+              display: 'block',
             }}
-            error={passwordError}
           />
-        </div>
-
-        {/* Remember */}
-        <div className="remember-row">
-          <input
-            type="checkbox"
-            id="remember-input"
-            checked={remember}
-            onChange={() => {}}
-            style={{ display: 'none' }}
-          />
+        ) : (
           <div
-            className={`custom-check${remember ? ' checked' : ''}`}
-            role="checkbox"
-            aria-checked={remember}
-            tabIndex={0}
-            onClick={() => setRemember((r) => !r)}
-            onKeyDown={(e) => {
-              if (e.key === ' ' || e.key === 'Enter') {
-                e.preventDefault();
-                setRemember((r) => !r);
-              }
+            style={{
+              padding: 24,
+              textAlign: 'center',
+              color: '#6b7280',
             }}
           >
-            <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
-              <path
-                d="M1 4L3.5 6.5L9 1"
-                stroke="#0A1628"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
+            <i
+              className={`ti ${icon}`}
+              style={{
+                fontSize: 34,
+                display: 'block',
+                marginBottom: 10,
+              }}
+            />
+
+            <div
+              style={{
+                fontWeight: 600,
+                marginBottom: 4,
+              }}
+            >
+              {title}
+            </div>
+
+            <div
+              style={{
+                fontSize: '.8rem',
+                color: '#9ca3af',
+              }}
+            >
+              {helper}
+            </div>
           </div>
-          <label htmlFor="remember-input" className="remember-label">
-            Remember me for 30 days
-          </label>
-        </div>
-
-        {/* Submit */}
-        <button type="submit" className={`btn-submit${loading ? ' loading' : ''}`}>
-          <span className="btn-text">Continue</span>
-          <span className="btn-spinner">
-            <span className="spinner-ring"></span>
-          </span>
-        </button>
-
-        <div className="divider">or</div>
-
-        {/* Google */}
-        <button type="button" className="btn-social" onClick={handleGoogleClick}>
-          <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-            <path
-              d="M17.64 9.205c0-.639-.057-1.252-.164-1.841H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.875 2.684-6.615z"
-              fill="#4285F4"
-            />
-            <path
-              d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 009 18z"
-              fill="#34A853"
-            />
-            <path
-              d="M3.964 10.71A5.41 5.41 0 013.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 000 9c0 1.452.348 2.827.957 4.042l3.007-2.332z"
-              fill="#FBBC05"
-            />
-            <path
-              d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 00.957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z"
-              fill="#EA4335"
-            />
-          </svg>
-          Continue with Google
-        </button>
-
-        <div className="signup-row">
-          New here?{' '}
-          <button type="button" className="link-button" onClick={onSwitchToRegister}>
-            Create a free account
-          </button>
-        </div>
-
-      </form>
-
-      <Toast {...toast} />
+        )}
+      </div>
     </>
   );
 }
-
-export default LoginForm;

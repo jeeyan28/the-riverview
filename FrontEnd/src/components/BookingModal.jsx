@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { resolveImageUrl } from '../utils/resolveImageUrl';
 import fallbackRoomImg from '../assets/pictures/Billiard.jpg';
@@ -10,15 +10,17 @@ import {
   loadMonthAvailability,
   clearMonthAvailability,
   getFreeSlotCount,
-  FEW_SLOTS_THRESHOLD,
   isHolidayDate,
   isOperatingDay,
   computeDownPayment,
+  getFacilityAvailability,
 } from '../utils/rooms';
+import { API_BASE_URL } from '../services/api';
 
-
-const API_BASE_URL = 'http://localhost:3000';
 const MAX_DURATION = 5;
+
+
+const PAYMONGO_API_BASE = 'https://api.paymongo.com/v1';
 
 const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -57,9 +59,6 @@ function priceOptionsFor(room) {
       }];
 }
 
-// STEPS — the 6-stage progress indicator shown in the Booking UI reference.
-// 'price' (Room), 'calendar' (Date), 'slots' (Time), 'details' (Details),
-// 'review' (Review), and 'payment' are all real internal steps.
 const STEPS = [
   { key: 'price', label: 'Room' },
   { key: 'calendar', label: 'Date' },
@@ -69,6 +68,16 @@ const STEPS = [
   { key: 'payment', label: 'Payment' },
 ];
 const STEP_INDEX = { price: 1, calendar: 2, slots: 3, details: 4, review: 5, payment: 6 };
+
+// PAYMENT_METHODS — the in-modal method picker on the Payment step. Card
+// reveals an inline form (tokenized client-side); the wallets attach
+// straight away and open a popup for authorization.
+const PAYMENT_METHODS = [
+  { key: 'gcash', label: 'GCash', icon: 'fa-solid fa-wallet' },
+  { key: 'paymaya', label: 'Maya', icon: 'fa-solid fa-money-bill-wave' },
+  { key: 'qrph', label: 'QR Ph', icon: 'fa-solid fa-qrcode' },
+  { key: 'card', label: 'Credit / Debit Card', icon: 'fa-solid fa-credit-card' },
+];
 
 function BookingStepper({ step }) {
   const activeIndex = STEP_INDEX[step] || 1;
@@ -88,72 +97,151 @@ function BookingStepper({ step }) {
   );
 }
 
-// BookingSummaryCard — migrated 1:1 from renderBookingSummary() in
-// js/index.js. Shown once a booking's payment is confirmed.
-function BookingSummaryCard({ booking }) {
+
+function BookingSuccess({ booking, room, selectedVariant, onDone }) {
   if (!booking) return null;
+
+  const facility = room?.name || booking.roomLabel || '—';
+  const roomName = selectedVariant?.label || booking.variantLabel || booking.roomLabel || '—';
 
   const dateLabel = booking.date
     ? new Date(`${booking.date}T00:00:00`).toLocaleDateString(undefined, {
-        weekday: 'long',
         month: 'long',
         day: 'numeric',
         year: 'numeric',
       })
     : '—';
   const startHour = parseInt(String(booking.timeIn || '0').split(':')[0], 10) || 0;
-  const timeLabel = `${formatHour(startHour)} – ${formatHour(startHour + (booking.duration || 0))}`;
-  const paymentPillClass =
-    booking.paymentStatus === 'Paid'
-      ? 'bk-status-pill--paid'
-      : booking.paymentStatus === 'Pending Verification' || booking.paymentStatus === 'Unpaid'
-      ? 'bk-status-pill--pending'
-      : 'bk-status-pill--unpaid';
-  const reference = booking.paymongoPaymentId || booking._id || '—';
+  const duration = booking.duration || 0;
+  const timeLabel = `${formatHour(startHour)} – ${formatHour(startHour + duration)} (${duration} hour${duration === 1 ? '' : 's'})`;
+
+  const downPayment = Number(booking.downPayment || 0);
+  const remaining = Math.max(0, Number(booking.amount || 0) - downPayment);
+
+
+  function handleOpenReceipt() {
+    const rows = [
+      ['Reservation Code', booking.reservationCode || '—'],
+      ['Room', roomName],
+      ['Facility', facility],
+      ['Date', dateLabel],
+      ['Time', timeLabel],
+      ['Guests', String(booking.guestCount || 1)],
+    ];
+
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Receipt - ${booking.reservationCode || ''}</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: Arial, Helvetica, sans-serif; color: #1a1a1a; background: #f2f2f2; margin: 0; padding: 24px; }
+  .receipt { max-width: 480px; margin: 0 auto; background: #fff; border-radius: 12px; padding: 32px; box-shadow: 0 2px 12px rgba(0,0,0,.08); }
+  .check { width: 48px; height: 48px; border-radius: 50%; background: #00C9A7; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 26px; margin: 0 auto 14px; }
+  h1 { text-align: center; font-size: 1.15rem; margin: 0 0 4px; }
+  .sub { text-align: center; font-size: .85rem; color: #666; margin: 0 0 22px; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 18px; }
+  td { padding: 8px 0; font-size: .88rem; border-bottom: 1px solid #eee; }
+  td.label { color: #888; }
+  td.value { text-align: right; font-weight: 600; }
+  .code { font-family: 'Courier New', monospace; color: #00947a; }
+  .cost { border-top: 2px solid #eee; padding-top: 14px; }
+  .paid { color: #00947a; font-weight: 700; }
+  .balance { color: #b5760f; font-weight: 700; }
+  .note { text-align: center; font-size: .78rem; color: #888; margin-top: 18px; }
+  .actions { text-align: center; margin-top: 24px; }
+  button { background: #00C9A7; color: #06251f; border: none; padding: 10px 22px; border-radius: 8px; font-weight: 700; font-size: .85rem; cursor: pointer; }
+  @media print { .actions { display: none; } body { background: #fff; padding: 0; } .receipt { box-shadow: none; } }
+</style>
+</head>
+<body>
+  <div class="receipt">
+    <div class="check">&#10003;</div>
+    <h1>Booking Confirmed!</h1>
+    <p class="sub">Your reservation has been successfully created.</p>
+    <table>
+      ${rows.map(([label, value], i) => `<tr><td class="label">${label}</td><td class="value${i === 0 ? ' code' : ''}">${value}</td></tr>`).join('')}
+    </table>
+    <table class="cost">
+      <tr><td class="label">Downpayment Paid</td><td class="value paid">&#8369;${downPayment.toLocaleString()}</td></tr>
+      <tr><td class="label">Remaining Balance</td><td class="value balance">&#8369;${remaining.toLocaleString()}</td></tr>
+    </table>
+    ${booking.guestEmail ? `<p class="note">A copy of this receipt has been sent to ${booking.guestEmail}</p>` : ''}
+    <div class="actions">
+      <button onclick="window.print()">Download PDF</button>
+    </div>
+  </div>
+</body>
+</html>`;
+
+    const win = window.open('', '_blank');
+    if (!win) return;
+    win.document.write(html);
+    win.document.close();
+  }
 
   return (
-    <div className="bk-summary-card" style={{ display: 'block' }}>
-      <p className="bk-summary-card-title">Booking summary</p>
-      <div className="bk-summary-row">
-        <span className="bk-sr-label"><i className="fa-solid fa-door-open"></i> Room</span>
-        <span className="bk-sr-value">
-          {booking.roomLabel || '—'}
-          {booking.variantLabel ? ` · ${booking.variantLabel}` : ''}
-        </span>
+    <>
+      <div className="bk-confirm-icon"><i className="fa-solid fa-check"></i></div>
+      <h3>Booking Confirmed!</h3>
+      <p>Your reservation has been successfully created.</p>
+
+      <div className="bk-success-card">
+        <div className="bk-success-grid">
+          <div className="bk-success-item">
+            <span className="bk-summary-label">Reservation Code</span>
+            <span className="bk-success-code">{booking.reservationCode || '—'}</span>
+          </div>
+          <div className="bk-success-item">
+            <span className="bk-summary-label">Room</span>
+            <span className="bk-summary-value">{roomName}</span>
+          </div>
+          <div className="bk-success-item">
+            <span className="bk-summary-label">Facility</span>
+            <span className="bk-summary-value">{facility}</span>
+          </div>
+          <div className="bk-success-item">
+            <span className="bk-summary-label">Date</span>
+            <span className="bk-summary-value">{dateLabel}</span>
+          </div>
+          <div className="bk-success-item">
+            <span className="bk-summary-label">Time</span>
+            <span className="bk-summary-value">{timeLabel}</span>
+          </div>
+          <div className="bk-success-item">
+            <span className="bk-summary-label">Guests</span>
+            <span className="bk-summary-value">{booking.guestCount || 1}</span>
+          </div>
+        </div>
+
+        <div className="bk-success-cost">
+          <div className="bk-success-item">
+            <span className="bk-summary-label">Downpayment Paid</span>
+            <span className="bk-success-paid">₱{downPayment.toLocaleString()}</span>
+          </div>
+          <div className="bk-success-item">
+            <span className="bk-summary-label">Remaining Balance</span>
+            <span className="bk-success-balance">₱{remaining.toLocaleString()}</span>
+          </div>
+        </div>
       </div>
-      <div className="bk-summary-row">
-        <span className="bk-sr-label"><i className="fa-solid fa-calendar-days"></i> Date</span>
-        <span className="bk-sr-value">{dateLabel}</span>
+
+      <div className="bk-detail-actions">
+        <button className="bk-back-btn" onClick={handleOpenReceipt}>
+          <i className="fa-solid fa-download"></i> Download Receipt
+        </button>
+        <button className="bk-confirm bk-continue" onClick={onDone}>
+          Back to Home
+        </button>
       </div>
-      <div className="bk-summary-row">
-        <span className="bk-sr-label"><i className="fa-solid fa-clock"></i> Time</span>
-        <span className="bk-sr-value">{timeLabel}</span>
-      </div>
-      <div className="bk-summary-row">
-        <span className="bk-sr-label"><i className="fa-solid fa-hourglass-half"></i> Duration</span>
-        <span className="bk-sr-value">{booking.duration || 0}h</span>
-      </div>
-      <div className="bk-summary-row">
-        <span className="bk-sr-label"><i className="fa-solid fa-users"></i> Pax</span>
-        <span className="bk-sr-value">
-          {booking.guestCount || 1} guest{(booking.guestCount || 1) > 1 ? 's' : ''}
-        </span>
-      </div>
-      <div className="bk-summary-row">
-        <span className="bk-sr-label"><i className="fa-solid fa-peso-sign"></i> Down payment</span>
-        <span className="bk-sr-value">₱{Number(booking.downPayment || 0).toLocaleString()}</span>
-      </div>
-      <div className="bk-summary-row">
-        <span className="bk-sr-label"><i className="fa-solid fa-circle-check"></i> Payment status</span>
-        <span className="bk-sr-value">
-          <span className={`bk-status-pill ${paymentPillClass}`}>{booking.paymentStatus || 'Unpaid'}</span>
-        </span>
-      </div>
-      <div className="bk-summary-row">
-        <span className="bk-sr-label"><i className="fa-solid fa-hashtag"></i> Reference no.</span>
-        <span className="bk-sr-value bk-ref-value">{String(reference)}</span>
-      </div>
-    </div>
+
+      {booking.guestEmail && (
+        <p className="bk-success-note">
+          <i className="fa-solid fa-circle-check"></i> A copy of this receipt has been sent to {booking.guestEmail}
+        </p>
+      )}
+    </>
   );
 }
 
@@ -177,9 +265,22 @@ function BookingModal({ room, returnInfo, onClose, openHour, closeHour, settings
   const [monthBookings, setMonthBookings] = useState({});
   const [reserved, setReserved] = useState([]);
   const [confirming, setConfirming] = useState(false);
+  const [facilityStatus, setFacilityStatus] = useState(null); // 'Available' | 'Fully Booked' | null while loading
 
   const [payLoading, setPayLoading] = useState(false);
   const [payError, setPayError] = useState('');
+
+  // Embedded PayMongo flow — booking + Payment Intent are created once, the
+  // moment the Payment step is reached (see the effect below), then reused
+  // across method picks/retries. `publicKey` is fetched once for client-side
+  // card tokenization (raw card data never touches our server).
+  const [paymongoPublicKey, setPaymongoPublicKey] = useState('');
+  const [pmIntent, setPmIntent] = useState(null); // { paymentIntentId, clientKey, amount } — no bookingId: the Booking doesn't exist until payment succeeds
+  const [selectedMethod, setSelectedMethod] = useState(null); // 'card' | 'gcash' | 'paymaya' | 'qrph'
+  const [cardNumber, setCardNumber] = useState('');
+  const [cardExpiry, setCardExpiry] = useState('');
+  const [cardCvc, setCardCvc] = useState('');
+  const pollRef = useRef(null);
 
   // pmReturn — the paymongoReturn step's own resolution state.
   // phase: 'loading' | 'cancelled' | 'needLogin' | 'confirmed' | 'pending'
@@ -199,15 +300,52 @@ function BookingModal({ room, returnInfo, onClose, openHour, closeHour, settings
     setGuestNote('');
     setGuestCount(1);
     setPaxError('');
+    setPmIntent(null);
+    setSelectedMethod(null);
+    setCardNumber('');
+    setCardExpiry('');
+    setCardCvc('');
+    setPayError('');
+    stopPolling();
 
     const user = authUser;
     setGuestName(user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : '');
     setGuestContact(user ? user.phone || user.email || '' : '');
   }, [room]);
 
+  // Facility availability badge (Room Selection step) — same rule as
+  // Home.jsx's refreshLiveRoomStatuses: an "Available" room only flips to
+  // "Fully Booked" if every remaining operating hour today is reserved.
+  // Non-"Available" admin statuses collapse to "Fully Booked" (the binary
+  // summary this step shows for now — see FEATURE_REQUESTS.md).
+  useEffect(() => {
+    if (!room) {
+      setFacilityStatus(null);
+      return;
+    }
+    if (room.status !== 'Available') {
+      setFacilityStatus('Fully Booked');
+      return;
+    }
+    let cancelled = false;
+    setFacilityStatus(null);
+
+    async function loadFacilityStatus() {
+      const now = new Date();
+      const todayStr = dateKey(now.getFullYear(), now.getMonth(), now.getDate());
+      const reservedToday = await fetchReservedHours(room._id, todayStr);
+      if (!cancelled) setFacilityStatus(getFacilityAvailability(reservedToday, openHour, closeHour));
+    }
+
+    loadFacilityStatus();
+    return () => {
+      cancelled = true;
+    };
+  }, [room, openHour, closeHour]);
+
   // Drive the paymongoReturn step off `returnInfo` — mirrors
   // handlePaymongoReturn() in the original, run once when Home.jsx detects
-  // ?paymongo=...&bookingId=... on load.
+  // ?paymongo=...&paymentIntentId=... on load.
   useEffect(() => {
     if (!returnInfo) return;
     let cancelled = false;
@@ -216,16 +354,8 @@ function BookingModal({ room, returnInfo, onClose, openHour, closeHour, settings
 
     async function resolve() {
       if (returnInfo.result === 'cancel') {
-        // Best-effort: release the held slot. Safe even if the booking was
-        // actually paid a moment earlier (server no-ops that case).
-        try {
-          await fetch(`${API_BASE_URL}/api/payments/paymongo/cancel/${encodeURIComponent(returnInfo.bookingId)}`, {
-            method: 'POST',
-            credentials: 'include',
-          });
-        } catch (err) {
-          console.error(err);
-        }
+        // Nothing to release server-side: no Booking/slot is ever held
+        // before payment succeeds, so there's no cancel call to make here.
         if (!cancelled) setPmReturn({ phase: 'cancelled', booking: null });
         return;
       }
@@ -243,21 +373,12 @@ function BookingModal({ room, returnInfo, onClose, openHour, closeHour, settings
         if (cancelled) return;
         try {
           const res = await fetch(
-            `${API_BASE_URL}/api/payments/paymongo/status/${encodeURIComponent(returnInfo.bookingId)}`,
+            `${API_BASE_URL}/api/payments/paymongo/status/${encodeURIComponent(returnInfo.paymentIntentId)}`,
             { credentials: 'include' }
           );
           const data = await res.json().catch(() => ({}));
-          if (res.ok && data.paymentStatus === 'Paid') {
-            let booking = null;
-            try {
-              const bookingRes = await fetch(
-                `${API_BASE_URL}/api/bookings/${encodeURIComponent(returnInfo.bookingId)}`,
-                { credentials: 'include' }
-              );
-              if (bookingRes.ok) booking = await bookingRes.json();
-            } catch (err) {
-              console.error(err);
-            }
+          if (res.ok && data.paymentStatus === 'Paid' && data.bookingId) {
+            const booking = await fetchPaidBooking(data.bookingId);
             if (!cancelled) setPmReturn({ phase: 'confirmed', booking });
             return;
           }
@@ -321,6 +442,76 @@ function BookingModal({ room, returnInfo, onClose, openHour, closeHour, settings
     }
     setPaxError(message);
   }, [room, guestCount]);
+
+  // Entering the Payment step: fetch the publishable key (for client-side
+  // card tokenization) and create the booking + Payment Intent once, up
+  // front, so every method the guest tries just attaches to the same
+  // intent instead of creating a new booking per attempt.
+  useEffect(() => {
+    if (step !== 'payment' || pmIntent || !room || !selectedVariant || !selectedDate || selectedHour === null) return;
+    let cancelled = false;
+
+    async function init() {
+      setPayError('');
+      setPayLoading(true);
+      try {
+        if (!paymongoPublicKey) {
+          const cfgRes = await fetch(`${API_BASE_URL}/api/payments/paymongo/config`, { credentials: 'include' });
+          const cfg = await cfgRes.json().catch(() => ({}));
+          if (cfgRes.ok && cfg.publicKey && !cancelled) setPaymongoPublicKey(cfg.publicKey);
+        }
+
+        const { y, m, d } = selectedDate;
+        const dateStr = dateKey(y, m, d);
+        const timeStr = `${String(selectedHour).padStart(2, '0')}:00`;
+
+        const res = await fetch(`${API_BASE_URL}/api/payments/paymongo/intent`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            guestName: guestName.trim(),
+            guestContact: guestContact.trim(),
+            guestCount: guestCount || 1,
+            specialRequests: guestNote.trim(),
+            roomId: room._id,
+            variantLabel: selectedVariant.label,
+            date: dateStr,
+            timeIn: timeStr,
+            duration: selectedDuration,
+          }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          if (res.status === 401) {
+            await logout();
+            alert('Your session has expired. Please log in again to complete your booking.');
+            window.location.href = '/login';
+            return;
+          }
+          throw new Error(data.message || 'Could not start online payment.');
+        }
+
+        // Release the local cache for this room/date/month so, if the guest
+        // backs out instead of finishing payment, the slot still shows
+        // correctly next time it's checked.
+        clearReservedHours(room._id, dateStr);
+        clearMonthAvailability(room._id, y, m + 1);
+
+        if (!cancelled) setPmIntent({ paymentIntentId: data.paymentIntentId, clientKey: data.clientKey, amount: data.amount });
+      } catch (err) {
+        console.error(err);
+        if (!cancelled) setPayError(err.message || 'Something went wrong starting checkout. Please try again.');
+      } finally {
+        if (!cancelled) setPayLoading(false);
+      }
+    }
+
+    init();
+    return () => {
+      cancelled = true;
+    };
+  }, [step, room, selectedVariant, selectedDate, selectedHour]);
 
   function handleOverlayClick(e) {
     if (e.target === e.currentTarget) onClose();
@@ -410,56 +601,226 @@ function BookingModal({ room, returnInfo, onClose, openHour, closeHour, settings
     setStep('payment');
   }
 
-  // payOnlineAutomatically — creates the booking server-side and redirects
-  // to PayMongo's hosted checkout. Migrated 1:1. This is the ONLY payment
-  // path (manual/screenshot payment was removed backend-side too).
-  async function payOnlineAutomatically() {
-    const { y, m, d } = selectedDate;
-    const dateStr = dateKey(y, m, d);
-    const timeStr = `${String(selectedHour).padStart(2, '0')}:00`;
+  function stopPolling() {
+    if (pollRef.current) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+  }
 
+  // Stop any in-flight poll on unmount so it doesn't keep hitting the API
+  // (or touching state) after the modal is gone.
+  useEffect(() => stopPolling, []);
+
+  async function fetchPaidBooking(bookingId) {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/bookings/${encodeURIComponent(bookingId)}`, { credentials: 'include' });
+      if (res.ok) return await res.json();
+    } catch (err) {
+      console.error(err);
+    }
+    return null;
+  }
+
+  // POLL_INTERVAL_MS / POLL_MAX_ATTEMPTS — shared tuning for
+  // pollPaymentStatus below (~3 minutes total at 2s intervals).
+  const POLL_INTERVAL_MS = 2000;
+  const POLL_MAX_ATTEMPTS = 90;
+
+  // pollPaymentStatus — shared by openPopupAndPoll (3D Secure/e-wallet
+  // popup) and pollStatusOnly (no popup, e.g. some async payment rails).
+  // Polls GET /status until paid, the optional popup is closed without
+  // paying, or POLL_MAX_ATTEMPTS is reached.
+  function pollPaymentStatus(paymentIntentId, popup) {
+    setStep('paymongoReturn');
+    setPmReturn({ phase: 'loading', booking: null });
+
+    let attempts = 0;
+    stopPolling();
+    pollRef.current = setInterval(async () => {
+      attempts += 1;
+      let paid = false;
+      let paidBookingId = null;
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/payments/paymongo/status/${encodeURIComponent(paymentIntentId)}`, {
+          credentials: 'include',
+        });
+        const data = await res.json().catch(() => ({}));
+        paid = res.ok && data.paymentStatus === 'Paid';
+        paidBookingId = data.bookingId || null;
+      } catch (err) {
+        console.error(err);
+      }
+
+      if (paid) {
+        stopPolling();
+        if (popup && !popup.closed) popup.close();
+        const booking = paidBookingId ? await fetchPaidBooking(paidBookingId) : null;
+        setPmReturn({ phase: 'confirmed', booking });
+        return;
+      }
+
+      if (popup && popup.closed) {
+        stopPolling();
+        // Closed without paying — go back to the method picker so the guest
+        // can try again instead of ending the whole booking flow.
+        setStep('payment');
+        setPayError('Payment was not completed. Please try again.');
+        return;
+      }
+
+      if (attempts >= POLL_MAX_ATTEMPTS) {
+        stopPolling();
+        setPmReturn({ phase: 'pending', booking: null });
+      }
+    }, POLL_INTERVAL_MS);
+  }
+
+  // openPopupAndPoll — the popup carries the customer through 3D Secure or
+  // an e-wallet's own authorization page; pollPaymentStatus watches for the
+  // outcome (source of truth either way — the popup itself, or a delayed
+  // webhook, could resolve it first). Stops as soon as it's paid, or once
+  // the popup is closed without a paid result.
+  function openPopupAndPoll(redirectUrl, paymentIntentId) {
+    const popup = window.open(redirectUrl, 'paymongo_pay', 'width=480,height=760');
+    if (!popup) {
+      // Popup blocked — fall back to a full-page redirect, same as the
+      // original hosted-checkout flow did.
+      window.location.href = redirectUrl;
+      return;
+    }
+    pollPaymentStatus(paymentIntentId, popup);
+  }
+
+  // pollStatusOnly — for the rare "processing" result (no redirect/popup
+  // involved, e.g. some async payment rails): just wait for the intent to
+  // resolve, reusing the same paymongoReturn UI as the popup flow.
+  function pollStatusOnly(paymentIntentId) {
+    pollPaymentStatus(paymentIntentId, null);
+  }
+
+  // attachAndHandle — sends a Payment Method (card id or wallet type) to the
+  // booking's Payment Intent and reacts to the result.
+  async function attachAndHandle(body) {
     setPayError('');
     setPayLoading(true);
-
     try {
-      const res = await fetch(`${API_BASE_URL}/api/payments/paymongo/checkout`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          guestName: guestName.trim(),
-          guestContact: guestContact.trim(),
-          guestCount: guestCount || 1,
-          specialRequests: guestNote.trim(),
-          roomId: room._id,
-          variantLabel: selectedVariant.label,
-          date: dateStr,
-          timeIn: timeStr,
-          duration: selectedDuration,
-        }),
-      });
-
+      const res = await fetch(
+        `${API_BASE_URL}/api/payments/paymongo/intent/${encodeURIComponent(pmIntent.paymentIntentId)}/attach`,
+        {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        }
+      );
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
+
+      if (!res.ok && res.status !== 402 && res.status !== 409) {
         if (res.status === 401) {
           await logout();
           alert('Your session has expired. Please log in again to complete your booking.');
           window.location.href = '/login';
           return;
         }
-        throw new Error(data.message || 'Could not start online payment.');
+        throw new Error(data.message || 'Payment could not be processed. Please try again.');
       }
 
-      // Release the local cache for this room/date/month so, if the user
-      // hits the browser back button instead of PayMongo's own cancel
-      // link, the slot still shows correctly next time it's checked.
-      clearReservedHours(room._id, dateStr);
-      clearMonthAvailability(room._id, y, m + 1);
-
-      window.location.href = data.checkoutUrl;
+      if (data.status === 'succeeded') {
+        const booking = await fetchPaidBooking(data.bookingId);
+        setStep('paymongoReturn');
+        setPmReturn({ phase: 'confirmed', booking });
+        return;
+      }
+      if (data.status === 'awaiting_next_action' && data.redirectUrl) {
+        openPopupAndPoll(data.redirectUrl, pmIntent.paymentIntentId);
+        return;
+      }
+      if (data.status === 'processing') {
+        pollStatusOnly(pmIntent.paymentIntentId);
+        return;
+      }
+      if (data.status === 'paid_slot_unavailable') {
+        // Rare: payment succeeded but another confirmed reservation took the
+        // slot in the meantime (Availability Safety Check). No booking was
+        // created — surface this clearly rather than a generic decline.
+        setPayError(data.message || 'Your payment succeeded, but this slot was just taken. Please contact support.');
+        return;
+      }
+      // status === 'failed' (card declined, etc.) — data.message already set
+      setPayError(data.message || 'That payment method was declined. Please try another.');
     } catch (err) {
       console.error(err);
-      setPayError(err.message || 'Something went wrong starting checkout. Please try again.');
+      setPayError(err.message || 'Something went wrong. Please try again.');
+    } finally {
+      setPayLoading(false);
+    }
+  }
+
+  // handleSelectMethod — tile click only selects a method now (matches the
+  // reference UI's select-then-"Pay Now" flow). The actual charge is fired
+  // by the shared footer button: handleConfirmWalletPay for wallets, or the
+  // card form's own submit (routed to the same button via form=).
+  function handleSelectMethod(key) {
+    if (!pmIntent || payLoading) return;
+    setSelectedMethod(key);
+    setPayError('');
+  }
+
+  // handleConfirmWalletPay — GCash/Maya/QRPh carry no sensitive data, so the
+  // Payment Method is created server-side; Pay Now just tells the backend
+  // which type to use.
+  function handleConfirmWalletPay() {
+    if (!pmIntent || payLoading || !selectedMethod || selectedMethod === 'card') return;
+    attachAndHandle({ paymentMethodType: selectedMethod });
+  }
+
+  // handlePayCard — tokenizes the card directly against PayMongo's API from
+  // the browser, using the publishable key, so the card number/CVC never
+  // touch our server — only the resulting Payment Method id does.
+  async function handlePayCard(e) {
+    e.preventDefault();
+    if (!pmIntent || payLoading) return;
+
+    const digits = cardNumber.replace(/\s+/g, '');
+    const [mm, yyRaw] = cardExpiry.split('/').map((s) => (s || '').trim());
+    const yy = yyRaw && yyRaw.length === 2 ? `20${yyRaw}` : yyRaw;
+    if (!digits || digits.length < 12 || !mm || !yy || !cardCvc) {
+      setPayError('Please enter a valid card number, expiry (MM/YY), and CVC.');
+      return;
+    }
+    if (!paymongoPublicKey) {
+      setPayError('Payment is still initializing — please wait a moment and try again.');
+      return;
+    }
+
+    setPayError('');
+    setPayLoading(true);
+    try {
+      const res = await fetch(`${PAYMONGO_API_BASE}/payment_methods`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Basic ${btoa(`${paymongoPublicKey}:`)}`,
+        },
+        body: JSON.stringify({
+          data: {
+            attributes: {
+              type: 'card',
+              details: { card_number: digits, exp_month: Number(mm), exp_year: Number(yy), cvc: cardCvc },
+              billing: guestName ? { name: guestName.trim() } : undefined,
+            },
+          },
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data?.errors?.[0]?.detail || 'Card could not be verified. Please check the details and try again.');
+      }
+      await attachAndHandle({ paymentMethodId: data.data.id });
+    } catch (err) {
+      console.error(err);
+      setPayError(err.message || 'Card could not be verified. Please check the details and try again.');
       setPayLoading(false);
     }
   }
@@ -480,6 +841,9 @@ function BookingModal({ room, returnInfo, onClose, openHour, closeHour, settings
 
     const oh = settings?.operatingHours || {};
     const maxAdvanceDays = Number(oh.maxAdvanceDays) || 30;
+    // Admin-configurable via Settings > Operating Schedule; 2 matches the
+    // schema's own default (model/settings.js) if the field is missing.
+    const fewSlotsThreshold = Number.isFinite(Number(oh.fewSlotsThreshold)) ? Number(oh.fewSlotsThreshold) : 2;
     const latestBookable = new Date(today);
     latestBookable.setDate(latestBookable.getDate() + maxAdvanceDays);
 
@@ -504,7 +868,7 @@ function BookingModal({ room, returnInfo, onClose, openHour, closeHour, settings
       const fullyBooked = freeSlots === 0;
       const unavailable = holiday || closedDay || beyondWindow || cutoffBlocked;
       const blocked = unavailable || fullyBooked;
-      const fewSlots = !unavailable && !fullyBooked && freeSlots <= FEW_SLOTS_THRESHOLD;
+      const fewSlots = !unavailable && !fullyBooked && freeSlots <= fewSlotsThreshold;
 
       let variant = null; // no dot for past dates with nothing to report
       let title = '';
@@ -592,7 +956,19 @@ function BookingModal({ room, returnInfo, onClose, openHour, closeHour, settings
           {/* STEP 1: ROOM SELECTION */}
           {step === 'price' && room && (
             <div className="bk-step" id="bkStepPrice">
-              <p className="bk-choose-label">Choose a room</p>
+              <div className="bk-choose-label-row">
+                <p className="bk-choose-label">Choose a room</p>
+                {facilityStatus && (
+                  <span
+                    className={
+                      'bk-status-pill ' +
+                      (facilityStatus === 'Fully Booked' ? 'bk-status-pill--fullybooked' : 'bk-status-pill--available')
+                    }
+                  >
+                    {facilityStatus}
+                  </span>
+                )}
+              </div>
               <div className="bk-room-list" id="bkPriceList">
                 {priceItems.map((opt, i) => {
                   const optImage = opt.image || room.image;
@@ -613,7 +989,9 @@ function BookingModal({ room, returnInfo, onClose, openHour, closeHour, settings
                       </div>
                       <div className="bk-room-option-body">
                         <div className="bk-room-option-top">
-                          <p className="bk-room-option-name">{opt.label}</p>
+                          <div className="bk-room-option-name-wrap">
+                            <p className="bk-room-option-name">{opt.label}</p>
+                          </div>
                           <span className={'bk-radio' + (isSelected ? ' bk-radio--selected' : '')}></span>
                         </div>
                         {opt.pax && (
@@ -955,43 +1333,108 @@ function BookingModal({ room, returnInfo, onClose, openHour, closeHour, settings
             </div>
           )}
 
-          {/* STEP 6: DOWN PAYMENT */}
+          {/* STEP 6: PAYMENT */}
           {step === 'payment' && room && selectedVariant && (
             <div className="bk-step" id="bkStepPayment">
-              <button className="bk-back" onClick={() => setStep('review')}>
-                <i className="fa-solid fa-arrow-left"></i> Back to review
-              </button>
-
               <div className="bk-slots-head">
-                <h3>Down payment required</h3>
-                <p>The minimum down payment equals this room's first-hour rate — it secures your slot instantly.</p>
+                <h3>Payment</h3>
               </div>
 
-              <div className="bk-summary bk-downpayment-summary">
-                <div>
-                  <p className="bk-summary-label">Amount to pay now</p>
-                  <p className="bk-summary-value" id="bkDownPaymentAmount">
-                    ₱{computeDownPayment(selectedVariant.price).toLocaleString()}
-                  </p>
-                </div>
-                <div className="bk-downpayment-note">
-                  <i className="fa-solid fa-circle-info"></i>
-                  <span>First hour rate — the remaining balance is settled on-site.</span>
-                </div>
-              </div>
-
-              <div className="bk-online-pay-card">
-                <p className="bk-online-pay-title"><i className="fa-solid fa-shield-halved"></i> Pay securely online</p>
-                <p className="bk-online-pay-sub">
-                  Pay by GCash, Maya, QR Ph, or card through our secure checkout. Your booking confirms
-                  automatically — no waiting, no manual verification.
+              <div className="bk-downpayment-card">
+                <span className="bk-downpayment-card-dot" aria-hidden="true"></span>
+                <p className="bk-summary-label">Downpayment Amount</p>
+                <p className="bk-downpayment-amount">
+                  ₱{computeDownPayment(selectedVariant.price).toLocaleString()}
                 </p>
-                <button type="button" className="bk-confirm" onClick={payOnlineAutomatically} disabled={payLoading}>
-                  {payLoading ? 'Redirecting…' : 'Proceed to Secure Checkout'}
+                <p className="bk-downpayment-duration">(1 hour)</p>
+              </div>
+
+              <div className="bk-payment-methods">
+                <span className="bk-payment-methods-label">Select Payment Method</span>
+                <div className="bk-payment-methods-grid">
+                  {PAYMENT_METHODS.map((m) => (
+                    <button
+                      key={m.key}
+                      type="button"
+                      className={
+                        'bk-payment-method-tile' +
+                        (selectedMethod === m.key ? ' bk-payment-method-tile--selected' : '') +
+                        (!pmIntent || payLoading ? ' bk-payment-method-tile--disabled' : '')
+                      }
+                      disabled={!pmIntent || payLoading}
+                      onClick={() => handleSelectMethod(m.key)}
+                    >
+                      <i className={m.icon}></i>
+                      <span>{m.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {!pmIntent && !payError && (
+                <p className="bk-online-pay-sub">Preparing secure payment…</p>
+              )}
+
+              {selectedMethod && selectedMethod !== 'card' && (
+                <p className="bk-payment-redirect-note">You will be redirected to complete your payment.</p>
+              )}
+
+              {selectedMethod === 'card' && (
+                <form id="bkCardForm" className="bk-guest-fields" onSubmit={handlePayCard}>
+                  <div className="bk-field">
+                    <label className="bk-field-label">Card Number</label>
+                    <input
+                      className="bk-field-input"
+                      inputMode="numeric"
+                      placeholder="1234 5678 9012 3456"
+                      value={cardNumber}
+                      onChange={(e) => setCardNumber(e.target.value)}
+                      disabled={payLoading}
+                    />
+                  </div>
+                  <div style={{ display: 'flex', gap: 12 }}>
+                    <div className="bk-field" style={{ flex: 1 }}>
+                      <label className="bk-field-label">Expiry (MM/YY)</label>
+                      <input
+                        className="bk-field-input"
+                        placeholder="MM/YY"
+                        value={cardExpiry}
+                        onChange={(e) => setCardExpiry(e.target.value)}
+                        disabled={payLoading}
+                      />
+                    </div>
+                    <div className="bk-field" style={{ flex: 1 }}>
+                      <label className="bk-field-label">CVC</label>
+                      <input
+                        className="bk-field-input"
+                        inputMode="numeric"
+                        placeholder="123"
+                        value={cardCvc}
+                        onChange={(e) => setCardCvc(e.target.value)}
+                        disabled={payLoading}
+                      />
+                    </div>
+                  </div>
+                </form>
+              )}
+
+              {payError && (
+                <p style={{ display: 'block', fontSize: '.78rem', color: '#e2554b', marginTop: 8 }}>{payError}</p>
+              )}
+
+              <div className="bk-detail-actions">
+                <button className="bk-back-btn" onClick={() => setStep('review')}>
+                  <i className="fa-solid fa-arrow-left"></i> Back
                 </button>
-                {payError && (
-                  <p style={{ display: 'block', fontSize: '.78rem', color: '#e2554b', marginTop: 8 }}>{payError}</p>
-                )}
+                <button
+                  type={selectedMethod === 'card' ? 'submit' : 'button'}
+                  form={selectedMethod === 'card' ? 'bkCardForm' : undefined}
+                  className="bk-confirm bk-continue"
+                  disabled={payLoading || !pmIntent || !selectedMethod}
+                  onClick={selectedMethod === 'card' ? undefined : handleConfirmWalletPay}
+                >
+                  {payLoading ? 'Processing…' : 'Pay Now'}
+                </button>
               </div>
             </div>
           )}
@@ -999,38 +1442,43 @@ function BookingModal({ room, returnInfo, onClose, openHour, closeHour, settings
           {/* STEP 4b: RETURNING FROM PAYMONGO CHECKOUT */}
           {step === 'paymongoReturn' && (
             <div className="bk-step" id="bkStepPaymongoReturn">
-              <div className="bk-confirm-icon">
-                {pmReturn.phase === 'loading' && <i className="fa-solid fa-spinner fa-spin"></i>}
-                {pmReturn.phase === 'cancelled' && <i className="fa-solid fa-circle-xmark"></i>}
-                {pmReturn.phase === 'needLogin' && <i className="fa-solid fa-triangle-exclamation"></i>}
-                {pmReturn.phase === 'confirmed' && <i className="fa-solid fa-circle-check"></i>}
-                {pmReturn.phase === 'pending' && <i className="fa-solid fa-clock"></i>}
-              </div>
+              {pmReturn.phase === 'confirmed' ? (
+                <BookingSuccess
+                  booking={pmReturn.booking}
+                  room={room}
+                  selectedVariant={selectedVariant}
+                  onDone={handleDone}
+                />
+              ) : (
+                <>
+                  <div className="bk-confirm-icon">
+                    {pmReturn.phase === 'loading' && <i className="fa-solid fa-spinner fa-spin"></i>}
+                    {pmReturn.phase === 'cancelled' && <i className="fa-solid fa-circle-xmark"></i>}
+                    {pmReturn.phase === 'needLogin' && <i className="fa-solid fa-triangle-exclamation"></i>}
+                    {pmReturn.phase === 'pending' && <i className="fa-solid fa-clock"></i>}
+                  </div>
 
-              <h3>
-                {pmReturn.phase === 'loading' && 'Confirming your payment…'}
-                {pmReturn.phase === 'cancelled' && 'Payment cancelled'}
-                {pmReturn.phase === 'needLogin' && 'Please log in to confirm'}
-                {pmReturn.phase === 'confirmed' && 'Payment confirmed — booking Confirmed!'}
-                {pmReturn.phase === 'pending' && 'Still confirming your payment…'}
-              </h3>
+                  <h3>
+                    {pmReturn.phase === 'loading' && 'Confirming your payment…'}
+                    {pmReturn.phase === 'cancelled' && 'Payment cancelled'}
+                    {pmReturn.phase === 'needLogin' && 'Please log in to confirm'}
+                    {pmReturn.phase === 'pending' && 'Still confirming your payment…'}
+                  </h3>
 
-              <p>
-                {pmReturn.phase === 'loading' && 'Please wait a moment.'}
-                {pmReturn.phase === 'cancelled' &&
-                  "No worries — your slot wasn't charged and hasn't been held. Feel free to book again whenever you're ready."}
-                {pmReturn.phase === 'needLogin' &&
-                  'Log in with the same account you booked with to see your payment status.'}
-                {pmReturn.phase === 'confirmed' &&
-                  'Your down payment went through and your slot is secured. See you then!'}
-                {pmReturn.phase === 'pending' &&
-                  'This can take a little longer than usual. You\'ll see your booking move to "Confirmed" in your profile shortly — no need to pay again.'}
-              </p>
+                  <p>
+                    {pmReturn.phase === 'loading' && 'Please wait a moment.'}
+                    {pmReturn.phase === 'cancelled' &&
+                      "No worries — your slot wasn't charged and hasn't been held. Feel free to book again whenever you're ready."}
+                    {pmReturn.phase === 'needLogin' &&
+                      'Log in with the same account you booked with to see your payment status.'}
+                    {pmReturn.phase === 'pending' &&
+                      'This can take a little longer than usual. You\'ll see your booking move to "Confirmed" in your profile shortly — no need to pay again.'}
+                  </p>
 
-              {pmReturn.phase === 'confirmed' && <BookingSummaryCard booking={pmReturn.booking} />}
-
-              {pmReturn.phase !== 'loading' && (
-                <button className="bk-done" onClick={handleDone}>Done</button>
+                  {pmReturn.phase !== 'loading' && (
+                    <button className="bk-done" onClick={handleDone}>Done</button>
+                  )}
+                </>
               )}
             </div>
           )}

@@ -4,6 +4,8 @@ import { BrowserRouter } from 'react-router-dom'
 import App from './App.jsx'
 import { AuthProvider } from './context/AuthContext.jsx'
 
+import './styles/root.css'
+
 // BrowserRouter wraps the whole app exactly once, here at the root —
 // this is what makes <Routes>/<Route>/<Link>/useNavigate work anywhere
 // inside <App />. See Phase 3 notes for what each of those do.
