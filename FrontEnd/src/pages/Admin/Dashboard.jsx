@@ -160,7 +160,7 @@ function Dashboard() {
 
         <div className="card">
           <div className="card-head"><span className="card-title">Room Status</span></div>
-          <div id="dash-room-status" style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+          <div id="dash-room-status" className="dash-room-status">
             {roomsLoading ? (
               <div className="dash-empty-state">Loading…</div>
             ) : roomsError ? (

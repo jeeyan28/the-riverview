@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import logo from '../assets/logo/logoo.png';
 import { useAuth } from '../context/AuthContext';
+import ThemeToggle from './ThemeToggle';
 
 // ─────────────────────────────────────────────────────────────────────────
 // Navbar — the public site's promo banner + header + mobile nav drawer,
@@ -12,10 +13,6 @@ import { useAuth } from '../context/AuthContext';
 // All state (promo visibility, mobile nav open/closed, scrolled) still
 // lives in MainLayout — this component only receives values + handler
 // functions as props and renders markup, same as Phase 6/7.
-//
-// Dark/light theme toggle removed (site is dark-only now): ThemeToggle
-// import, both instances (desktop + mobile), and the theme/onToggleTheme
-// props all deleted.
 //
 // PHASE 8 (part 3, ProfileModal) ADDITION: the user-chip DROPDOWN toggle
 // (open/close the `.user-chip-menu`, click-outside-to-close) was wired here
@@ -73,11 +70,16 @@ function Navbar({
   onCloseMobileNav,
   scrolled,
   onOpenProfile,
+  theme,
+  onToggleTheme,
 }) {
   const [chipMenuOpen, setChipMenuOpen] = useState(false);
   const chipRef = useRef(null);
   const { user, isAdmin, logout } = useAuth();
   const navigate = useNavigate();
+  // Theme toggle only lives on the landing page (shared theme state still
+  // applies everywhere via useTheme's data-theme attribute on <html>).
+  const isHome = useLocation().pathname === '/';
 
   // Scroll-spy nav highlighting — ported 1:1 from the original js/index.js
   // (lines ~174-184): tracks scroll position against each `section[id]`'s
@@ -173,6 +175,8 @@ function Navbar({
         </nav>
 
         <div className="nav-buttons">
+          {isHome && <ThemeToggle id="nav-theme-toggle" theme={theme} onToggle={onToggleTheme} />}
+
           {/* Shown only when no one is logged in — matches original's
               loginBtn.style.display = loggedIn ? 'none' : ''. */}
           <Link
@@ -248,6 +252,7 @@ function Navbar({
       {/* MOBILE NAV */}
       <div className={`mobile-nav${mobileNavOpen ? ' open' : ''}`} id="mobile-nav">
         <button className="mobile-nav-close" id="nav-close" onClick={onCloseMobileNav}>✕</button>
+        {isHome && <ThemeToggle id="mobile-theme-toggle" theme={theme} onToggle={onToggleTheme} style={{ marginBottom: '1rem' }} />}
         <a href="#home" onClick={onCloseMobileNav}>Home</a>
         <a href="#rooms" onClick={onCloseMobileNav}>Rooms</a>
         <a href="#about" onClick={onCloseMobileNav}>About</a>

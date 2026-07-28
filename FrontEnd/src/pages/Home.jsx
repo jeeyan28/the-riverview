@@ -1,5 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
+import {
+  Clock3, CalendarCheck, PartyPopper, Trophy,
+  Zap, LayoutGrid, ShieldCheck,
+  DoorOpen, CalendarDays, Grid2x2, RefreshCcw, Wallet, FileText, MessageCircle,
+  HelpCircle, X,
+} from 'lucide-react';
 import { useSiteSettings } from '../hooks/useSiteSettings';
 import { resolveImageUrl } from '../utils/resolveImageUrl';
 import { dateKey, fetchReservedHours } from '../utils/rooms';
@@ -35,6 +41,29 @@ function getOffset(index, current, total) {
   if (diff < -total / 2) diff += total;
   return diff;
 }
+
+// "Why Book Online?" benefit cards.
+const WHY_BOOK_CARDS = [
+  { icon: CalendarCheck, title: 'Reserve in Advance', desc: "Lock in your preferred room before it's gone." },
+  { icon: Zap, title: 'Faster Check-In', desc: 'Skip the wait — your room is ready when you arrive.' },
+  { icon: LayoutGrid, title: 'See What\u2019s Available', desc: 'Browse room types and real-time availability first.' },
+  { icon: ShieldCheck, title: 'Secure Booking', desc: 'Your reservation and payment details stay protected.' },
+];
+
+// "Helpful Information" cards — practical, optional notes, not warnings.
+// Opening hours text intentionally mirrors the hero's hardcoded string
+// (see PROJECT_PROGRESS.md) rather than adding a second, separately
+// formatted source for the same fact.
+const HELPFUL_INFO_CARDS = [
+  { icon: DoorOpen, title: 'Walk-Ins Welcome', desc: 'Just show up — subject to availability.' },
+  { icon: CalendarDays, title: 'Book Ahead on Weekends', desc: 'Reservations are recommended on weekends and holidays.' },
+  { icon: Grid2x2, title: 'Choose Your Room Type', desc: 'Solo, Big, or Shared — pick what fits your group.' },
+  { icon: RefreshCcw, title: 'Availability Updates Often', desc: 'Room status refreshes regularly so what you see is accurate.' },
+  { icon: Wallet, title: 'Down Payment May Apply', desc: 'A small deposit may be required to confirm your reservation.' },
+  { icon: FileText, title: 'Flexible Policies', desc: 'Cancellation and rescheduling options may apply — just ask.' },
+  { icon: Clock3, title: 'Open Daily', desc: '7AM to midnight, every day of the week.' },
+  { icon: MessageCircle, title: 'Need Help?', desc: 'Have questions? Reach out — we\u2019re happy to help.' },
+];
 
 // Keyword-based icon lookup for each facility feature tag — visual only,
 // falls back to a generic check icon for anything unrecognized.
@@ -184,7 +213,7 @@ function RoomCard({ room, liveStatus, onSelect }) {
 }
 
 function Home() {
-  const { settings, openHour, closeHour, loaded: settingsLoaded } = useSiteSettings();
+  const { settings, openHour, closeHour, loaded: settingsLoaded, refetch: refetchSettings } = useSiteSettings();
   const [rooms, setRooms] = useState(null); // null = loading
   const [loadError, setLoadError] = useState(false);
   const [liveStatuses, setLiveStatuses] = useState({}); // { [roomId]: 'Fully Booked' }
@@ -192,6 +221,7 @@ function Home() {
   const [bookingRoom, setBookingRoom] = useState(null); // room object, or null when closed
   const [paymongoReturn, setPaymongoReturn] = useState(null); // { result, paymentIntentId }, or null
   const [searchParams, setSearchParams] = useSearchParams();
+  const [helpOpen, setHelpOpen] = useState(false); // "?" floating Helpful Information panel
 
   // handlePaymongoReturn (URL-reading half) — migrated 1:1 from js/index.js.
   // Runs once on mount, exactly like the original's unconditional
@@ -251,10 +281,17 @@ function Home() {
           .filter((r) => r.status === 'Available')
           .map(async (room) => {
             try {
+              // No variantLabel here: this badge is a room-wide "nothing left
+              // to book today" summary, so it counts against the room's
+              // total units across every variant (falls back to 1 for rooms
+              // without variants) rather than any single variant's pool.
+              const totalUnits = room.variants && room.variants.length
+                ? room.variants.reduce((sum, v) => sum + (Number(v.roomCount) || 1), 0)
+                : 1;
               const reserved = await fetchReservedHours(room._id, todayStr);
               let fullyBooked = currentHour < closeHour; // only meaningful if time remains today
               for (let h = currentHour; h < closeHour && fullyBooked; h++) {
-                if (!reserved.includes(h)) fullyBooked = false;
+                if (Number(reserved?.[h] || 0) < totalUnits) fullyBooked = false;
               }
               if (fullyBooked) updates[room._id] = 'Fully Booked';
             } catch (err) {
@@ -273,8 +310,25 @@ function Home() {
     };
   }, [rooms, settingsLoaded, openHour, closeHour]);
 
-  function handleSelectRoom(room) {
+  // Opens immediately with the (possibly stale) room from the page-load
+  // list so the modal isn't blank while loading, then swaps in a fresh
+  // fetch by id. Room data (roomCount, status, price) can change in admin
+  // any time after this page loaded, and the booking flow's availability
+  // math depends on that being current — otherwise the modal can show
+  // capacity that no longer matches what the backend will actually check.
+  // Settings (operating hours, fewSlotsThreshold) are refetched the same
+  // way — useSiteSettings only fetches once on mount, so without this an
+  // admin's hour/threshold change wouldn't show until a page reload.
+  async function handleSelectRoom(room) {
     setBookingRoom(room);
+    refetchSettings();
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/rooms/${room._id}`, { credentials: 'include' });
+      if (res.ok) setBookingRoom(await res.json());
+    } catch (err) {
+      console.error(err);
+      // keep the already-open stale room rather than blocking the flow
+    }
   }
 
   // Scroll-reveal — toggles `.is-visible` on `.reveal`/`.reveal-stagger`
@@ -344,25 +398,25 @@ function Home() {
           </div>
           <div className="rooms-header-right">
             <p>Walk-ins welcome.<br />Reservations recommended on weekends.</p>
-            <a href="#rooms" className="btn-view-all" onClick={(e) => e.preventDefault()}>
+            <Link to="/rooms" className="btn-view-all">
               View All Rooms <i className="fa-solid fa-chevron-right"></i>
-            </a>
+            </Link>
           </div>
         </div>
 
         <div className="rooms-grid reveal-stagger" id="room-grid">
           {rooms === null && !loadError && (
-            <div style={{ textAlign: 'center', color: '#888', padding: '32px 0', width: '100%' }}>
+            <div className="text-center text-muted py-4 w-100">
               Loading rooms…
             </div>
           )}
           {loadError && (
-            <div style={{ textAlign: 'center', color: '#888', padding: '32px 0', width: '100%' }}>
+            <div className="text-center text-muted py-4 w-100">
               Could not load rooms right now. Please try again later.
             </div>
           )}
           {rooms !== null && !loadError && rooms.length === 0 && (
-            <div style={{ textAlign: 'center', color: '#888', padding: '32px 0', width: '100%' }}>
+            <div className="text-center text-muted py-4 w-100">
               No rooms available yet — check back soon.
             </div>
           )}
@@ -378,13 +432,20 @@ function Home() {
         </div>
       </section>
 
-      {/* SECTION DIVIDER — visual break between Rooms and Our Spaces only;
-          no functionality, purely to separate the two room-listing sections. */}
-      <section className="section-divider">
-        <div className="section-divider-inner reveal">
-          <span className="section-divider-label">The Riverview Experience</span>
-          <h3>More than just rooms.</h3>
-          <p>Take a closer look at what makes every space here worth coming back to.</p>
+      {/* WHY BOOK ONLINE */}
+      <section className="why-book">
+        <div className="why-book-inner reveal">
+          <div className="section-label">Why Book Online?</div>
+          <h2>A few reasons to reserve ahead.</h2>
+        </div>
+        <div className="why-book-grid reveal-stagger">
+          {WHY_BOOK_CARDS.map((c) => (
+            <div className="why-book-card" key={c.title}>
+              <div className="why-book-card-icon"><c.icon size={18} color="var(--teal)" /></div>
+              <h4>{c.title}</h4>
+              <p>{c.desc}</p>
+            </div>
+          ))}
         </div>
       </section>
 
@@ -442,28 +503,71 @@ function Home() {
 
           <div className="about-right reveal-stagger">
             <div className="about-card">
-              <div className="about-card-icon">🕐</div>
+              <div className="about-card-icon"><Clock3 size={20} color="var(--teal)" /></div>
               <h4>Open Daily</h4>
               <p>7AM to midnight, every day of the week. We keep the lights on so you can play longer.</p>
             </div>
             <div className="about-card">
-              <div className="about-card-icon">📱</div>
+              <div className="about-card-icon"><CalendarCheck size={20} color="var(--teal)" /></div>
               <h4>Easy Booking</h4>
               <p>Reserve your room online in seconds. Walk-ins always welcome, reservations always smoother.</p>
             </div>
             <div className="about-card">
-              <div className="about-card-icon">🎉</div>
+              <div className="about-card-icon"><PartyPopper size={20} color="var(--teal)" /></div>
               <h4>Events & Parties</h4>
               <p>Celebrating something? We'll help set it up. Birthdays, team events, reunions — we handle it.</p>
             </div>
             <div className="about-card">
-              <div className="about-card-icon">🏆</div>
+              <div className="about-card-icon"><Trophy size={20} color="var(--teal)" /></div>
               <h4>Official Games</h4>
               <p>Full scoreboard, timer, and sound system for serious basketball matchups. Play like it counts.</p>
             </div>
           </div>
         </div>
       </section>
+
+      {/* HELPFUL INFORMATION — floating "?" widget, optional/informational
+          only, not a warning or required notice. */}
+      <div className="help-widget">
+        {helpOpen && (
+          <div className="help-panel" role="dialog" aria-label="Helpful Information">
+            <div className="help-panel-header">
+              <div>
+                <div className="section-label">Good to Know</div>
+                <h4>Helpful Information</h4>
+              </div>
+              <button
+                type="button"
+                className="help-panel-close"
+                aria-label="Close"
+                onClick={() => setHelpOpen(false)}
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <div className="help-panel-list">
+              {HELPFUL_INFO_CARDS.map((c) => (
+                <div className="info-card" key={c.title}>
+                  <div className="info-card-icon"><c.icon size={16} color="var(--teal)" /></div>
+                  <div>
+                    <h4>{c.title}</h4>
+                    <p>{c.desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        <button
+          type="button"
+          className={`help-fab${helpOpen ? ' is-open' : ''}`}
+          aria-expanded={helpOpen}
+          aria-label={helpOpen ? 'Close helpful information' : 'Open helpful information'}
+          onClick={() => setHelpOpen((v) => !v)}
+        >
+          {helpOpen ? <X size={20} /> : <HelpCircle size={20} />}
+        </button>
+      </div>
 
       <BookingModal
         room={bookingRoom}

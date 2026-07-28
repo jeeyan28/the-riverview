@@ -1,4 +1,3 @@
-
 const REPORT_ITEMS = [
   { icon: 'file-spreadsheet', bg: 'rgba(239,62,109,.1)', color: 'var(--teal)', name: 'Daily Booking Report', date: 'Today, Jun 25 2026' },
   { icon: 'file-analytics', bg: 'rgba(55,138,221,.1)', color: '#378ADD', name: 'Weekly Revenue Summary', date: 'Jun 19–25 2026' },
@@ -35,22 +34,14 @@ function Reports() {
 
       <div className="card">
         <div className="card-head"><span className="card-title">Custom date range</span></div>
-        <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <label style={{ fontSize: '.7rem', color: 'var(--muted)' }}>From</label>
-            <input
-              type="date"
-              defaultValue="2026-06-01"
-              style={{ background: 'var(--navy3)', border: '1px solid var(--border)', borderRadius: 8, padding: '7px 10px', color: 'var(--text)', fontSize: '.82rem', fontFamily: "'Inter',sans-serif", outline: 'none' }}
-            />
+        <div className="rep-daterange-row">
+          <div className="field-stack">
+            <label className="field-label">From</label>
+            <input type="date" defaultValue="2026-06-01" className="rep-date-input" />
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <label style={{ fontSize: '.7rem', color: 'var(--muted)' }}>To</label>
-            <input
-              type="date"
-              defaultValue="2026-06-25"
-              style={{ background: 'var(--navy3)', border: '1px solid var(--border)', borderRadius: 8, padding: '7px 10px', color: 'var(--text)', fontSize: '.82rem', fontFamily: "'Inter',sans-serif", outline: 'none' }}
-            />
+          <div className="field-stack">
+            <label className="field-label">To</label>
+            <input type="date" defaultValue="2026-06-25" className="rep-date-input" />
           </div>
           <button className="save-btn">Generate Report</button>
         </div>

@@ -33,16 +33,10 @@ function Users() {
   const [roleChangeTarget, setRoleChangeTarget] = useState(null); // the user row, or null
 
   const fetchUsers = useCallback(async () => {
-    // Waits on `initializing` (see AuthContext) rather than checking
-    // admin:manage immediately: hasPermission()/guardPermission() read
-    // `user.permissions`, which isn't trustworthy until the initial
-    // GET /api/auth/me revalidation resolves — checking earlier could show
-    // a false "no permission" alert to a legitimate admin:manage user on a
-    // hard refresh, before their real permissions have loaded.
+    // Wait for AuthContext's permission revalidation before gating, to
+    // avoid a false "no permission" flash on hard refresh.
     if (initializing) return;
-    // Direct port of renderUsersPanel()'s guardPermission('admin:manage', ...)
-    // — re-checked on every call, same as the original (initial load,
-    // search, and role-filter changes all funnel through this function).
+    // Re-checked on every call: initial load, search, and role-filter changes.
     if (!guardPermission('admin:manage', "You don't have permission to manage users.")) {
       setLoading(false);
       return;
@@ -152,20 +146,21 @@ function Users() {
             <i className="ti ti-plus"></i> Add User
           </button>
         </div>
-        <div style={{ display: 'flex', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
+        <div className="users-filters">
           <input
             id="users-search"
             type="text"
             placeholder="Search name or email…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            style={{ flex: 1, minWidth: 200, background: 'var(--navy3)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 12px', color: 'var(--text)', fontSize: '.82rem', fontFamily: "'Inter',sans-serif", outline: 'none' }}
+            className="users-filter-input"
+            style={{ flex: 1, minWidth: 200 }}
           />
           <select
             id="users-role-filter"
             value={roleFilter}
             onChange={(e) => setRoleFilter(e.target.value)}
-            style={{ background: 'var(--navy3)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 12px', color: 'var(--text)', fontSize: '.82rem', fontFamily: "'Inter',sans-serif", outline: 'none' }}
+            className="users-filter-input"
           >
             <option value="">All roles</option>
             <option value="super_admin">Owner</option>
@@ -191,14 +186,9 @@ function Users() {
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────
-// AddUserModal — page-specific/single-use, same reasoning as Bookings.jsx's
-// ManualBookingModal/EditBookingModal (components/README.md's Modal.jsx
-// notes). Keeps the original's inline error div (um-error) instead of
-// alert(), since the original distinguished "validation problem, fix and
-// retry without losing your other fields" (inline) from "action already
-// happened, just acknowledge it" (alert, used for status/delete above).
-// ─────────────────────────────────────────────────────────────────────────
+// Add User modal (page-specific, same pattern as Bookings.jsx's modals).
+// Validation errors show inline so the form isn't cleared; status/delete
+// use alert() since those actions have already happened.
 function AddUserModal({ open, onClose, assignableRoles, onCreated }) {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -312,11 +302,8 @@ function AddUserModal({ open, onClose, assignableRoles, onCreated }) {
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────
-// RoleChangeModal — page-specific/single-use, same reasoning as above.
-// `user` is the live row passed in from Users()'s own `users` state, so
-// re-opening it always reflects the current role/canManage state.
-// ─────────────────────────────────────────────────────────────────────────
+// Role Change modal (page-specific). `user` is the live row from Users()'s
+// state, so reopening it always reflects the current role.
 function RoleChangeModal({ user, assignableRoles, onClose, onSaved }) {
   const [role, setRole] = useState('');
   const [error, setError] = useState('');

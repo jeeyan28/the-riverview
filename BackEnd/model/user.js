@@ -81,7 +81,7 @@ userSchema.pre("save", async function () {
   // saved is PendingRegistration.passwordHash, already bcrypt-hashed at
   // /register time. Hashing it again here would make it unverifiable.
   if (this.$locals.skipPasswordHash) return;
-  this.password = await bcrypt.hash(this.password, 10);
+  this.password = await bcrypt.hash(this.password, SALT_ROUNDS);
 });
 
 userSchema.methods.comparePassword = async function (candidate) {
@@ -91,6 +91,10 @@ userSchema.methods.comparePassword = async function (candidate) {
 
 const MAX_ATTEMPTS = 5;
 const LOCK_TIME_MS = 15 * 60 * 1000; // 15 minutes
+// Shared with routes/auth.js's /register handler, which hashes a
+// PendingRegistration's password with this same cost factor before it's
+// later copied onto the User document (see skipPasswordHash below).
+const SALT_ROUNDS = 10;
 
 userSchema.methods.registerFailedLogin = async function () {
   this.failedLoginAttempts += 1;
@@ -110,5 +114,4 @@ userSchema.methods.registerSuccessfulLogin = async function () {
 
 module.exports = mongoose.model("User", userSchema);
 module.exports.ROLES = ROLES;
-
-
+module.exports.SALT_ROUNDS = SALT_ROUNDS;

@@ -1,16 +1,19 @@
 import { useEffect, useState } from 'react';
 import { Outlet } from 'react-router-dom';
+import 'bootstrap/dist/css/bootstrap.min.css';
 import '../styles/style.css';
 import '../styles/enhancements.css';
 import '../styles/auth-ui.css';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import ProfileModal from '../components/ProfileModal';
+import { useTheme } from '../hooks/useTheme';
 
 
 const PROMO_DISMISS_KEY = 'riverview-promo-dismissed';
 
 function MainLayout() {
+  const [theme, toggleTheme] = useTheme();
   const [promoVisible, setPromoVisible] = useState(
     () => sessionStorage.getItem(PROMO_DISMISS_KEY) !== '1'
   );
@@ -64,6 +67,8 @@ function MainLayout() {
         onCloseMobileNav={() => setMobileNavOpen(false)}
         scrolled={scrolled}
         onOpenProfile={() => setProfileOpen(true)}
+        theme={theme}
+        onToggleTheme={toggleTheme}
       />
 
       <main>

@@ -15,7 +15,6 @@ const NAV_SECTIONS = [
     items: [
       { to: '/admin/dashboard', icon: 'ti-layout-dashboard', label: 'Dashboard', roles: MANAGER_UP },
       { to: '/admin/monitor', icon: 'ti-device-desktop-analytics', label: 'Room Monitor' },
-      { to: '/admin/room-management', icon: 'ti-building-store', label: 'Room Management' },
       { to: '/admin/bookings', icon: 'ti-calendar-event', label: 'Bookings' },
     ],
   },
@@ -32,8 +31,8 @@ const NAV_SECTIONS = [
     items: [
       { to: '/admin/users', icon: 'ti-users-group', label: 'Manage Users', permission: 'admin:manage' },
       { to: '/admin/logs', icon: 'ti-lock-access', label: 'Login History', roles: MANAGER_UP },
+      { to: '/admin/room-management', icon: 'ti-building', label: 'Room Management', permission: 'room:manage' },
       { to: '/admin/settings', icon: 'ti-settings', label: 'Settings', permission: 'settings:view' },
-      { to: '/admin/profile', icon: 'ti-user-circle', label: 'Profile' },
     ],
   },
 ];
@@ -43,15 +42,14 @@ const NAV_SECTIONS = [
 export const PAGE_TITLES = {
   dashboard: 'Dashboard',
   monitor: 'Room Monitor',
-  'room-management': 'Room Management',
   bookings: 'Bookings',
   analytics: 'Analytics',
   reports: 'Reports',
   forecasting: 'Forecasting',
   users: 'Manage Users',
   logs: 'Login History',
+  'room-management': 'Room Management',
   settings: 'Settings',
-  profile: 'Profile',
 };
 
 function fullName(user) {

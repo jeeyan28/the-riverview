@@ -1,553 +1,68 @@
 import { useCallback, useEffect, useState } from 'react';
 import Modal from '../../components/Modal';
-import ImageUploadPreview from '../../components/ImageUploadPreview';
-import { resolveImageUrl } from '../../utils/resolveImageUrl';
+import PasswordInput from '../../components/PasswordInput';
+import PasswordRequirementsList from '../../components/PasswordRequirementsList';
 import { useAuth } from '../../context/AuthContext';
-import { roomsService } from '../../services/rooms';
 import { settingsService } from '../../services/settings';
+import { usersService } from '../../services/users';
+import { PASSWORD_REQUIREMENTS } from '../../utils/password';
 
 
 const SETTINGS_TABS = [
-  { key: 'facilities', label: 'Facilities' },
   { key: 'announcements', label: 'Announcements' },
   { key: 'audit', label: 'Audit Log' },
+  { key: 'profile', label: 'Profile' },
 ];
 
 function Settings() {
-  const [activeTab, setActiveTab] = useState('facilities');
+  const [activeTab, setActiveTab] = useState('announcements');
 
   return (
     <div className="panel active" id="panel-settings">
-      <div className="set-tabs">
-        {SETTINGS_TABS.map((tab) => (
-          <button
-            key={tab.key}
-            className={`set-tab${activeTab === tab.key ? ' active' : ''}`}
-            onClick={() => setActiveTab(tab.key)}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
+      <div className="set-layout">
+        <div className="set-tabs">
+          {SETTINGS_TABS.map((tab) => (
+            <button
+              key={tab.key}
+              className={`set-tab${activeTab === tab.key ? ' active' : ''}`}
+              onClick={() => setActiveTab(tab.key)}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
 
-      <div className={`set-subpanel${activeTab === 'facilities' ? ' active' : ''}`} id="set-facilities">
-        {activeTab === 'facilities' && (
-          <>
-            <FacilitiesTab />
-            <OperatingScheduleAndHolidays />
-          </>
-        )}
-      </div>
-
-      <div className={`set-subpanel${activeTab === 'announcements' ? ' active' : ''}`} id="set-announcements">
-        {activeTab === 'announcements' && <AnnouncementsTab />}
-      </div>
-      <div className={`set-subpanel${activeTab === 'audit' ? ' active' : ''}`} id="set-audit">
-        {activeTab === 'audit' && <AuditLogTab />}
+        <div className="set-content">
+          <div className={`set-subpanel${activeTab === 'announcements' ? ' active' : ''}`} id="set-announcements">
+            {activeTab === 'announcements' && (
+              <>
+                <AnnouncementsTab />
+                <OperatingScheduleAndHolidays />
+              </>
+            )}
+          </div>
+          <div className={`set-subpanel${activeTab === 'audit' ? ' active' : ''}`} id="set-audit">
+            {activeTab === 'audit' && <AuditLogTab />}
+          </div>
+          <div className={`set-subpanel${activeTab === 'profile' ? ' active' : ''}`} id="set-profile">
+            {activeTab === 'profile' && <ProfileTab />}
+          </div>
+        </div>
       </div>
     </div>
   );
 }
 
-const STATUS_CLASS_MAP = {
-  Available: 'st-available',
-  Occupied: 'st-occupied',
-  'Under Maintenance': 'st-maintenance',
-  Inactive: 'st-inactive',
-};
-
-function emptyFacilityForm() {
-  return {
-    name: '',
-    roomNumber: '',
-    description: '',
-    price: '',
-    status: 'Available',
-    capacity: '',
-    variants: [], // [{ label, price, pax }]
-    features: [], // ['Air-conditioned', ...]
-  };
-}
 
 // ─────────────────────────────────────────────────────────────────────────
-// FacilitiesTab — its own component (not inlined in Settings()) since it
-// owns a fair amount of local state (rooms list + the whole modal form).
-// Stays in this file rather than moving to components/ since, like
-// Bookings.jsx's modals, it's page-specific and single-use.
-// ─────────────────────────────────────────────────────────────────────────
-function FacilitiesTab() {
-  const { hasPermission, guardPermission } = useAuth();
-  const canManage = hasPermission('room:manage');
-
-  const [rooms, setRooms] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  const [modalOpen, setModalOpen] = useState(false);
-  const [editingId, setEditingId] = useState(null); // null = Add mode
-  const [form, setForm] = useState(emptyFacilityForm());
-  const [existingImageUrl, setExistingImageUrl] = useState('');
-  const [selectedImageFile, setSelectedImageFile] = useState(null);
-  const [featureInput, setFeatureInput] = useState('');
-  const [saving, setSaving] = useState(false);
-
-  const fetchRooms = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await roomsService.list();
-      // normalizeRooms() equivalent — tolerate features/variants arriving as
-      // strings from an older backend, same defensive parsing as the original.
-      const normalized = (Array.isArray(data) ? data : []).map((r) => ({
-        ...r,
-        capacity: r.capacity != null ? r.capacity : '',
-        features: Array.isArray(r.features)
-          ? r.features
-          : typeof r.features === 'string' && r.features
-          ? r.features.split(',').map((f) => f.trim()).filter(Boolean)
-          : [],
-        variants: Array.isArray(r.variants)
-          ? r.variants
-          : typeof r.variants === 'string' && r.variants
-          ? safeParseJson(r.variants, [])
-          : [],
-      }));
-      setRooms(normalized);
-    } catch (err) {
-      console.error('Could not load rooms from the API:', err);
-      setRooms([]);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchRooms();
-  }, [fetchRooms]);
-
-  function openAddModal() {
-    if (!guardPermission('room:manage')) return;
-    setEditingId(null);
-    setForm(emptyFacilityForm());
-    setExistingImageUrl('');
-    setSelectedImageFile(null);
-    setFeatureInput('');
-    setModalOpen(true);
-  }
-
-  function openEditModal(room) {
-    if (!guardPermission('room:manage')) return;
-    setEditingId(room._id);
-    setForm({
-      name: room.name || '',
-      roomNumber: room.roomNumber || '',
-      description: room.description || '',
-      price: room.price || '',
-      status: room.status || 'Available',
-      capacity: room.capacity || '',
-      variants: (room.variants || []).map((v) => ({ ...v })),
-      features: [...(room.features || [])],
-    });
-    setExistingImageUrl(room.image ? resolveImageUrl(room.image) : '');
-    setSelectedImageFile(null);
-    setFeatureInput('');
-    setModalOpen(true);
-  }
-
-  function closeModal() {
-    setModalOpen(false);
-    setEditingId(null);
-    setSelectedImageFile(null);
-  }
-
-  /* ── pricing tiers ── */
-  function addVariantRow() {
-    setForm((f) => ({ ...f, variants: [...f.variants, { label: '', price: '', pax: '' }] }));
-  }
-  function updateVariant(i, field, value) {
-    setForm((f) => {
-      const variants = f.variants.map((v, idx) => (idx === i ? { ...v, [field]: value } : v));
-      return { ...f, variants };
-    });
-  }
-  function removeVariantRow(i) {
-    setForm((f) => ({ ...f, variants: f.variants.filter((_, idx) => idx !== i) }));
-  }
-
-  /* ── feature chips ── */
-  function addFeatureChip() {
-    const raw = featureInput.trim();
-    if (!raw) return;
-    // allow comma-separated paste, e.g. "Aircon, Free WiFi"
-    setForm((f) => {
-      const features = [...f.features];
-      raw
-        .split(',')
-        .map((s) => s.trim())
-        .filter(Boolean)
-        .forEach((val) => {
-          if (!features.some((existing) => existing.toLowerCase() === val.toLowerCase())) {
-            features.push(val);
-          }
-        });
-      return { ...f, features };
-    });
-    setFeatureInput('');
-  }
-  function removeFeatureChip(i) {
-    setForm((f) => ({ ...f, features: f.features.filter((_, idx) => idx !== i) }));
-  }
-
-  /* ── save / remove ── */
-  async function handleSave() {
-    if (!guardPermission('room:manage')) return;
-    if (!form.name.trim() || !form.roomNumber.trim()) {
-      alert('Please fill in category and room number.');
-      return;
-    }
-    const cleanVariants = form.variants
-      .filter((v) => v.label.trim() !== '' || v.price !== '')
-      .map((v) => ({ label: v.label.trim(), price: Number(v.price) || 0, pax: (v.pax || '').trim() }));
-    if (!form.price && cleanVariants.length === 0) {
-      alert('Add a base price, or at least one pricing tier.');
-      return;
-    }
-
-    setSaving(true);
-    try {
-      // FormData (not JSON) so the selected image file rides along in the
-      // same request, same as the original's saveFacility().
-      const formData = new FormData();
-      formData.append('name', form.name.trim());
-      formData.append('roomNumber', form.roomNumber.trim());
-      formData.append('description', form.description.trim());
-      formData.append('price', Number(form.price) || 0);
-      formData.append('status', form.status);
-      formData.append('capacity', Number(form.capacity) || 0);
-      formData.append('features', JSON.stringify(form.features));
-      formData.append('variants', JSON.stringify(cleanVariants));
-      if (selectedImageFile) formData.append('image', selectedImageFile);
-
-      if (editingId) {
-        await roomsService.update(editingId, formData);
-      } else {
-        await roomsService.create(formData);
-      }
-      closeModal();
-      await fetchRooms();
-    } catch (err) {
-      console.error(err);
-      alert(err.message || 'Something went wrong saving the facility.');
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function handleRemove() {
-    if (!guardPermission('room:manage')) return;
-    if (!editingId) return closeModal();
-    if (!window.confirm('Remove this facility? This cannot be undone.')) return;
-    try {
-      await roomsService.remove(editingId);
-      closeModal();
-      await fetchRooms();
-    } catch (err) {
-      console.error(err);
-      alert('Could not delete this facility.');
-    }
-  }
-
-  async function quickDelete(id) {
-    if (!guardPermission('room:manage')) return;
-    if (!window.confirm('Remove this facility? This cannot be undone.')) return;
-    try {
-      await roomsService.remove(id);
-      await fetchRooms();
-    } catch (err) {
-      console.error(err);
-      alert('Could not delete this facility.');
-    }
-  }
-
-  async function duplicate(room) {
-    if (!guardPermission('room:manage')) return;
-    const payload = {
-      name: room.name + ' (Copy)',
-      roomNumber: room.roomNumber,
-      capacity: room.capacity,
-      description: room.description,
-      price: room.price,
-      status: room.status,
-      features: JSON.stringify(room.features || []),
-      variants: JSON.stringify(room.variants || []),
-    };
-    try {
-      // See rooms.js's header note: the original never surfaced a server
-      // message here (fixed 'Failed to duplicate facility.' string, no
-      // res.json() read at all) — preserved below since this catch's
-      // alert() also ignores err.message, same as before.
-      await roomsService.create(payload);
-      await fetchRooms();
-    } catch (err) {
-      console.error(err);
-      alert('Could not duplicate this facility.');
-    }
-  }
-
-  return (
-    <>
-      <div className="card">
-        <div className="fac-head">
-          <div className="fac-head-left">
-            <i className="ti ti-building"></i>
-            <span className="fac-head-title">Manage your Facility</span>
-          </div>
-          <button className="btn-teal" onClick={openAddModal}>
-            <i className="ti ti-plus"></i>Add Facility
-          </button>
-        </div>
-      </div>
-
-      <div className="fac-grid" id="fac-grid">
-        {loading ? (
-          <div style={{ textAlign: 'center', color: 'var(--muted)', padding: '24px 0', gridColumn: '1/-1' }}>Loading facilities…</div>
-        ) : rooms.length === 0 ? (
-          <div style={{ textAlign: 'center', color: 'var(--muted)', padding: '24px 0', gridColumn: '1/-1' }}>
-            No facilities yet. Click "Add Facility" to create one.
-          </div>
-        ) : (
-          rooms.map((r) => {
-            const hasVariants = r.variants && r.variants.length > 0;
-            const topPrice = hasVariants
-              ? `From ₱${Math.min(...r.variants.map((v) => Number(v.price) || 0))}/hr`
-              : r.price
-              ? `₱${r.price}/hr`
-              : '—';
-            return (
-              <div className="fac-card" key={r._id}>
-                <div className="fac-img">
-                  {r.image ? (
-                    <img src={resolveImageUrl(r.image)} alt={r.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  ) : (
-                    <>
-                      <i className="ti ti-photo" style={{ fontSize: 22, marginRight: 6 }}></i>
-                      {r.name} Image
-                    </>
-                  )}
-                </div>
-                <div className="fac-body">
-                  <div className="fac-title-row">
-                    <div>
-                      <div className="fac-name">{r.name}</div>
-                      <div className="fac-meta">{r.roomNumber}</div>
-                    </div>
-                    <div className="fac-price">{topPrice}</div>
-                  </div>
-                  {hasVariants && (
-                    <div className="fac-variants">
-                      {r.variants.map((v, i) => (
-                        <div className="fac-variant-row" key={i}>
-                          <span className="fv-label">
-                            {v.label}
-                            {v.pax ? ` · ${v.pax}` : ''}
-                          </span>
-                          <span className="fv-price">₱{v.price}/hr</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  <div className="fac-desc">{r.description || ''}</div>
-                  <span className={`fac-status ${STATUS_CLASS_MAP[r.status] || 'st-available'}`}>{r.status}</span>
-                  <div className="fac-tags">
-                    {(r.features || []).map((f, i) => (
-                      <span className="fac-tag" key={i}>{f}</span>
-                    ))}
-                  </div>
-                  <div className="fac-actions">
-                    {canManage ? (
-                      <>
-                        <button className="fac-edit-btn" onClick={() => openEditModal(r)}>
-                          <i className="ti ti-edit"></i>Edit
-                        </button>
-                        <button className="fac-icon-btn" title="Duplicate" onClick={() => duplicate(r)}>
-                          <i className="ti ti-copy"></i>
-                        </button>
-                        <button className="fac-icon-btn del" title="Remove" onClick={() => quickDelete(r._id)}>
-                          <i className="ti ti-trash"></i>
-                        </button>
-                      </>
-                    ) : (
-                      <span style={{ fontSize: '.72rem', color: 'var(--muted)' }}>View only</span>
-                    )}
-                  </div>
-                </div>
-              </div>
-            );
-          })
-        )}
-      </div>
-
-      {/* ── Facility Add/Edit modal ── */}
-      <Modal open={modalOpen} onClose={closeModal} size="lg">
-        <div className="modal-lg-title">{editingId ? 'Edit Facility' : 'Add Facility'}</div>
-        <div className="modal-lg-sub">
-          {editingId ? 'Update facility information, pricing tiers, and features.' : 'Add a new facility to your listing.'}
-        </div>
-
-        <div className="frow">
-          <div className="ffield">
-            <label className="flabel">Category</label>
-            <input type="text" placeholder="e.g. Billiards" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
-          </div>
-          <div className="ffield">
-            <label className="flabel">Room Number</label>
-            <input type="text" placeholder="e.g. Room 3" value={form.roomNumber} onChange={(e) => setForm((f) => ({ ...f, roomNumber: e.target.value }))} />
-          </div>
-        </div>
-
-        <div className="ffield">
-          <label className="flabel">Description</label>
-          <textarea
-            placeholder="Short description guests will see"
-            value={form.description}
-            onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-          />
-        </div>
-
-        <div className="ffield">
-          <div className="flabel-row">
-            <label className="flabel">Pricing Tiers</label>
-            <span className="flabel-hint">Each tier needs a name, rate, and pax allowance — this is what guests pick from</span>
-          </div>
-          <div className="variant-list" id="fm-variant-list">
-            {form.variants.length === 0 ? (
-              <div className="variant-empty">No pricing tiers yet — add one for things like "Solo — Regular" or "Big Room".</div>
-            ) : (
-              form.variants.map((v, i) => (
-                <div className="variant-row" key={i}>
-                  <input
-                    type="text" className="variant-label" placeholder="e.g. Big Room"
-                    value={v.label} onChange={(e) => updateVariant(i, 'label', e.target.value)}
-                  />
-                  <div className="variant-price-wrap">
-                    <span>₱</span>
-                    <input type="number" min={0} placeholder="0" value={v.price} onChange={(e) => updateVariant(i, 'price', e.target.value)} />
-                    <span>/hr</span>
-                  </div>
-                  <input
-                    type="text" className="variant-pax" placeholder="e.g. 6 pax"
-                    value={v.pax} onChange={(e) => updateVariant(i, 'pax', e.target.value)}
-                  />
-                  <button type="button" className="variant-remove-btn" title="Remove tier" onClick={() => removeVariantRow(i)}>
-                    <i className="ti ti-trash"></i>
-                  </button>
-                </div>
-              ))
-            )}
-          </div>
-          <button type="button" className="add-row-btn" onClick={addVariantRow}>
-            <i className="ti ti-plus"></i>Add pricing tier
-          </button>
-        </div>
-
-        <div className="frow">
-          <div className="ffield">
-            <label className="flabel">Base Price (₱/hr)</label>
-            <input type="number" placeholder="0" min={0} value={form.price} onChange={(e) => setForm((f) => ({ ...f, price: e.target.value }))} />
-          </div>
-          <div className="ffield">
-            <label className="flabel">Status</label>
-            <select value={form.status} onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))}>
-              <option>Available</option>
-              <option>Occupied</option>
-              <option>Under Maintenance</option>
-              <option>Inactive</option>
-            </select>
-          </div>
-        </div>
-
-        <div className="ffield">
-          <label className="flabel">Max Capacity (Pax)</label>
-          <span className="flabel-hint">Guests won't be able to book more pax than this. Leave 0/blank for no limit.</span>
-          <input type="number" placeholder="e.g. 10" min={0} value={form.capacity} onChange={(e) => setForm((f) => ({ ...f, capacity: e.target.value }))} />
-        </div>
-
-        <div className="field-note">Base price is used only when no pricing tiers are set.</div>
-
-        <div className="ffield">
-          <label className="flabel">Facility Image</label>
-          <ImageUploadPreview
-            icon="ti-photo"
-            title={existingImageUrl || selectedImageFile ? 'Click to change image' : 'Click to upload facility image'}
-            subtitle="PNG, JPG up to 10MB"
-            accept="image/png,image/jpeg"
-            maxSizeMB={10}
-            maxHeight={110}
-            value={existingImageUrl}
-            onFileSelect={setSelectedImageFile}
-          />
-        </div>
-
-        <div className="ffield" style={{ marginBottom: 22 }}>
-          <label className="flabel">Additional Features</label>
-          <div className="chip-list" id="fm-feature-chips">
-            {form.features.map((f, i) => (
-              <span className="chip" key={i}>
-                {f}
-                <button type="button" title="Remove" onClick={() => removeFeatureChip(i)}>
-                  <i className="ti ti-x" style={{ fontSize: 11 }}></i>
-                </button>
-              </span>
-            ))}
-          </div>
-          <div className="chip-input-row">
-            <input
-              type="text"
-              placeholder="e.g. Air-conditioned, Free WiFi — press Enter to add"
-              value={featureInput}
-              onChange={(e) => setFeatureInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  addFeatureChip();
-                }
-              }}
-            />
-            <button type="button" className="chip-add-btn" onClick={addFeatureChip}>
-              <i className="ti ti-plus"></i>
-            </button>
-          </div>
-        </div>
-
-        <div className="modal-actions-split">
-          <button className="btn-remove" onClick={handleRemove} style={{ display: editingId ? 'inline-block' : 'none' }}>
-            Remove
-          </button>
-          <button className="btn-save" disabled={saving} onClick={handleSave}>
-            {saving ? 'Saving…' : editingId ? 'Save Changes' : 'Add Facility'}
-          </button>
-        </div>
-      </Modal>
-    </>
-  );
-}
-
-function safeParseJson(str, fallback) {
-  try {
-    return JSON.parse(str);
-  } catch {
-    return fallback;
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────
-// OperatingScheduleAndHolidays — PART 10b. Renders as a sibling of
-// FacilitiesTab inside the same set-facilities subpanel, matching the
-// original admin.html where the "Operating Schedule" and "Holiday &
-// Closure Dates" cards sit directly underneath the facility grid.
+// OperatingScheduleAndHolidays — renders as a sibling of AnnouncementsTab
+// inside the set-announcements subpanel (moved here in Phase 2, since the
+// old set-facilities subpanel was removed once Facility CRUD moved to
+// /admin/room-management).
 //
-// One component (not two) because the legacy loadOperatingSettings()
-// fetches both from the single GET /api/settings/admin call and re-fetches
-// both together after every save/add/delete — splitting them would just
-// mean two components independently re-implementing the same fetch.
+// One component (not two) because it fetches both operating hours and
+// holidays from the single GET /api/settings/admin call and re-fetches
+// both together after every save/add/delete.
 // ─────────────────────────────────────────────────────────────────────────
 const DAY_PILLS = [
   { day: 1, label: 'Mon' },
@@ -579,9 +94,6 @@ function OperatingScheduleAndHolidays() {
   const [loading, setLoading] = useState(true);
   const [openTime, setOpenTime] = useState('06:00');
   const [closeTime, setCloseTime] = useState('22:00');
-  const [maxAdvanceDays, setMaxAdvanceDays] = useState('30');
-  const [cutoffHours, setCutoffHours] = useState('2');
-  const [fewSlotsThreshold, setFewSlotsThreshold] = useState('2');
   const [openDays, setOpenDays] = useState(DEFAULT_OPEN_DAYS_BEFORE_LOAD);
   const [holidays, setHolidays] = useState([]);
 
@@ -594,9 +106,6 @@ function OperatingScheduleAndHolidays() {
       const oh = settings.operatingHours || {};
       setOpenTime(oh.openTime || '06:00');
       setCloseTime(oh.closeTime || '22:00');
-      setMaxAdvanceDays(String(oh.maxAdvanceDays || 30));
-      setCutoffHours(String(oh.bookingCutoffHours ?? 2));
-      setFewSlotsThreshold(String(oh.fewSlotsThreshold ?? 2));
       // Same fallback as the original loadOperatingSettings(): all 7 days
       // on if the server document has no openDays array yet.
       setOpenDays(Array.isArray(oh.openDays) ? oh.openDays : [0, 1, 2, 3, 4, 5, 6]);
@@ -622,14 +131,7 @@ function OperatingScheduleAndHolidays() {
     if (!guardPermission('settings:manage', "You don't have permission to change operating hours.")) return;
     setSaveState('saving');
     try {
-      await settingsService.updateOperatingHours({
-        openTime,
-        closeTime,
-        openDays,
-        maxAdvanceDays: Number(maxAdvanceDays),
-        bookingCutoffHours: Number(cutoffHours),
-        fewSlotsThreshold: Number(fewSlotsThreshold),
-      });
+      await settingsService.updateOperatingHours({ openTime, closeTime, openDays });
       setSaveState('saved');
       setTimeout(() => setSaveState('idle'), 1500);
     } catch (err) {
@@ -694,40 +196,6 @@ function OperatingScheduleAndHolidays() {
             <div className="sched-input-wrap">
               <i className="ti ti-clock"></i>
               <input type="time" value={closeTime} onChange={(e) => setCloseTime(e.target.value)} />
-            </div>
-          </div>
-          <div className="sched-field">
-            <label>Max Advance Reservation</label>
-            <div className="sched-inline">
-              <select value={maxAdvanceDays} onChange={(e) => setMaxAdvanceDays(e.target.value)}>
-                <option value="15">15</option>
-                <option value="30">30</option>
-                <option value="60">60</option>
-              </select>
-              <span>days in advance</span>
-            </div>
-          </div>
-          <div className="sched-field">
-            <label>Booking Cutoff Time</label>
-            <div className="sched-inline">
-              <select value={cutoffHours} onChange={(e) => setCutoffHours(e.target.value)}>
-                <option value="1">1</option>
-                <option value="2">2</option>
-                <option value="4">4</option>
-              </select>
-              <span>hours before facility opens</span>
-            </div>
-          </div>
-          <div className="sched-field">
-            <label>Few Slots Threshold</label>
-            <div className="sched-inline">
-              <select value={fewSlotsThreshold} onChange={(e) => setFewSlotsThreshold(e.target.value)}>
-                <option value="1">1</option>
-                <option value="2">2</option>
-                <option value="3">3</option>
-                <option value="4">4</option>
-              </select>
-              <span>or fewer free hourly slots shows as "Few Slots"</span>
             </div>
           </div>
         </div>
@@ -969,6 +437,207 @@ function AuditLogTab() {
         ))}
       </div>
     </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// PROFILE tab — moved here from the standalone Admin/Profile.jsx page,
+// now reached via Settings > Profile instead of its own /admin/profile
+// route. Logic/markup unchanged; only the outer page-level wrapper
+// (`.panel#panel-profile`) was dropped since it now nests inside this
+// page's own `.set-subpanel`.
+// ─────────────────────────────────────────────────────────────────────────
+function displayName(admin) {
+  if (!admin) return 'Admin';
+  const name = `${admin.firstName || ''} ${admin.lastName || ''}`.trim();
+  return name || 'Admin';
+}
+
+function initialsOf(admin) {
+  if (!admin) return 'A';
+  return displayName(admin).charAt(0).toUpperCase();
+}
+
+const PROFILE_METRICS = [
+  { label: 'Total Logins', value: '142' },
+  { label: 'Bookings Managed', value: '388' },
+  { label: 'Reports Generated', value: '27' },
+  { label: 'Account Created', value: 'Jan 2026' },
+];
+
+function ProfileTab() {
+  const { user: admin, updateUser } = useAuth();
+
+  const [firstName, setFirstName] = useState(admin?.firstName || '');
+  const [lastName, setLastName] = useState(admin?.lastName || '');
+  const [email, setEmail] = useState(admin?.email || '');
+  const [phone, setPhone] = useState(admin?.phone || '');
+  const [savingDetails, setSavingDetails] = useState(false);
+
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [savingPassword, setSavingPassword] = useState(false);
+
+  const passwordChecks = PASSWORD_REQUIREMENTS.map((req) => ({ ...req, met: req.test(newPassword) }));
+  const passwordValid = passwordChecks.every((c) => c.met);
+
+  async function handleSaveDetails() {
+    if (!admin?._id) return;
+    // Trims each field before sending and reflects the trimmed values back
+    // into local state after a successful save, so the inputs match what
+    // was actually saved.
+    const trimmedFirstName = firstName.trim();
+    const trimmedLastName = lastName.trim();
+    const trimmedPhone = phone.trim();
+    setSavingDetails(true);
+    try {
+      // email intentionally omitted.
+      await usersService.updateProfile(admin._id, { firstName: trimmedFirstName, lastName: trimmedLastName, phone: trimmedPhone });
+
+      setFirstName(trimmedFirstName);
+      setLastName(trimmedLastName);
+      setPhone(trimmedPhone);
+
+      // Updates the shared AuthContext `user` (so AdminSidebar's name
+      // reflects this immediately) and writes the merged object back to
+      // storage.
+      updateUser({ firstName: trimmedFirstName, lastName: trimmedLastName, phone: trimmedPhone });
+      alert('Profile updated.');
+    } catch (err) {
+      alert(err.message || 'Could not reach the server. Is it running?');
+    } finally {
+      setSavingDetails(false);
+    }
+  }
+
+  async function handleSavePassword() {
+    if (!admin?._id) return;
+    if (!currentPassword) return alert('Enter your current password.');
+    if (!passwordValid) return alert('New password does not meet all requirements.');
+    if (newPassword !== confirmPassword) return alert("New password and confirmation don't match.");
+
+    setSavingPassword(true);
+    try {
+      await usersService.updatePassword(admin._id, { currentPassword, newPassword });
+
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      alert('Password updated.');
+    } catch (err) {
+      alert(err.message || 'Could not reach the server. Is it running?');
+    } finally {
+      setSavingPassword(false);
+    }
+  }
+
+  return (
+    <>
+      <div className="profile-hero">
+        <div className="profile-av" id="profile-av">{initialsOf(admin)}</div>
+        <div>
+          <div className="profile-name" id="profile-fullname">{displayName(admin)}</div>
+          <div className="profile-role" id="profile-role">{admin?.roleLabel || 'Admin'} · The Riverview</div>
+          <div className="profile-meta">
+            <span className="pmeta"><i className="ti ti-mail"></i><span id="profile-meta-email">{admin?.email || ''}</span></span>
+            <span className="pmeta"><i className="ti ti-phone"></i><span id="profile-meta-phone">{admin?.phone || ''}</span></span>
+            <span className="pmeta"><i className="ti ti-map-pin"></i>San Rafael, Bulacan</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="p2col">
+        <div className="card">
+          <div className="card-head"><span className="card-title">Personal information</span></div>
+          <div className="pfield">
+            <label>First name</label>
+            <input type="text" id="profile-firstname-input" value={firstName} onChange={(e) => setFirstName(e.target.value)} />
+          </div>
+          <div className="pfield">
+            <label>Last name</label>
+            <input type="text" id="profile-lastname-input" value={lastName} onChange={(e) => setLastName(e.target.value)} />
+          </div>
+          <div className="pfield">
+            <label>Email address</label>
+            <input type="email" id="profile-email" value={email} onChange={(e) => setEmail(e.target.value)} />
+          </div>
+          <div className="pfield">
+            <label>Phone number</label>
+            <input type="tel" id="profile-phone" value={phone} onChange={(e) => setPhone(e.target.value)} />
+          </div>
+          <button
+            className="save-btn"
+            id="profile-save-details-btn"
+            style={{ marginTop: 6 }}
+            type="button"
+            disabled={savingDetails}
+            onClick={handleSaveDetails}
+          >
+            {savingDetails ? 'Saving…' : 'Save changes'}
+          </button>
+        </div>
+        <div className="card">
+          <div className="card-head"><span className="card-title">Change password</span></div>
+          <div className="pfield">
+            <label>Current password</label>
+            <PasswordInput
+              id="profile-current-password"
+              name="currentPassword"
+              placeholder="Enter current password"
+              autoComplete="current-password"
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+            />
+          </div>
+          <div className="pfield">
+            <label>New password</label>
+            <PasswordInput
+              id="profile-new-password"
+              name="newPassword"
+              placeholder="New password"
+              autoComplete="new-password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+            >
+              <PasswordRequirementsList password={newPassword} />
+            </PasswordInput>
+          </div>
+          <div className="pfield">
+            <label>Confirm new password</label>
+            <PasswordInput
+              id="profile-confirm-password"
+              name="confirmPassword"
+              placeholder="Confirm password"
+              autoComplete="new-password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+            />
+          </div>
+          <button
+            className="save-btn"
+            id="profile-save-password-btn"
+            style={{ marginTop: 6 }}
+            type="button"
+            disabled={savingPassword}
+            onClick={handleSavePassword}
+          >
+            {savingPassword ? 'Updating…' : 'Update password'}
+          </button>
+        </div>
+      </div>
+
+      <div className="metric-row">
+        {PROFILE_METRICS.map((m) => (
+          <div className="mc" key={m.label}>
+            <div className="mc-label">{m.label}</div>
+            <div className="mc-val" style={m.label === 'Account Created' ? { fontSize: '1rem' } : undefined}>
+              {m.value}
+            </div>
+          </div>
+        ))}
+      </div>
+    </>
   );
 }
 

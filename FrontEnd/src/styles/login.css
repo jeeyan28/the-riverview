@@ -3,15 +3,6 @@
    The Riverview
    ========================================================== */
 
-body{
-
-    background:var(--bg);
-
-    color:var(--text);
-
-    overflow-x:hidden;
-}
-
 /*Login Page*/
 .login-page{
     --bg:#0D1726;
@@ -31,6 +22,15 @@ body{
 
     --transition:.28s cubic-bezier(.22,.61,.36,1);
 
+    /* Form-field surface tints — same idea as style.css's --ovl-* scale. */
+    --ovl-04:rgba(255,255,255,.04);
+    --ovl-06:rgba(255,255,255,.06);
+    --ovl-07:rgba(255,255,255,.07);
+    --ovl-08:rgba(255,255,255,.08);
+    --ovl-14:rgba(255,255,255,.14);
+    --ovl-16:rgba(255,255,255,.16);
+    --muted-2:#6D829B;
+
     position: relative;
     width: 100%;
     min-height: 100vh;
@@ -40,8 +40,13 @@ body{
     color: var(--text);
 }
 
+/* No theme toggle on this page by design, and no longer reacts to the
+   shared site-wide data-theme attribute either — login always renders
+   this fixed dark design regardless of the Home/Admin toggle state. */
+
+
 /*Background*/
-.login-background{
+.login-page .login-background{
 
     position:absolute;
 
@@ -51,8 +56,7 @@ body{
 
     z-index:0;
 }
-
-.login-background-image{
+.login-page .login-background-image{
 
     position:absolute;
 
@@ -69,7 +73,7 @@ body{
     filter:saturate(.95);
 }
 /*Overlay*/
-.login-background-overlay{
+.login-page .login-background-overlay{
 
     position:absolute;
 
@@ -92,7 +96,7 @@ body{
     );
 }
 /*Header*/
-.login-header{
+.login-page .login-header{
 
     position:absolute;
 
@@ -112,7 +116,7 @@ body{
 
     z-index:10;
 }
-.login-brand .login-logo{
+.login-page .login-brand .login-logo{
     width:40px !important;
     height:40px !important;
     max-width:40px !important;
@@ -122,19 +126,17 @@ body{
     object-fit:contain;
     flex-shrink:0;
 }
-
-.login-brand{
+.login-page .login-brand{
     display:flex;
     align-items:center;
     gap:12px;
 }
-
-.login-brand-title{
+.login-page .login-brand-title{
 
     letter-spacing:-.02em;
 }
 /*Main*/
-.login-layout{
+.login-page .login-layout{
 
     position:relative;
 
@@ -164,7 +166,7 @@ body{
 
         64px;
 }
-.login-copy{
+.login-page .login-copy{
 
     max-width:480px;
 
@@ -172,7 +174,7 @@ body{
 
     animation:fadeUp .8s ease;
 }
-.login-badge{
+.login-page .login-badge{
 
     display:inline-flex;
 
@@ -202,7 +204,7 @@ body{
 
     margin-bottom:28px;
 }
-.login-copy h1{
+.login-page .login-copy h1{
 
     font-size:clamp(3rem,5vw,4.8rem);
 
@@ -214,7 +216,7 @@ body{
 
     margin:0 0 24px;
 }
-.login-copy p{
+.login-page .login-copy p{
 
     font-size:1.08rem;
 
@@ -225,7 +227,7 @@ body{
     max-width:420px;
 }
 /*Card*/
-.login-card{
+.login-page .login-card{
 
     width:100%;
 
@@ -241,7 +243,7 @@ body{
 
     -webkit-backdrop-filter:blur(var(--blur));
 
-    border:1px solid rgba(255,255,255,.08);
+    border:1px solid var(--ovl-08);
 
     box-shadow:var(--shadow);
 
@@ -253,7 +255,7 @@ body{
 
     flex-direction:column;
 }
-.login-card-header{
+.login-page .login-card-header{
 
     margin-bottom:34px;
 
@@ -264,7 +266,7 @@ body{
    the form body animated while the header swapped instantly, which read
    as barely-there). Fills the space .login-card-header/.auth-card-body
    used to split directly as .login-card's flex children. */
-.auth-card-inner{
+.login-page .auth-card-inner{
 
     display:flex;
 
@@ -279,7 +281,7 @@ body{
    locked to Login's natural size via inline style (see Login.jsx) — this
    is what scrolls internally so Register's extra fields never grow the
    card or the page behind it. */
-.auth-card-body{
+.login-page .auth-card-body{
 
     flex:1 1 auto;
 
@@ -298,11 +300,11 @@ body{
    picks the class based on isLogin): forward to Register slides in from
    the right, back to Login slides in from the left. .login-card's own
    overflow:hidden clips the off-screen starting position. */
-.auth-card-inner.slide-to-register{
+.login-page .auth-card-inner.slide-to-register{
 
     animation:authSlideInRight .42s cubic-bezier(.22,.61,.36,1);
 }
-.auth-card-inner.slide-to-login{
+.login-page .auth-card-inner.slide-to-login{
 
     animation:authSlideInLeft .42s cubic-bezier(.22,.61,.36,1);
 }
@@ -342,32 +344,31 @@ body{
 }
 
 /* Thin, on-brand scrollbar for the card body (Register is the tall one) */
-.auth-card-body{
+.login-page .auth-card-body{
 
     scrollbar-width:thin;
 
     scrollbar-color:rgba(25,216,195,.45) transparent;
 }
-.auth-card-body::-webkit-scrollbar{
+.login-page .auth-card-body::-webkit-scrollbar{
 
     width:6px;
 }
-.auth-card-body::-webkit-scrollbar-track{
+.login-page .auth-card-body::-webkit-scrollbar-track{
 
     background:transparent;
 }
-.auth-card-body::-webkit-scrollbar-thumb{
+.login-page .auth-card-body::-webkit-scrollbar-thumb{
 
     background:rgba(25,216,195,.45);
 
     border-radius:999px;
 }
-.auth-card-body::-webkit-scrollbar-thumb:hover{
+.login-page .auth-card-body::-webkit-scrollbar-thumb:hover{
 
     background:rgba(25,216,195,.7);
 }
-
-.login-card-header h2{
+.login-page .login-card-header h2{
 
     font-size:2rem;
 
@@ -377,8 +378,7 @@ body{
 
     letter-spacing:-.03em;
 }
-
-.login-card-header p{
+.login-page .login-card-header p{
 
     color:var(--muted);
 
@@ -406,20 +406,17 @@ body{
 /* ==========================================================
    FORM
 ========================================================== */
-
-.login-form{
+.login-page .login-form{
     display:flex;
     flex-direction:column;
     gap:22px;
 }
-
-.field{
+.login-page .field{
     display:flex;
     flex-direction:column;
     gap:10px;
 }
-
-.field label{
+.login-page .field label{
 
     font-size:.78rem;
 
@@ -431,11 +428,11 @@ body{
 
     color:var(--muted);
 }
-.input-wrap{
+.login-page .input-wrap{
 
     position:relative;
 }
-.input-icon{
+.login-page .input-icon{
 
     position:absolute;
 
@@ -445,13 +442,13 @@ body{
 
     transform:translateY(-50%);
 
-    color:#6D829B;
+    color:var(--muted-2);
 
     transition:var(--transition);
 
     pointer-events:none;
 }
-.field input{
+.login-page .field input{
 
     width:100%;
 
@@ -471,11 +468,11 @@ body{
 
     background:
 
-        rgba(255,255,255,.04);
+        var(--ovl-04);
 
     border:
 
-        1px solid rgba(255,255,255,.08);
+        1px solid var(--ovl-08);
 
     color:white;
 
@@ -485,25 +482,23 @@ body{
 
     transition:var(--transition);
 }
+.login-page .field input::placeholder{
 
-.field input::placeholder{
-
-    color:#6F8197;
+    color:var(--muted-2);
 }
-.field input:focus{
+.login-page .field input:focus{
 
     border-color:rgba(25,216,195,.65);
 
     background:
 
-        rgba(255,255,255,.06);
+        var(--ovl-06);
 
     box-shadow:
 
         0 0 0 4px rgba(25,216,195,.10);
 }
-
-.input-wrap:focus-within .input-icon{
+.login-page .input-wrap:focus-within .input-icon{
 
     color:var(--accent);
 }
@@ -511,11 +506,11 @@ body{
 /* Show/hide toggle on password fields (PasswordInput.jsx's .toggle-pw) —
    was previously unstyled here, leaving the button unpositioned and
    vertically misaligned. Mirrors .input-icon's centering approach. */
-.input-wrap:has(.toggle-pw) input{
+.login-page .input-wrap:has(.toggle-pw) input{
 
     padding-right:46px;
 }
-.toggle-pw{
+.login-page .toggle-pw{
 
     position:absolute;
 
@@ -529,7 +524,7 @@ body{
 
     border:none;
 
-    color:#6D829B;
+    color:var(--muted-2);
 
     cursor:pointer;
 
@@ -541,83 +536,21 @@ body{
 
     transition:var(--transition);
 }
-.toggle-pw:hover{
+.login-page .toggle-pw:hover{
 
     color:var(--accent);
 }
-
-/* Toast (Toast.jsx / useToast.js) — the component always renders its div
-   and toggles a "show" class for visibility; that class toggle only works
-   if a hidden default state exists. No .toast rule existed anywhere in
-   this codebase, so it rendered as a bare, always-visible block. */
-.toast{
-
-    position:fixed;
-
-    bottom:28px;
-
-    left:50%;
-
-    transform:translate(-50%,16px);
-
-    display:flex;
-
-    align-items:center;
-
-    gap:10px;
-
-    background:#101d33;
-
-    color:var(--text);
-
-    border:1px solid rgba(255,255,255,.1);
-
-    padding:.85rem 1.3rem;
-
-    border-radius:14px;
-
-    font-size:.88rem;
-
-    box-shadow:0 20px 50px rgba(0,0,0,.4);
-
-    opacity:0;
-
-    pointer-events:none;
-
-    z-index:1000;
-
-    transition:opacity .25s ease, transform .25s ease;
-}
-.toast.show{
-
-    opacity:1;
-
-    transform:translate(-50%,0);
-
-    pointer-events:auto;
-}
-.toast.error{
-
-    border-color:rgba(255,107,107,.4);
-}
-.toast-icon{
-
-    font-size:1rem;
-
-    line-height:1;
-}
-.field.has-error input{
+.login-page .field.has-error input{
 
     border-color:#FF6B6B;
 }
-
-.field-error{
+.login-page .field-error{
 
     font-size:.78rem;
 
     color:#FF6B6B;
 }
-.password-row{
+.login-page .password-row{
 
     display:flex;
 
@@ -625,7 +558,7 @@ body{
 
     align-items:center;
 }
-.forgot-link{
+.login-page .forgot-link{
     color:var(--accent);
     font-size:.82rem;
     transition:var(--transition);
@@ -635,15 +568,14 @@ body{
     font-family:inherit;
     cursor:pointer;
 }
-
-.forgot-link:hover{
+.login-page .forgot-link:hover{
     opacity:.75;
 }
 
 /* ==========================================================
    FORGOT PASSWORD MODAL
 ========================================================== */
-.forgot-modal-backdrop{
+.login-page .forgot-modal-backdrop{
     position:fixed;
     inset:0;
     z-index:100;
@@ -661,8 +593,7 @@ body{
     from{ opacity:0; }
     to{ opacity:1; }
 }
-
-.forgot-modal{
+.login-page .forgot-modal{
     position:relative;
     width:100%;
     max-width:440px;
@@ -682,16 +613,15 @@ body{
         transform:none;
     }
 }
-
-.forgot-modal-close{
+.login-page .forgot-modal-close{
     position:absolute;
     top:20px;
     right:20px;
     width:32px;
     height:32px;
     border-radius:10px;
-    border:1px solid rgba(255,255,255,.08);
-    background:rgba(255,255,255,.04);
+    border:1px solid var(--ovl-08);
+    background:var(--ovl-04);
     color:var(--muted);
     font-size:.9rem;
     cursor:pointer;
@@ -700,13 +630,12 @@ body{
     justify-content:center;
     transition:var(--transition);
 }
-.forgot-modal-close:hover{
+.login-page .forgot-modal-close:hover{
     color:var(--text);
-    border-color:rgba(255,255,255,.16);
-    background:rgba(255,255,255,.07);
+    border-color:var(--ovl-16);
+    background:var(--ovl-07);
 }
-
-.otp-input-group{
+.login-page .otp-input-group{
     display:flex;
     gap:10px;
 }
@@ -715,7 +644,7 @@ body{
    div for label/error-message layout, and without this the 50px icon
    padding from .field input was winning, squeezing the digit almost
    entirely out of the visible box. */
-.otp-input-group .otp-input{
+.login-page .otp-input-group .otp-input{
     width:100%;
     height:56px;
     padding:0;
@@ -724,39 +653,36 @@ body{
     font-weight:700;
     letter-spacing:0;
     border-radius:16px;
-    background:rgba(255,255,255,.04);
-    border:1px solid rgba(255,255,255,.08);
+    background:var(--ovl-04);
+    border:1px solid var(--ovl-08);
     color:var(--text);
     transition:var(--transition);
 }
-.otp-input-group .otp-input:focus{
+.login-page .otp-input-group .otp-input:focus{
     outline:none;
     border-color:rgba(25,216,195,.65);
-    background:rgba(255,255,255,.06);
+    background:var(--ovl-06);
     box-shadow:0 0 0 4px rgba(25,216,195,.10);
 }
-
-.otp-expiry{
+.login-page .otp-expiry{
     font-size:.78rem;
     color:var(--muted);
 }
-
-.signup-row .link-button:disabled{
+.login-page .signup-row .link-button:disabled{
     color:var(--muted);
     cursor:not-allowed;
     opacity:.7;
 }
-.signup-row .link-button:disabled:hover{
+.login-page .signup-row .link-button:disabled:hover{
     text-decoration:none;
 }
-
-.forgot-success{
+.login-page .forgot-success{
     display:flex;
     flex-direction:column;
     align-items:center;
     text-align:center;
 }
-.forgot-success-icon{
+.login-page .forgot-success-icon{
     width:56px;
     height:56px;
     border-radius:50%;
@@ -770,8 +696,7 @@ body{
     font-size:1.6rem;
     font-weight:700;
 }
-
-.password-requirements{
+.login-page .password-requirements{
     list-style:none;
     margin:8px 0 0;
     padding:0;
@@ -779,7 +704,7 @@ body{
     grid-template-columns:1fr 1fr;
     gap:4px 12px;
 }
-.password-requirements li{
+.login-page .password-requirements li{
     display:flex;
     align-items:center;
     gap:6px;
@@ -787,44 +712,42 @@ body{
     color:#FF6B6B;
     transition:color .15s ease;
 }
-.password-requirements li.met{
+.login-page .password-requirements li.met{
     color:var(--accent);
 }
-.password-requirements .requirement-icon{
+.login-page .password-requirements .requirement-icon{
     font-size:.68rem;
     line-height:1;
     min-width:1em;
 }
-
-.btn-submit:disabled{
+.login-page .btn-submit:disabled{
     opacity:.5;
     cursor:not-allowed;
 }
-
-.forgot-modal-actions{
+.login-page .forgot-modal-actions{
     display:flex;
     gap:12px;
 }
-.forgot-modal-actions .btn-cancel{
+.login-page .forgot-modal-actions .btn-cancel{
     flex:1;
     height:56px;
     border-radius:16px;
-    border:1px solid rgba(255,255,255,.08);
-    background:rgba(255,255,255,.04);
+    border:1px solid var(--ovl-08);
+    background:var(--ovl-04);
     color:var(--text);
     font-weight:600;
     font-size:.95rem;
     cursor:pointer;
     transition:var(--transition);
 }
-.forgot-modal-actions .btn-cancel:hover{
-    background:rgba(255,255,255,.07);
-    border-color:rgba(255,255,255,.16);
+.login-page .forgot-modal-actions .btn-cancel:hover{
+    background:var(--ovl-07);
+    border-color:var(--ovl-16);
 }
-.forgot-modal-actions .btn-submit{
+.login-page .forgot-modal-actions .btn-submit{
     flex:1.4;
 }
-.remember-row{
+.login-page .remember-row{
 
     display:flex;
 
@@ -832,8 +755,7 @@ body{
 
     gap:12px;
 }
-
-.remember-label{
+.login-page .remember-label{
 
     font-size:.86rem;
 
@@ -843,7 +765,7 @@ body{
 
     cursor:pointer;
 }
-.custom-check{
+.login-page .custom-check{
 
     width:18px;
 
@@ -853,11 +775,11 @@ body{
 
     border:
 
-        1px solid rgba(255,255,255,.14);
+        1px solid var(--ovl-14);
 
     background:
 
-        rgba(255,255,255,.04);
+        var(--ovl-04);
 
     display:flex;
 
@@ -871,24 +793,21 @@ body{
 
     flex-shrink:0;
 }
-
-.custom-check.checked{
+.login-page .custom-check.checked{
 
     background:var(--accent);
 
     border-color:var(--accent);
 }
-
-.custom-check svg{
+.login-page .custom-check svg{
 
     display:none;
 }
-
-.custom-check.checked svg{
+.login-page .custom-check.checked svg{
 
     display:block;
 }
-.btn-submit{
+.login-page .btn-submit{
 
     width:100%;
 
@@ -920,7 +839,7 @@ body{
 
     overflow:hidden;
 }
-.btn-submit:hover{
+.login-page .btn-submit:hover{
 
     transform:translateY(-2px);
 
@@ -928,22 +847,19 @@ body{
 
         0 20px 50px rgba(25,216,195,.28);
 }
-
-.btn-submit:active{
+.login-page .btn-submit:active{
 
     transform:translateY(0);
 }
-.btn-text{
+.login-page .btn-text{
 
     transition:.25s;
 }
-
-.btn-submit.loading .btn-text{
+.login-page .btn-submit.loading .btn-text{
 
     opacity:0;
 }
-
-.btn-spinner{
+.login-page .btn-spinner{
 
     position:absolute;
 
@@ -959,13 +875,11 @@ body{
 
     transition:.2s;
 }
-
-.btn-submit.loading .btn-spinner{
+.login-page .btn-submit.loading .btn-spinner{
 
     opacity:1;
 }
-
-.spinner-ring{
+.login-page .spinner-ring{
 
     width:18px;
 
@@ -987,7 +901,7 @@ body{
         transform:rotate(360deg);
     }
 }
-.divider{
+.login-page .divider{
 
     display:flex;
 
@@ -995,13 +909,12 @@ body{
 
     gap:16px;
 
-    color:#71849B;
+    color:var(--muted-2);
 
     font-size:.82rem;
 }
-
-.divider::before,
-.divider::after{
+.login-page .divider::before,
+.login-page .divider::after{
 
     content:"";
 
@@ -1011,9 +924,9 @@ body{
 
     background:
 
-        rgba(255,255,255,.08);
+        var(--ovl-08);
 }
-.btn-social{
+.login-page .btn-social{
 
     width:100%;
 
@@ -1023,11 +936,11 @@ body{
 
     border:
 
-        1px solid rgba(255,255,255,.08);
+        1px solid var(--ovl-08);
 
     background:
 
-        rgba(255,255,255,.04);
+        var(--ovl-04);
 
     color:white;
 
@@ -1047,20 +960,19 @@ body{
 
     transition:var(--transition);
 }
-
-.btn-social:hover{
+.login-page .btn-social:hover{
 
     background:
 
-        rgba(255,255,255,.07);
+        var(--ovl-07);
 
     border-color:
 
-        rgba(255,255,255,.16);
+        var(--ovl-16);
 
     transform:translateY(-2px);
 }
-.signup-row{
+.login-page .signup-row{
 
     margin-top:8px;
 
@@ -1070,9 +982,8 @@ body{
 
     font-size:.88rem;
 }
-
-.signup-row a,
-.signup-row .link-button{
+.login-page .signup-row a,
+.login-page .signup-row .link-button{
 
     color:var(--accent);
 
@@ -1090,9 +1001,8 @@ body{
 
     cursor:pointer;
 }
-
-.signup-row a:hover,
-.signup-row .link-button:hover{
+.login-page .signup-row a:hover,
+.login-page .signup-row .link-button:hover{
 
     text-decoration:underline;
 }

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Mail, User } from 'lucide-react';
 import PasswordInput from './PasswordInput';
 import PasswordRequirementsList from './PasswordRequirementsList';
 import Toast from './Toast';
@@ -289,7 +290,7 @@ function RegisterForm({ onSwitchToLogin }) {
                 clearError('firstName');
               }}
             />
-            <span className="input-icon">👤</span>
+            <User size={18} className="input-icon" />
           </div>
           <span className="field-error" style={{ display: errors.firstName ? 'block' : 'none' }}>
             {errors.firstName}
@@ -311,7 +312,7 @@ function RegisterForm({ onSwitchToLogin }) {
                 clearError('lastName');
               }}
             />
-            <span className="input-icon">👤</span>
+            <User size={18} className="input-icon" />
           </div>
           <span className="field-error" style={{ display: errors.lastName ? 'block' : 'none' }}>
             {errors.lastName}
@@ -333,7 +334,7 @@ function RegisterForm({ onSwitchToLogin }) {
                 clearError('email');
               }}
             />
-            <span className="input-icon">✉</span>
+            <Mail size={18} className="input-icon" />
           </div>
           <span className="field-error" style={{ display: errors.email ? 'block' : 'none' }}>
             {errors.email || 'Enter a valid email address.'}

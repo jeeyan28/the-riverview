@@ -7,6 +7,7 @@ import { useConfirm } from '../../hooks/useConfirm';
 import { dateKey } from '../../utils/rooms';
 import { resolveImageUrl } from '../../utils/resolveImageUrl';
 import { useAuth } from '../../context/AuthContext';
+import { useSiteSettings } from '../../hooks/useSiteSettings';
 import { roomsService } from '../../services/rooms';
 import { bookingsService } from '../../services/bookings';
 
@@ -28,6 +29,12 @@ const PAYMENT_PILL_CLASS = {
   Paid: 'pill-active',
   Rejected: 'pill-overdue',
 };
+// Single source of truth for the status/payment-status dropdowns (filter bar + Edit Booking modal).
+const BOOKING_STATUSES = ['Pending Payment Verification', 'Confirmed', 'Rejected', 'Active', 'Pending', 'Done', 'Overdue', 'Cancelled'];
+const PAYMENT_STATUSES = Object.keys(PAYMENT_PILL_CLASS);
+const PAYMENT_METHODS = ['Cash', 'GCash', 'Maya'];
+const SEARCH_DEBOUNCE_MS = 350;
+const MAX_GUEST_HISTORY_ROWS = 5;
 const SHORT_STATUS = { 'Pending Payment Verification': 'Pending' };
 const WEEKDAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -35,22 +42,14 @@ function shortStatusLabel(status) {
   return SHORT_STATUS[status] || status;
 }
 
-// Fallback only — for bookings created before `reservationCode` existed.
-// Every new booking gets a real reservationCode from the server
-// (see saveWithReservationCode() in bookingHelper.js) and that's used instead.
+// Fallback ID for bookings created before reservationCode existed.
 function shortBookingId(b) {
   const year = b.createdAt ? new Date(b.createdAt).getFullYear() : new Date().getFullYear();
   const tail = String(b._id || '').slice(-6).toUpperCase();
   return `#BK-${year}-${tail}`;
 }
 
-// POST-AUDIT CLEANUP follow-up: the Manual Booking modal's date field used
-// to start empty (the original hardcoded a stale demo date, which wasn't
-// worth replicating). Product decision: default to today's date instead.
-// Self-contained rather than reusing utils/rooms.js's dateKey() here, since
-// this needs the exact zero-padded "YYYY-MM-DD" string the native
-// <input type="date"> requires, and dateKey()'s own output format wasn't
-// re-verified as part of this task.
+// Manual Booking modal's date field defaults to today (YYYY-MM-DD for <input type="date">).
 function todayDateStr() {
   const d = new Date();
   const yyyy = d.getFullYear();
@@ -63,6 +62,9 @@ function Bookings() {
   const { initializing, hasPermission, guardPermission } = useAuth();
   const canManage = hasPermission('booking:manage');
   const { confirm, confirmProps } = useConfirm();
+  // Admin-configurable via Settings > Operating Schedule (BackEnd/model/settings.js);
+  // shared with the online BookingModal so both stay in sync.
+  const { minDuration, maxDuration } = useSiteSettings();
 
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -88,6 +90,9 @@ function Bookings() {
   const [detailId, setDetailId] = useState(null);
   const [editId, setEditId] = useState(null);
   const [proofId, setProofId] = useState(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [fullHistory, setFullHistory] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
 
   /* ── fetch rooms once (room filter + manual-booking select) ── */
   useEffect(() => {
@@ -130,18 +135,16 @@ function Bookings() {
     fetchBookings();
   }, [statusFilter, paymentFilter, roomFilter, dateFilter]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Search is debounced 350ms, same as the original's setTimeout-based
-  // debounce on the '#bk-search' input listener.
+  // Debounced search input, mirrors the original's '#bk-search' listener timing.
   useEffect(() => {
     clearTimeout(searchDebounce.current);
-    searchDebounce.current = setTimeout(fetchBookings, 350);
+    searchDebounce.current = setTimeout(fetchBookings, SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(searchDebounce.current);
   }, [search]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  /* ── open Manual Booking modal on arrival from Dashboard's quick action ──
-     Waits on `initializing` (see AuthContext) so a hard refresh landing
-     directly on this URL doesn't get an incorrect "no permission" alert
-     just because /api/auth/me hasn't resolved yet. */
+  /* Open Manual Booking modal on arrival from Dashboard's quick action.
+     Waits on `initializing` so a hard refresh doesn't show a false
+     "no permission" alert before auth has resolved. */
   useEffect(() => {
     if (initializing) return;
     if (searchParams.get('openManualBooking') === '1') {
@@ -153,19 +156,13 @@ function Bookings() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initializing]);
 
-  // Direct port of openModal()'s guard — no data-requires-permission on
-  // the "Manual Booking"/"Add Booking" button itself in admin.html (grep
-  // confirmed), so the button stays visible to everyone; only the click
-  // is blocked (with the original's default "You don't have permission to
-  // do that." message, since openModal() didn't pass a custom one).
+  // Button stays visible to everyone; only the click is permission-gated.
   function openManualBooking() {
     if (!guardPermission('booking:manage')) return;
     setManualOpen(true);
   }
 
-  // Direct port of openEditBookingModal()'s guard — reached from both the
-  // (already canManage-gated) row Edit button and the detail modal's Edit
-  // Booking button, same as the original.
+  // Reached from the row's Edit button and the detail modal's Edit Booking button.
   function openEditBooking(id) {
     if (!guardPermission('booking:manage')) return;
     setEditId(id);
@@ -183,8 +180,7 @@ function Bookings() {
   async function updateBookingStatus(id, status) {
     if (!guardPermission('booking:manage')) return;
     try {
-      // Same endpoint as EditBookingModal.handleSave() below, different
-      // payload — see this file's header note and bookings.js's own.
+      // Shares PUT /api/bookings/:id with EditBookingModal.handleSave(), smaller payload.
       await bookingsService.update(id, { status });
       await fetchBookings();
     } catch (err) {
@@ -228,6 +224,38 @@ function Bookings() {
     }
   }
 
+  // Fetches this guest's complete booking history from the server — unlike
+  // `historyForDetail` below, not limited to the currently loaded/filtered bookings.
+  async function openFullHistory() {
+    if (!detailBooking) return;
+    setHistoryOpen(true);
+    setHistoryLoading(true);
+    try {
+      const params = detailBooking.guestContact ? { guestContact: detailBooking.guestContact } : { guestName: detailBooking.guestName };
+      const data = await bookingsService.list(params);
+      const list = (Array.isArray(data) ? data : [])
+        .filter((b) => b._id !== detailBooking._id)
+        .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+      setFullHistory(list);
+    } catch (err) {
+      console.error(err);
+      setFullHistory([]);
+    } finally {
+      setHistoryLoading(false);
+    }
+  }
+
+  /* ── summary cards (derived from the currently loaded/filtered bookings) ── */
+  const stats = useMemo(
+    () => ({
+      total: bookings.length,
+      pendingPayments: bookings.filter((b) => ['Unpaid', 'Pending Verification'].includes(b.paymentStatus)).length,
+      activeGuests: bookings.filter((b) => b.status === 'Active').length,
+      cancelled: bookings.filter((b) => b.status === 'Cancelled').length,
+    }),
+    [bookings]
+  );
+
   const detailBooking = useMemo(() => bookings.find((b) => b._id === detailId) || null, [bookings, detailId]);
   const editBooking = useMemo(() => bookings.find((b) => b._id === editId) || null, [bookings, editId]);
   const proofBooking = useMemo(() => bookings.find((b) => b._id === proofId) || null, [bookings, proofId]);
@@ -241,7 +269,7 @@ function Bookings() {
           (detailBooking.guestContact ? b.guestContact === detailBooking.guestContact : b.guestName === detailBooking.guestName)
       )
       .sort((a, b) => (b.date || '').localeCompare(a.date || ''))
-      .slice(0, 5);
+      .slice(0, MAX_GUEST_HISTORY_ROWS);
   }, [bookings, detailBooking]);
 
   /* ── calendar data: group currently-loaded bookings by date ── */
@@ -312,45 +340,33 @@ function Bookings() {
       label: 'Actions',
       render: (b) => {
         const isPendingVerification = b.status === 'Pending Payment Verification';
-        const btnStyle = (color) => ({ border: 'none', background: 'none', fontSize: '.75rem', color, cursor: 'pointer', fontWeight: 600 });
         return (
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <button style={btnStyle('var(--text)')} onClick={() => setDetailId(b._id)}>
+          <div className="d-flex gap-2 flex-wrap">
+            <button className="tbl-action-btn" style={{ color: 'var(--text)' }} onClick={() => setDetailId(b._id)}>
               View
             </button>
             {canManage && (
               <>
                 {isPendingVerification && (
                   <>
-                    <button style={btnStyle('var(--teal)')} onClick={() => approveBooking(b._id)}>
+                    <button className="tbl-action-btn" style={{ color: 'var(--teal)' }} onClick={() => approveBooking(b._id)}>
                       Approve
                     </button>
-                    <button style={btnStyle('var(--red)')} onClick={() => rejectBooking(b._id)}>
+                    <button className="tbl-action-btn" style={{ color: 'var(--red)' }} onClick={() => rejectBooking(b._id)}>
                       Reject
                     </button>
                   </>
                 )}
                 {!isPendingVerification && b.status === 'Overdue' && (
-                  <button style={btnStyle('var(--red)')} onClick={() => updateBookingStatus(b._id, 'Done')}>
+                  <button className="tbl-action-btn" style={{ color: 'var(--red)' }} onClick={() => updateBookingStatus(b._id, 'Done')}>
                     Resolve
                   </button>
                 )}
                 {!isPendingVerification && b.status !== 'Overdue' && !['Done', 'Cancelled', 'Rejected'].includes(b.status) && (
-                  <button style={btnStyle('var(--teal)')} onClick={() => updateBookingStatus(b._id, 'Done')}>
+                  <button className="tbl-action-btn" style={{ color: 'var(--teal)' }} onClick={() => updateBookingStatus(b._id, 'Done')}>
                     Mark Done
                   </button>
                 )}
-                {!['Cancelled', 'Rejected'].includes(b.status) && (
-                  <button style={btnStyle('var(--amber)')} onClick={() => updateBookingStatus(b._id, 'Cancelled')}>
-                    Cancel
-                  </button>
-                )}
-                <button style={btnStyle('var(--text)')} onClick={() => openEditBooking(b._id)}>
-                  Edit
-                </button>
-                <button style={btnStyle('var(--muted)')} onClick={() => deleteBooking(b._id)}>
-                  Delete
-                </button>
               </>
             )}
           </div>
@@ -361,6 +377,25 @@ function Bookings() {
 
   return (
     <div className="panel active" id="panel-bookings">
+      <div className="metric-row">
+        <div className="mc">
+          <div className="mc-label"><i className="ti ti-calendar-stats"></i> Total Reservations</div>
+          <div className="mc-val">{stats.total.toLocaleString()}</div>
+        </div>
+        <div className="mc">
+          <div className="mc-label"><i className="ti ti-credit-card"></i> Pending Payments</div>
+          <div className="mc-val">{stats.pendingPayments.toLocaleString()}</div>
+        </div>
+        <div className="mc">
+          <div className="mc-label"><i className="ti ti-users"></i> Active Guests</div>
+          <div className="mc-val">{stats.activeGuests.toLocaleString()}</div>
+        </div>
+        <div className="mc">
+          <div className="mc-label"><i className="ti ti-circle-x"></i> Cancelled</div>
+          <div className="mc-val">{stats.cancelled.toLocaleString()}</div>
+        </div>
+      </div>
+
       <div className="bk-toolbar">
         <div className="bk-filters">
           <input
@@ -372,23 +407,16 @@ function Bookings() {
           />
           <select className="bk-filter-input" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
             <option value="">All Status</option>
-            <option value="Pending Payment Verification">Pending Payment Verification</option>
-            <option value="Confirmed">Confirmed</option>
-            <option value="Rejected">Rejected</option>
-            <option value="Active">Active</option>
-            <option value="Pending">Pending</option>
-            <option value="Done">Done</option>
-            <option value="Overdue">Overdue</option>
-            <option value="Cancelled">Cancelled</option>
+            {BOOKING_STATUSES.map((s) => (
+              <option key={s} value={s}>{s}</option>
+            ))}
           </select>
           <select className="bk-filter-input" value={paymentFilter} onChange={(e) => setPaymentFilter(e.target.value)}>
             <option value="">All Payment Status</option>
-            <option value="Unpaid">Unpaid</option>
-            <option value="Pending Verification">Pending Verification</option>
-            <option value="Paid">Paid</option>
-            <option value="Rejected">Rejected</option>
+            {PAYMENT_STATUSES.map((s) => (
+              <option key={s} value={s}>{s}</option>
+            ))}
           </select>
-          {/* FIXED: was permanently stuck at "All Rooms" in the original — see header comment */}
           <select className="bk-filter-input" value={roomFilter} onChange={(e) => setRoomFilter(e.target.value)}>
             <option value="">All Rooms</option>
             {rooms.map((r) => (
@@ -413,9 +441,9 @@ function Bookings() {
         </button>
       </div>
 
-      {/* FIXED: calendar had matching CSS/markup but zero JS anywhere — see header comment */}
+      {/* Calendar view (bkcal-* CSS) is not wired up yet — computed above, not rendered. */}
 
-      <div className="card" style={{ padding: 0, overflow: 'hidden', overflowX: 'auto' }}>
+      <div className="card card-flush">
         <DataTable
           columns={columns}
           rows={bookings}
@@ -426,10 +454,10 @@ function Bookings() {
       </div>
 
       {/* ── Manual Booking modal ── */}
-      <ManualBookingModal open={manualOpen} onClose={() => setManualOpen(false)} rooms={rooms} onCreated={fetchBookings} />
+      <ManualBookingModal open={manualOpen} onClose={() => setManualOpen(false)} rooms={rooms} onCreated={fetchBookings} minDuration={minDuration} maxDuration={maxDuration} />
 
       {/* ── Edit Booking modal ── */}
-      <EditBookingModal booking={editBooking} onClose={() => setEditId(null)} onSaved={fetchBookings} />
+      <EditBookingModal booking={editBooking} onClose={() => setEditId(null)} onSaved={fetchBookings} minDuration={minDuration} maxDuration={maxDuration} />
 
       {/* ── Payment Screenshot modal ── */}
       <Modal open={!!proofBooking} onClose={() => setProofId(null)} title="Payment Screenshot">
@@ -483,33 +511,81 @@ function Bookings() {
               </span>
             </div>
 
-            <div className="bd-section">
-              <div className="bd-section-title"><i className="ti ti-user"></i> Customer Information</div>
-              <div className="bd-grid">
-                <div className="bd-field"><label>Customer Name</label><p>{detailBooking.guestName || '—'}</p></div>
-                <div className="bd-field">
-                  <label>Email</label>
-                  <p>{detailBooking.guestEmail || (String(detailBooking.guestContact || '').includes('@') ? detailBooking.guestContact : '—')}</p>
+            <div className="bd-section two-col">
+              <div>
+                <div className="bd-section-title"><i className="ti ti-user"></i> Customer Information</div>
+                <div className="bd-grid" style={{ gridTemplateColumns: '1fr 1fr' }}>
+                  <div className="bd-field"><label>Customer Name</label><p>{detailBooking.guestName || '—'}</p></div>
+                  <div className="bd-field">
+                    <label>Email</label>
+                    <p>{detailBooking.guestEmail || (String(detailBooking.guestContact || '').includes('@') ? detailBooking.guestContact : '—')}</p>
+                  </div>
+                  <div className="bd-field">
+                    <label>Phone Number</label>
+                    <p>{detailBooking.guestContact && !String(detailBooking.guestContact).includes('@') ? detailBooking.guestContact : detailBooking.guestContact || '—'}</p>
+                  </div>
+                  <div className="bd-field"><label>Number of Guests</label><p>{detailBooking.guestCount ? String(detailBooking.guestCount) : '—'}</p></div>
                 </div>
-                <div className="bd-field">
-                  <label>Phone Number</label>
-                  <p>{detailBooking.guestContact && !String(detailBooking.guestContact).includes('@') ? detailBooking.guestContact : detailBooking.guestContact || '—'}</p>
+              </div>
+
+              <div>
+                <div className="bd-section-title"><i className="ti ti-credit-card"></i> Payment Breakdown</div>
+                <div className="bd-grid" style={{ gridTemplateColumns: '1fr 1fr' }}>
+                  <div className="bd-field"><label>Downpayment</label><p>₱{Number(detailBooking.downPayment || 0).toLocaleString()}</p></div>
+                  <div className="bd-field"><label>Remaining Balance</label><p>₱{Number((detailBooking.amount || 0) - (detailBooking.downPayment || 0)).toLocaleString()}</p></div>
+                  <div className="bd-field"><label>Total Amount</label><p>₱{Number(detailBooking.amount || 0).toLocaleString()}</p></div>
+                  <div className="bd-field"><label>Payment Method</label><p>{detailBooking.paymentMethod || '—'}</p></div>
                 </div>
               </div>
             </div>
 
-            <div className="bd-section">
-              <div className="bd-section-title"><i className="ti ti-calendar-event"></i> Booking Details</div>
-              <div className="bd-grid">
-                <div className="bd-field">
-                  <label>Room</label>
-                  <p>{detailBooking.roomLabel || '—'}{detailBooking.variantLabel ? ` (${detailBooking.variantLabel})` : ''}</p>
+            <div className="bd-section two-col">
+              <div>
+                <div className="bd-section-title"><i className="ti ti-calendar-event"></i> Booking Specifications</div>
+                <div className="bd-grid" style={{ gridTemplateColumns: '1fr 1fr' }}>
+                  <div className="bd-field">
+                    <label>Room</label>
+                    <p>{detailBooking.roomLabel || '—'}{detailBooking.variantLabel ? ` (${detailBooking.variantLabel})` : ''}</p>
+                  </div>
+                  <div className="bd-field"><label>Scheduled Date</label><p>{detailBooking.date || '—'}</p></div>
+                  <div className="bd-field"><label>Check-in Time</label><p>{detailBooking.timeIn || '—'}</p></div>
+                  <div className="bd-field"><label>Duration</label><p>{detailBooking.duration ? `${detailBooking.duration} hr${detailBooking.duration > 1 ? 's' : ''}` : '—'}</p></div>
                 </div>
-                <div className="bd-field"><label>Date</label><p>{detailBooking.date || '—'}</p></div>
-                <div className="bd-field"><label>Time</label><p>{detailBooking.timeIn || '—'}</p></div>
-                <div className="bd-field"><label>Duration</label><p>{detailBooking.duration ? `${detailBooking.duration} hr${detailBooking.duration > 1 ? 's' : ''}` : '—'}</p></div>
-                <div className="bd-field"><label>Number of Guests</label><p>{detailBooking.guestCount ? String(detailBooking.guestCount) : '—'}</p></div>
-                <div className="bd-field"><label>Total Amount</label><p>₱{Number(detailBooking.amount || 0).toLocaleString()}</p></div>
+              </div>
+
+              <div>
+                <div className="bd-section-title"><i className="ti ti-history"></i> Customer Booking History</div>
+                <div className="card card-flush">
+                  <table className="tbl">
+                    <thead style={{ background: 'var(--navy3)' }}>
+                      <tr><th style={{ padding: '8px 10px' }}>Date</th><th>Room</th><th>Hrs</th><th>Status</th></tr>
+                    </thead>
+                    <tbody>
+                      {historyForDetail.length === 0 ? (
+                        <tr><td colSpan={4} style={{ textAlign: 'center', color: 'var(--muted)', padding: '10px 0', fontSize: '.8rem' }}>No previous bookings from this guest.</td></tr>
+                      ) : (
+                        historyForDetail.map((h) => (
+                          <tr key={h._id}>
+                            <td style={{ padding: '8px 10px' }}>{h.date}</td>
+                            <td>{h.roomLabel}</td>
+                            <td>{h.duration}hrs</td>
+                            <td><span className={`pill ${STATUS_PILL_CLASS[h.status] || 'pill-pending'}`}>{shortStatusLabel(h.status)}</span></td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+                {historyForDetail.length > 0 && (
+                  <button
+                    type="button"
+                    className="tbl-action-btn"
+                    style={{ color: 'var(--text)', marginTop: 6 }}
+                    onClick={openFullHistory}
+                  >
+                    View All History
+                  </button>
+                )}
               </div>
             </div>
 
@@ -531,64 +607,65 @@ function Bookings() {
               <div className="bd-section">
                 <div className="bd-section-title"><i className="ti ti-credit-card"></i> Payment</div>
                 <p style={{ fontSize: '.85rem', color: 'var(--muted)', margin: 0 }}>
-                  Paid automatically online via PayMongo — confirmed and verified by PayMongo directly, no screenshot or manual approval needed.
+                  Paid automatically online via PayMongo — confirmed and verified directly, no screenshot or manual approval needed.
                 </p>
               </div>
             )}
 
             <div className="bd-section">
-              <div className="bd-section-title"><i className="ti ti-history"></i> Booking History</div>
-              <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-                <table className="tbl">
-                  <thead style={{ background: 'var(--navy3)' }}>
-                    <tr><th style={{ padding: '8px 10px' }}>Date</th><th>Room</th><th>Duration</th><th>Status</th></tr>
-                  </thead>
-                  <tbody>
-                    {historyForDetail.length === 0 ? (
-                      <tr><td colSpan={4} style={{ textAlign: 'center', color: 'var(--muted)', padding: '10px 0', fontSize: '.8rem' }}>No previous bookings from this guest.</td></tr>
-                    ) : (
-                      historyForDetail.map((h) => (
-                        <tr key={h._id}>
-                          <td style={{ padding: '8px 10px' }}>{h.date}</td>
-                          <td>{h.roomLabel}</td>
-                          <td>{h.duration}hrs</td>
-                          <td><span className={`pill ${STATUS_PILL_CLASS[h.status] || 'pill-pending'}`}>{shortStatusLabel(h.status)}</span></td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            <div className="bd-section">
-              <div className="bd-section-title"><i className="ti ti-file-text"></i> Additional Notes</div>
-              <p className="bd-notes-label">Special Requests</p>
+              <div className="bd-section-title"><i className="ti ti-file-text"></i> Special Requests / Notes</div>
               <p className="bd-notes-body">{detailBooking.specialRequests?.trim() || 'No special requests provided.'}</p>
             </div>
 
             <div className="modal-actions" style={{ justifyContent: 'space-between' }}>
-              {canManage && !['Cancelled', 'Rejected', 'Done'].includes(detailBooking.status) && (
-                <button
-                  className="btn-cancel"
-                  style={{ color: 'var(--red)', borderColor: 'rgba(225,29,72,.3)' }}
-                  onClick={async () => {
-                    if (!(await confirm('Cancel this booking? The guest will need to rebook if they still want the slot.', { danger: true, confirmText: 'Cancel Booking' }))) return;
-                    await updateBookingStatus(detailBooking._id, 'Cancelled');
-                    setDetailId(null);
-                  }}
-                >
-                  Cancel Booking
-                </button>
-              )}
-              <div style={{ display: 'flex', gap: 10, marginLeft: 'auto' }}>
-                <button className="btn-cancel" onClick={() => setDetailId(null)}>Close</button>
+              <div style={{ display: 'flex', gap: 10 }}>
                 {canManage && (
                   <button
                     className="btn-cancel"
                     onClick={() => { const id = detailBooking._id; setDetailId(null); openEditBooking(id); }}
                   >
                     Edit Booking
+                  </button>
+                )}
+                {canManage && (
+                  <button
+                    className="btn-cancel"
+                    style={{ color: 'var(--red)', borderColor: 'rgba(225,29,72,.3)' }}
+                    onClick={async () => { const id = detailBooking._id; setDetailId(null); await deleteBooking(id); }}
+                  >
+                    Delete
+                  </button>
+                )}
+                {canManage && !['Cancelled', 'Rejected', 'Done'].includes(detailBooking.status) && (
+                  <button
+                    className="btn-cancel"
+                    style={{ color: 'var(--amber)', borderColor: 'rgba(245,165,36,.35)' }}
+                    onClick={async () => {
+                      if (!(await confirm('Cancel this booking? The guest will need to rebook if they still want the slot.', { danger: true, confirmText: 'Cancel Booking' }))) return;
+                      await updateBookingStatus(detailBooking._id, 'Cancelled');
+                      setDetailId(null);
+                    }}
+                  >
+                    Cancel Booking
+                  </button>
+                )}
+              </div>
+              <div style={{ display: 'flex', gap: 10 }}>
+                <button className="btn-cancel" onClick={() => setDetailId(null)}>Close</button>
+                {canManage && ['Pending', 'Pending Payment Verification'].includes(detailBooking.status) && (
+                  <button
+                    className="btn-cancel"
+                    style={{ color: 'var(--red)', borderColor: 'rgba(225,29,72,.3)' }}
+                    onClick={async () => {
+                      if (detailBooking.status === 'Pending Payment Verification') {
+                        await rejectBooking(detailBooking._id);
+                      } else {
+                        await updateBookingStatus(detailBooking._id, 'Rejected');
+                      }
+                      setDetailId(null);
+                    }}
+                  >
+                    Deny
                   </button>
                 )}
                 {canManage && ['Pending', 'Pending Payment Verification'].includes(detailBooking.status) && (
@@ -612,18 +689,43 @@ function Bookings() {
         )}
       </Modal>
 
+      {/* ── Full guest booking history modal (all bookings, not just this page's) ── */}
+      <Modal open={historyOpen} onClose={() => setHistoryOpen(false)} title={`Booking History — ${detailBooking?.guestName || ''}`}>
+        <div className="card card-flush">
+          <table className="tbl">
+            <thead style={{ background: 'var(--navy3)' }}>
+              <tr><th style={{ padding: '8px 10px' }}>Date</th><th>Room</th><th>Hrs</th><th>Status</th></tr>
+            </thead>
+            <tbody>
+              {historyLoading ? (
+                <tr><td colSpan={4} style={{ textAlign: 'center', color: 'var(--muted)', padding: '10px 0', fontSize: '.8rem' }}>Loading…</td></tr>
+              ) : fullHistory.length === 0 ? (
+                <tr><td colSpan={4} style={{ textAlign: 'center', color: 'var(--muted)', padding: '10px 0', fontSize: '.8rem' }}>No previous bookings from this guest.</td></tr>
+              ) : (
+                fullHistory.map((h) => (
+                  <tr key={h._id}>
+                    <td style={{ padding: '8px 10px' }}>{h.date}</td>
+                    <td>{h.roomLabel}</td>
+                    <td>{h.duration}hrs</td>
+                    <td><span className={`pill ${STATUS_PILL_CLASS[h.status] || 'pill-pending'}`}>{shortStatusLabel(h.status)}</span></td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+        <div className="modal-actions">
+          <button className="btn-cancel" onClick={() => setHistoryOpen(false)}>Close</button>
+        </div>
+      </Modal>
+
       <ConfirmDialog {...confirmProps} />
     </div>
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────
-// ManualBookingModal — its own small component (not inlined in Bookings())
-// only because it needs its own isolated form-field state; still page-
-// specific/single-use per components/README.md's Modal.jsx notes, so it
-// stays in this file rather than moving to src/components/.
-// ─────────────────────────────────────────────────────────────────────────
-function ManualBookingModal({ open, onClose, rooms, onCreated }) {
+// Manual Booking modal (own isolated form state, page-specific).
+function ManualBookingModal({ open, onClose, rooms, onCreated, minDuration, maxDuration }) {
   const { guardPermission } = useAuth();
   const [guestName, setGuestName] = useState('');
   const [roomId, setRoomId] = useState('');
@@ -688,14 +790,20 @@ function ManualBookingModal({ open, onClose, rooms, onCreated }) {
       </div>
       <div className="mfield">
         <label>Duration (hours)</label>
-        <input type="number" min={1} max={8} value={duration} onChange={(e) => setDuration(e.target.value)} />
+        <input
+          type="number"
+          min={minDuration}
+          max={maxDuration}
+          value={duration}
+          onChange={(e) => setDuration(e.target.value)}
+        />
       </div>
       <div className="mfield">
         <label>Payment method</label>
         <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)}>
-          <option>Cash</option>
-          <option>GCash</option>
-          <option>Maya</option>
+          {PAYMENT_METHODS.map((m) => (
+            <option key={m}>{m}</option>
+          ))}
         </select>
       </div>
       <div className="modal-actions">
@@ -708,12 +816,8 @@ function ManualBookingModal({ open, onClose, rooms, onCreated }) {
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────
-// EditBookingModal — same isolated-state reasoning as ManualBookingModal
-// above. `booking` is the live row from Bookings()'s own `bookings` state
-// (found by editId), so its fields are always in sync with the table.
-// ─────────────────────────────────────────────────────────────────────────
-function EditBookingModal({ booking, onClose, onSaved }) {
+// Edit Booking modal — `booking` is the live row from Bookings()'s state, kept in sync with the table.
+function EditBookingModal({ booking, onClose, onSaved, minDuration, maxDuration }) {
   const { guardPermission } = useAuth();
   const [duration, setDuration] = useState(1);
   const [paymentMethod, setPaymentMethod] = useState('Cash');
@@ -731,14 +835,13 @@ function EditBookingModal({ booking, onClose, onSaved }) {
   async function handleSave() {
     if (!guardPermission('booking:manage')) return;
     const d = Number(duration);
-    if (!Number.isFinite(d) || d < 1 || d > 5) {
-      alert('Duration must be between 1 and 5 hours.');
+    if (!Number.isFinite(d) || d < minDuration || d > maxDuration) {
+      alert(`Duration must be between ${minDuration} and ${maxDuration} hours.`);
       return;
     }
     setSaving(true);
     try {
-      // Same endpoint as updateBookingStatus() above, fuller payload — see
-      // this file's header note and bookings.js's own.
+      // Shares PUT /api/bookings/:id with updateBookingStatus(), fuller payload.
       await bookingsService.update(booking._id, { duration: d, paymentMethod, status });
       onClose();
       await onSaved();
@@ -759,27 +862,28 @@ function EditBookingModal({ booking, onClose, onSaved }) {
           </p>
           <div className="mfield">
             <label>Duration (hours)</label>
-            <input type="number" min={1} max={5} value={duration} onChange={(e) => setDuration(e.target.value)} />
+            <input
+              type="number"
+              min={minDuration}
+              max={maxDuration}
+              value={duration}
+              onChange={(e) => setDuration(e.target.value)}
+            />
           </div>
           <div className="mfield">
             <label>Payment method</label>
             <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)}>
-              <option>Cash</option>
-              <option>GCash</option>
-              <option>Maya</option>
+              {PAYMENT_METHODS.map((m) => (
+                <option key={m}>{m}</option>
+              ))}
             </select>
           </div>
           <div className="mfield">
             <label>Status</label>
             <select value={status} onChange={(e) => setStatus(e.target.value)}>
-              <option value="Pending">Pending</option>
-              <option value="Pending Payment Verification">Pending Payment Verification</option>
-              <option value="Confirmed">Confirmed</option>
-              <option value="Rejected">Rejected</option>
-              <option value="Active">Active</option>
-              <option value="Done">Done</option>
-              <option value="Overdue">Overdue</option>
-              <option value="Cancelled">Cancelled</option>
+              {BOOKING_STATUSES.map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
             </select>
           </div>
           <div className="modal-actions">

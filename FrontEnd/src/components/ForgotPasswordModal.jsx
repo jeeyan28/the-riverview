@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { X, Mail, CheckCircle2 } from 'lucide-react';
 import Toast from './Toast';
 import OtpInput from './OtpInput';
 import { useToast } from '../hooks/useToast';
@@ -249,7 +250,7 @@ function ForgotPasswordModal({ open, onClose, onReturnToLogin }) {
         aria-labelledby="forgot-modal-title"
       >
         <button type="button" className="forgot-modal-close" onClick={onClose} aria-label="Close">
-          ✕
+          <X size={16} />
         </button>
 
         {!sent ? (
@@ -276,7 +277,7 @@ function ForgotPasswordModal({ open, onClose, onReturnToLogin }) {
                       setEmailError('');
                     }}
                   />
-                  <span className="input-icon">✉</span>
+                  <Mail size={18} className="input-icon" />
                 </div>
                 <span className="field-error" style={{ display: emailError ? 'block' : 'none' }}>
                   {emailError || 'Enter a valid email address.'}
@@ -299,7 +300,7 @@ function ForgotPasswordModal({ open, onClose, onReturnToLogin }) {
         ) : verified && resetDone ? (
           <>
             <div className="login-card-header forgot-success">
-              <span className="forgot-success-icon" aria-hidden="true">✓</span>
+              <span className="forgot-success-icon" aria-hidden="true"><CheckCircle2 size={28} /></span>
               <h2 id="forgot-modal-title">Password updated</h2>
               <p>Your password has been changed. You can now log in.</p>
             </div>

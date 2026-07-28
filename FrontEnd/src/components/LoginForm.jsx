@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Mail } from 'lucide-react';
 import PasswordInput from './PasswordInput';
 import Toast from './Toast';
 import OtpInput from './OtpInput';
@@ -7,12 +8,6 @@ import { useGoogleAuth } from '../hooks/useGoogleAuth';
 import { useCountdownClock } from '../hooks/useCountdownClock';
 import { useAuth } from '../context/AuthContext';
 import { OTP_LENGTH, OTP_EXPIRY_SECONDS, RESEND_COOLDOWN_SECONDS, formatCountdown } from '../utils/otp';
-
-// ─────────────────────────────────────────────────────────────────────────
-// LoginForm — extracted from the old standalone Login page so it can be
-// swapped with RegisterForm inside the shared Auth card (see
-// pages/Login.jsx). Markup, validation, and API calls are unchanged.
-// ─────────────────────────────────────────────────────────────────────────
 
 function redirectAfterLogin(user) {
   const isAdmin = ['staff', 'manager', 'super_admin'].includes(user.role);
@@ -263,7 +258,7 @@ function LoginForm({ onSwitchToRegister, onForgotPassword }) {
                 setEmailError('');
               }}
             />
-            <span className="input-icon">✉</span>
+            <Mail size={18} className="input-icon" />
           </div>
           <span className="field-error" style={{ display: emailError ? 'block' : 'none' }}>
             {emailError || 'Enter a valid email address.'}

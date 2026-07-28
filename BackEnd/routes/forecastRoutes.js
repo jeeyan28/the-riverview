@@ -43,7 +43,7 @@ router.get("/", async (req, res) => {
     const [bookings, sales] = await Promise.all([
       Booking.find({
         createdAt: { $gte: since },
-        status: { $nin: ["Rejected", "Cancelled"] },
+        status: { $nin: [Booking.BOOKING_STATUS.REJECTED, Booking.BOOKING_STATUS.CANCELLED] },
       }).select("createdAt amount roomLabel status"),
       Sale.find({
         createdAt: { $gte: since },

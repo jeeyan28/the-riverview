@@ -40,6 +40,7 @@ function ProfileModal({ open, onClose }) {
   const [bookings, setBookings] = useState([]);
   const [loadingBookings, setLoadingBookings] = useState(false);
   const [bookingsError, setBookingsError] = useState('');
+  const [viewingBooking, setViewingBooking] = useState(null);
 
   const [toast, setToast] = useState({ visible: false, message: '', type: 'success' });
   const toastTimer = useRef(null);
@@ -80,6 +81,7 @@ function ProfileModal({ open, onClose }) {
       setPasswordForm(EMPTY_PASSWORD);
       setPasswordError('');
       setBookingsError('');
+      setViewingBooking(null);
       setLoadingBookings(true);
       try {
         const data = await bookingsService.mine();
@@ -422,6 +424,13 @@ function ProfileModal({ open, onClose }) {
                     <div className="pf-booking-price">₱{Number(b.amount || 0).toLocaleString()}</div>
                     <span className={`pf-chip pf-chip--${historyStatusClass(b.status)}`}>{b.status}</span>
                   </div>
+                  <button
+                    type="button"
+                    className="pf-view-btn"
+                    onClick={() => setViewingBooking(b)}
+                  >
+                    View
+                  </button>
                 </div>
               ))}
             </div>
@@ -432,6 +441,77 @@ function ProfileModal({ open, onClose }) {
           </button>
         </div>
       </div>
+
+      {viewingBooking && (
+        <div
+          className="pf-overlay open"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setViewingBooking(null);
+          }}
+        >
+          <div className="pf-modal">
+            <div className="pf-modal-head">
+              <h2 className="pf-modal-title">Booking details</h2>
+              <button className="pf-close" aria-label="Close" onClick={() => setViewingBooking(null)}>
+                <i className="fa-solid fa-xmark"></i>
+              </button>
+            </div>
+
+            <div className="pf-detail-list">
+              <div className="pf-detail-row">
+                <span className="pf-detail-label">Reservation code</span>
+                <span className="pf-detail-value">{viewingBooking.reservationCode || '—'}</span>
+              </div>
+              <div className="pf-detail-row">
+                <span className="pf-detail-label">Room</span>
+                <span className="pf-detail-value">
+                  {viewingBooking.roomLabel}{viewingBooking.variantLabel ? ` · ${viewingBooking.variantLabel}` : ''}
+                </span>
+              </div>
+              <div className="pf-detail-row">
+                <span className="pf-detail-label">Date</span>
+                <span className="pf-detail-value">{viewingBooking.date}</span>
+              </div>
+              <div className="pf-detail-row">
+                <span className="pf-detail-label">Time</span>
+                <span className="pf-detail-value">{viewingBooking.timeIn} · {viewingBooking.duration}h</span>
+              </div>
+              <div className="pf-detail-row">
+                <span className="pf-detail-label">Guests</span>
+                <span className="pf-detail-value">{viewingBooking.guestCount || 1}</span>
+              </div>
+              <div className="pf-detail-row">
+                <span className="pf-detail-label">Amount</span>
+                <span className="pf-detail-value">₱{Number(viewingBooking.amount || 0).toLocaleString()}</span>
+              </div>
+              <div className="pf-detail-row">
+                <span className="pf-detail-label">Payment method</span>
+                <span className="pf-detail-value">{viewingBooking.paymentMethod || '—'}</span>
+              </div>
+              <div className="pf-detail-row">
+                <span className="pf-detail-label">Payment status</span>
+                <span className="pf-detail-value">{viewingBooking.paymentStatus || '—'}</span>
+              </div>
+              <div className="pf-detail-row">
+                <span className="pf-detail-label">Status</span>
+                <span className={`pf-chip pf-chip--${historyStatusClass(viewingBooking.status)}`}>{viewingBooking.status}</span>
+              </div>
+              {viewingBooking.specialRequests && (
+                <div className="pf-detail-row pf-detail-row--block">
+                  <span className="pf-detail-label">Special requests</span>
+                  <span className="pf-detail-value">{viewingBooking.specialRequests}</span>
+                </div>
+              )}
+            </div>
+
+            <div className="pf-modal-actions">
+              <button type="button" className="pf-btn pf-btn-ghost" onClick={() => setViewingBooking(null)}>
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className={`pf-toast${toast.visible ? ' show' : ''}${toast.type === 'error' ? ' error' : ''}`} id="pfToast">
         <span id="pfToastIcon">{toast.type === 'error' ? '⚠️' : '✅'}</span>

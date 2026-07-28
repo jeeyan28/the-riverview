@@ -69,19 +69,14 @@ const roomImageUpload = makeCloudinaryUploader({
   transformation: [{ width: 1600, crop: "limit" }],
 });
 
-// Separate Cloudinary folder for payment proof screenshots, kept apart from room
-// photos so admins reviewing payments never have to wade through facility images
-// (and so the two can get different retention/visibility rules later if needed).
+
 const paymentProofUpload = makeCloudinaryUploader({
   folder: "riverview/payment-proofs",
   allowed_formats: ["jpg", "jpeg", "png", "webp"],
   transformation: [{ width: 1200, crop: "limit" }],
 });
 
-// QR codes for admin-managed payment methods (Settings > Payment Methods —
-// e.g. GCash, Maya, or any wallet the business adds). Separate folder from
-// both room photos and payment-proof screenshots so these long-lived
-// "scan to pay" images never get mixed up with one-off customer uploads.
+
 const paymentMethodQrUpload = makeCloudinaryUploader({
   folder: "riverview/payment-method-qr",
   allowed_formats: ["jpg", "jpeg", "png", "webp"],
