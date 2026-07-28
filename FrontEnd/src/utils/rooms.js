@@ -1,87 +1,70 @@
-// rooms.js — small stateless helpers shared by the Home page's room grid
-// and by BookingModal.jsx's calendar/slots (same original functions in
-// js/index.js, split out so both consumers share one copy instead of
-// duplicating them across pages).
 import { API_BASE_URL } from '../services/api';
 
-// dateKey — migrated 1:1 from js/index.js. Formats a Date's year/month
-// (0-indexed)/day into the "YYYY-MM-DD" string the backend's availability
-// endpoints expect.
 export function dateKey(y, m, d) {
   return `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 }
 
-// getRoomCapacity — migrated 1:1 from js/index.js. A room's capacity comes
-// from its own `capacity` field (set by an admin under Room Management).
-// 0/unset means "no limit enforced" so rooms created before this field
-// existed keep working exactly as before.
 export function getRoomCapacity(room) {
   const cap = Number(room?.capacity);
   return Number.isFinite(cap) && cap > 0 ? cap : null;
 }
 
-// Per-room, per-date cache of reserved hours, mirroring the module-level
-// `RESERVED` cache in the original js/index.js so re-checking the same
-// room/date (e.g. re-rendering the grid) doesn't refetch needlessly.
 const reservedCache = {};
 
-// fetchReservedHours — migrated from loadAvailability() in js/index.js.
-// Returns the flat list of hours already reserved for a given room+date,
-// e.g. a 2-hour booking starting at 14:00 contributes [14, 15].
-export async function fetchReservedHours(roomId, dateStr) {
-  const key = `${roomId}|${dateStr}`;
+export async function fetchReservedHours(roomId, dateStr, variantLabel) {
+  const key = `${roomId}|${dateStr}|${variantLabel || ''}`;
   if (reservedCache[key]) return reservedCache[key];
 
   try {
+    const params = new URLSearchParams({ roomId, date: dateStr });
+    if (variantLabel) params.set('variantLabel', variantLabel);
     const res = await fetch(
-      `${API_BASE_URL}/api/bookings/availability?roomId=${encodeURIComponent(roomId)}&date=${encodeURIComponent(dateStr)}`,
+      `${API_BASE_URL}/api/bookings/availability?${params.toString()}`,
       { credentials: 'include' }
     );
     if (!res.ok) throw new Error('Failed to load availability');
     const bookings = await res.json();
 
-    const hours = [];
+    const hourCounts = {};
+
     bookings.forEach((b) => {
-      const startHour = parseInt(b.timeIn.split(':')[0], 10);
-      for (let h = startHour; h < startHour + b.duration; h++) hours.push(h);
+      const startHour = parseInt( String(b.timeIn).split(':')[0], 10 );
+      for ( let h = startHour; h < startHour + Number(b.duration); h++ ) 
+      { hourCounts[h] = (hourCounts[h] || 0) + 1; }
     });
-    reservedCache[key] = hours;
+    reservedCache[key] = hourCounts;
   } catch (err) {
-    console.error(err);
+  console.error(err);
   }
-  return reservedCache[key] || [];
+  return reservedCache[key] || {};
 }
 
-// clearReservedHours — invalidates one room/date's cached reserved-hours
-// entry. Mirrors `delete RESERVED[key]` in the original's
-// payOnlineAutomatically(), called right before redirecting to PayMongo so
-// a held slot doesn't look stale if the visitor comes back via browser
-// back instead of PayMongo's own cancel link.
-export function clearReservedHours(roomId, dateStr) {
-  delete reservedCache[`${roomId}|${dateStr}`];
+export function clearReservedHours(
+  roomId,
+  dateStr,
+  variantLabel
+) {
+  const prefix = `${roomId}|${dateStr}|`;
+
+  Object.keys(reservedCache).forEach((key) => {
+    if (key.startsWith(prefix)) {
+      delete reservedCache[key];
+    }
+  });
 }
 
-// ─────────────────────────────────────────────────────────────────────────
-// Booking Modal phase additions (below). Same source functions as above —
-// migrated 1:1 from js/index.js — split out here per this file's original
-// plan so Home.jsx's room grid and BookingModal.jsx's calendar/slots share
-// one copy instead of duplicating them.
-// ─────────────────────────────────────────────────────────────────────────
-
-// Per-room, per-month cache of that month's bookings, mirroring the
-// module-level `MONTH_AVAILABILITY` cache in the original js/index.js.
 const monthAvailabilityCache = {};
 
-// loadMonthAvailability — migrated 1:1 from js/index.js. Returns
-// { "YYYY-MM-DD": [{ timeIn, duration }, ...] } for every day in the given
-// month that has at least one booking for this room.
-export async function loadMonthAvailability(roomId, year, month /* 1-12 */) {
-  const key = `${roomId}|${year}-${month}`;
+export async function loadMonthAvailability(roomId, year, month /* 1-12 */, variantLabel) {
+  const key = `${roomId}|${year}-${month}|${variantLabel || ''}`;
   if (monthAvailabilityCache[key]) return monthAvailabilityCache[key];
 
   try {
+    const params = new URLSearchParams({ roomId, year, month });
+    if (variantLabel) params.set('variantLabel', variantLabel);
+
     const res = await fetch(
-      `${API_BASE_URL}/api/bookings/availability-month?roomId=${encodeURIComponent(roomId)}&year=${year}&month=${month}`,
+      `${API_BASE_URL}/api/bookings/availability-month?${params.toString()}`,
       { credentials: 'include' }
     );
     if (!res.ok) throw new Error('Failed to load month availability');
@@ -93,72 +76,65 @@ export async function loadMonthAvailability(roomId, year, month /* 1-12 */) {
   return monthAvailabilityCache[key];
 }
 
-// clearMonthAvailability — invalidates one room/month's cached entry.
-// Mirrors `delete MONTH_AVAILABILITY[key]` in payOnlineAutomatically().
 export function clearMonthAvailability(roomId, year, month /* 1-12 */) {
-  delete monthAvailabilityCache[`${roomId}|${year}-${month}`];
+  const prefix = `${roomId}|${year}-${month}|`;
+  Object.keys(monthAvailabilityCache).forEach((key) => {
+    if (key.startsWith(prefix)) delete monthAvailabilityCache[key];
+  });
 }
 
-// coveredHours — shared by isDayFullyBooked/getFreeSlotCount below so both
-// derive from the same per-hour occupancy array instead of two separate
-// implementations drifting apart.
-function coveredHours(dayBookings, openHour, closeHour) {
-  const covered = new Array(Math.max(0, closeHour - openHour)).fill(false);
+// Per-hour booked COUNT (not just a boolean) — an hour is only "covered"
+// once `totalRooms` existing bookings already occupy it, matching the
+// backend's capacity-aware availability check (see bookingHelper.js's
+// getSlotCapacity). Defaults to 1 unit for callers that don't pass
+// totalRooms, so a room/variant with no known capacity still behaves like
+// the old single-unit assumption.
+function coveredHours(dayBookings, openHour, closeHour, totalRooms = 1) {
+  const counts = new Array(Math.max(0, closeHour - openHour)).fill(0);
   (dayBookings || []).forEach((b) => {
     const start = parseInt(String(b.timeIn).split(':')[0], 10);
     for (let h = start; h < start + b.duration; h++) {
-      if (h >= openHour && h < closeHour) covered[h - openHour] = true;
+      if (h >= openHour && h < closeHour) counts[h - openHour] += 1;
     }
   });
-  return covered;
+  return counts.map((count) => count >= (Number(totalRooms) || 1));
 }
 
-// isDayFullyBooked — migrated 1:1 from js/index.js. A day is "fully
-// booked" for a room if every operating hour from openHour to closeHour is
-// covered by at least one active booking. openHour/closeHour are passed in
-// (from useSiteSettings) instead of read off a global, since this is now a
-// pure function.
-export function isDayFullyBooked(dayBookings, openHour, closeHour) {
+export function isDayFullyBooked(dayBookings, openHour, closeHour, totalRooms = 1) {
   if (!dayBookings || !dayBookings.length) return false;
-  return coveredHours(dayBookings, openHour, closeHour).every(Boolean);
+  return coveredHours(dayBookings, openHour, closeHour, totalRooms).every(Boolean);
 }
 
-// getFreeSlotCount — number of still-open 1-hour slots for a room on a
-// given day, within [openHour, closeHour). Powers the Date Selection
-// calendar's per-day "N slots" label and its Available/Few Slots split.
-// The Available/Few-Slots cutoff itself is admin-configurable (Settings >
-// Operating Schedule, operatingHours.fewSlotsThreshold — see
-// BackEnd/model/settings.js) and read directly off `settings` by callers,
-// not defined here.
-export function getFreeSlotCount(dayBookings, openHour, closeHour) {
-  return coveredHours(dayBookings, openHour, closeHour).filter((covered) => !covered).length;
+export function getFreeSlotCount(dayBookings, openHour, closeHour, totalRooms = 1) {
+  return coveredHours(dayBookings, openHour, closeHour, totalRooms).filter((covered) => !covered).length;
 }
 
-// isHolidayDate — migrated 1:1 from js/index.js. `holidays` is
-// useSiteSettings' `settings.holidays` array.
+export function getAvailableRoomCount(
+  reservedCounts,
+  roomCount,
+  selectedHour
+) {
+  const totalRooms = Number(roomCount) || 1;
+  const bookedRooms = Number(
+    reservedCounts?.[selectedHour] || 0
+  );
+
+  return Math.max(
+    0,
+    totalRooms - bookedRooms
+  );
+}
+
 export function isHolidayDate(dateStr, holidays) {
   return (holidays || []).some((h) => h.date === dateStr && h.fullDay);
 }
 
-// isOperatingDay — migrated 1:1 from js/index.js. `operatingHours` is
-// useSiteSettings' `settings.operatingHours` (may be null before load).
 export function isOperatingDay(dateObj, operatingHours) {
   const oh = operatingHours;
   if (!oh || !Array.isArray(oh.openDays) || !oh.openDays.length) return true;
   return oh.openDays.includes(dateObj.getDay());
 }
 
-// getFacilityAvailability — single facility-level Available/Fully Booked
-// summary for the Booking Modal's Room Selection step. Same rule as
-// Home.jsx's refreshLiveRoomStatuses(): fully booked only if every
-// remaining operating hour today is already reserved. `reserved` is
-// today's reserved-hours array (fetchReservedHours), openHour/closeHour
-// come from useSiteSettings.
-//
-// Future: once Room gets a numberOfRooms field, pass totalRooms and
-// overlappingConfirmedBookings to switch to a real "X of Y Rooms
-// Available" count (availableRooms = totalRooms - overlappingConfirmedBookings)
-// — no call-site rewrite needed, just start passing the extra params.
 export function getFacilityAvailability(reserved, openHour, closeHour, opts = {}) {
   const { totalRooms, overlappingConfirmedBookings, now = new Date() } = opts;
 
@@ -175,12 +151,6 @@ export function getFacilityAvailability(reserved, openHour, closeHour, opts = {}
   return fullyBooked ? 'Fully Booked' : 'Available';
 }
 
-// computeDownPayment — migrated 1:1 from js/index.js. Mirrors the
-// server-side calculation in Backend/utils/bookingHelper.js so the amount
-// shown in the modal matches what the backend will actually require. The
-// down payment equals the room/variant's FIRST HOUR rate — not a
-// percentage of the total — regardless of how many hours are booked. The
-// server always recomputes and enforces this itself; this is display-only.
 export function computeDownPayment(unitPrice) {
   return Math.max(0, Math.round(Number(unitPrice) || 0));
 }

@@ -1,9 +1,14 @@
 import { useEffect, useState } from 'react';
 import { Navigate, Outlet } from 'react-router-dom';
+import 'bootstrap/dist/css/bootstrap.min.css';
 import '../styles/admin.css';
 import AdminSidebar from '../components/AdminSidebar';
+import ThemeToggle from '../components/ThemeToggle';
 import { useAuth } from '../context/AuthContext';
 
+// Light/dark preference, remembered per admin — same pattern as the
+// sidebar's collapsed state (client-side only, no backend field).
+const ADMIN_THEME_KEY = 'rv_admin_theme';
 
 function AdminLayout() {
   // AdminSidebar reads `user`/`logout` itself via useAuth() directly — this
@@ -11,6 +16,26 @@ function AdminLayout() {
   const { initializing, isAdmin } = useAuth();
   const [liveTime, setLiveTime] = useState('');
   const [pageTitle, setPageTitle] = useState('Dashboard');
+  const [theme, setTheme] = useState(() => {
+    try {
+      return localStorage.getItem(ADMIN_THEME_KEY) === 'dark' ? 'dark' : 'light';
+    } catch {
+      return 'light';
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(ADMIN_THEME_KEY, theme);
+    } catch {
+      // Storage unavailable (private mode, etc.) — theme still applies
+      // for the session, it just won't persist.
+    }
+  }, [theme]);
+
+  function toggleTheme() {
+    setTheme((t) => (t === 'dark' ? 'light' : 'dark'));
+  }
 
   // Same one-second clock chip as the old #live-time span.
   useEffect(() => {
@@ -40,7 +65,7 @@ function AdminLayout() {
   }
 
   return (
-    <div id="app">
+    <div id="app" data-theme={theme}>
       <AdminSidebar onNavigate={setPageTitle} />
 
       {/* ── MAIN ── */}
@@ -72,6 +97,7 @@ function AdminLayout() {
             <button className="notif-btn" aria-label="Notifications">
               <i className="ti ti-bell"></i><span className="notif-dot"></span>
             </button>
+            <ThemeToggle id="admin-theme-toggle" theme={theme} onToggle={toggleTheme} />
           </div>
         </div>
 

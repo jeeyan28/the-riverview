@@ -7,15 +7,12 @@
     cursor: pointer;
     padding: .35rem .6rem .35rem .35rem;
     border-radius: 999px;
-    border: 1px solid var(--border);
+    border: 1px solid var(--nav-border);
     background: none;
     transition: background .2s, border-color .2s;
     user-select: none;
 }
-.user-chip:hover { background: var(--card-light); }
-header:not(.scrolled) .user-chip { border-color: rgba(255,255,255,.3); }
-header:not(.scrolled) .user-chip-name,
-header:not(.scrolled) .user-chip i { color: #fff; }
+.user-chip:hover { background: var(--nav-card); }
 
 .user-chip-avatar {
     width: 28px; height: 28px;
@@ -32,13 +29,13 @@ header:not(.scrolled) .user-chip i { color: #fff; }
 .user-chip-name {
     font-size: .85rem;
     font-weight: 500;
-    color: var(--text-main);
+    color: var(--nav-text);
     max-width: 120px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
-.user-chip > i { font-size: .65rem; color: var(--text-muted-light); transition: transform .2s; }
+.user-chip > i { font-size: .65rem; color: var(--nav-muted); transition: transform .2s; }
 .user-chip-menu.open ~ i,
 .user-chip.open > i { transform: rotate(180deg); }
 

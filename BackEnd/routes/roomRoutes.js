@@ -5,46 +5,13 @@ const upload = require("../middleware/upload");
 const { requirePermission } = require("../middleware/adminAuth");
 const { PERMISSIONS } = require("../utils/permissions");
 
-function parseFeatures(features) {
-  if (Array.isArray(features)) return features;
-  if (!features) return [];
-  if (typeof features === "string") {
-    try {
-      const parsed = JSON.parse(features);
-      if (Array.isArray(parsed)) return parsed;
-    } catch (_) {}
-    return features.split(",").map(f => f.trim()).filter(Boolean);
-  }
-  return [];
-}
-
-function parseVariants(variants) {
-  if (Array.isArray(variants)) return variants;
-  if (!variants) return [];
-  try {
-    const parsed = JSON.parse(variants);
-    if (!Array.isArray(parsed)) return [];
-    return parsed
-      .map(v => ({
-        label: String(v.label || "").trim(),
-        price: Number(v.price) || 0,
-        pax: String(v.pax || "").trim(),
-        image: String(v.image || "").trim(),
-        description: String(v.description || "").trim(),
-        features: Array.isArray(v.features) ? v.features.map(f => String(f).trim()).filter(Boolean) : []
-      }))
-      .filter(v => v.label !== "" || v.price > 0);
-  } catch (_) {
-    return [];
-  }
-}
 
 // Public — guests need to see rooms to book them
 router.get("/", async (req, res) => {
   try {
     const filter = {};
     if (req.query.status) filter.status = req.query.status;
-    const rooms = await Room.find(filter).populate("category").sort({ name: 1 });
+    const rooms = await Room.find(filter).sort({ name: 1 });
     res.json(rooms);
   } catch (err) {
     console.error(err);
@@ -67,7 +34,6 @@ router.get("/:id", async (req, res) => {
 router.post("/", requirePermission(PERMISSIONS.ROOM_MANAGE), upload.single("image"), async (req, res) => {
   try {
     const {
-      category,
       name,
       roomNumber,
       description,
@@ -78,15 +44,22 @@ router.post("/", requirePermission(PERMISSIONS.ROOM_MANAGE), upload.single("imag
       capacity,
     } = req.body;
 
-    if (!category || !name || !roomNumber) {
+    if (!name || !roomNumber) {
       return res.status(400).json({
-        message: "category, name and roomNumber are required."
+        message: "name and roomNumber are required."
       });
     }
 
-    const room = new Room({
-      category,
+    let parsedFeatures = [];
+    let parsedVariants = [];
+    try {
+      if (features) parsedFeatures = JSON.parse(features);
+      if (variants) parsedVariants = JSON.parse(variants);
+    } catch {
+      return res.status(400).json({ message: "features/variants must be valid JSON." });
+    }
 
+    const room = new Room({
       name,
       roomNumber,
 
@@ -96,11 +69,10 @@ router.post("/", requirePermission(PERMISSIONS.ROOM_MANAGE), upload.single("imag
 
       status: status || "Available",
 
-      features: parseFeatures(features),
-
-      variants: parseVariants(variants),
-
       capacity: Number(capacity) || 0,
+
+      features: parsedFeatures,
+      variants: parsedVariants,
 
       image: req.file ? req.file.path : (req.body.image || ""),
     });
@@ -116,7 +88,6 @@ router.post("/", requirePermission(PERMISSIONS.ROOM_MANAGE), upload.single("imag
 router.put("/:id", requirePermission(PERMISSIONS.ROOM_MANAGE), upload.single("image"), async (req, res) => {
   try {
     const {
-      category,
       name,
       description,
       price,
@@ -129,17 +100,23 @@ router.put("/:id", requirePermission(PERMISSIONS.ROOM_MANAGE), upload.single("im
     // Room No. is locked after creation (FEATURE_REQUESTS.md Priority 1) —
     // silently ignored here even if sent.
     const update = {};
-    if (category !== undefined) update.category = category;
     if (name !== undefined) update.name = name;
     if (description !== undefined) update.description = description;
     if (price !== undefined) update.price = Number(price) || 0;
     if (status !== undefined) update.status = status;
-    if (features !== undefined) update.features = parseFeatures(features);
-    if (variants !== undefined) update.variants = parseVariants(variants);
     if (capacity !== undefined) update.capacity = Number(capacity) || 0;
     if (req.file) update.image = req.file.path;
 
-    const room = await Room.findByIdAndUpdate(req.params.id, update, { new: true, runValidators: true });
+    // features/variants arrive as JSON strings inside FormData — see the
+    // same note in POST / above.
+    try {
+      if (features !== undefined) update.features = JSON.parse(features);
+      if (variants !== undefined) update.variants = JSON.parse(variants);
+    } catch {
+      return res.status(400).json({ message: "features/variants must be valid JSON." });
+    }
+
+    const room = await Room.findByIdAndUpdate(req.params.id, update, { returnDocument: "after", runValidators: true });
     if (!room) return res.status(404).json({ message: "Room not found." });
 
     res.json(room);

@@ -31,3 +31,53 @@ textarea,
 select{
     font:inherit;
 }
+
+/* ==========================
+   Theme toggle smoothing — applies to every element site-wide so
+   background/text/border color changes ease in on toggle, not just
+   the few components (header, theme-toggle) with their own transition.
+   Elements that already declare their own `transition` (e.g. header,
+   .theme-toggle) keep using that instead, since same-specificity rules
+   are resolved by source order and those are declared later.
+========================== */
+*{
+    transition: background-color .3s ease, color .3s ease, border-color .3s ease;
+}
+
+/* ==========================
+   Toast (Toast.jsx / useToast.js) — shared app-wide, so this lives
+   here rather than in any single page's stylesheet. --text falls back
+   to #fff since not every page defines that token.
+========================== */
+.toast{
+    position:fixed;
+    bottom:28px;
+    left:50%;
+    transform:translate(-50%,16px);
+    display:flex;
+    align-items:center;
+    gap:10px;
+    background:#101d33;
+    color:var(--text,#fff);
+    border:1px solid rgba(255,255,255,.1);
+    padding:.85rem 1.3rem;
+    border-radius:14px;
+    font-size:.88rem;
+    box-shadow:0 20px 50px rgba(0,0,0,.4);
+    opacity:0;
+    pointer-events:none;
+    z-index:1000;
+    transition:opacity .25s ease, transform .25s ease;
+}
+.toast.show{
+    opacity:1;
+    transform:translate(-50%,0);
+    pointer-events:auto;
+}
+.toast.error{
+    border-color:rgba(255,107,107,.4);
+}
+.toast-icon{
+    font-size:1rem;
+    line-height:1;
+}

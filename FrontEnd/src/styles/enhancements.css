@@ -154,14 +154,6 @@ nav a:hover::after, nav a.active::after { width: 20px; }
     will-change: transform;
 }
 
-.hero-intro-avatar {
-    animation: rvFloat 5s ease-in-out infinite;
-}
-@keyframes rvFloat {
-    0%, 100% { transform: translateY(0); }
-    50%      { transform: translateY(-4px); }
-}
-
 .hero-content > * { animation: rvRise .7s var(--ease-out) both; }
 .hero-intro   { animation-delay: .05s; }
 .hero-eyebrow { animation-delay: .12s; }

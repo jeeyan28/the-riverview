@@ -4,6 +4,7 @@ const bcrypt = require("bcryptjs"); // matches the package used in model/user.js
 const router = express.Router();
 
 const User = require("../model/user");
+const LoginHistory = require("../model/loginHistory");
 const PendingRegistration = require("../model/pendingRegistration");
 const { loginLimiter, forgotPasswordLimiter, registerOtpLimiter } = require("../middleware/rateLimiter");
 const { ensureAuthenticated } = require("../middleware/adminAuth");
@@ -60,6 +61,27 @@ function saveSession(req) {
   });
 }
 
+// Records a single login attempt (success or failure) for the admin panel's
+// Login History page. Never throws into the caller — a logging failure
+// must not block or fail a real login.
+async function logLoginAttempt(req, { user, email, status, reason = "", method = "password" }) {
+  try {
+    await LoginHistory.create({
+      user: user ? user._id : undefined,
+      name: user ? `${user.firstName} ${user.lastName}`.trim() : "",
+      email: (user ? user.email : email || "").toLowerCase(),
+      role: user ? user.role : "user",
+      method,
+      status,
+      reason,
+      ip: req.ip || "",
+      userAgent: req.headers["user-agent"] || "",
+    });
+  } catch (err) {
+    console.error("Failed to record login history:", err);
+  }
+}
+
 // ── Register a new (customer) user — Part 3: stages the signup as a
 // PendingRegistration and emails an OTP; the User document itself isn't
 // created until that OTP is verified (Part 5/7).
@@ -111,7 +133,7 @@ router.post("/register", registerOtpLimiter, async (req, res) => {
       return res.status(409).json({ message: "An account with this email already exists." });
     }
 
-    const passwordHash = await bcrypt.hash(password, 10);
+    const passwordHash = await bcrypt.hash(password, User.SALT_ROUNDS);
 
     // Reuse an existing pending signup for this email instead of creating a
     // second one — just refresh its data and OTP, per FEATURE_REQUESTS.md.
@@ -414,16 +436,19 @@ router.post("/login", loginLimiter, async (req, res) => {
       // Burn roughly the same amount of time as a real bcrypt compare would,
       // so "no such user" and "wrong password" aren't distinguishable by timing.
       await bcrypt.compare(password, DUMMY_HASH);
+      await logLoginAttempt(req, { email, status: "failed", reason: "No account found" });
       return res.status(401).json({ message: "Invalid email or password." });
     }
 
     if (user.lockUntil && user.lockUntil.getTime() > Date.now()) {
+      await logLoginAttempt(req, { user, status: "failed", reason: "Account locked" });
       return res.status(423).json({
         message: "Account temporarily locked due to repeated failed attempts. Try again in a few minutes.",
       });
     }
 
     if (!user.isActive) {
+      await logLoginAttempt(req, { user, status: "failed", reason: "Account deactivated" });
       return res.status(403).json({ message: "This account has been deactivated." });
     }
 
@@ -431,6 +456,7 @@ router.post("/login", loginLimiter, async (req, res) => {
     // compare (same as isActive above) so the frontend can offer a resend
     // button without first requiring a correct password.
     if (!user.isVerified) {
+      await logLoginAttempt(req, { user, status: "failed", reason: "Email not verified" });
       return res.status(403).json({
         message: "Please verify your email before signing in.",
         unverified: true,
@@ -440,10 +466,12 @@ router.post("/login", loginLimiter, async (req, res) => {
     const match = await user.comparePassword(password);
     if (!match) {
       await user.registerFailedLogin();
+      await logLoginAttempt(req, { user, status: "failed", reason: "Wrong password" });
       return res.status(401).json({ message: "Invalid email or password." });
     }
 
     await user.registerSuccessfulLogin();
+    await logLoginAttempt(req, { user, status: "success" });
 
     // Regenerate the session on privilege change (anonymous -> authenticated) to
     // prevent session fixation: an attacker who set a session ID before login
@@ -495,6 +523,7 @@ router.post("/google", async (req, res) => {
       });
     } else {
       if (!user.isActive) {
+        await logLoginAttempt(req, { user, status: "failed", reason: "Account deactivated", method: "google" });
         return res.status(403).json({ message: "This account has been deactivated." });
       }
       if (!user.googleId) user.googleId = profile.googleId;
@@ -510,6 +539,8 @@ router.post("/google", async (req, res) => {
       if (!user.isVerified) user.isVerified = true;
       await user.registerSuccessfulLogin();
     }
+
+    await logLoginAttempt(req, { user, status: "success", method: "google" });
 
     // Same reasoning as /login: regenerate on privilege change to avoid session fixation.
     await regenerateSession(req);

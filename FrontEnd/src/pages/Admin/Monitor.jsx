@@ -3,14 +3,73 @@ import Modal from '../../components/Modal';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import { useConfirm } from '../../hooks/useConfirm';
 import { useAuth } from '../../context/AuthContext';
-import { roomsService } from '../../services/rooms';
-import { roomSessionsService } from '../../services/roomSessions';
+import { monitorRoomsService, roomSessionsService } from '../../services/monitoring';
 
 
-const MONITOR_WARNING_MS = 5 * 60 * 1000;  // timer turns yellow at ≤5 min
+const MONITOR_WARNING_MS = 10 * 60 * 1000; // timer turns yellow at ≤10 min
 const MONITOR_CRITICAL_MS = 60 * 1000;     // timer turns red at ≤1 min
+const MONITOR_WARNING_MIN = MONITOR_WARNING_MS / 60000;
+const MONITOR_CRITICAL_MIN = MONITOR_CRITICAL_MS / 60000;
+
+// Overdue sound alert: beeps once the instant a room first hits 00:00, then
+// repeats on this interval for as long as any room is still overdue.
+const OVERDUE_ALERT_REPEAT_MS = 30 * 1000;
+const OVERDUE_SOUND_MUTED_KEY = 'roomMonitor.overdueSoundMuted';
+
+// Two-tone beep via the Web Audio API — no audio file/asset dependency.
+// Browsers block audio before any user gesture on the page; since staff are
+// actively clicking around Room Monitor this only ever fails silently on
+// the very first page load, which the visual ring already covers.
+function playOverdueBeep() {
+  try {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return;
+    const ctx = new Ctx();
+    [880, 660].forEach((freq, i) => {
+      const start = ctx.currentTime + i * 0.18;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0.0001, start);
+      gain.gain.exponentialRampToValueAtTime(0.22, start + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.16);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(start);
+      osc.stop(start + 0.18);
+    });
+    setTimeout(() => ctx.close(), 500);
+  } catch {
+    // Web Audio unavailable — the visual ring still applies.
+  }
+}
 
 const BASE_STATUS_CLASS = { Available: 'available', Occupied: 'occupied', 'Under Maintenance': 'overdue', Inactive: 'vacant' };
+
+// Facility group header icon — keyed off r.facilityName. Unrecognized
+// facilities fall back to a generic building icon.
+const FACILITY_ICONS = { Billiards: 'ti-disc', Karaoke: 'ti-microphone-2', 'Private Rooms': 'ti-door', 'Rental Court': 'ti-trophy' };
+const FACILITY_ICON_DEFAULT = 'ti-building';
+
+// Badge text for Grid + Table. Any active occupancy reads "In Use" —
+// urgency (>10min/≤10min/≤1min) is conveyed by color/icon, not by text.
+// Non-occupied rooms fall back to the room's own status (Available, etc).
+
+const VIEW_MODE_KEY = 'roomMonitor.viewMode';
+
+// Rooms created before the facilityName/roomName split only have the old
+// `name` field (which held the facility) and no roomName at all. Filling
+// both in here, once, means every render below can assume they exist —
+// no repeated fallback checks scattered through the grid/table/modals.
+// Edit the room via the UI to replace these placeholders with real values.
+function normalizeRoom(r) {
+  return {
+    ...r,
+    facilityName: r.facilityName || r.name || 'Unassigned',
+    hasCustomName: !!(r.roomName && r.roomName.trim()),
+    roomName: r.roomName || `Room ${r.roomNumber ?? ''}`.trim(),
+  };
+}
 
 function sessionStart(session) {
   return new Date(session.startTime);
@@ -21,7 +80,12 @@ function sessionEnd(session) {
 function formatStartTime(session) {
   return sessionStart(session).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
-function formatTimeRemaining(ms) {
+function formatEndTime(session) {
+  return sessionEnd(session).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+// Precise HH:MM:SS while time remains; clamps to 00:00:00 once past end.
+function formatTimeRemaining(ms, isPastEnd) {
+  if (isPastEnd) return '00:00:00';
   const totalSeconds = Math.max(0, Math.floor(ms / 1000));
   const h = Math.floor(totalSeconds / 3600);
   const m = Math.floor((totalSeconds % 3600) / 60);
@@ -34,6 +98,27 @@ function findRoomOccupancy(roomId, sessions) {
   return matches.reduce((latest, s) => (!latest || sessionEnd(s) > sessionEnd(latest) ? s : latest), null);
 }
 
+// Single source of truth for a room's derived monitoring state — shared by
+// Grid cards and Table rows so the two views can never disagree or duplicate logic.
+function buildRoomView(r, sessions) {
+  const occupancy = findRoomOccupancy(r._id, sessions);
+  const remaining = occupancy ? sessionEnd(occupancy).getTime() - Date.now() : null;
+
+  const isPastEnd = occupancy && remaining <= 0;
+  const isCritical = occupancy && !isPastEnd && remaining <= MONITOR_CRITICAL_MS;
+  const isWarning = occupancy && !isPastEnd && !isCritical && remaining <= MONITOR_WARNING_MS;
+
+  // 'safe' = an occupied room with plenty of time left (>10min) — green per
+  // the traffic-light spec, same border/pill treatment as Available.
+  const stateClass = (isPastEnd || isCritical) ? 'expired' : isWarning ? 'warning' : occupancy ? 'safe' : (BASE_STATUS_CLASS[r.status] || 'vacant');
+  const statusLabel = occupancy ? 'In Use' : r.status;
+  // Past-end (remaining <= 0) blinks in addition to being red, so it stands
+  // out from the merely-critical (≤1 min, still counting) state.
+  const blinkClass = isPastEnd ? ' blink-expired' : '';
+
+  return { occupancy, remaining, isPastEnd, isCritical, isWarning, stateClass, statusLabel, blinkClass };
+}
+
 function Monitor() {
   const { hasPermission, guardPermission } = useAuth();
   const canManage = hasPermission('room:manage');
@@ -43,18 +128,72 @@ function Monitor() {
   const [loading, setLoading] = useState(true);
   const [sessions, setSessions] = useState([]);
   const [, forceTick] = useState(0); // re-render every second so countdowns move
+  const [viewMode, setViewMode] = useState(() => {
+    try {
+      return localStorage.getItem(VIEW_MODE_KEY) === 'table' ? 'table' : 'grid';
+    } catch {
+      return 'grid';
+    }
+  });
+
+  function changeViewMode(mode) {
+    setViewMode(mode);
+    try {
+      localStorage.setItem(VIEW_MODE_KEY, mode);
+    } catch {
+      /* localStorage unavailable — view choice just won't persist */
+    }
+  }
 
   // modal: null (closed) | { mode: 'start'|'extend', fixedRoom: room, session: session|null }
-  // 'start'  — Available room's "Edit" button — starts a brand-new session
+  // 'start'  — Available room's "Start Session" button — starts a brand-new session
   // 'extend' — Occupied room's "Extend" button — re-anchors remaining time
   const [modal, setModal] = useState(null);
   const [showAddRoom, setShowAddRoom] = useState(false);
+  const [editRoomId, setEditRoomId] = useState(null);
+  const [facilityFilter, setFacilityFilter] = useState('All');
+  const [roomNameFilter, setRoomNameFilter] = useState('All'); // shows only the picked room within the current facility
+  const [sortBy, setSortBy] = useState('default'); // 'default' | 'timeLeft' | 'roomNumber'
+  const [detailRoomId, setDetailRoomId] = useState(null);
+  const [soundMuted, setSoundMuted] = useState(() => {
+    try {
+      return localStorage.getItem(OVERDUE_SOUND_MUTED_KEY) === '1';
+    } catch {
+      return false;
+    }
+  });
+
+  // Kept fresh every render (not just on rooms/sessions change) so the
+  // interval below — mounted once — always reads the current overdue set
+  // without needing to be recreated every tick.
+  const overdueIdsRef = useRef([]);
+  const previouslyOverdueRef = useRef(new Set());
+  const lastAlertAtRef = useRef(0);
+  const soundMutedRef = useRef(soundMuted);
+
+  function toggleSoundMuted() {
+    setSoundMuted((m) => {
+      const next = !m;
+      try {
+        localStorage.setItem(OVERDUE_SOUND_MUTED_KEY, next ? '1' : '0');
+      } catch {
+        /* localStorage unavailable — mute choice just won't persist */
+      }
+      return next;
+    });
+  }
+
+  function selectFacilityFilter(name) {
+    setFacilityFilter(name);
+    setRoomNameFilter('All');
+  }
 
   async function fetchRooms() {
     try {
-      const data = await roomsService.list();
-      setRooms(Array.isArray(data) ? data : []);
-      return data;
+      const data = await monitorRoomsService.list();
+      const list = Array.isArray(data) ? data : [];
+      setRooms(list.map(normalizeRoom));
+      return list;
     } catch (err) {
       console.error(err);
       setRooms([]);
@@ -78,6 +217,10 @@ function Monitor() {
   }
 
   useEffect(() => {
+    soundMutedRef.current = soundMuted;
+  }, [soundMuted]);
+
+  useEffect(() => {
     let cancelled = false;
     (async () => {
       setLoading(true);
@@ -87,9 +230,32 @@ function Monitor() {
 
     const tickHandle = setInterval(() => forceTick((n) => n + 1), 1000);
 
+    // Separate interval (mount-once) for the overdue sound alert, so it
+    // isn't torn down/recreated by the render-driving tick above. Reads
+    // overdueIdsRef, which is kept current every render below.
+    const alertHandle = setInterval(() => {
+      const current = overdueIdsRef.current;
+      if (current.length === 0) {
+        previouslyOverdueRef.current = new Set();
+        return;
+      }
+      if (!soundMutedRef.current) {
+        const prev = previouslyOverdueRef.current;
+        const hasNewOverdue = current.some((id) => !prev.has(id));
+        const now = Date.now();
+        const dueForRepeat = now - lastAlertAtRef.current >= OVERDUE_ALERT_REPEAT_MS;
+        if (hasNewOverdue || dueForRepeat) {
+          playOverdueBeep();
+          lastAlertAtRef.current = now;
+        }
+      }
+      previouslyOverdueRef.current = new Set(current);
+    }, 1000);
+
     return () => {
       cancelled = true;
       clearInterval(tickHandle);
+      clearInterval(alertHandle);
     };
   }, []);
 
@@ -106,8 +272,8 @@ function Monitor() {
       // a failed room reset here just means the card won't repaint as
       // Available until the next successful update.
       try {
-        const updatedRoom = await roomsService.updateStatus(roomId, 'Available');
-        setRooms((prev) => prev.map((r) => (r._id === roomId ? { ...r, ...updatedRoom } : r)));
+        const updatedRoom = await monitorRoomsService.updateStatus(roomId, 'Available');
+        setRooms((prev) => prev.map((r) => (r._id === roomId ? normalizeRoom({ ...r, ...updatedRoom }) : r)));
       } catch {
         /* soft-fail — see comment above */
       }
@@ -128,7 +294,7 @@ function Monitor() {
     setModal({ mode: 'extend', fixedRoom: room, session });
   }
 
-  async function handleModalSubmit({ mode, roomId, sessionId, totalHours, paymentMethod }) {
+  async function handleModalSubmit({ mode, roomId, sessionId, totalHours, paymentMethod, paymentStatus }) {
     if (!guardPermission('room:manage')) return;
 
     if (mode === 'extend') {
@@ -138,15 +304,16 @@ function Monitor() {
         startTime: new Date().toISOString(),
         duration: totalHours,
         paymentMethod,
+        paymentStatus,
       });
     } else {
       // mode === 'start'
-      await roomSessionsService.create({ roomId, duration: totalHours, paymentMethod });
+      await roomSessionsService.create({ roomId, duration: totalHours, paymentMethod, paymentStatus });
 
       // Reflect the room as occupied right away rather than waiting for a refetch.
       try {
-        const updatedRoom = await roomsService.updateStatus(roomId, 'Occupied');
-        setRooms((prev) => prev.map((r) => (r._id === roomId ? { ...r, ...updatedRoom } : r)));
+        const updatedRoom = await monitorRoomsService.updateStatus(roomId, 'Occupied');
+        setRooms((prev) => prev.map((r) => (r._id === roomId ? normalizeRoom({ ...r, ...updatedRoom }) : r)));
       } catch {
         /* soft-fail — matches original's `if (roomRes.ok)` check */
       }
@@ -156,24 +323,31 @@ function Monitor() {
     await fetchMonitorSessions();
   }
 
-  // FEATURE_REQUESTS.md Priority 0 — create a Room from within Room
-  // Monitoring itself. Name, Room No., and Rate (price) are collected;
-  // status/capacity keep their existing defaults and can be adjusted later
-  // via Settings.
-  async function handleAddRoom({ name, roomNumber, price }) {
+  // Creates a Room from within Room Monitoring itself. Facility, Room Name,
+  // Room No., and Rate (price) are collected; status/capacity keep their
+  // existing defaults and can be adjusted later via Settings.
+  async function handleAddRoom({ facilityName, roomName, roomNumber, price }) {
     if (!guardPermission('room:manage')) return;
-    await roomsService.create({ name, roomNumber, price });
+    await monitorRoomsService.create({ facilityName, roomName, roomNumber, price });
     await fetchRooms();
   }
 
-  // "Delete" beside an Available room's "Edit" button — removes the Room
-  // itself (DELETE /api/rooms/:id). Only offered while Available, since an
-  // Occupied room has no Edit button to sit beside in the first place.
+  // Edit button — saves the room's own details (facility/room name/rate/room
+  // no.), it does not touch sessions or occupancy.
+  async function handleEditRoom({ facilityName, roomName, roomNumber, price }) {
+    if (!guardPermission('room:manage')) return;
+    await monitorRoomsService.update(editRoomId, { facilityName, roomName, roomNumber, price });
+    await fetchRooms();
+  }
+
+  // "Delete" beside an Available room's Start Session/Edit buttons — removes
+  // the Room itself. Only offered while Available; an Occupied room has none
+  // of these buttons.
   async function deleteRoom(roomId) {
     if (!guardPermission('room:manage')) return;
     if (!(await confirm('Delete this room permanently? This cannot be undone.', { confirmText: 'Delete' }))) return;
     try {
-      await roomsService.remove(roomId);
+      await monitorRoomsService.remove(roomId);
       setRooms((prev) => prev.filter((r) => r._id !== roomId));
     } catch (err) {
       console.error(err);
@@ -181,117 +355,366 @@ function Monitor() {
     }
   }
 
+  // Facilities come from each room's own `facilityName` field.
+  const facilities = [...new Set(rooms.map((r) => r.facilityName))];
+  const facilityCounts = rooms.reduce((acc, r) => {
+    acc[r.facilityName] = (acc[r.facilityName] || 0) + 1;
+    return acc;
+  }, {});
+  const filteredRooms = facilityFilter === 'All' ? rooms : rooms.filter((r) => r.facilityName === facilityFilter);
+  // Room-name options only make sense once a specific facility is picked —
+  // "All Facilities" can have duplicate room names across different facilities.
+  const roomNameOptions = facilityFilter === 'All' ? [] : [...new Set(filteredRooms.map((r) => r.roomName))];
+  const visibleRooms = (() => {
+    const list = roomNameFilter === 'All' ? filteredRooms : filteredRooms.filter((r) => r.roomName === roomNameFilter);
+    if (sortBy === 'timeLeft') {
+      // Soonest-expiring occupied rooms first; rooms with no active session go last.
+      return [...list].sort((a, b) => {
+        const occA = findRoomOccupancy(a._id, sessions);
+        const occB = findRoomOccupancy(b._id, sessions);
+        const remA = occA ? sessionEnd(occA).getTime() - Date.now() : null;
+        const remB = occB ? sessionEnd(occB).getTime() - Date.now() : null;
+        if (remA == null && remB == null) return 0;
+        if (remA == null) return 1;
+        if (remB == null) return -1;
+        return remA - remB;
+      });
+    }
+    if (sortBy === 'roomNumber') {
+      return [...list].sort((a, b) => String(a.roomNumber).localeCompare(String(b.roomNumber), undefined, { numeric: true, sensitivity: 'base' }));
+    }
+    return list;
+  })();
+  const facilityGroups = [];
+  const groupIndex = new Map();
+  visibleRooms.forEach((r) => {
+    if (!groupIndex.has(r.facilityName)) {
+      groupIndex.set(r.facilityName, []);
+      facilityGroups.push([r.facilityName, groupIndex.get(r.facilityName)]);
+    }
+    groupIndex.get(r.facilityName).push(r);
+  });
+
+  const detailRoom = detailRoomId ? rooms.find((r) => r._id === detailRoomId) || null : null;
+  const detailView = detailRoom ? buildRoomView(detailRoom, sessions) : null;
+
+  // Recomputed every render (including every tick) so the alert interval
+  // above always sees the latest overdue set via the ref.
+  overdueIdsRef.current = rooms
+    .filter((r) => {
+      const v = buildRoomView(r, sessions);
+      return v.occupancy && v.isPastEnd;
+    })
+    .map((r) => r._id);
+
   return (
     <div className="panel active" id="panel-monitor">
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <span style={{ fontSize: '.78rem', color: 'var(--muted)' }}>Live monitoring — updates every second</span>
-        {canManage && (
-          <div style={{ display: 'flex', gap: '10px' }}>
+      <div className="d-flex align-items-center justify-content-between">
+        <div className="rm-page-head">
+          <span className="live-badge"><span className="dot"></span>Live</span>
+          <span className="rm-page-sub">Real-time room status and session monitoring</span>
+        </div>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <div className="view-toggle" role="group" aria-label="Switch view">
+            <button
+              type="button"
+              className={`view-toggle-btn${viewMode === 'grid' ? ' active' : ''}`}
+              onClick={() => changeViewMode('grid')}
+            >
+              <i className="ti ti-layout-grid"></i>Grid View
+            </button>
+            <button
+              type="button"
+              className={`view-toggle-btn${viewMode === 'table' ? ' active' : ''}`}
+              onClick={() => changeViewMode('table')}
+            >
+              <i className="ti ti-list"></i>Table View
+            </button>
+          </div>
+          {canManage && (
             <button className="btn-teal" onClick={() => setShowAddRoom(true)}>
               <i className="ti ti-building-plus"></i>New Room
             </button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
-      <div className="room-grid" id="monitor-room-grid">
-        {loading ? (
-          <div style={{ textAlign: 'center', color: 'var(--muted)', padding: '24px 0', gridColumn: '1/-1' }}>Loading rooms…</div>
-        ) : rooms.length === 0 ? (
-          <div style={{ textAlign: 'center', color: 'var(--muted)', padding: '24px 0', gridColumn: '1/-1' }}>
-            No rooms yet — click New Room above to add one.
+      {loading ? (
+        <div className="room-grid"><div className="room-grid-empty">Loading rooms…</div></div>
+      ) : rooms.length === 0 ? (
+        <div className="room-grid"><div className="room-grid-empty">No rooms yet — click New Room above to add one.</div></div>
+      ) : (
+        <>
+          <div className="fac-toolbar">
+            <div className="fac-chips" role="group" aria-label="Filter by facility">
+              <button
+                type="button"
+                className={`fac-chip${facilityFilter === 'All' ? ' active' : ''}`}
+                onClick={() => selectFacilityFilter('All')}
+              >
+                All Facilities
+              </button>
+              {facilities.map((name) => (
+                <button
+                  key={name}
+                  type="button"
+                  className={`fac-chip${facilityFilter === name ? ' active' : ''}`}
+                  onClick={() => selectFacilityFilter(name)}
+                >
+                  {name} ({facilityCounts[name] || 0})
+                </button>
+              ))}
+            </div>
+            {facilityFilter !== 'All' && roomNameOptions.length > 1 && (
+              <div className="fac-chips" role="group" aria-label="Filter by room name">
+                <button
+                  type="button"
+                  className={`fac-chip${roomNameFilter === 'All' ? ' active' : ''}`}
+                  onClick={() => setRoomNameFilter('All')}
+                >
+                  All Rooms
+                </button>
+                {roomNameOptions.map((name) => (
+                  <button
+                    key={name}
+                    type="button"
+                    className={`fac-chip${roomNameFilter === name ? ' active' : ''}`}
+                    onClick={() => setRoomNameFilter(name)}
+                  >
+                    {name}
+                  </button>
+                ))}
+              </div>
+            )}
+            <div className="fac-chips" role="group" aria-label="Sort rooms">
+              <button
+                type="button"
+                className={`fac-chip${sortBy === 'default' ? ' active' : ''}`}
+                onClick={() => setSortBy('default')}
+              >
+                Sort: Default
+              </button>
+              <button
+                type="button"
+                className={`fac-chip${sortBy === 'timeLeft' ? ' active' : ''}`}
+                onClick={() => setSortBy('timeLeft')}
+              >
+                Sort: Time Left
+              </button>
+              <button
+                type="button"
+                className={`fac-chip${sortBy === 'roomNumber' ? ' active' : ''}`}
+                onClick={() => setSortBy('roomNumber')}
+              >
+                Sort: Room No.
+              </button>
+            </div>
+            <div className="legend">
+              <div className="legend-item"><span className="legend-dot" style={{ background: 'var(--green)' }}></span>{'>'} {MONITOR_WARNING_MIN} min</div>
+              <div className="legend-item"><span className="legend-dot" style={{ background: 'var(--amber)' }}></span>≤ {MONITOR_WARNING_MIN} min</div>
+              <div className="legend-item"><span className="legend-dot" style={{ background: 'var(--red)' }}></span>≤ {MONITOR_CRITICAL_MIN} min</div>
+              <div className="legend-item"><span className="legend-dot" style={{ background: 'var(--muted)' }}></span>Available</div>
+              <button
+                type="button"
+                className={`fac-chip${soundMuted ? '' : ' active'}`}
+                onClick={toggleSoundMuted}
+                title={soundMuted ? 'Unmute overdue alert sound' : 'Mute overdue alert sound'}
+              >
+                <i className={`ti ${soundMuted ? 'ti-bell-off' : 'ti-bell-ringing'}`}></i>{soundMuted ? 'Sound Off' : 'Sound On'}
+              </button>
+            </div>
           </div>
-        ) : (
-          rooms.map((r) => {
-            const occupancy = findRoomOccupancy(r._id, sessions);
-            const remaining = occupancy ? sessionEnd(occupancy).getTime() - Date.now() : null;
 
-            // Reaching 0 no longer ends the session automatically — the card
-            // turns red and blinks (see blinkClass) and keeps counting until
-            // staff steps in.
-            const isPastEnd = occupancy && remaining <= 0;
-            const isCritical = occupancy && !isPastEnd && remaining <= MONITOR_CRITICAL_MS;
-            const isWarning = occupancy && !isPastEnd && !isCritical && remaining <= MONITOR_WARNING_MS;
-
-            const stateClass = (isPastEnd || isCritical) ? 'expired' : isWarning ? 'warning' : BASE_STATUS_CLASS[r.status] || 'vacant';
-            // Past-end (remaining <= 0) blinks in addition to being red, so it
-            // stands out from the merely-critical (≤1 min, still counting) state.
-            const blinkClass = isPastEnd ? ' blink-expired' : '';
-            const icoClass = r.status === 'Occupied' ? 'ico-teal' : r.status === 'Under Maintenance' ? 'ico-amber' : r.status === 'Available' ? 'ico-green' : 'ico-blue';
-            const icoGlyph = r.status === 'Occupied' ? 'ti-circle-dashed' : r.status === 'Under Maintenance' ? 'ti-alert-triangle' : 'ti-circle-off';
-
-            const barPercent = occupancy
-              ? Math.max(0, Math.min(100, (remaining / (occupancy.duration * 60 * 60 * 1000)) * 100))
-              : r.status === 'Occupied' ? 60 : 0;
-            const barColor = (isPastEnd || isCritical) ? 'var(--red)' : isWarning ? 'var(--amber)' : occupancy || r.status === 'Occupied' ? 'var(--teal)' : 'var(--blue)';
+          {viewMode === 'grid' ? (
+        <>
+          {facilityGroups.map(([facilityName, facilityRooms]) => (
+            <div className="rm-group" key={facilityName}>
+              <div className="rm-group-head">
+                <i className={`ti ${FACILITY_ICONS[facilityName] || FACILITY_ICON_DEFAULT} rm-group-ico`}></i>
+                {facilityName} <span className="rm-group-count">· {facilityRooms.length} Room{facilityRooms.length === 1 ? '' : 's'}</span>
+              </div>
+              <div className="room-grid">
+                {facilityRooms.map((r) => {
+            const v = buildRoomView(r, sessions);
+            const { occupancy, remaining, isPastEnd, isCritical, isWarning, stateClass, statusLabel, blinkClass } = v;
 
             return (
-              <div className={`rm ${stateClass}${blinkClass}`} key={r._id}>
+              <div
+                className={`rm ${stateClass}${blinkClass}`}
+                key={r._id}
+                onClick={() => setDetailRoomId(r._id)}
+                role="button"
+                tabIndex={0}
+              >
+                {occupancy && (isCritical || isPastEnd) && (
+                  <span className="rm-warning-pop"><i className="ti ti-alert-triangle"></i></span>
+                )}
                 <div className="rm-head">
                   <div>
-                    <div className="rm-name">{r.name}</div>
-                    <div className="rm-type">{r.roomNumber}</div>
+                    <div className="rm-name">Room {r.roomNumber}</div>
+                    {r.hasCustomName && <div className="rm-type">{r.roomName}</div>}
                   </div>
-                  <div className={`rm-ico ${icoClass}`}><i className={`ti ${icoGlyph}`}></i></div>
+                  <div className="rm-head-right">
+                    {occupancy && (isCritical || isPastEnd) && (
+                      <span className="rm-ico ico-red"><i className="ti ti-alert-triangle"></i></span>
+                    )}
+                    <span className={`rm-status-pill status-${stateClass}`}><span className="dot"></span>{statusLabel}</span>
+                  </div>
                 </div>
-                <div className="rm-rows">
-                  <div className="rm-row">
-                    <span className="lbl">Status</span>
-                    <span className={`rm-status-pill status-${stateClass}`}><span className="dot"></span>{r.status}</span>
-                  </div>
-                  {occupancy ? (
-                    <>
-                      <div className="rm-row"><span className="lbl">Room No.</span><span className="val">{r.roomNumber}</span></div>
-                      <div className="rm-row"><span className="lbl">Payment Method</span><span className="val">{occupancy.paymentMethod || '—'}</span></div>
-                      <div className="rm-row"><span className="lbl">Start Time</span><span className="val">{formatStartTime(occupancy)}</span></div>
-                      <div className="rm-row">
-                        <span className="lbl">Time Left</span>
-                        <span className={`val rm-timer${isWarning ? ' warn' : ''}${(isPastEnd || isCritical) ? ' expired' : ''}`}>
-                          {formatTimeRemaining(remaining)}
-                        </span>
+                {occupancy ? (
+                  <>
+                    <div className="rm-timer-row">
+                      <span className={`rm-ico ico-${(isPastEnd || isCritical) ? 'red' : isWarning ? 'amber' : 'green'}`}>
+                        <i className={`ti ${(isCritical || isPastEnd) ? 'ti-alert-triangle' : 'ti-clock'}`}></i>
+                      </span>
+                      <div>
+                        <div className={`rm-timer-big${isWarning ? ' warn' : ''}${(isPastEnd || isCritical) ? ' expired' : ''}`}>
+                          {formatTimeRemaining(remaining, isPastEnd)}
+                        </div>
+                        <div className="rm-timer-caption">Time left</div>
                       </div>
-                    </>
-                  ) : (
-                    <div className="rm-row"><span className="lbl">Rate</span><span className="val">₱{r.price}/hr</span></div>
-                  )}
-                </div>
-                {(isWarning || isCritical) && (
-                  <div className="rm-warn-badge"><i className="ti ti-alert-triangle"></i>Ending soon</div>
+                    </div>
+                    <div className="rm-foot">
+                      <div className={`rm-foot-info rm-foot-info--${(occupancy.paymentStatus || 'Unpaid').toLowerCase()}`}>
+                        <i className="ti ti-user"></i>{occupancy.paymentStatus || 'Unpaid'}
+                      </div>
+                      <div className="rm-foot-price">₱{r.price}/hr</div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="rm-empty">
+                    <i className="ti ti-device-desktop"></i>
+                    <span>{r.status === 'Available' ? 'Available' : r.status}</span>
+                  </div>
                 )}
-                <div className="rm-bar-wrap">
-                  <div className="rm-bar" style={{ width: `${barPercent}%`, background: barColor }}></div>
-                </div>
-                <div className="rm-actions">
-                  {occupancy ? (
-                    canManage ? (
-                      <>
-                        <button className="rm-btn" onClick={() => openExtendModal(occupancy, r)}><i className="ti ti-edit"></i>Extend</button>
-                        <button className="rm-btn danger" onClick={() => endSession(occupancy._id, r._id)}><i className="ti ti-trash"></i>End Session</button>
-                      </>
-                    ) : (
-                      <span style={{ fontSize: '.82rem', color: 'var(--muted)' }}>In use</span>
-                    )
-                  ) : r.status === 'Available' ? (
-                    canManage ? (
-                      <>
-                        <button className="rm-btn primary" onClick={() => openStartSessionModal(r)}><i className="ti ti-edit"></i>Edit</button>
-                        <button className="rm-btn danger" onClick={() => deleteRoom(r._id)}><i className="ti ti-trash"></i>Delete Room</button>
-                      </>
-                    ) : (
-                      <span style={{ fontSize: '.82rem', color: 'var(--muted)' }}>No permission</span>
-                    )
-                  ) : (
-                    <span style={{ fontSize: '.82rem', color: 'var(--muted)' }}>{r.status}</span>
-                  )}
-                </div>
+                {!occupancy && r.status === 'Available' && canManage && (
+                  <div className="rm-foot">
+                    <button
+                      type="button"
+                      className="rm-btn primary"
+                      style={{ width: '100%', justifyContent: 'center' }}
+                      onClick={(e) => { e.stopPropagation(); openStartSessionModal(r); }}
+                    >
+                      <i className="ti ti-player-play"></i>Start Session
+                    </button>
+                  </div>
+                )}
               </div>
             );
-          })
-        )}
-      </div>
+                  })}
+              </div>
+            </div>
+          ))}
+        </>
+      ) : (
+        <div className="card card-flush rm-table-wrap">
+          <table className="rm-table">
+            <thead>
+              <tr>
+                <th>Room</th>
+                <th>Status</th>
+                <th>Start</th>
+                <th>End</th>
+                <th>Remaining</th>
+                <th>Payment</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {visibleRooms.map((r) => {
+                const v = buildRoomView(r, sessions);
+                const { occupancy, remaining, isPastEnd, isCritical, isWarning, stateClass, statusLabel } = v;
+
+                return (
+                  <tr key={r._id} className={v.blinkClass ? 'blink-expired' : ''}>
+                    <td>
+                      <div className="rm-name">Room {r.roomNumber}</div>
+                      <div className="rm-type">{r.facilityName}{r.hasCustomName ? ` · ${r.roomName}` : ''}</div>
+                    </td>
+                    <td><span className={`rm-status-pill status-${stateClass}`}><span className="dot"></span>{statusLabel}</span></td>
+                    <td>{occupancy ? formatStartTime(occupancy) : '—'}</td>
+                    <td>{occupancy ? formatEndTime(occupancy) : '—'}</td>
+                    <td>
+                      <span className={`rm-timer${isWarning ? ' warn' : ''}${(isPastEnd || isCritical) ? ' expired' : ''}`}>
+                        {occupancy && (isCritical || isPastEnd) && (
+                          <i className="ti ti-alert-triangle rm-timer-warn-ico"></i>
+                        )}
+                        {occupancy ? formatTimeRemaining(remaining, isPastEnd) : '—'}
+                      </span>
+                    </td>
+                    <td>
+                      {occupancy ? (
+                        <span className={`pay-pill pay-${(occupancy.paymentStatus || 'Unpaid').toLowerCase()}`}>{occupancy.paymentStatus || 'Unpaid'}</span>
+                      ) : '—'}
+                    </td>
+                    <td>
+                      <div className="rm-actions rm-actions--table">
+                        {occupancy ? (
+                          canManage ? (
+                            <>
+                              <button className="rm-btn" onClick={() => openExtendModal(occupancy, r)}><i className="ti ti-edit"></i>Extend</button>
+                              <button className="rm-btn danger" onClick={() => endSession(occupancy._id, r._id)}><i className="ti ti-trash"></i>End</button>
+                            </>
+                          ) : (
+                            <span className="rm-note">In use</span>
+                          )
+                        ) : r.status === 'Available' ? (
+                          canManage ? (
+                            <>
+                              <button className="rm-btn primary" onClick={() => openStartSessionModal(r)}><i className="ti ti-player-play"></i>Start Session</button>
+                              <button className="rm-btn" onClick={() => setEditRoomId(r._id)}><i className="ti ti-edit"></i>Edit</button>
+                              <button className="rm-btn danger" onClick={() => deleteRoom(r._id)}><i className="ti ti-trash"></i>Delete</button>
+                            </>
+                          ) : (
+                            <span className="rm-note">No permission</span>
+                          )
+                        ) : (
+                          <span className="rm-note">{r.status}</span>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+        </>
+      )}
 
       <SessionModal modal={modal} onClose={() => setModal(null)} onSubmit={handleModalSubmit} />
-      <AddRoomModal open={showAddRoom} onClose={() => setShowAddRoom(false)} onSubmit={handleAddRoom} existingNames={[...new Set(rooms.map((r) => r.name))]} />
+      <RoomFormModal open={showAddRoom} onClose={() => setShowAddRoom(false)} onSubmit={handleAddRoom} existingFacilities={facilities} rooms={rooms} />
+      <RoomFormModal
+        open={!!editRoomId}
+        onClose={() => setEditRoomId(null)}
+        onSubmit={handleEditRoom}
+        existingFacilities={facilities}
+        rooms={rooms}
+        initialRoom={rooms.find((r) => r._id === editRoomId) || null}
+      />
+      <RoomDetailModal
+        room={detailRoom}
+        view={detailView}
+        onClose={() => setDetailRoomId(null)}
+        canManage={canManage}
+        onExtend={() => {
+          setDetailRoomId(null);
+          openExtendModal(detailView.occupancy, detailRoom);
+        }}
+        onEndSession={() => {
+          setDetailRoomId(null);
+          endSession(detailView.occupancy._id, detailRoom._id);
+        }}
+        onEdit={() => {
+          setDetailRoomId(null);
+          setEditRoomId(detailRoom._id);
+        }}
+        onDelete={() => {
+          setDetailRoomId(null);
+          deleteRoom(detailRoom._id);
+        }}
+      />
 
       <ConfirmDialog {...confirmProps} />
     </div>
@@ -299,91 +722,231 @@ function Monitor() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// AddRoomModal — FEATURE_REQUESTS.md Priority 0: create a new Room (Name
-// + Room No.) from within Room Monitoring. Only collects the two fields
-// Room.js actually requires; everything else keeps its schema default.
-//
-// FEATURE_REQUESTS.md Priority 3 — Name is an editable dropdown (add new /
-// delete existing option). Options are stored client-side in localStorage
-// (seeded from existing room names) rather than via Settings, per the
-// "Room Monitoring must not depend on Settings" architecture decision.
+// RoomDetailModal — opened by clicking a room card/row. Grid/table only show
+// the compact summary (time left + payment); this shows everything else
+// (status, room no., facility, payment method, start/end time). `view` is
+// recomputed fresh from live `rooms`/`sessions` state each render (see
+// detailView in Monitor), so the countdown here keeps ticking too.
 // ─────────────────────────────────────────────────────────────────────────
-const ROOM_NAME_PRESETS_KEY = 'roomMonitor.roomNamePresets';
+function RoomDetailModal({ room, view, onClose, canManage, onExtend, onEndSession, onEdit, onDelete }) {
+  const title = room ? `${room.roomName} — ${room.facilityName}` : 'Room details';
 
-function loadRoomNamePresets(existingNames) {
+  return (
+    <Modal open={!!room} onClose={onClose} title={title}>
+      {room && view && (
+        <>
+          <div className="rm-rows">
+            <div className="rm-row">
+              <span className="lbl">Status</span>
+              <span className={`rm-status-pill status-${view.stateClass}`}><span className="dot"></span>{view.statusLabel}</span>
+            </div>
+            <div className="rm-row"><span className="lbl">Facility</span><span className="val">{room.facilityName}</span></div>
+            <div className="rm-row"><span className="lbl">Room Name</span><span className="val">{room.roomName}</span></div>
+            <div className="rm-row"><span className="lbl">Room No.</span><span className="val">{room.roomNumber}</span></div>
+            {view.occupancy ? (
+              <>
+                <div className="rm-row"><span className="lbl">Payment Method</span><span className="val">{view.occupancy.paymentMethod || '—'}</span></div>
+                <div className="rm-row">
+                  <span className="lbl">Payment Status</span>
+                  <span className={`pay-pill pay-${(view.occupancy.paymentStatus || 'Unpaid').toLowerCase()}`}>{view.occupancy.paymentStatus || 'Unpaid'}</span>
+                </div>
+                <div className="rm-row"><span className="lbl">Start Time</span><span className="val">{formatStartTime(view.occupancy)}</span></div>
+                <div className="rm-row"><span className="lbl">End Time</span><span className="val">{formatEndTime(view.occupancy)}</span></div>
+                <div className="rm-row">
+                  <span className="lbl">Time Left</span>
+                  <span className={`val rm-timer${view.isWarning ? ' warn' : ''}${(view.isPastEnd || view.isCritical) ? ' expired' : ''}`}>
+                    {formatTimeRemaining(view.remaining, view.isPastEnd)}
+                  </span>
+                </div>
+              </>
+            ) : (
+              <div className="rm-row"><span className="lbl">Rate</span><span className="val">₱{room.price}/hr</span></div>
+            )}
+          </div>
+          <div className="modal-actions">
+            {view.occupancy ? (
+              canManage && (
+                <>
+                  <button className="rm-btn" onClick={onExtend}><i className="ti ti-edit"></i>Extend</button>
+                  <button className="rm-btn danger" onClick={onEndSession}><i className="ti ti-trash"></i>End Session</button>
+                </>
+              )
+            ) : room.status === 'Available' ? (
+              canManage && (
+                <>
+                  <button className="rm-btn" onClick={onEdit}><i className="ti ti-edit"></i>Edit</button>
+                  <button className="rm-btn danger" onClick={onDelete}><i className="ti ti-trash"></i>Delete Room</button>
+                </>
+              )
+            ) : null}
+            <button className="btn-cancel" onClick={onClose}>Close</button>
+          </div>
+        </>
+      )}
+    </Modal>
+  );
+}
+
+
+// Facility and Room Name are both editable dropdowns (add new / delete
+// option), stored client-side in localStorage — Room Monitoring doesn't
+// depend on Settings. Room Name options are scoped per facility so e.g.
+// Billiards and Karaoke each keep their own list.
+const FACILITY_PRESETS_KEY = 'roomMonitor.facilityPresets';
+const roomNamePresetsKey = (facilityName) => `roomMonitor.roomNamePresets.${facilityName}`;
+
+function loadPresets(key, seed = []) {
   let stored = [];
   try {
-    stored = JSON.parse(localStorage.getItem(ROOM_NAME_PRESETS_KEY) || '[]');
+    stored = JSON.parse(localStorage.getItem(key) || '[]');
     if (!Array.isArray(stored)) stored = [];
   } catch {
     stored = [];
   }
-  return [...new Set([...stored, ...existingNames])].sort((a, b) => a.localeCompare(b));
+  // Filters out null/undefined/blank — matters for rooms saved before the
+  // facilityName/roomName split, which have neither field set yet.
+  const clean = [...stored, ...seed].filter((v) => typeof v === 'string' && v.trim());
+  return [...new Set(clean)].sort((a, b) => a.localeCompare(b));
 }
 
-function saveRoomNamePresets(options) {
-  localStorage.setItem(ROOM_NAME_PRESETS_KEY, JSON.stringify(options));
+function savePresets(key, options) {
+  localStorage.setItem(key, JSON.stringify(options));
 }
 
-function AddRoomModal({ open, onClose, onSubmit, existingNames }) {
-  const [name, setName] = useState('');
-  const [roomNumber, setRoomNumber] = useState('');
-  const [price, setPrice] = useState('');
-  const [nameOptions, setNameOptions] = useState([]);
+// One dropdown-with-add-new-and-delete control, reused for both Facility
+// and Room Name fields below.
+function PresetDropdown({ label, value, options, onSelect, onAdd, onDelete, placeholder }) {
   const [addingNew, setAddingNew] = useState(false);
-  const [newOptionInput, setNewOptionInput] = useState('');
-  const [submitting, setSubmitting] = useState(false);
+  const [input, setInput] = useState('');
 
-  useEffect(() => {
-    if (open) {
-      setName('');
-      setRoomNumber('');
-      setPrice('');
-      setAddingNew(false);
-      setNewOptionInput('');
-      setNameOptions(loadRoomNamePresets(existingNames));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
-
-  function handleSelectName(value) {
-    if (value === '__add_new__') {
+  function handleSelect(v) {
+    if (v === '__add_new__') {
       setAddingNew(true);
       return;
     }
     setAddingNew(false);
-    setName(value);
+    onSelect(v);
   }
 
-  function handleAddOption() {
-    const trimmed = newOptionInput.trim();
+  function handleAdd() {
+    const trimmed = input.trim();
     if (!trimmed) return;
-    setNameOptions((prev) => {
+    onAdd(trimmed);
+    setAddingNew(false);
+    setInput('');
+  }
+
+  return (
+    <div className="mfield">
+      <label>{label}</label>
+      <div className="field-row">
+        <select value={value} onChange={(e) => handleSelect(e.target.value)} className="field-col">
+          <option value="">{placeholder}</option>
+          {options.map((opt) => (
+            <option key={opt} value={opt}>{opt}</option>
+          ))}
+          <option value="__add_new__">+ Add new option…</option>
+        </select>
+        {value && options.includes(value) && (
+          <button type="button" className="rm-btn danger" style={{ flex: '0 0 auto', padding: '7px 10px' }} onClick={() => onDelete(value)} title={`Remove "${value}" from list`}>
+            <i className="ti ti-trash"></i>
+          </button>
+        )}
+      </div>
+      {addingNew && (
+        <div className="field-row field-row--top-gap">
+          <input type="text" value={input} onChange={(e) => setInput(e.target.value)} placeholder={`New ${label.toLowerCase()}`} className="field-col" autoFocus />
+          <button type="button" className="rm-btn primary" style={{ flex: '0 0 auto', padding: '7px 12px' }} onClick={handleAdd}>Add</button>
+          <button type="button" className="rm-btn" style={{ flex: '0 0 auto', padding: '7px 10px' }} onClick={() => { setAddingNew(false); setInput(''); }} title="Cancel">
+            <i className="ti ti-x"></i>
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Add/Edit Room form. `initialRoom` (present in edit mode) prefills every
+// field; submitting always sends the full {facilityName, roomName,
+// roomNumber, price} shape so the same handler works for create and update.
+function RoomFormModal({ open, onClose, onSubmit, existingFacilities, rooms, initialRoom }) {
+  const isEdit = !!initialRoom;
+  const [facilityName, setFacilityName] = useState('');
+  const [roomName, setRoomName] = useState('');
+  const [roomNumber, setRoomNumber] = useState('');
+  const [price, setPrice] = useState('');
+  const [facilityOptions, setFacilityOptions] = useState([]);
+  const [roomNameOptions, setRoomNameOptions] = useState([]);
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    setFacilityName(initialRoom?.facilityName || '');
+    setRoomName(initialRoom?.roomName || '');
+    setRoomNumber(initialRoom?.roomNumber || '');
+    setPrice(initialRoom ? String(initialRoom.price ?? '') : '');
+    setFacilityOptions(loadPresets(FACILITY_PRESETS_KEY, existingFacilities));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, initialRoom]);
+
+  // Room Name options refresh whenever the selected facility changes, scoped
+  // to that facility's own existing room names.
+  useEffect(() => {
+    if (!open || !facilityName) {
+      setRoomNameOptions([]);
+      return;
+    }
+    const seed = rooms.filter((r) => r.facilityName === facilityName).map((r) => r.roomName);
+    setRoomNameOptions(loadPresets(roomNamePresetsKey(facilityName), seed));
+  }, [open, facilityName, rooms]);
+
+  function handleAddFacility(trimmed) {
+    setFacilityOptions((prev) => {
       if (prev.includes(trimmed)) return prev;
       const next = [...prev, trimmed].sort((a, b) => a.localeCompare(b));
-      saveRoomNamePresets(next);
+      savePresets(FACILITY_PRESETS_KEY, next);
       return next;
     });
-    setName(trimmed);
-    setAddingNew(false);
-    setNewOptionInput('');
+    setFacilityName(trimmed);
+    setRoomName('');
   }
 
-  function handleDeleteOption(option) {
-    if (!window.confirm(`Remove "${option}" from the Name list? This only affects the dropdown, not any existing room.`)) return;
-    setNameOptions((prev) => {
+  function handleDeleteFacility(option) {
+    if (!window.confirm(`Remove "${option}" from the Facility list? This only affects the dropdown, not any existing room.`)) return;
+    setFacilityOptions((prev) => {
       const next = prev.filter((o) => o !== option);
-      saveRoomNamePresets(next);
+      savePresets(FACILITY_PRESETS_KEY, next);
       return next;
     });
-    if (name === option) setName('');
+    if (facilityName === option) setFacilityName('');
+  }
+
+  function handleAddRoomName(trimmed) {
+    setRoomNameOptions((prev) => {
+      if (prev.includes(trimmed)) return prev;
+      const next = [...prev, trimmed].sort((a, b) => a.localeCompare(b));
+      savePresets(roomNamePresetsKey(facilityName), next);
+      return next;
+    });
+    setRoomName(trimmed);
+  }
+
+  function handleDeleteRoomName(option) {
+    if (!window.confirm(`Remove "${option}" from this facility's Room Name list?`)) return;
+    setRoomNameOptions((prev) => {
+      const next = prev.filter((o) => o !== option);
+      savePresets(roomNamePresetsKey(facilityName), next);
+      return next;
+    });
+    if (roomName === option) setRoomName('');
   }
 
   async function handleSubmit() {
-    const trimmedName = name.trim();
+    const trimmedFacility = facilityName.trim();
+    const trimmedRoomName = roomName.trim();
     const trimmedRoomNumber = roomNumber.trim();
-    if (!trimmedName || !trimmedRoomNumber) {
-      alert('Please enter both Room No. and Name.');
+    if (!trimmedFacility || !trimmedRoomName || !trimmedRoomNumber) {
+      alert('Please fill in Facility, Room Name, and Room No.');
       return;
     }
     const trimmedPrice = price.trim();
@@ -391,50 +954,45 @@ function AddRoomModal({ open, onClose, onSubmit, existingNames }) {
       alert('Rate must be a valid non-negative number.');
       return;
     }
+    // Room No. must be unique within its room name — same number in two
+    // different room names (even same facility) is fine, but not twice inside the same one.
+    const numberTaken = rooms.some((r) => r.roomName === trimmedRoomName && String(r.roomNumber) === trimmedRoomNumber && r._id !== initialRoom?._id);
+    if (numberTaken) {
+      alert(`Room No. ${trimmedRoomNumber} is already used in "${trimmedRoomName}". Choose a different number.`);
+      return;
+    }
     setSubmitting(true);
     try {
-      await onSubmit({ name: trimmedName, roomNumber: trimmedRoomNumber, price: trimmedPrice ? Number(trimmedPrice) : 0 });
+      await onSubmit({ facilityName: trimmedFacility, roomName: trimmedRoomName, roomNumber: trimmedRoomNumber, price: trimmedPrice ? Number(trimmedPrice) : 0 });
       onClose();
     } catch (err) {
       console.error(err);
-      alert(err.message || 'Could not create this room.');
+      alert(err.message || `Could not ${isEdit ? 'save' : 'create'} this room.`);
     } finally {
       setSubmitting(false);
     }
   }
 
   return (
-    <Modal open={open} onClose={onClose} title="New Room — Room Monitoring">
-      <div className="mfield">
-        <label>Name</label>
-        <div style={{ display: 'flex', gap: '8px' }}>
-          <select value={name} onChange={(e) => handleSelectName(e.target.value)} style={{ flex: 1 }}>
-            <option value="">Select a name…</option>
-            {nameOptions.map((opt) => (
-              <option key={opt} value={opt}>{opt}</option>
-            ))}
-            <option value="__add_new__">+ Add new option…</option>
-          </select>
-          {name && nameOptions.includes(name) && (
-            <button type="button" className="rm-btn danger" style={{ flex: '0 0 auto', padding: '7px 10px' }} onClick={() => handleDeleteOption(name)} title={`Remove "${name}" from list`}>
-              <i className="ti ti-trash"></i>
-            </button>
-          )}
-        </div>
-        {addingNew && (
-          <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
-            <input
-              type="text"
-              value={newOptionInput}
-              onChange={(e) => setNewOptionInput(e.target.value)}
-              placeholder="New room name"
-              style={{ flex: 1 }}
-              autoFocus
-            />
-            <button type="button" className="rm-btn primary" style={{ flex: '0 0 auto', padding: '7px 12px' }} onClick={handleAddOption}>Add</button>
-          </div>
-        )}
-      </div>
+    <Modal open={open} onClose={onClose} title={isEdit ? 'Edit Room — Room Monitoring' : 'New Room — Room Monitoring'}>
+      <PresetDropdown
+        label="Facility"
+        value={facilityName}
+        options={facilityOptions}
+        onSelect={(v) => { setFacilityName(v); setRoomName(''); }}
+        onAdd={handleAddFacility}
+        onDelete={handleDeleteFacility}
+        placeholder="Select a facility…"
+      />
+      <PresetDropdown
+        label="Room Name"
+        value={roomName}
+        options={roomNameOptions}
+        onSelect={setRoomName}
+        onAdd={handleAddRoomName}
+        onDelete={handleDeleteRoomName}
+        placeholder={facilityName ? 'Select a room name…' : 'Pick a facility first'}
+      />
       <div className="mfield">
         <label>Rate (₱/hr)</label>
         <input type="number" min="0" step="1" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="e.g. 150" />
@@ -446,18 +1004,14 @@ function AddRoomModal({ open, onClose, onSubmit, existingNames }) {
       <div className="modal-actions">
         <button className="btn-cancel" onClick={onClose}>Cancel</button>
         <button className="btn-confirm" disabled={submitting} onClick={handleSubmit}>
-          {submitting ? 'Adding…' : 'Add Room'}
+          {submitting ? (isEdit ? 'Saving…' : 'Adding…') : (isEdit ? 'Save Changes' : 'Add Room')}
         </button>
       </div>
     </Modal>
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────
-// SessionModal — covers Start and Extend. Always targets a single
-// fixedRoom — there is no room or category picker, since those are locked
-// after room creation.
-// ─────────────────────────────────────────────────────────────────────────
+
 const DURATION_PRESETS = [
   { label: '15m', mins: 15 },
   { label: '30m', mins: 30 },
@@ -480,6 +1034,7 @@ function SessionModal({ modal, onClose, onSubmit }) {
   const [minutes, setMinutes] = useState('');
   const [seconds, setSeconds] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('Cash');
+  const [paymentStatus, setPaymentStatus] = useState('Unpaid');
   const [submitting, setSubmitting] = useState(false);
   const [addTimeOpen, setAddTimeOpen] = useState(false);
   const [addHours, setAddHours] = useState('');
@@ -501,11 +1056,13 @@ function SessionModal({ modal, onClose, onSubmit }) {
       const remainingMs = Math.max(0, sessionEnd(modal.session).getTime() - Date.now());
       setDurationFromHours(remainingMs > 0 ? remainingMs / 3600000 : 1 / 3600);
       setPaymentMethod(modal.session.paymentMethod || 'Cash');
+      setPaymentStatus(modal.session.paymentStatus || 'Unpaid');
     } else {
       setHours('');
       setMinutes('');
       setSeconds('');
       setPaymentMethod('Cash');
+      setPaymentStatus('Unpaid');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modal]);
@@ -570,6 +1127,7 @@ function SessionModal({ modal, onClose, onSubmit }) {
         sessionId: modal.session?._id,
         totalHours,
         paymentMethod,
+        paymentStatus,
       });
     } catch (err) {
       console.error(err);
@@ -579,13 +1137,13 @@ function SessionModal({ modal, onClose, onSubmit }) {
     }
   }
 
-  const fixedRoomLabel = modal?.fixedRoom ? `Room No. ${modal.fixedRoom.roomNumber} — ${modal.fixedRoom.name}` : '';
+  const fixedRoomLabel = modal?.fixedRoom ? `${modal.fixedRoom.roomName} — Room No. ${modal.fixedRoom.roomNumber} (${modal.fixedRoom.facilityName})` : '';
   const fixedRoomRate = modal?.fixedRoom ? `₱${modal.fixedRoom.price}/hr` : '';
   // FEATURE_REQUESTS.md Priority 4 — Extend is a quick time-only popup: no
   // rate, no payment method (it keeps the session's existing paymentMethod,
   // prefilled above), just the duration. Room context moves into the title
   // instead of a separate label line.
-  const title = isExtend ? `Extend Session — ${modal?.fixedRoom?.name || ''}` : 'Start Session';
+  const title = isExtend ? `Extend Session — ${modal?.fixedRoom?.roomName || ''}` : 'Start Session';
 
   return (
     <Modal open={!!modal} onClose={onClose} title={title}>
@@ -611,11 +1169,11 @@ function SessionModal({ modal, onClose, onSubmit }) {
                 </div>
                 {addTimeOpen && (
                   <div className="aw-addtime-row">
-                    <div style={{ flex: 1 }}>
+                    <div className="field-col">
                       <input type="number" min="0" step="1" value={addHours} onChange={(e) => setAddHours(e.target.value)} placeholder="0" />
                       <div className="aw-unit-lbl">Hours</div>
                     </div>
-                    <div style={{ flex: 1 }}>
+                    <div className="field-col">
                       <input type="number" min="0" step="1" value={addMinutes} onChange={(e) => setAddMinutes(e.target.value)} placeholder="0" />
                       <div className="aw-unit-lbl">Minutes</div>
                     </div>
@@ -625,16 +1183,16 @@ function SessionModal({ modal, onClose, onSubmit }) {
               </>
             )}
 
-            <div style={{ display: 'flex', gap: '8px', marginTop: isExtend ? '10px' : 0 }}>
-              <div style={{ flex: 1 }}>
+            <div className={`field-row${isExtend ? ' field-row--extend-gap' : ''}`}>
+              <div className="field-col">
                 <input type="number" min="0" step="1" value={hours} onChange={(e) => handleHmsChange('hours', e.target.value)} />
                 <div className="aw-unit-lbl">Hours</div>
               </div>
-              <div style={{ flex: 1 }}>
+              <div className="field-col">
                 <input type="number" min="0" step="1" value={minutes} onChange={(e) => handleHmsChange('minutes', e.target.value)} />
                 <div className="aw-unit-lbl">Minutes</div>
               </div>
-              <div style={{ flex: 1 }}>
+              <div className="field-col">
                 <input type="number" min="0" step="1" value={seconds} onChange={(e) => handleHmsChange('seconds', e.target.value)} />
                 <div className="aw-unit-lbl">Seconds</div>
               </div>
@@ -659,6 +1217,26 @@ function SessionModal({ modal, onClose, onSubmit }) {
               </select>
             </div>
           )}
+
+          <div className="mfield">
+            <label>Payment Status</label>
+            <div className="pay-toggle" role="group" aria-label="Payment status">
+              <button
+                type="button"
+                className={`pay-toggle-btn pay-toggle-btn--paid${paymentStatus === 'Paid' ? ' active' : ''}`}
+                onClick={() => setPaymentStatus('Paid')}
+              >
+                Paid
+              </button>
+              <button
+                type="button"
+                className={`pay-toggle-btn pay-toggle-btn--unpaid${paymentStatus === 'Unpaid' ? ' active' : ''}`}
+                onClick={() => setPaymentStatus('Unpaid')}
+              >
+                Unpaid
+              </button>
+            </div>
+          </div>
 
           <div className="modal-actions">
             <button className="btn-cancel" onClick={onClose}>Cancel</button>

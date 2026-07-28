@@ -10,17 +10,14 @@ import {
   loadMonthAvailability,
   clearMonthAvailability,
   getFreeSlotCount,
+  getAvailableRoomCount,
   isHolidayDate,
   isOperatingDay,
   computeDownPayment,
-  getFacilityAvailability,
 } from '../utils/rooms';
 import { API_BASE_URL } from '../services/api';
 
-const MAX_DURATION = 5;
-
-
-const PAYMONGO_API_BASE = 'https://api.paymongo.com/v1';
+const PAYMONGO_API_BASE = import.meta.env.VITE_PAYMONGO_API_BASE || 'https://api.paymongo.com/v1';
 
 const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -37,13 +34,52 @@ function formatHour(h) {
   return `${display}:00 ${period}`;
 }
 
-function maxDurationFrom(h, closeHour, reserved) {
-  let max = 0;
-  for (let t = h; t < closeHour; t++) {
-    if (reserved.includes(t)) break;
-    max++;
+function canBookDuration(
+  startHour,
+  duration,
+  closeHour,
+  reserved,
+  totalRooms
+) {
+  if (startHour + duration > closeHour) {
+    return false;
   }
-  return max;
+
+  for (
+    let hour = startHour;
+    hour < startHour + duration;
+    hour++
+  ) {
+    const bookedRooms = Number(reserved?.[hour] || 0);
+
+    if (bookedRooms >= totalRooms) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+// Whether this hour on its own is already fully reserved by another booking.
+function isHourBooked(hour, reserved, totalRooms) {
+  return Number(reserved?.[hour] || 0) >= totalRooms;
+}
+
+// A start time's state: 'booked' (a reservation conflicts), 'insufficient'
+// (room is free, but the chosen duration would run past closing), or
+// 'available'. Booked always takes priority over insufficient time.
+function getSlotState(startHour, duration, closeHour, reserved, totalRooms) {
+  if (isHourBooked(startHour, reserved, totalRooms)) return 'booked';
+  if (startHour + duration > closeHour) return 'insufficient';
+  if (!canBookDuration(startHour, duration, closeHour, reserved, totalRooms)) return 'booked';
+  return 'available';
+}
+
+// Latest hour a booking of `duration` can start and still end by closing.
+// Returns null if the duration doesn't fit anywhere in the operating window.
+function getLatestStartTime(openHour, closeHour, duration) {
+  const latest = closeHour - duration;
+  return latest >= openHour ? latest : null;
 }
 
 function priceOptionsFor(room) {
@@ -56,6 +92,8 @@ function priceOptionsFor(room) {
         image: room.image || '',
         description: room.description || '',
         features: room.features || [],
+        roomCount: 1,
+        status: room.status,
       }];
 }
 
@@ -249,23 +287,30 @@ function BookingModal({ room, returnInfo, onClose, openHour, closeHour, settings
   const open = !!room || !!returnInfo;
   const { user: authUser, revalidate, logout } = useAuth();
 
+  const [monthBookings, setMonthBookings] = useState({});
+  const [reserved, setReserved] = useState({});
+  const [priceReserved, setPriceReserved] = useState({});
+  const [confirming, setConfirming] = useState(false);
+
   const [step, setStep] = useState('price'); // 'price' | 'calendar' | 'slots' | 'details' | 'payment' | 'paymongoReturn'
   const [viewDate, setViewDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(null); // { y, m, d }
   const [selectedVariant, setSelectedVariant] = useState(null);
   const [selectedHour, setSelectedHour] = useState(null);
-  const [selectedDuration, setSelectedDuration] = useState(1);
+  const totalRooms = Number(selectedVariant?.roomCount) || 1;
+  // Admin-configurable via Settings > Operating Schedule; defaults match the
+  // schema's own defaults (model/settings.js) if the fields are missing.
+  const minDuration = Number.isFinite(Number(settings?.operatingHours?.minOnlineDurationHours))
+    ? Number(settings.operatingHours.minOnlineDurationHours) : 1;
+  const maxDuration = Number.isFinite(Number(settings?.operatingHours?.maxOnlineDurationHours))
+    ? Number(settings.operatingHours.maxOnlineDurationHours) : 5;
+  const [selectedDuration, setSelectedDuration] = useState(minDuration);
 
   const [guestName, setGuestName] = useState('');
   const [guestContact, setGuestContact] = useState('');
   const [guestCount, setGuestCount] = useState(1);
   const [guestNote, setGuestNote] = useState('');
   const [paxError, setPaxError] = useState('');
-
-  const [monthBookings, setMonthBookings] = useState({});
-  const [reserved, setReserved] = useState([]);
-  const [confirming, setConfirming] = useState(false);
-  const [facilityStatus, setFacilityStatus] = useState(null); // 'Available' | 'Fully Booked' | null while loading
 
   const [payLoading, setPayLoading] = useState(false);
   const [payError, setPayError] = useState('');
@@ -296,7 +341,7 @@ function BookingModal({ room, returnInfo, onClose, openHour, closeHour, settings
     setSelectedDate(null);
     setSelectedVariant(null);
     setSelectedHour(null);
-    setSelectedDuration(1);
+    setSelectedDuration(minDuration);
     setGuestNote('');
     setGuestCount(1);
     setPaxError('');
@@ -312,36 +357,6 @@ function BookingModal({ room, returnInfo, onClose, openHour, closeHour, settings
     setGuestName(user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : '');
     setGuestContact(user ? user.phone || user.email || '' : '');
   }, [room]);
-
-  // Facility availability badge (Room Selection step) — same rule as
-  // Home.jsx's refreshLiveRoomStatuses: an "Available" room only flips to
-  // "Fully Booked" if every remaining operating hour today is reserved.
-  // Non-"Available" admin statuses collapse to "Fully Booked" (the binary
-  // summary this step shows for now — see FEATURE_REQUESTS.md).
-  useEffect(() => {
-    if (!room) {
-      setFacilityStatus(null);
-      return;
-    }
-    if (room.status !== 'Available') {
-      setFacilityStatus('Fully Booked');
-      return;
-    }
-    let cancelled = false;
-    setFacilityStatus(null);
-
-    async function loadFacilityStatus() {
-      const now = new Date();
-      const todayStr = dateKey(now.getFullYear(), now.getMonth(), now.getDate());
-      const reservedToday = await fetchReservedHours(room._id, todayStr);
-      if (!cancelled) setFacilityStatus(getFacilityAvailability(reservedToday, openHour, closeHour));
-    }
-
-    loadFacilityStatus();
-    return () => {
-      cancelled = true;
-    };
-  }, [room, openHour, closeHour]);
 
   // Drive the paymongoReturn step off `returnInfo` — mirrors
   // handlePaymongoReturn() in the original, run once when Home.jsx detects
@@ -404,30 +419,57 @@ function BookingModal({ room, returnInfo, onClose, openHour, closeHour, settings
     };
   }, [open]);
 
+  // Fetch today's reserved hours for the room-selection step, so each
+  // variant card can show a live "X of Y rooms available" count. Fetched
+  // PER VARIANT (keyed by label) — each variant has its own pool of units
+  // (roomCount), so one variant's bookings must never count against
+  // another variant's availability.
+  useEffect(() => {
+    if (step !== 'price' || !room) return;
+    let cancelled = false;
+    const now = new Date();
+    const key = dateKey(now.getFullYear(), now.getMonth(), now.getDate());
+    const options = priceOptionsFor(room);
+    Promise.all(
+      options.map((opt) => fetchReservedHours(room._id, key, opt.label).then((hours) => [opt.label, hours]))
+    ).then((entries) => {
+      if (!cancelled) setPriceReserved(Object.fromEntries(entries));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [step, room]);
+
   // Fetch this room's bookings for the visible calendar month.
   useEffect(() => {
-    if (step !== 'calendar' || !room) return;
+    if (step !== 'calendar' || !room || !selectedVariant) return;
     let cancelled = false;
-    loadMonthAvailability(room._id, viewDate.getFullYear(), viewDate.getMonth() + 1).then((data) => {
+    loadMonthAvailability(room._id, viewDate.getFullYear(), viewDate.getMonth() + 1, selectedVariant.label).then((data) => {
       if (!cancelled) setMonthBookings(data);
     });
     return () => {
       cancelled = true;
     };
-  }, [step, room, viewDate]);
+  }, [step, room, viewDate, selectedVariant]);
 
   // Fetch reserved hours for the selected date once we reach the slots step.
+  // Always bypasses the cache here — this number directly gates which hours
+  // are clickable, so a stale count (e.g. from an admin walk-in booking made
+  // elsewhere in the same session, or an earlier Home.jsx/price-step fetch)
+  // would let someone pick an hour that's already gone, only to be rejected
+  // later at payment.
   useEffect(() => {
     if (step !== 'slots' || !room || !selectedDate) return;
     let cancelled = false;
     const key = dateKey(selectedDate.y, selectedDate.m, selectedDate.d);
-    fetchReservedHours(room._id, key).then((hours) => {
+    clearReservedHours(room._id, key);
+    fetchReservedHours( room._id, key, selectedVariant?.label ).then((hours) => {
       if (!cancelled) setReserved(hours);
     });
     return () => {
       cancelled = true;
     };
-  }, [step, room, selectedDate]);
+  }, [step, room, selectedDate, selectedVariant]);
 
   // Keep the Pax input's inline error in sync with the room's capacity —
   // mirrors validatePaxInput(), called wherever the original called it.
@@ -443,10 +485,6 @@ function BookingModal({ room, returnInfo, onClose, openHour, closeHour, settings
     setPaxError(message);
   }, [room, guestCount]);
 
-  // Entering the Payment step: fetch the publishable key (for client-side
-  // card tokenization) and create the booking + Payment Intent once, up
-  // front, so every method the guest tries just attaches to the same
-  // intent instead of creating a new booking per attempt.
   useEffect(() => {
     if (step !== 'payment' || pmIntent || !room || !selectedVariant || !selectedDate || selectedHour === null) return;
     let cancelled = false;
@@ -530,7 +568,7 @@ function BookingModal({ room, returnInfo, onClose, openHour, closeHour, settings
   function handleSelectDate(y, m, d) {
     setSelectedDate({ y, m, d });
     setSelectedHour(null);
-    setSelectedDuration(1);
+    setSelectedDuration(minDuration);
     setStep('slots');
   }
 
@@ -549,8 +587,18 @@ function BookingModal({ room, returnInfo, onClose, openHour, closeHour, settings
     setSelectedHour(null);
   }
 
-  function handleSelectHour(h) {
-    setSelectedHour(h);
+  function handleSelectHour(hour) {
+    const available = getAvailableRoomCount(
+      reserved,
+      Number(selectedVariant?.roomCount) || 1,
+      hour
+    );
+
+    if (available <= 0) {
+      return;
+    }
+
+    setSelectedHour(hour);
   }
 
   function handleContinueFromSlots() {
@@ -558,14 +606,6 @@ function BookingModal({ room, returnInfo, onClose, openHour, closeHour, settings
     setStep('details');
   }
 
-  // confirmBooking — STEP 1 of confirming: validates guest details + pax
-  // capacity, re-verifies the session with the server (not just cached
-  // storage — see original's comment on why), then moves to the Review
-  // step (details are re-validated here, before anything is shown back to
-  // the guest for confirmation; Review's own Continue just advances to
-  // payment, no re-validation needed). Migrated 1:1, including the plain
-  // alert() for the name/contact check (kept as-is rather than switched to
-  // a toast, to match the original's exact UX for this one validation).
   async function confirmBooking() {
     const trimmedName = guestName.trim();
     const trimmedContact = guestContact.trim();
@@ -585,18 +625,9 @@ function BookingModal({ room, returnInfo, onClose, openHour, closeHour, settings
       window.location.href = '/login';
       return;
     }
-
-    // Note: the original computed and stored a total `amount` here
-    // (price * duration) but never actually read it again — this step
-    // only ever displays the down payment (first-hour rate), computed
-    // separately below from selectedVariant.price. Not carried over here
-    // since it would be genuinely dead state.
     setStep('review');
   }
 
-  // proceedToPayment — Review step's Continue. Everything (name/contact,
-  // pax, session) was already validated moving into Review via
-  // confirmBooking() above, so this just advances the step.
   function proceedToPayment() {
     setStep('payment');
   }
@@ -608,8 +639,6 @@ function BookingModal({ room, returnInfo, onClose, openHour, closeHour, settings
     }
   }
 
-  // Stop any in-flight poll on unmount so it doesn't keep hitting the API
-  // (or touching state) after the modal is gone.
   useEffect(() => stopPolling, []);
 
   async function fetchPaidBooking(bookingId) {
@@ -622,15 +651,9 @@ function BookingModal({ room, returnInfo, onClose, openHour, closeHour, settings
     return null;
   }
 
-  // POLL_INTERVAL_MS / POLL_MAX_ATTEMPTS — shared tuning for
-  // pollPaymentStatus below (~3 minutes total at 2s intervals).
   const POLL_INTERVAL_MS = 2000;
   const POLL_MAX_ATTEMPTS = 90;
 
-  // pollPaymentStatus — shared by openPopupAndPoll (3D Secure/e-wallet
-  // popup) and pollStatusOnly (no popup, e.g. some async payment rails).
-  // Polls GET /status until paid, the optional popup is closed without
-  // paying, or POLL_MAX_ATTEMPTS is reached.
   function pollPaymentStatus(paymentIntentId, popup) {
     setStep('paymongoReturn');
     setPmReturn({ phase: 'loading', booking: null });
@@ -662,8 +685,6 @@ function BookingModal({ room, returnInfo, onClose, openHour, closeHour, settings
 
       if (popup && popup.closed) {
         stopPolling();
-        // Closed without paying — go back to the method picker so the guest
-        // can try again instead of ending the whole booking flow.
         setStep('payment');
         setPayError('Payment was not completed. Please try again.');
         return;
@@ -839,54 +860,29 @@ function BookingModal({ room, returnInfo, onClose, openHour, closeHour, settings
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const oh = settings?.operatingHours || {};
-    const maxAdvanceDays = Number(oh.maxAdvanceDays) || 30;
-    // Admin-configurable via Settings > Operating Schedule; 2 matches the
-    // schema's own default (model/settings.js) if the field is missing.
-    const fewSlotsThreshold = Number.isFinite(Number(oh.fewSlotsThreshold)) ? Number(oh.fewSlotsThreshold) : 2;
-    const latestBookable = new Date(today);
-    latestBookable.setDate(latestBookable.getDate() + maxAdvanceDays);
-
-    const now = new Date();
-    const cutoffHours = Number(oh.bookingCutoffHours) || 0;
-    const todaysOpenTime = new Date(today);
-    todaysOpenTime.setHours(openHour, 0, 0, 0);
-    const todayCutoffLocked = now < todaysOpenTime && todaysOpenTime - now < cutoffHours * 3600000;
-
     const days = [];
     for (let d = 1; d <= daysInMonth; d++) {
       const thisDate = new Date(y, m, d);
       const dStr = dateKey(y, m, d);
       const isToday = thisDate.getTime() === today.getTime();
-      const beyondWindow = thisDate > latestBookable;
-      const cutoffBlocked = isToday && todayCutoffLocked;
       const holiday = isHolidayDate(dStr, settings?.holidays);
       const closedDay = !isOperatingDay(thisDate, settings?.operatingHours);
       const past = thisDate < today;
 
-      const freeSlots = getFreeSlotCount(monthBookings[dStr], openHour, closeHour);
+      const freeSlots = getFreeSlotCount(monthBookings[dStr], openHour, closeHour, totalRooms);
       const fullyBooked = freeSlots === 0;
-      const unavailable = holiday || closedDay || beyondWindow || cutoffBlocked;
+      const unavailable = holiday || closedDay;
       const blocked = unavailable || fullyBooked;
-      const fewSlots = !unavailable && !fullyBooked && freeSlots <= fewSlotsThreshold;
 
       let variant = null; // no dot for past dates with nothing to report
       let title = '';
       if (!past) {
         if (unavailable) {
           variant = 'unavailable';
-          title = holiday
-            ? 'Closed for a holiday/closure'
-            : beyondWindow
-            ? `Bookings only open ${maxAdvanceDays} days in advance`
-            : cutoffBlocked
-            ? `Booking cutoff — must book at least ${cutoffHours}h before opening`
-            : 'Closed on this day of the week';
+          title = holiday ? 'Closed for a holiday/closure' : 'Closed on this day of the week';
         } else if (fullyBooked) {
           variant = 'full';
           title = 'Fully booked for this room';
-        } else if (fewSlots) {
-          variant = 'few';
         } else {
           variant = 'available';
         }
@@ -896,8 +892,6 @@ function BookingModal({ room, returnInfo, onClose, openHour, closeHour, settings
         d, y, m, isToday,
         disabled: past || blocked,
         variant,
-        freeSlots,
-        showSlots: !past && !unavailable && !fullyBooked,
         title,
       });
     }
@@ -958,16 +952,6 @@ function BookingModal({ room, returnInfo, onClose, openHour, closeHour, settings
             <div className="bk-step" id="bkStepPrice">
               <div className="bk-choose-label-row">
                 <p className="bk-choose-label">Choose a room</p>
-                {facilityStatus && (
-                  <span
-                    className={
-                      'bk-status-pill ' +
-                      (facilityStatus === 'Fully Booked' ? 'bk-status-pill--fullybooked' : 'bk-status-pill--available')
-                    }
-                  >
-                    {facilityStatus}
-                  </span>
-                )}
               </div>
               <div className="bk-room-list" id="bkPriceList">
                 {priceItems.map((opt, i) => {
@@ -978,11 +962,23 @@ function BookingModal({ room, returnInfo, onClose, openHour, closeHour, settings
                   const isSelected =
                     !!selectedVariant && selectedVariant.label === opt.label && selectedVariant.price === opt.price;
 
+                  const totalRoomsOpt = Number(opt.roomCount) || 1;
+                  const availableCount =
+                    opt.status === 'Maintenance' || opt.status === 'Unavailable'
+                      ? 0
+                      : getAvailableRoomCount(priceReserved[opt.label] || {}, totalRoomsOpt, new Date().getHours());
+                  const isFullyBooked = availableCount <= 0;
+
                   return (
                     <div
-                      className={'bk-room-option' + (isSelected ? ' bk-room-option--selected' : '')}
+                      className={
+                        'bk-room-option' +
+                        (isSelected ? ' bk-room-option--selected' : '') +
+                        (isFullyBooked ? ' bk-room-option--disabled' : '')
+                      }
                       key={i}
-                      onClick={() => handleChooseOption(opt)}
+                      onClick={isFullyBooked ? undefined : () => handleChooseOption(opt)}
+                      style={isFullyBooked ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
                     >
                       <div className="bk-room-option-img">
                         <img src={cardImage} alt={opt.label} />
@@ -1061,7 +1057,6 @@ function BookingModal({ room, returnInfo, onClose, openHour, closeHour, settings
                       (day.disabled ? ' bk-day--disabled' : ' bk-day--open') +
                       (day.isToday ? ' bk-day--today' : '') +
                       (day.variant === 'available' ? ' bk-day--available' : '') +
-                      (day.variant === 'few' ? ' bk-day--few' : '') +
                       (day.variant === 'full' ? ' bk-day--full' : '') +
                       (day.variant === 'unavailable' ? ' bk-day--unavailable' : '')
                     }
@@ -1069,9 +1064,6 @@ function BookingModal({ room, returnInfo, onClose, openHour, closeHour, settings
                     onClick={!day.disabled ? () => handleSelectDate(day.y, day.m, day.d) : undefined}
                   >
                     <span className="bk-day-num">{day.d}</span>
-                    {day.showSlots && (
-                      <span className="bk-day-slots">{day.freeSlots} slot{day.freeSlots === 1 ? '' : 's'}</span>
-                    )}
                   </div>
                 ))}
               </div>
@@ -1097,7 +1089,35 @@ function BookingModal({ room, returnInfo, onClose, openHour, closeHour, settings
                 <p>{selectedOptionLabel}</p>
               </div>
 
+              <div className="bk-duration-picker">
+                <span>Duration (Maximum {maxDuration} hours)</span>
+                <div className="bk-duration-options" id="bkDurationOptions">
+                  {Array.from({ length: maxDuration - minDuration + 1 }, (_, i) => i + minDuration).map((dur) => (
+                    <div
+                      key={dur}
+                      className={'bk-duration-btn' + (dur === selectedDuration ? ' bk-duration-btn--selected' : '')}
+                      onClick={() => handleSelectDuration(dur)}
+                    >
+                      {dur}h
+                    </div>
+                  ))}
+                </div>
+              </div>
+
               <p className="bk-choose-label">Available Time</p>
+
+              {(() => {
+                const latestStart = getLatestStartTime(openHour, closeHour, selectedDuration);
+                const helperText = latestStart !== null
+                  ? `For a ${selectedDuration}-hour booking, the latest available start time is ${formatHour(latestStart)}. Later start times would extend beyond our ${formatHour(closeHour)} closing time.`
+                  : `A ${selectedDuration}-hour booking doesn't fit within today's operating hours (closes at ${formatHour(closeHour)}).`;
+                return (
+                  <p className="bk-slot-helper-msg">
+                    {helperText}
+                  </p>
+                );
+              })()}
+
               <div className="bk-slots-grid" id="bkSlotsGrid">
                 {(() => {
                   const now = new Date();
@@ -1108,43 +1128,48 @@ function BookingModal({ room, returnInfo, onClose, openHour, closeHour, settings
                   const currentHour = now.getHours();
                   const slots = [];
                   for (let h = openHour; h < closeHour; h++) {
-                    const isPast = isToday && h <= currentHour;
-                    const fits = !isPast && maxDurationFrom(h, closeHour, reserved) >= selectedDuration;
+                    // Skip hours that have already started/passed today.
+                    if (isToday && h <= currentHour) continue;
+
+                    const state = getSlotState(h, selectedDuration, closeHour, reserved, totalRooms);
+                    const fits = state === 'available';
+
+                    let slotStatusLabel;
+                    let slotStatusColor; // only set for the dynamic "few left" vs "available" case below
+                    if (state === 'booked') {
+                      slotStatusLabel = 'Booked';
+                    } else if (state === 'insufficient') {
+                      const remaining = closeHour - h;
+                      slotStatusLabel = `Only ${remaining} Hour${remaining === 1 ? '' : 's'} Remaining`;
+                    } else {
+                      const availableCount = getAvailableRoomCount(reserved, totalRooms, h);
+                      const isFewLeft = availableCount <= 2 && availableCount < totalRooms;
+                      slotStatusLabel = isFewLeft
+                        ? `Only ${availableCount} of ${totalRooms} Left`
+                        : `${availableCount} of ${totalRooms} Available`;
+                      slotStatusColor = isFewLeft ? '#d97706' : '#16a34a';
+                    }
+
                     slots.push(
                       <div
                         key={h}
                         className={
                           'bk-slot' +
-                          (!fits ? ' bk-slot--reserved' : '') +
+                          (state === 'booked' ? ' bk-slot--reserved' : '') +
+                          (state === 'insufficient' ? ' bk-slot--insufficient' : '') +
                           (selectedHour !== null && h >= selectedHour && h < selectedHour + selectedDuration
                             ? ' bk-slot--selected'
                             : '')
                         }
-                        title={isPast ? 'This time has already passed today' : undefined}
                         onClick={fits ? () => handleSelectHour(h) : undefined}
                       >
                         <span className="bk-slot-time">{formatHour(h)}</span>
-                        <span className="bk-slot-status">{fits ? 'Available' : 'Unavailable'}</span>
+                        <span className="bk-slot-status" style={slotStatusColor ? { color: slotStatusColor } : undefined}>{slotStatusLabel}</span>
                       </div>
                     );
                   }
                   return slots;
                 })()}
-              </div>
-
-              <div className="bk-duration-picker">
-                <span>Duration (Maximum {MAX_DURATION} hours)</span>
-                <div className="bk-duration-options" id="bkDurationOptions">
-                  {Array.from({ length: MAX_DURATION }, (_, i) => i + 1).map((dur) => (
-                    <div
-                      key={dur}
-                      className={'bk-duration-btn' + (dur === selectedDuration ? ' bk-duration-btn--selected' : '')}
-                      onClick={() => handleSelectDuration(dur)}
-                    >
-                      {dur}h
-                    </div>
-                  ))}
-                </div>
               </div>
 
               <div className="bk-time-summary" id="bkTimeSummary">

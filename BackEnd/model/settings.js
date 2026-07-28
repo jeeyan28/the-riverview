@@ -28,14 +28,11 @@ const operatingHoursSchema = new mongoose.Schema({
   openTime:  { type: String, default: "06:00" }, // "HH:MM", 24h
   closeTime: { type: String, default: "22:00" },
   openDays:  { type: [Number], default: [0, 1, 2, 3, 4, 5, 6] },
-  maxAdvanceDays:      { type: Number, default: 30 },
-  bookingCutoffHours:  { type: Number, default: 2 },
-  // A day with this many or fewer free hourly slots (but more than 0) shows
-  // as "Few Slots" instead of "Available" on the booking page's Date
-  // Selection calendar. Was a Frontend-only hardcoded constant
-  // (utils/rooms.js's FEW_SLOTS_THRESHOLD) — moved here so it's
-  // admin-configurable (Settings > Operating Schedule) instead.
-  fewSlotsThreshold:   { type: Number, default: 2 },
+  // Min/max hours a customer can select per online booking (admin bookings
+  // are capped separately at 24h in bookingHelper.js). Admin-configurable
+  // via Settings > Operating Schedule.
+  minOnlineDurationHours: { type: Number, default: 1 },
+  maxOnlineDurationHours: { type: Number, default: 5 },
 }, { _id: false });
 
 // A customer-facing down-payment option shown on the booking page (e.g.

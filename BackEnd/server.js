@@ -15,12 +15,6 @@ require("dotenv").config({ path: path.join(__dirname, ".env") });
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// If this app runs behind any reverse proxy / load balancer / platform
-// (Render, Railway, Nginx, etc.) in production, Express needs to trust the
-// X-Forwarded-Proto header to know the original request was HTTPS. Without
-// this, cookie.secure=true (below) can end up unusable and sessions silently
-// fail to persist — this is the most common cause of "I'm logged in but every
-// request says I'm not."
 if (process.env.NODE_ENV === "production") {
   app.set("trust proxy", 1);
 }
@@ -28,11 +22,7 @@ if (process.env.NODE_ENV === "production") {
 // Sets baseline security headers (HSTS, X-Content-Type-Options, X-Frame-Options, etc).
 app.use(helmet());
 
-// PayMongo webhook — MUST be registered before express.json() below and use
-// express.raw(), because verifying the Paymongo-Signature header requires
-// the exact raw bytes PayMongo sent. If express.json() parsed the body first,
-// re-serializing it to compute the signature would (almost always) produce
-// different bytes and every legitimate webhook would fail verification.
+
 const { webhookHandler } = require("./routes/paymongoRoutes");
 app.post("/api/payments/paymongo/webhook", express.raw({ type: "application/json" }), webhookHandler);
 
@@ -92,10 +82,14 @@ app.use(session({
 // ── Routes
 app.use("/api/auth", require("./routes/auth"));
 app.use("/api/rooms", require("./routes/roomRoutes"));
-app.use("/api/room-sessions", require("./routes/roomSessionRoutes")); // Room Monitoring — independent of Booking (FEATURE_REQUESTS.md Priority 1)
-app.use("/api/categories", require("./routes/categoryRoutes")); // Tier 4: room categories
+
+const monitoringRoutes = require("./routes/monitoringRoutes");
+app.use("/api/monitor-rooms", monitoringRoutes.roomsRouter);
+app.use("/api/room-sessions", monitoringRoutes.sessionsRouter);
+
 app.use("/api/bookings", require("./routes/bookingRoutes"));
 app.use("/api/users", require("./routes/userRoutes"));
+app.use("/api/login-history", require("./routes/loginHistoryRoutes"));
 app.use("/api/settings", require("./routes/settingsRoutes")); // operating hours, holidays, announcements
 app.use("/api/forecast", require("./routes/forecastRoutes")); // Owner-only demand/revenue forecasting
 app.use("/api/payments/paymongo", require("./routes/paymongoRoutes").router); // automatic online payment (checkout + status)

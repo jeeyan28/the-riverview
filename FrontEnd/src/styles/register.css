@@ -3,10 +3,12 @@
    to LoginForm, which uses login.css. These two files define several of
    the same class names (.field, .input-wrap, .custom-check, .btn-submit,
    .divider, .btn-social) with different tokens, so everything here is
-   scoped under `.rf-scope` — the wrapper RegisterForm renders — to avoid
-   overriding LoginForm's styles or vice versa. */
+   scoped under `.rf-scope` — the wrapper RegisterForm renders. Also
+   prefixed with `.login-page` (login.css's own page wrapper) to keep this
+   one class more specific than login.css's `.login-page .field` etc., so
+   Register's styles always win regardless of CSS load order. */
 
-.rf-scope {
+.login-page .rf-scope {
     --navy:    #0A1628;
     --surface-alt: #16243f;
     --card-light: #1c2c4a;
@@ -19,18 +21,18 @@
 }
 
 /* ─── FORM ─── */
-.rf-scope .signup-form {
+.login-page .rf-scope .signup-form {
     display: flex;
     flex-direction: column;
     gap: 1rem;
 }
 
-.rf-scope .field {
+.login-page .rf-scope .field {
     display: flex;
     flex-direction: column;
     gap: .4rem;
 }
-.rf-scope .field label {
+.login-page .rf-scope .field label {
     font-size: .78rem;
     font-weight: 600;
     color: var(--muted);
@@ -38,10 +40,10 @@
     text-transform: uppercase;
 }
 
-.rf-scope .input-wrap {
+.login-page .rf-scope .input-wrap {
     position: relative;
 }
-.rf-scope .input-wrap .input-icon {
+.login-page .rf-scope .input-wrap .input-icon {
     position: absolute;
     left: 1rem;
     top: 50%;
@@ -52,7 +54,7 @@
     transition: color .2s;
 }
 
-.rf-scope .field input:not(.otp-input) {
+.login-page .rf-scope .field input:not(.otp-input) {
     width: 100%;
     height: 56px;
     background: var(--surface-alt);
@@ -68,24 +70,24 @@
     outline: none;
     appearance: none;
 }
-.rf-scope .field input::placeholder { color: #4a5d72; }
-.rf-scope .field input:not(.otp-input):focus {
+.login-page .rf-scope .field input::placeholder { color: #4a5d72; }
+.login-page .rf-scope .field input:not(.otp-input):focus {
     border-color: var(--teal);
     background: var(--card-light);
     box-shadow: var(--glow-teal, 0 0 0 4px rgba(0,201,167,.14));
 }
-.rf-scope .input-wrap:focus-within .input-icon { color: var(--teal); }
-.rf-scope .input-wrap:has(.toggle-pw) input { padding-right: 2.75rem; }
+.login-page .rf-scope .input-wrap:focus-within .input-icon { color: var(--teal); }
+.login-page .rf-scope .input-wrap:has(.toggle-pw) input { padding-right: 2.75rem; }
 
-.rf-scope .field-error {
+.login-page .rf-scope .field-error {
     font-size: .75rem;
     color: var(--error);
     display: none;
 }
-.rf-scope .field.has-error input { border-color: var(--error); }
-.rf-scope .field.has-error .field-error { display: block; }
+.login-page .rf-scope .field.has-error input { border-color: var(--error); }
+.login-page .rf-scope .field.has-error .field-error { display: block; }
 
-.rf-scope .password-requirements {
+.login-page .rf-scope .password-requirements {
     list-style: none;
     margin: 0;
     padding: 0;
@@ -93,7 +95,7 @@
     flex-direction: column;
     gap: .3rem;
 }
-.rf-scope .password-requirements li {
+.login-page .rf-scope .password-requirements li {
     display: flex;
     align-items: center;
     gap: .5rem;
@@ -102,14 +104,14 @@
     color: var(--error);
     transition: color .15s ease;
 }
-.rf-scope .password-requirements li.met { color: var(--teal); }
-.rf-scope .password-requirements .requirement-icon {
+.login-page .rf-scope .password-requirements li.met { color: var(--teal); }
+.login-page .rf-scope .password-requirements .requirement-icon {
     font-size: .7rem;
     line-height: 1;
     min-width: 1em;
 }
 
-.rf-scope .toggle-pw {
+.login-page .rf-scope .toggle-pw {
     position: absolute;
     right: .9rem;
     top: 50%;
@@ -123,15 +125,15 @@
     transition: color .2s;
     line-height: 1;
 }
-.rf-scope .toggle-pw:hover { color: var(--teal); }
+.login-page .rf-scope .toggle-pw:hover { color: var(--teal); }
 
 /* Terms checkbox */
-.rf-scope .terms-row {
+.login-page .rf-scope .terms-row {
     display: flex;
     align-items: flex-start;
     gap: .6rem;
 }
-.rf-scope .custom-check {
+.login-page .rf-scope .custom-check {
     width: 18px;
     height: 18px;
     min-width: 18px;
@@ -146,32 +148,32 @@
                 background var(--dur-fast, .2s) var(--ease-out, ease);
     margin-top: 2px;
 }
-.rf-scope .custom-check.checked {
+.login-page .rf-scope .custom-check.checked {
     background: var(--teal);
     border-color: var(--teal);
 }
-.rf-scope .custom-check svg { display: none; }
-.rf-scope .custom-check.checked svg { display: block; }
-.rf-scope #terms-input { display: none; }
-.rf-scope .terms-label {
+.login-page .rf-scope .custom-check svg { display: none; }
+.login-page .rf-scope .custom-check.checked svg { display: block; }
+.login-page .rf-scope #terms-input { display: none; }
+.login-page .rf-scope .terms-label {
     font-size: .82rem;
     color: var(--muted);
     cursor: pointer;
     user-select: none;
     line-height: 1.5;
 }
-.rf-scope .terms-label a { color: var(--teal); font-weight: 600; }
-.rf-scope .terms-label a:hover { text-decoration: underline; }
+.login-page .rf-scope .terms-label a { color: var(--teal); font-weight: 600; }
+.login-page .rf-scope .terms-label a:hover { text-decoration: underline; }
 
 /* Divider */
-.rf-scope .divider {
+.login-page .rf-scope .divider {
     display: flex;
     align-items: center;
     gap: .75rem;
     color: var(--muted);
     font-size: .75rem;
 }
-.rf-scope .divider::before, .rf-scope .divider::after {
+.login-page .rf-scope .divider::before, .login-page .rf-scope .divider::after {
     content: '';
     flex: 1;
     height: 1px;
@@ -179,7 +181,7 @@
 }
 
 /* Submit */
-.rf-scope .btn-submit {
+.login-page .rf-scope .btn-submit {
     width: 100%;
     height: 56px;
     background: var(--teal);
@@ -197,22 +199,22 @@
     position: relative;
     overflow: hidden;
 }
-.rf-scope .btn-submit:hover {
+.login-page .rf-scope .btn-submit:hover {
     opacity: .88;
     transform: translateY(-1px);
     box-shadow: var(--shadow-soft, 0 8px 24px rgba(10,22,40,.06));
 }
-.rf-scope .btn-submit:active { transform: scale(.98); }
-.rf-scope .btn-submit:disabled {
+.login-page .rf-scope .btn-submit:active { transform: scale(.98); }
+.login-page .rf-scope .btn-submit:disabled {
     opacity: .4;
     cursor: not-allowed;
     transform: none;
     box-shadow: none;
 }
-.rf-scope .btn-submit.loading { pointer-events: none; }
-.rf-scope .btn-submit .btn-text { transition: opacity .2s; }
-.rf-scope .btn-submit.loading .btn-text { opacity: 0; }
-.rf-scope .btn-spinner {
+.login-page .rf-scope .btn-submit.loading { pointer-events: none; }
+.login-page .rf-scope .btn-submit .btn-text { transition: opacity .2s; }
+.login-page .rf-scope .btn-submit.loading .btn-text { opacity: 0; }
+.login-page .rf-scope .btn-spinner {
     position: absolute;
     inset: 0;
     display: flex;
@@ -221,8 +223,8 @@
     opacity: 0;
     transition: opacity .2s;
 }
-.rf-scope .btn-submit.loading .btn-spinner { opacity: 1; }
-.rf-scope .spinner-ring {
+.login-page .rf-scope .btn-submit.loading .btn-spinner { opacity: 1; }
+.login-page .rf-scope .spinner-ring {
     width: 20px;
     height: 20px;
     border: 2px solid rgba(10,22,40,.3);
@@ -233,7 +235,7 @@
 @keyframes rf-spin { to { transform: rotate(360deg); } }
 
 /* Social */
-.rf-scope .btn-social {
+.login-page .rf-scope .btn-social {
     width: 100%;
     height: 56px;
     background: var(--surface-alt);
@@ -253,20 +255,20 @@
                 transform var(--dur-fast, .2s) var(--ease-out, ease),
                 box-shadow var(--dur-fast, .2s) var(--ease-out, ease);
 }
-.rf-scope .btn-social:hover {
+.login-page .rf-scope .btn-social:hover {
     background: var(--card-light);
     border-color: rgba(255,255,255,.18);
     transform: translateY(-1px);
     box-shadow: var(--shadow-soft, 0 8px 24px rgba(10,22,40,.06));
 }
 
-.rf-scope .login-row {
+.login-page .rf-scope .login-row {
     text-align: center;
     font-size: .83rem;
     color: var(--muted);
 }
-.rf-scope .login-row a,
-.rf-scope .login-row .link-button {
+.login-page .rf-scope .login-row a,
+.login-page .rf-scope .login-row .link-button {
     color: var(--teal);
     font-weight: 600;
     background: none;
@@ -276,5 +278,5 @@
     font-size: inherit;
     cursor: pointer;
 }
-.rf-scope .login-row a:hover,
-.rf-scope .login-row .link-button:hover { text-decoration: underline; }
+.login-page .rf-scope .login-row a:hover,
+.login-page .rf-scope .login-row .link-button:hover { text-decoration: underline; }

@@ -1,20 +1,6 @@
-// ─────────────────────────────────────────────────────────────────────────
-// services/users.js — Phase 14. Wraps the 5 /api/users/* endpoints
-// Users.jsx calls directly today. Mirrors Backend/routes (Users route
-// group) 1:1 — see services/README.md.
-//
-//   list          ← fetchUsers()                (GET /api/users?search=&role=)
-//   create        ← AddUserModal.handleSubmit()  (POST /api/users)
-//   updateRole    ← RoleChangeModal.handleSave()  (PUT /api/users/:id/role)
-//   updateStatus  ← toggleUserStatus()            (PUT /api/users/:id/status)
-//   remove        ← deleteUser()                  (DELETE /api/users/:id)
-//
-// NOT included yet: Profile.jsx's own /api/users/:id (general profile PUT)
-// and /api/users/:id/password calls, and components/ProfileModal.jsx's
-// near-duplicate of the same two — deferred to the phase that migrates
-// those files (see this phase's resume prompt), so this module doesn't
-// grow ahead of what's actually wired up.
-// ─────────────────────────────────────────────────────────────────────────
+// services/users.js — wraps /api/users/* endpoints, used by Users.jsx and
+// Settings.jsx's ProfileTab. ProfileModal.jsx still has its own raw fetch()
+// calls to the same profile/password endpoints — not yet migrated.
 import { apiRequest } from './api';
 
 const BASE = '/api/users';
@@ -36,4 +22,8 @@ export const usersService = {
   updateStatus: (id, isActive) => apiRequest(`${BASE}/${id}/status`, { method: 'PUT', body: { isActive }, fallbackMessage: 'Failed to update status.' }),
 
   remove: (id) => apiRequest(`${BASE}/${id}`, { method: 'DELETE', fallbackMessage: 'Failed to delete user.' }),
+
+  updateProfile: (id, payload) => apiRequest(`${BASE}/${id}`, { method: 'PUT', body: payload, fallbackMessage: 'Could not update your profile.' }),
+
+  updatePassword: (id, payload) => apiRequest(`${BASE}/${id}/password`, { method: 'PUT', body: payload, fallbackMessage: 'Could not update your password.' }),
 };

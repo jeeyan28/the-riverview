@@ -4,28 +4,18 @@ import AuthLayout from './layouts/AuthLayout';
 import AdminLayout from './layouts/AdminLayout';
 import { useAuth } from './context/AuthContext';
 import Home from './pages/Home';
+import Rooms from './pages/Rooms';
 import Login from './pages/Login';
 import Dashboard from './pages/Admin/Dashboard';
 import Bookings from './pages/Admin/Bookings';
 import Monitor from './pages/Admin/Monitor';
-import RoomManagement from './pages/Admin/RoomManagement';
 import Analytics from './pages/Admin/Analytics';
 import Users from './pages/Admin/Users';
 import Reports from './pages/Admin/Reports';
 import Settings from './pages/Admin/Settings';
-import Profile from './pages/Admin/Profile';
+import RoomManagement from './pages/Admin/RoomManagement';
 import Forecasting from './pages/Admin/Forecasting';
-
-
-function TempPage({ name }) {
-  return (
-    <div style={{ padding: '3rem', fontFamily: 'sans-serif' }}>
-      <p>
-        <strong>{name}</strong> — placeholder content.
-      </p>
-    </div>
-  );
-}
+import LoginHistory from './pages/Admin/LoginHistory';
 
 
 function RequirePermission({ permission, children }) {
@@ -41,6 +31,7 @@ function App() {
     <Routes>
       <Route element={<MainLayout />}>
         <Route path="/" element={<Home />} />
+        <Route path="/rooms" element={<Rooms />} />
       </Route>
 
       <Route element={<AuthLayout />}>
@@ -50,15 +41,14 @@ function App() {
       <Route path="/admin" element={<AdminLayout />}>
         <Route path="dashboard" element={<Dashboard />} />
         <Route path="monitor" element={<Monitor />} />
-        <Route path="room-management" element={<RoomManagement />} />
         <Route path="bookings" element={<Bookings />} />
         <Route path="analytics" element={<Analytics />} />
         <Route path="reports" element={<Reports />} />
         <Route path="forecasting" element={<Forecasting />} />
         <Route path="users" element={<RequirePermission permission="admin:manage"><Users /></RequirePermission>} />
-        <Route path="logs" element={<TempPage name="Admin / Login History" />} />
+        <Route path="logs" element={<LoginHistory />} />
+        <Route path="room-management" element={<RoomManagement />} />
         <Route path="settings" element={<Settings />} />
-        <Route path="profile" element={<Profile />} />
       </Route>
     </Routes>
   );

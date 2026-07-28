@@ -34,43 +34,61 @@ export function useSiteSettings() {
   const [openHour, setOpenHour] = useState(7);
   const [closeHour, setCloseHour] = useState(24);
   const [fewSlotsThreshold, setFewSlotsThreshold] = useState(2);
+  const [minDuration, setMinDuration] = useState(1);
+  const [maxDuration, setMaxDuration] = useState(5);
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    let cancelled = false;
-
-    async function loadSiteSettings() {
-      try {
-        const data = await apiRequest('/api/settings');
-        if (cancelled) return;
-
-        setSettings(data);
-
-        const oh = data.operatingHours;
-        if (oh) {
-          const open = parseHourFromTimeStr(oh.openTime, 7);
-          let close = parseHourFromTimeStr(oh.closeTime, 24);
-          // "00:00" closing means midnight — treat as end-of-day (24) so
-          // hour-range loops (`for (h = open; h < close; h++)`) still work.
-          if (close <= open) close += 24;
-          setOpenHour(open);
-          setCloseHour(close);
-          if (Number.isFinite(Number(oh.fewSlotsThreshold))) {
-            setFewSlotsThreshold(Number(oh.fewSlotsThreshold));
-          }
-        }
-      } catch (err) {
-        console.error(err);
-      } finally {
-        if (!cancelled) setLoaded(true);
-      }
-    }
-
-    loadSiteSettings();
+    const controller = { cancelled: false };
+    loadSiteSettings(controller);
     return () => {
-      cancelled = true;
+      controller.cancelled = true;
     };
   }, []);
 
-  return { settings, openHour, closeHour, fewSlotsThreshold, loaded };
+  // Shared by the mount-time load and refetch() below so both apply the
+  // same parsing/fallback logic and there's one place that writes state.
+  async function loadSiteSettings(controller) {
+    try {
+      const data = await apiRequest('/api/settings');
+      if (controller.cancelled) return;
+
+      setSettings(data);
+
+      const oh = data.operatingHours;
+      if (oh) {
+        const open = parseHourFromTimeStr(oh.openTime, 7);
+        let close = parseHourFromTimeStr(oh.closeTime, 24);
+        // "00:00" closing means midnight — treat as end-of-day (24) so
+        // hour-range loops (`for (h = open; h < close; h++)`) still work.
+        if (close <= open) close += 24;
+        setOpenHour(open);
+        setCloseHour(close);
+        if (Number.isFinite(Number(oh.fewSlotsThreshold))) {
+          setFewSlotsThreshold(Number(oh.fewSlotsThreshold));
+        }
+        if (Number.isFinite(Number(oh.minOnlineDurationHours))) {
+          setMinDuration(Number(oh.minOnlineDurationHours));
+        }
+        if (Number.isFinite(Number(oh.maxOnlineDurationHours))) {
+          setMaxDuration(Number(oh.maxOnlineDurationHours));
+        }
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      if (!controller.cancelled) setLoaded(true);
+    }
+  }
+
+  // Re-fetches on demand — mirrors the room-by-id refetch in Home.jsx's
+  // handleSelectRoom. The mount-time fetch alone goes stale if an admin
+  // changes operating hours/threshold while the page is already open;
+  // callers that gate a booking action (e.g. opening the booking modal)
+  // should call this first so the flow starts on current data.
+  function refetch() {
+    return loadSiteSettings({ cancelled: false });
+  }
+
+  return { settings, openHour, closeHour, fewSlotsThreshold, minDuration, maxDuration, loaded, refetch };
 }

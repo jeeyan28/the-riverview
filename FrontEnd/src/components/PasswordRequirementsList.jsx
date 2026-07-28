@@ -1,3 +1,4 @@
+import { Check, X } from 'lucide-react';
 import { getPasswordChecks } from '../utils/password';
 
 // Password requirements checklist — shared by every password-entry screen
@@ -14,7 +15,7 @@ function PasswordRequirementsList({ password }) {
     <ul className="password-requirements">
       {getPasswordChecks(password).map((req) => (
         <li key={req.key} className={req.met ? 'met' : 'unmet'}>
-          <span className="requirement-icon">{req.met ? '✓' : '✕'}</span>
+          <span className="requirement-icon">{req.met ? <Check size={12} /> : <X size={12} />}</span>
           {req.label}
         </li>
       ))}
