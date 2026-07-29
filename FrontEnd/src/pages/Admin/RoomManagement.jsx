@@ -1,16 +1,21 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Modal from '../../components/Modal';
 import ImageUploadPreview from '../../components/ImageUploadPreview';
+import RoomOptionCard from '../../components/RoomOptionCard';
 import { resolveImageUrl } from '../../utils/resolveImageUrl';
+import { priceOptionsFor } from '../../utils/rooms';
 import { useAuth } from '../../context/AuthContext';
 import { roomsService } from '../../services/rooms';
 
-const STATUS_CLASS_MAP = {
-  Available: 'st-available',
-  Occupied: 'st-occupied',
-  'Under Maintenance': 'st-maintenance',
-  Inactive: 'st-inactive',
-};
+// Edit-modal flow — mirrors the same step-by-step feel as BookingModal's
+// stepper (Room -> Pricing -> ... ), reordered for editing content rather
+// than transacting: Room identity, then Pricing, then Images, then Amenities.
+const FORM_STEPS = [
+  { key: 'room', label: 'Room' },
+  { key: 'pricing', label: 'Pricing' },
+  { key: 'images', label: 'Images' },
+  { key: 'amenities', label: 'Amenities' },
+];
 
 function emptyFacilityForm() {
   return {
@@ -18,7 +23,6 @@ function emptyFacilityForm() {
     roomNumber: '',
     description: '',
     price: '',
-    status: 'Available',
     capacity: '',
     variants: [], // [{ label, price, pax, roomCount, status }]
     features: [],
@@ -39,12 +43,16 @@ function RoomManagement() {
 
   const [rooms, setRooms] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [selectedCategory, setSelectedCategory] = useState('all');
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null); // null = Add mode
+  const [formStep, setFormStep] = useState('room');
   const [form, setForm] = useState(emptyFacilityForm());
   const [existingImageUrl, setExistingImageUrl] = useState('');
   const [selectedImageFile, setSelectedImageFile] = useState(null);
+  const [variantImageFiles, setVariantImageFiles] = useState({}); // { [variantIndex]: File }
+  const [variantImagePreviews, setVariantImagePreviews] = useState({}); // { [variantIndex]: blobUrl }
   const [featureInput, setFeatureInput] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -83,9 +91,15 @@ function RoomManagement() {
   function openAddModal() {
     if (!guardPermission('room:manage')) return;
     setEditingId(null);
+    setFormStep('room');
     setForm(emptyFacilityForm());
     setExistingImageUrl('');
     setSelectedImageFile(null);
+    setVariantImageFiles({});
+    setVariantImagePreviews((prev) => {
+      Object.values(prev).forEach((url) => URL.revokeObjectURL(url));
+      return {};
+    });
     setFeatureInput('');
     setModalOpen(true);
   }
@@ -93,18 +107,23 @@ function RoomManagement() {
   function openEditModal(room) {
     if (!guardPermission('room:manage')) return;
     setEditingId(room._id);
+    setFormStep('room');
     setForm({
       name: room.name || '',
       roomNumber: room.roomNumber || '',
       description: room.description || '',
       price: room.price || '',
-      status: room.status || 'Available',
       capacity: room.capacity || '',
       variants: (room.variants || []).map((v) => ({ ...v, roomCount: v.roomCount ?? 1, status: v.status || 'Available' })),
       features: [...(room.features || [])],
     });
     setExistingImageUrl(room.image ? resolveImageUrl(room.image) : '');
     setSelectedImageFile(null);
+    setVariantImageFiles({});
+    setVariantImagePreviews((prev) => {
+      Object.values(prev).forEach((url) => URL.revokeObjectURL(url));
+      return {};
+    });
     setFeatureInput('');
     setModalOpen(true);
   }
@@ -119,7 +138,7 @@ function RoomManagement() {
   function addVariantRow() {
     setForm((f) => ({
       ...f,
-      variants: [...f.variants, { label: '', price: '', pax: '', roomCount: 1, status: 'Available' }],
+      variants: [...f.variants, { label: '', price: '', pax: '', roomCount: 1, status: 'Available', image: '' }],
     }));
   }
 
@@ -130,8 +149,49 @@ function RoomManagement() {
     }));
   }
 
+  // Shifts map keys down by one past the removed index, dropping the
+  // removed entry — keeps variantImageFiles/variantImagePreviews aligned
+  // with form.variants after a row is deleted.
+  function reindexAfterRemove(map, removedIndex) {
+    const next = {};
+    Object.keys(map).forEach((key) => {
+      const idx = Number(key);
+      if (idx < removedIndex) next[idx] = map[idx];
+      else if (idx > removedIndex) next[idx - 1] = map[idx];
+    });
+    return next;
+  }
+
   function removeVariantRow(i) {
     setForm((f) => ({ ...f, variants: f.variants.filter((_, idx) => idx !== i) }));
+    setVariantImageFiles((m) => reindexAfterRemove(m, i));
+    setVariantImagePreviews((m) => {
+      if (m[i]) URL.revokeObjectURL(m[i]);
+      return reindexAfterRemove(m, i);
+    });
+  }
+
+  function handleVariantImageSelect(i, file) {
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) {
+      alert('Image must be smaller than 10MB.');
+      return;
+    }
+    if (!file.type.startsWith('image/')) {
+      alert('Please select a valid image.');
+      return;
+    }
+    setVariantImageFiles((m) => ({ ...m, [i]: file }));
+    setVariantImagePreviews((m) => {
+      if (m[i]) URL.revokeObjectURL(m[i]);
+      return { ...m, [i]: URL.createObjectURL(file) };
+    });
+  }
+
+  function variantThumbSrc(i, v) {
+    if (variantImagePreviews[i]) return variantImagePreviews[i];
+    if (v.image) return resolveImageUrl(v.image);
+    return null;
   }
 
   /* ── feature chips ── */
@@ -165,15 +225,17 @@ function RoomManagement() {
       alert('Please fill in category and room number.');
       return;
     }
-    const cleanVariants = form.variants
-      .filter((v) => v.label.trim() !== '' || v.price !== '')
-      .map((v) => ({
-        label: v.label.trim(),
-        price: Number(v.price) || 0,
-        pax: (v.pax || '').trim(),
-        roomCount: Math.max(1, Number(v.roomCount) || 1),
-        status: v.status || 'Available',
-      }));
+    const cleanVariantEntries = form.variants
+      .map((v, originalIndex) => ({ v, originalIndex }))
+      .filter(({ v }) => v.label.trim() !== '' || v.price !== '');
+    const cleanVariants = cleanVariantEntries.map(({ v }) => ({
+      label: v.label.trim(),
+      price: Number(v.price) || 0,
+      pax: (v.pax || '').trim(),
+      roomCount: Math.max(1, Number(v.roomCount) || 1),
+      status: v.status || 'Available',
+      image: v.image || '',
+    }));
     if (!form.price && cleanVariants.length === 0) {
       alert('Add a base price, or at least one pricing tier.');
       return;
@@ -186,11 +248,24 @@ function RoomManagement() {
       formData.append('roomNumber', form.roomNumber.trim());
       formData.append('description', form.description.trim());
       formData.append('price', Number(form.price) || 0);
-      formData.append('status', form.status);
       formData.append('capacity', Number(form.capacity) || 0);
       formData.append('features', JSON.stringify(form.features));
       formData.append('variants', JSON.stringify(cleanVariants));
       if (selectedImageFile) formData.append('image', selectedImageFile);
+
+      // Map each pending variant image file to its position in the final
+      // cleanVariants array (filtering above may have shifted indices).
+      const variantImageIndexes = [];
+      cleanVariantEntries.forEach(({ originalIndex }, newIndex) => {
+        const file = variantImageFiles[originalIndex];
+        if (file) {
+          variantImageIndexes.push(newIndex);
+          formData.append('variantImages', file);
+        }
+      });
+      if (variantImageIndexes.length) {
+        formData.append('variantImageIndexes', JSON.stringify(variantImageIndexes));
+      }
 
       if (editingId) {
         await roomsService.update(editingId, formData);
@@ -241,7 +316,6 @@ function RoomManagement() {
       capacity: room.capacity,
       description: room.description,
       price: room.price,
-      status: room.status,
       features: JSON.stringify(room.features || []),
       variants: JSON.stringify(room.variants || []),
     };
@@ -253,6 +327,25 @@ function RoomManagement() {
       alert('Could not duplicate this facility.');
     }
   }
+
+  const categories = useMemo(
+    () => Array.from(new Set(rooms.map((r) => r.name).filter(Boolean))).sort(),
+    [rooms]
+  );
+  const visibleRooms = selectedCategory === 'all' ? rooms : rooms.filter((r) => r.name === selectedCategory);
+  const facilityImagePreviewUrl = useMemo(
+    () => (selectedImageFile ? URL.createObjectURL(selectedImageFile) : existingImageUrl),
+    [selectedImageFile, existingImageUrl]
+  );
+
+  const previewOptions = useMemo(() => {
+    const formForPreview = {
+      ...form,
+      image: facilityImagePreviewUrl,
+      variants: form.variants.map((v, i) => ({ ...v, image: variantImagePreviews[i] || v.image })),
+    };
+    return priceOptionsFor(formForPreview);
+  }, [form, facilityImagePreviewUrl, variantImagePreviews]);
 
   return (
     <div className="panel active" id="panel-room-management">
@@ -270,13 +363,37 @@ function RoomManagement() {
         </div>
       </div>
 
-      <div className="fac-grid" id="fac-grid">
-        {loading ? (
-          <div className="room-grid-empty">Loading facilities…</div>
-        ) : rooms.length === 0 ? (
-          <div className="room-grid-empty">No facilities yet. Click "Add Facility" to create one.</div>
-        ) : (
-          rooms.map((r) => {
+      <div className="set-layout">
+        <div className="set-tabs">
+          <button
+            type="button"
+            className={`set-tab${selectedCategory === 'all' ? ' active' : ''}`}
+            onClick={() => setSelectedCategory('all')}
+          >
+            All Categories
+          </button>
+          {categories.map((cat) => (
+            <button
+              key={cat}
+              type="button"
+              className={`set-tab${selectedCategory === cat ? ' active' : ''}`}
+              onClick={() => setSelectedCategory(cat)}
+            >
+              {cat}
+            </button>
+          ))}
+        </div>
+
+        <div className="set-content">
+          <div className="fac-grid" id="fac-grid">
+            {loading ? (
+              <div className="room-grid-empty">Loading facilities…</div>
+            ) : visibleRooms.length === 0 ? (
+              <div className="room-grid-empty">
+                {rooms.length === 0 ? 'No facilities yet. Click "Add Facility" to create one.' : 'No facilities in this category yet.'}
+              </div>
+            ) : (
+              visibleRooms.map((r) => {
             const hasVariants = r.variants && r.variants.length > 0;
             const topPrice = hasVariants
               ? `From ₱${Math.min(...r.variants.map((v) => Number(v.price) || 0))}/hr`
@@ -317,7 +434,6 @@ function RoomManagement() {
                     </div>
                   )}
                   <div className="fac-desc">{r.description || ''}</div>
-                  <span className={`fac-status ${STATUS_CLASS_MAP[r.status] || 'st-available'}`}>{r.status}</span>
                   <div className="fac-tags">
                     {(r.features || []).map((f, i) => (
                       <span className="fac-tag" key={i}>{f}</span>
@@ -344,17 +460,41 @@ function RoomManagement() {
               </div>
             );
           })
-        )}
+            )}
+          </div>
+        </div>
       </div>
 
       {/* ── Facility Add/Edit modal ── */}
-      <Modal open={modalOpen} onClose={closeModal} size="xl">
+      <Modal open={modalOpen} onClose={closeModal} size="2xl">
         <div className="modal-lg-title">{editingId ? 'Edit Facility' : 'Add Facility'}</div>
         <div className="modal-lg-sub">
           {editingId ? 'Update facility information, pricing tiers, and features.' : 'Add a new facility to your listing.'}
         </div>
 
-        <div className="frow">
+        <div className="fm-stepper">
+          {FORM_STEPS.map((s, i) => {
+            const activeIndex = FORM_STEPS.findIndex((x) => x.key === formStep);
+            const state = i < activeIndex ? 'done' : i === activeIndex ? 'active' : 'upcoming';
+            return (
+              <button
+                type="button"
+                key={s.key}
+                className={`fm-step-dot fm-step-dot--${state}`}
+                onClick={() => setFormStep(s.key)}
+              >
+                <span className="fm-step-dot-num">{state === 'done' ? <i className="ti ti-check"></i> : i + 1}</span>
+                <span className="fm-step-dot-label">{s.label}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="fm-layout">
+          <div className="fm-form-col">
+            {formStep === 'room' && (
+            <>
+            <div className="frow">
           <div className="ffield">
             <label className="flabel">Category</label>
             <input type="text" placeholder="e.g. Billiards" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
@@ -375,9 +515,19 @@ function RoomManagement() {
         </div>
 
         <div className="ffield">
+          <label className="flabel">Max Capacity (Pax)</label>
+          <span className="flabel-hint">Guests won't be able to book more pax than this. Leave 0/blank for no limit.</span>
+          <input type="number" placeholder="e.g. 10" min={0} value={form.capacity} onChange={(e) => setForm((f) => ({ ...f, capacity: e.target.value }))} />
+        </div>
+            </>
+            )}
+
+            {formStep === 'pricing' && (
+            <>
+        <div className="ffield">
           <div className="flabel-row">
             <label className="flabel">Pricing Tiers</label>
-            <span className="flabel-hint">Each tier needs a name, rate, and pax allowance — this is what guests pick from</span>
+            <span className="flabel-hint">Each tier needs a name, rate, and pax allowance — this is what guests pick from.</span>
           </div>
           <div className="variant-list" id="fm-variant-list">
             {form.variants.length === 0 ? (
@@ -427,32 +577,20 @@ function RoomManagement() {
           </button>
         </div>
 
-        <div className="frow">
-          <div className="ffield">
-            <label className="flabel">Base Price (₱/hr)</label>
-            <input type="number" placeholder="0" min={0} value={form.price} onChange={(e) => setForm((f) => ({ ...f, price: e.target.value }))} />
-          </div>
-          <div className="ffield">
-            <label className="flabel">Status</label>
-            <select value={form.status} onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))}>
-              <option>Available</option>
-              <option>Occupied</option>
-              <option>Under Maintenance</option>
-              <option>Inactive</option>
-            </select>
-          </div>
-        </div>
-
         <div className="ffield">
-          <label className="flabel">Max Capacity (Pax)</label>
-          <span className="flabel-hint">Guests won't be able to book more pax than this. Leave 0/blank for no limit.</span>
-          <input type="number" placeholder="e.g. 10" min={0} value={form.capacity} onChange={(e) => setForm((f) => ({ ...f, capacity: e.target.value }))} />
+          <label className="flabel">Base Price (₱/hr)</label>
+          <input type="number" placeholder="0" min={0} value={form.price} onChange={(e) => setForm((f) => ({ ...f, price: e.target.value }))} />
         </div>
 
         <div className="field-note">Base price is used only when no pricing tiers are set.</div>
+            </>
+            )}
 
+            {formStep === 'images' && (
+            <>
         <div className="ffield">
           <label className="flabel">Facility Image</label>
+          <span className="flabel-hint">Shown on the category card in the main catalogue grid.</span>
           <ImageUploadPreview
             icon="ti-photo"
             title={existingImageUrl || selectedImageFile ? 'Click to change image' : 'Click to upload facility image'}
@@ -465,6 +603,36 @@ function RoomManagement() {
           />
         </div>
 
+        {form.variants.length > 0 && (
+          <div className="ffield">
+            <div className="flabel-row">
+              <label className="flabel">Pricing Tier Images</label>
+              <span className="flabel-hint">Shown when guests pick a room — falls back to a default photo if left blank.</span>
+            </div>
+            <div className="fm-tier-image-grid">
+              {form.variants.map((v, i) => (
+                <div className="fm-tier-image-item" key={i}>
+                  <div className="fm-tier-image-label">{v.label || `Tier ${i + 1}`}</div>
+                  <ImageUploadPreview
+                    icon="ti-photo"
+                    title={variantThumbSrc(i, v) ? 'Click to change image' : 'Click to upload image'}
+                    subtitle="PNG, JPG up to 10MB"
+                    accept="image/png,image/jpeg"
+                    maxSizeMB={10}
+                    maxHeight={90}
+                    value={variantThumbSrc(i, v) || ''}
+                    onFileSelect={(file) => handleVariantImageSelect(i, file)}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+            </>
+            )}
+
+            {formStep === 'amenities' && (
+            <>
         <div className="ffield" style={{ marginBottom: 22 }}>
           <label className="flabel">Additional Features</label>
           <div className="chip-list" id="fm-feature-chips">
@@ -493,6 +661,38 @@ function RoomManagement() {
             <button type="button" className="chip-add-btn" onClick={addFeatureChip}>
               <i className="ti ti-plus"></i>
             </button>
+          </div>
+        </div>
+            </>
+            )}
+
+            <div className="fm-step-nav">
+              <button
+                type="button"
+                className="btn-cancel"
+                disabled={FORM_STEPS.findIndex((s) => s.key === formStep) === 0}
+                onClick={() => setFormStep(FORM_STEPS[FORM_STEPS.findIndex((s) => s.key === formStep) - 1].key)}
+              >
+                <i className="ti ti-arrow-left"></i> Back
+              </button>
+              <button
+                type="button"
+                className="btn-cancel"
+                disabled={FORM_STEPS.findIndex((s) => s.key === formStep) === FORM_STEPS.length - 1}
+                onClick={() => setFormStep(FORM_STEPS[FORM_STEPS.findIndex((s) => s.key === formStep) + 1].key)}
+              >
+                Next <i className="ti ti-arrow-right"></i>
+              </button>
+            </div>
+          </div>
+
+          <div className="fm-preview-col">
+            <div className="fm-preview-label">Live Preview — what guests will see</div>
+            <div className="fm-preview-cards">
+              {previewOptions.map((opt, i) => (
+                <RoomOptionCard key={i} option={opt} room={{ ...form, image: facilityImagePreviewUrl }} />
+              ))}
+            </div>
           </div>
         </div>
 

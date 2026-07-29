@@ -4,7 +4,7 @@ import DataTable from '../../components/DataTable';
 
 
 
-const API_BASE_URL = 'http://localhost:3000'; // matches every other page pre-Phase 9
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
 const STATUS_PILL_CLASS = {
   Active: 'pill-active',

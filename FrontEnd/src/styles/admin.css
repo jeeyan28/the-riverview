@@ -588,16 +588,6 @@ body{
   font-size:.82rem;font-weight:700;color:var(--teal);white-space:nowrap;
   background:var(--teal-soft);padding:4px 10px;border-radius:20px;
 }
-.fac-status{
-  font-size:.64rem;font-weight:600;padding:2px 9px;border-radius:20px;
-  text-transform:uppercase;letter-spacing:.03em;
-  width:fit-content; margin-top:2px;
-}
-.fac-status.st-available{background:rgba(0,201,167,.14);color:var(--teal);}
-.fac-status.st-occupied{background:rgba(55,138,221,.14);color:var(--blue);}
-.fac-status.st-maintenance{background:rgba(239,159,39,.14);color:var(--amber);}
-.fac-status.st-inactive{background:rgba(138,155,176,.14);color:var(--muted);}
-
 .fac-variants{display:flex;flex-direction:column;gap:0;border-top:1px solid var(--border-soft);border-bottom:1px solid var(--border-soft);}
 .fac-variant-row{
   display:flex;align-items:center;justify-content:space-between;
@@ -772,6 +762,7 @@ body{
 }
 .modal-box.modal-lg{max-width:520px;}
 .modal-box.modal-xl{max-width:640px;}
+.modal-box.modal-2xl{max-width:960px;}
 .modal-title{font-family:var(--font-display);font-size:1.1rem;font-weight:700;margin-bottom:16px;color:var(--text);}
 .modal-lg-title{font-family:var(--font-display);font-size:1.15rem;font-weight:700;color:var(--text);}
 .modal-lg-sub{font-size:.78rem;color:var(--muted);margin-bottom:18px;}
@@ -1094,3 +1085,45 @@ body{
 .bkcal-day.has-bookings .bkcal-dot{background:var(--blue);color:#fff;}
 .bkcal-day.is-selected .bkcal-dot{background:#fff;color:var(--teal);}
 .bkcal-dot{font-size:.6rem;font-weight:700;background:var(--navy4);color:var(--muted);border-radius:10px;padding:0 5px;min-width:14px;text-align:center;}
+/* ── Room Management: Add/Edit Facility modal, two-pane layout ── */
+.fm-layout{display:flex;gap:24px;align-items:flex-start;margin-top:4px;}
+.fm-form-col{flex:1 1 55%;min-width:0;}
+.fm-preview-col{
+  flex:1 1 45%;min-width:0;position:sticky;top:0;
+  background:var(--navy3);border:1px solid var(--border);border-radius:14px;
+  padding:16px;max-height:70vh;overflow-y:auto;
+}
+.fm-preview-label{
+  font-size:.72rem;font-weight:600;color:var(--muted);text-transform:uppercase;
+  letter-spacing:.03em;margin-bottom:12px;
+}
+.fm-preview-cards{display:flex;flex-direction:column;gap:12px;}
+
+@media (max-width:900px){
+  .fm-layout{flex-direction:column;}
+  .fm-preview-col{position:static;max-height:none;width:100%;}
+}
+
+/* ── Room Management: stepped edit flow (Room -> Pricing -> Images -> Amenities) ── */
+.fm-stepper{
+  display:flex;align-items:center;gap:6px;margin:6px 0 18px;flex-wrap:wrap;
+}
+.fm-step-dot{
+  display:flex;align-items:center;gap:8px;padding:6px 12px 6px 6px;border:none;background:transparent;
+  border-radius:20px;cursor:pointer;font-family:var(--font-body);
+}
+.fm-step-dot-num{
+  width:24px;height:24px;flex-shrink:0;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  font-size:.72rem;font-weight:700;background:var(--navy3);color:var(--muted);border:1px solid var(--border);
+}
+.fm-step-dot-label{font-size:.78rem;font-weight:600;color:var(--muted);}
+.fm-step-dot--active .fm-step-dot-num{background:var(--teal);color:#fff;border-color:var(--teal);}
+.fm-step-dot--active .fm-step-dot-label{color:var(--text);}
+.fm-step-dot--done .fm-step-dot-num{background:var(--teal-soft);color:var(--teal);border-color:rgba(0,201,167,.35);}
+.fm-step-dot--done .fm-step-dot-label{color:var(--text);}
+
+.fm-step-nav{display:flex;justify-content:space-between;gap:10px;margin-top:16px;padding-top:14px;border-top:1px solid var(--border);}
+
+.fm-tier-image-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;}
+.fm-tier-image-item{display:flex;flex-direction:column;gap:6px;}
+.fm-tier-image-label{font-size:.74rem;font-weight:600;color:var(--text);}

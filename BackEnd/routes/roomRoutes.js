@@ -31,7 +31,7 @@ router.get("/:id", async (req, res) => {
 });
 
 // Everything below changes room data — manager/super_admin only
-router.post("/", requirePermission(PERMISSIONS.ROOM_MANAGE), upload.single("image"), async (req, res) => {
+router.post("/", requirePermission(PERMISSIONS.ROOM_MANAGE), upload.fields([{ name: "image", maxCount: 1 }, { name: "variantImages", maxCount: 20 }]), async (req, res) => {
   try {
     const {
       name,
@@ -42,6 +42,7 @@ router.post("/", requirePermission(PERMISSIONS.ROOM_MANAGE), upload.single("imag
       features,
       variants,
       capacity,
+      variantImageIndexes,
     } = req.body;
 
     if (!name || !roomNumber) {
@@ -59,6 +60,23 @@ router.post("/", requirePermission(PERMISSIONS.ROOM_MANAGE), upload.single("imag
       return res.status(400).json({ message: "features/variants must be valid JSON." });
     }
 
+    // Each entry in variantImageIndexes says which parsedVariants[] slot the
+    // corresponding file in req.files.variantImages (same order) belongs to.
+    const variantImageFiles = req.files?.variantImages || [];
+    if (variantImageFiles.length) {
+      let indexes = [];
+      try {
+        indexes = variantImageIndexes ? JSON.parse(variantImageIndexes) : [];
+      } catch {
+        return res.status(400).json({ message: "variantImageIndexes must be valid JSON." });
+      }
+      indexes.forEach((variantIndex, i) => {
+        if (parsedVariants[variantIndex] && variantImageFiles[i]) {
+          parsedVariants[variantIndex].image = variantImageFiles[i].path;
+        }
+      });
+    }
+
     const room = new Room({
       name,
       roomNumber,
@@ -74,7 +92,7 @@ router.post("/", requirePermission(PERMISSIONS.ROOM_MANAGE), upload.single("imag
       features: parsedFeatures,
       variants: parsedVariants,
 
-      image: req.file ? req.file.path : (req.body.image || ""),
+      image: req.files?.image?.[0] ? req.files.image[0].path : (req.body.image || ""),
     });
 
     await room.save();
@@ -85,7 +103,7 @@ router.post("/", requirePermission(PERMISSIONS.ROOM_MANAGE), upload.single("imag
   }
 });
 
-router.put("/:id", requirePermission(PERMISSIONS.ROOM_MANAGE), upload.single("image"), async (req, res) => {
+router.put("/:id", requirePermission(PERMISSIONS.ROOM_MANAGE), upload.fields([{ name: "image", maxCount: 1 }, { name: "variantImages", maxCount: 20 }]), async (req, res) => {
   try {
     const {
       name,
@@ -95,6 +113,7 @@ router.put("/:id", requirePermission(PERMISSIONS.ROOM_MANAGE), upload.single("im
       features,
       variants,
       capacity,
+      variantImageIndexes,
     } = req.body;
 
     // Room No. is locked after creation (FEATURE_REQUESTS.md Priority 1) —
@@ -105,7 +124,7 @@ router.put("/:id", requirePermission(PERMISSIONS.ROOM_MANAGE), upload.single("im
     if (price !== undefined) update.price = Number(price) || 0;
     if (status !== undefined) update.status = status;
     if (capacity !== undefined) update.capacity = Number(capacity) || 0;
-    if (req.file) update.image = req.file.path;
+    if (req.files?.image?.[0]) update.image = req.files.image[0].path;
 
     // features/variants arrive as JSON strings inside FormData — see the
     // same note in POST / above.
@@ -114,6 +133,23 @@ router.put("/:id", requirePermission(PERMISSIONS.ROOM_MANAGE), upload.single("im
       if (variants !== undefined) update.variants = JSON.parse(variants);
     } catch {
       return res.status(400).json({ message: "features/variants must be valid JSON." });
+    }
+
+    // Same index-mapped assignment as POST / above — only variants whose
+    // image actually changed this save have a file to attach here.
+    const variantImageFiles = req.files?.variantImages || [];
+    if (variantImageFiles.length && update.variants) {
+      let indexes = [];
+      try {
+        indexes = variantImageIndexes ? JSON.parse(variantImageIndexes) : [];
+      } catch {
+        return res.status(400).json({ message: "variantImageIndexes must be valid JSON." });
+      }
+      indexes.forEach((variantIndex, i) => {
+        if (update.variants[variantIndex] && variantImageFiles[i]) {
+          update.variants[variantIndex].image = variantImageFiles[i].path;
+        }
+      });
     }
 
     const room = await Room.findByIdAndUpdate(req.params.id, update, { returnDocument: "after", runValidators: true });

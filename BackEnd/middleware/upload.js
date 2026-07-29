@@ -60,6 +60,41 @@ function makeCloudinaryUploader(cloudinaryParams) {
         });
       };
     },
+
+    /**
+     * Accepts multiple named fields in one request (e.g. one room image +
+     * several variant images) and uploads every file across every field to
+     * Cloudinary, mimicking multer.fields()'s req.files = { fieldName: [file, ...] }
+     * shape so existing route code reading req.files keeps working unchanged.
+     * @param {{name: string, maxCount?: number}[]} fieldsConfig
+     */
+    fields(fieldsConfig) {
+      const multerMiddleware = memoryUpload.fields(fieldsConfig);
+
+      return function (req, res, next) {
+        multerMiddleware(req, res, async (err) => {
+          if (err) return next(err);
+          if (!req.files) {
+            req.files = {};
+            return next();
+          }
+
+          try {
+            for (const fieldName of Object.keys(req.files)) {
+              for (const file of req.files[fieldName]) {
+                const result = await uploadBufferToCloudinary(file.buffer, cloudinaryParams);
+                file.path = result.secure_url;
+                file.filename = result.public_id;
+                file.cloudinary = result;
+              }
+            }
+            next();
+          } catch (uploadErr) {
+            next(uploadErr);
+          }
+        });
+      };
+    },
   };
 }
 

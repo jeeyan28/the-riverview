@@ -154,3 +154,23 @@ export function getFacilityAvailability(reserved, openHour, closeHour, opts = {}
 export function computeDownPayment(unitPrice) {
   return Math.max(0, Math.round(Number(unitPrice) || 0));
 }
+
+// The list of bookable options for a room: its pricing tiers (variants) if
+// any exist, or a single synthesized "Standard" option built from the
+// room's own base fields. Used by both BookingModal (customer booking) and
+// Room Management's live preview, so admins see exactly what guests see —
+// one implementation, not two hand-maintained copies.
+export function priceOptionsFor(room) {
+  return room.variants && room.variants.length
+    ? room.variants
+    : [{
+        label: 'Standard',
+        price: room.price || 0,
+        pax: '',
+        image: room.image || '',
+        description: room.description || '',
+        features: room.features || [],
+        roomCount: 1,
+        status: room.status,
+      }];
+}

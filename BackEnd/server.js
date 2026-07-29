@@ -22,6 +22,28 @@ if (process.env.NODE_ENV === "production") {
 // Sets baseline security headers (HSTS, X-Content-Type-Options, X-Frame-Options, etc).
 app.use(helmet());
 
+// ── Connect to MongoDB (cached across serverless invocations, since each
+// invocation may run in a fresh/frozen instance and re-dialing every
+// request would be slow and eventually exhaust connections). Registered
+// before ANY route — including the webhook below — so every request path
+// is guaranteed to have a DB connection in flight.
+let isConnected = false;
+async function connectDB() {
+  if (isConnected) return;
+  await mongoose.connect(process.env.MONGO_URI);
+  isConnected = true;
+  console.log("✅ Connected to MongoDB");
+}
+
+app.use(async (req, res, next) => {
+  try {
+    await connectDB();
+    next();
+  } catch (err) {
+    console.error("MongoDB connection failed:", err.message);
+    res.status(500).json({ message: "Database connection failed" });
+  }
+});
 
 const { webhookHandler } = require("./routes/paymongoRoutes");
 app.post("/api/payments/paymongo/webhook", express.raw({ type: "application/json" }), webhookHandler);
@@ -103,16 +125,20 @@ app.use((err, req, res, next) => {
   next();
 });
 
-// ── Connect to MongoDB then start server
-mongoose
-  .connect(process.env.MONGO_URI)
-  .then(() => {
-    console.log("✅ Connected to MongoDB");
-    app.listen(PORT, () => {
-      console.log(`Server running on port ${PORT}`);
+// Only run a persistent listening server for local dev (`node server.js`).
+// On Vercel, this file is imported by api/index.js and the app is invoked
+// per-request instead — app.listen() must not run there.
+if (require.main === module) {
+  connectDB()
+    .then(() => {
+      app.listen(PORT, () => {
+        console.log(`Server running on port ${PORT}`);
+      });
+    })
+    .catch((err) => {
+      console.error("MongoDB connection failed:", err.message);
+      process.exit(1);
     });
-  })
-  .catch((err) => {
-    console.error("MongoDB connection failed:", err.message);
-    process.exit(1);
-  });
+}
+
+module.exports = app;
