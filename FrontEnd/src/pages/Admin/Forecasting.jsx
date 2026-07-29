@@ -3,7 +3,7 @@ import { Chart } from 'chart.js/auto';
 
 
 
-const API_BASE_URL = 'http://localhost:3000';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
 const TREND_WORD = { up: 'Trending up', down: 'Trending down', flat: 'Flat' };
 

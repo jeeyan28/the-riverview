@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { resolveImageUrl } from '../utils/resolveImageUrl';
 import fallbackRoomImg from '../assets/pictures/Billiard.jpg';
+import RoomOptionCard from './RoomOptionCard';
 import {
   dateKey,
   getRoomCapacity,
@@ -14,6 +15,7 @@ import {
   isHolidayDate,
   isOperatingDay,
   computeDownPayment,
+  priceOptionsFor,
 } from '../utils/rooms';
 import { API_BASE_URL } from '../services/api';
 
@@ -80,21 +82,6 @@ function getSlotState(startHour, duration, closeHour, reserved, totalRooms) {
 function getLatestStartTime(openHour, closeHour, duration) {
   const latest = closeHour - duration;
   return latest >= openHour ? latest : null;
-}
-
-function priceOptionsFor(room) {
-  return room.variants && room.variants.length
-    ? room.variants
-    : [{
-        label: 'Standard',
-        price: room.price || 0,
-        pax: '',
-        image: room.image || '',
-        description: room.description || '',
-        features: room.features || [],
-        roomCount: 1,
-        status: room.status,
-      }];
 }
 
 const STEPS = [
@@ -955,10 +942,6 @@ function BookingModal({ room, returnInfo, onClose, openHour, closeHour, settings
               </div>
               <div className="bk-room-list" id="bkPriceList">
                 {priceItems.map((opt, i) => {
-                  const optImage = opt.image || room.image;
-                  const cardImage = optImage ? resolveImageUrl(optImage) : fallbackRoomImg;
-                  const optDescription = opt.description || room.description;
-                  const optFeatures = opt.features && opt.features.length ? opt.features : room.features;
                   const isSelected =
                     !!selectedVariant && selectedVariant.label === opt.label && selectedVariant.price === opt.price;
 
@@ -970,40 +953,14 @@ function BookingModal({ room, returnInfo, onClose, openHour, closeHour, settings
                   const isFullyBooked = availableCount <= 0;
 
                   return (
-                    <div
-                      className={
-                        'bk-room-option' +
-                        (isSelected ? ' bk-room-option--selected' : '') +
-                        (isFullyBooked ? ' bk-room-option--disabled' : '')
-                      }
+                    <RoomOptionCard
                       key={i}
-                      onClick={isFullyBooked ? undefined : () => handleChooseOption(opt)}
-                      style={isFullyBooked ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
-                    >
-                      <div className="bk-room-option-img">
-                        <img src={cardImage} alt={opt.label} />
-                      </div>
-                      <div className="bk-room-option-body">
-                        <div className="bk-room-option-top">
-                          <div className="bk-room-option-name-wrap">
-                            <p className="bk-room-option-name">{opt.label}</p>
-                          </div>
-                          <span className={'bk-radio' + (isSelected ? ' bk-radio--selected' : '')}></span>
-                        </div>
-                        {opt.pax && (
-                          <p className="bk-room-option-pax"><i className="fa-solid fa-users"></i> {opt.pax}</p>
-                        )}
-                        {optDescription && <p className="bk-room-option-desc">{optDescription}</p>}
-                        {optFeatures && optFeatures.length > 0 && (
-                          <ul className="bk-room-option-amenities">
-                            {optFeatures.map((f, fi) => (
-                              <li key={fi}><i className="fa-solid fa-check"></i>{f}</li>
-                            ))}
-                          </ul>
-                        )}
-                        <span className="bk-room-option-price">₱{opt.price}/hr</span>
-                      </div>
-                    </div>
+                      option={opt}
+                      room={room}
+                      selected={isSelected}
+                      disabled={isFullyBooked}
+                      onSelect={() => handleChooseOption(opt)}
+                    />
                   );
                 })}
               </div>
@@ -1291,11 +1248,7 @@ function BookingModal({ room, returnInfo, onClose, openHour, closeHour, settings
               <div className="bk-review-room">
                 <div className="bk-review-room-img">
                   <img
-                    src={
-                      (selectedVariant.image || room.image)
-                        ? resolveImageUrl(selectedVariant.image || room.image)
-                        : fallbackRoomImg
-                    }
+                    src={selectedVariant.image ? resolveImageUrl(selectedVariant.image) : fallbackRoomImg}
                     alt={selectedVariant.label}
                   />
                 </div>
