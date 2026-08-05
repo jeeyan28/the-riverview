@@ -1,6 +1,5 @@
 :root {
-    /* Motion + depth tokens, additive to the existing palette */
-    --ease-out: cubic-bezier(.16,.84,.44,1);
+        --ease-out: cubic-bezier(.16,.84,.44,1);
     --ease-smooth: cubic-bezier(.4,0,.2,1);
     --dur-fast: .2s;
     --dur-med: .45s;
@@ -11,9 +10,6 @@
     --shadow-deep: 0 24px 60px rgba(0,0,0,.35), 0 4px 16px rgba(0,0,0,.2);
 }
 
-/* ---------------------------------------------------------------
-   ACCESSIBILITY — reduced motion support (highest priority)
---------------------------------------------------------------- */
 @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {
         animation-duration: .001ms !important;
@@ -25,9 +21,6 @@
     .hero-bg, .hero-carousel, .hero-intro-avatar { transform: none !important; }
 }
 
-/* ---------------------------------------------------------------
-   GLOBAL — smooth anchor offset + focus visibility
---------------------------------------------------------------- */
 html { scroll-behavior: smooth; scroll-padding-top: calc(var(--header-h, 68px) + var(--banner-h, 0px) + 16px); }
 
 a:focus-visible,
@@ -41,16 +34,12 @@ textarea:focus-visible,
     transition: outline-offset .15s var(--ease-out);
 }
 
-/* Page content settles in gently once fonts/layout are ready */
 body { animation: pageSettle .5s var(--ease-out) both; }
 @keyframes pageSettle {
     from { opacity: 0; }
     to   { opacity: 1; }
 }
 
-/* ---------------------------------------------------------------
-   SCROLL REVEAL — classes toggled by enhancements.js
---------------------------------------------------------------- */
 .reveal {
     opacity: 0;
     transform: translateY(28px);
@@ -67,7 +56,6 @@ body { animation: pageSettle .5s var(--ease-out) both; }
 .reveal-scale { transform: scale(.94); }
 .reveal-scale.is-visible { transform: scale(1); }
 
-/* Staggered children (rooms, about-cards, space rows) */
 .reveal-stagger > * {
     opacity: 0;
     transform: translateY(24px);
@@ -84,16 +72,12 @@ body { animation: pageSettle .5s var(--ease-out) both; }
 .reveal-stagger.is-visible > *:nth-child(7) { transition-delay: .4s; }
 .reveal-stagger.is-visible > *:nth-child(8) { transition-delay: .46s; }
 
-/* ---------------------------------------------------------------
-   HEADER — extra depth on the existing glass effect
---------------------------------------------------------------- */
 header.scrolled { box-shadow: var(--shadow-soft), 0 1px 24px rgba(10,22,40,.06); }
 
 .logo img { transition: transform var(--dur-fast) var(--ease-out); }
 .logo:hover img { transform: rotate(-4deg) scale(1.04); }
 .logo-name { position: relative; }
 
-/* Nav pill links get a soft lift + underline sheen */
 nav a { position: relative; overflow: hidden; }
 nav a::after {
     content: '';
@@ -125,9 +109,6 @@ nav a:hover::after, nav a.active::after { width: 20px; }
 
 .hamburger span { transition: all .3s var(--ease-smooth) !important; }
 
-/* ---------------------------------------------------------------
-   RIPPLE (used by enhancements.js on primary interactive controls)
---------------------------------------------------------------- */
 .rv-ripple-host { position: relative; overflow: hidden; }
 .rv-ripple {
     position: absolute;
@@ -142,9 +123,6 @@ nav a:hover::after, nav a.active::after { width: 20px; }
     to { transform: scale(2.6); opacity: 0; }
 }
 
-/* ---------------------------------------------------------------
-   HERO — floating + parallax polish (transform/opacity only)
---------------------------------------------------------------- */
 .hero-bg {
     transition: transform .2s linear;
     will-change: transform;
@@ -181,9 +159,6 @@ nav a:hover::after, nav a.active::after { width: 20px; }
 
 .hero-carousel-card:not(.is-active):hover { transform-origin: center; filter: brightness(1.08); }
 
-/* ---------------------------------------------------------------
-   ROOMS — richer card depth + micro-interactions
---------------------------------------------------------------- */
 .room-card {
     transition: transform var(--dur-med) var(--ease-out),
                 border-color var(--dur-med) var(--ease-out),
@@ -204,13 +179,9 @@ nav a:hover::after, nav a.active::after { width: 20px; }
 .btn-select:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(23,138,79,.25); }
 .btn-select:active { transform: translateY(0) scale(.98); }
 
-/* Subtle shimmer while rooms are loading */
 #room-grid > div[style*="Loading"] { animation: rvPulse 1.4s ease-in-out infinite; }
 @keyframes rvPulse { 0%,100% { opacity: .55; } 50% { opacity: 1; } }
 
-/* ---------------------------------------------------------------
-   BOOKING MODAL — glass sheen + interactive polish
---------------------------------------------------------------- */
 .bk-overlay.open { animation: bkOverlayFade .25s var(--ease-out); }
 @keyframes bkOverlayFade { from { opacity: 0; } to { opacity: 1; } }
 
@@ -222,11 +193,10 @@ nav a:hover::after, nav a.active::after { width: 20px; }
 .bk-close, .pf-close { transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out) !important; }
 .bk-close:hover, .pf-close:hover { transform: rotate(90deg); }
 
-.bk-price-card, .bk-day, .bk-slot {
+.bk-room-option, .bk-day, .bk-slot {
     transition: background .15s var(--ease-out), border-color .15s var(--ease-out),
                 transform .15s var(--ease-out), box-shadow .15s var(--ease-out) !important;
 }
-.bk-price-card:hover { box-shadow: 0 6px 18px rgba(0,201,167,.12); }
 .bk-slot:hover:not(.bk-slot--reserved) { box-shadow: 0 4px 12px rgba(0,201,167,.15); }
 .bk-day--selected, .bk-slot--selected { animation: rvSelectPop .25s var(--ease-out); }
 @keyframes rvSelectPop {
@@ -234,6 +204,14 @@ nav a:hover::after, nav a.active::after { width: 20px; }
     60% { transform: scale(1.04); }
     100% { transform: scale(1); }
 }
+
+.bk-back-btn {
+    transition: background var(--dur-fast) var(--ease-out),
+                border-color var(--dur-fast) var(--ease-out),
+                transform var(--dur-fast) var(--ease-out) !important;
+}
+.bk-back-btn:hover { transform: translateY(-1px); }
+.bk-back-btn:active { transform: translateY(0) scale(.98); }
 
 .bk-confirm, .bk-done, .bk-pax-btn {
     position: relative; overflow: hidden;
@@ -247,7 +225,6 @@ nav a:hover::after, nav a.active::after { width: 20px; }
 .bk-pax-btn:hover { transform: translateY(-1px); }
 .bk-pax-btn:active { transform: scale(.94); }
 
-/* Inputs — animated focus glow instead of a hard border snap */
 .bk-field-input, .pf-field input {
     transition: border-color var(--dur-fast) var(--ease-out),
                 background var(--dur-fast) var(--ease-out),
@@ -256,7 +233,6 @@ nav a:hover::after, nav a.active::after { width: 20px; }
 .bk-field-input:focus { box-shadow: var(--glow-teal); }
 .pf-field input:focus { box-shadow: var(--glow-teal); }
 
-/* Validation shake — plays once when .has-error / --error classes are applied */
 .bk-field-input--error, .pf-field.has-error input {
     animation: rvShake .35s var(--ease-out);
 }
@@ -271,8 +247,6 @@ nav a:hover::after, nav a.active::after { width: 20px; }
                 box-shadow var(--dur-fast) var(--ease-out) !important;
 }
 
-/* Password show/hide toggle + unmet-requirements checklist (PasswordInput.jsx
-   + PASSWORD_REQUIREMENTS, reused from Registration/Reset-Password). */
 .pf-field .input-wrap{position:relative;}
 .pf-field .input-wrap .input-icon{display:none;}
 .pf-field .input-wrap input{padding-right:34px;}
@@ -303,15 +277,9 @@ nav a:hover::after, nav a.active::after { width: 20px; }
 
 .pf-toast { box-shadow: var(--shadow-deep) !important; }
 
-/* ---------------------------------------------------------------
-   SPACES SHOWCASE — image zoom on row hover
---------------------------------------------------------------- */
 .space-img img { transition: transform var(--dur-med) var(--ease-out); }
 .space-row:hover .space-img img { transform: scale(1.04); }
 
-/* ---------------------------------------------------------------
-   ABOUT — card lift + icon pop
---------------------------------------------------------------- */
 .about-card {
     transition: border-color var(--dur-med) var(--ease-out),
                 transform var(--dur-med) var(--ease-out),
@@ -321,9 +289,6 @@ nav a:hover::after, nav a.active::after { width: 20px; }
 .about-card-icon { transition: transform var(--dur-fast) var(--ease-out); }
 .about-card:hover .about-card-icon { transform: scale(1.12) rotate(-6deg); }
 
-/* ---------------------------------------------------------------
-   FOOTER — link underline sweep + icon lift
---------------------------------------------------------------- */
 .footer-col > a {
     position: relative; width: fit-content;
 }
@@ -347,9 +312,6 @@ nav a:hover::after, nav a.active::after { width: 20px; }
 .newsletter-form:focus-within { box-shadow: var(--glow-teal); }
 .newsletter-form input { transition: background var(--dur-fast) ease; }
 
-/* ---------------------------------------------------------------
-   MOBILE NAV — nicer entrance for links
---------------------------------------------------------------- */
 .mobile-nav.open a {
     animation: rvRise .4s var(--ease-out) both;
 }
@@ -357,9 +319,6 @@ nav a:hover::after, nav a.active::after { width: 20px; }
 .mobile-nav.open a:nth-child(3) { animation-delay: .08s; }
 .mobile-nav.open a:nth-child(4) { animation-delay: .12s; }
 
-/* ---------------------------------------------------------------
-   RESPONSIVE — keep motion tasteful on small screens
---------------------------------------------------------------- */
 @media (max-width: 768px) {
     .reveal, .reveal-stagger > * { transform: translateY(18px); }
     .hero-content > * { animation-duration: .5s; }

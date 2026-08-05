@@ -4,9 +4,9 @@ const Room = require("../model/room");
 const upload = require("../middleware/upload");
 const { requirePermission } = require("../middleware/adminAuth");
 const { PERMISSIONS } = require("../utils/permissions");
+const { logAudit } = require("../utils/auditLog");
 
 
-// Public — guests need to see rooms to book them
 router.get("/", async (req, res) => {
   try {
     const filter = {};
@@ -30,12 +30,10 @@ router.get("/:id", async (req, res) => {
   }
 });
 
-// Everything below changes room data — manager/super_admin only
 router.post("/", requirePermission(PERMISSIONS.ROOM_MANAGE), upload.fields([{ name: "image", maxCount: 1 }, { name: "variantImages", maxCount: 20 }]), async (req, res) => {
   try {
     const {
       name,
-      roomNumber,
       description,
       price,
       status,
@@ -45,9 +43,9 @@ router.post("/", requirePermission(PERMISSIONS.ROOM_MANAGE), upload.fields([{ na
       variantImageIndexes,
     } = req.body;
 
-    if (!name || !roomNumber) {
+    if (!name) {
       return res.status(400).json({
-        message: "name and roomNumber are required."
+        message: "name is required."
       });
     }
 
@@ -60,8 +58,6 @@ router.post("/", requirePermission(PERMISSIONS.ROOM_MANAGE), upload.fields([{ na
       return res.status(400).json({ message: "features/variants must be valid JSON." });
     }
 
-    // Each entry in variantImageIndexes says which parsedVariants[] slot the
-    // corresponding file in req.files.variantImages (same order) belongs to.
     const variantImageFiles = req.files?.variantImages || [];
     if (variantImageFiles.length) {
       let indexes = [];
@@ -79,7 +75,6 @@ router.post("/", requirePermission(PERMISSIONS.ROOM_MANAGE), upload.fields([{ na
 
     const room = new Room({
       name,
-      roomNumber,
 
       description: description || "",
 
@@ -96,6 +91,7 @@ router.post("/", requirePermission(PERMISSIONS.ROOM_MANAGE), upload.fields([{ na
     });
 
     await room.save();
+    await logAudit({ category: "Room Management", action: "created", description: `added room "${room.name}"`, user: req.user });
     res.status(201).json(room);
   } catch (err) {
     console.error(err);
@@ -116,8 +112,6 @@ router.put("/:id", requirePermission(PERMISSIONS.ROOM_MANAGE), upload.fields([{ 
       variantImageIndexes,
     } = req.body;
 
-    // Room No. is locked after creation (FEATURE_REQUESTS.md Priority 1) —
-    // silently ignored here even if sent.
     const update = {};
     if (name !== undefined) update.name = name;
     if (description !== undefined) update.description = description;
@@ -126,8 +120,6 @@ router.put("/:id", requirePermission(PERMISSIONS.ROOM_MANAGE), upload.fields([{ 
     if (capacity !== undefined) update.capacity = Number(capacity) || 0;
     if (req.files?.image?.[0]) update.image = req.files.image[0].path;
 
-    // features/variants arrive as JSON strings inside FormData — see the
-    // same note in POST / above.
     try {
       if (features !== undefined) update.features = JSON.parse(features);
       if (variants !== undefined) update.variants = JSON.parse(variants);
@@ -135,8 +127,6 @@ router.put("/:id", requirePermission(PERMISSIONS.ROOM_MANAGE), upload.fields([{ 
       return res.status(400).json({ message: "features/variants must be valid JSON." });
     }
 
-    // Same index-mapped assignment as POST / above — only variants whose
-    // image actually changed this save have a file to attach here.
     const variantImageFiles = req.files?.variantImages || [];
     if (variantImageFiles.length && update.variants) {
       let indexes = [];
@@ -155,6 +145,7 @@ router.put("/:id", requirePermission(PERMISSIONS.ROOM_MANAGE), upload.fields([{ 
     const room = await Room.findByIdAndUpdate(req.params.id, update, { returnDocument: "after", runValidators: true });
     if (!room) return res.status(404).json({ message: "Room not found." });
 
+    await logAudit({ category: "Room Management", action: "updated", description: `updated room "${room.name}"`, user: req.user });
     res.json(room);
   } catch (err) {
     console.error(err);
@@ -166,6 +157,7 @@ router.delete("/:id", requirePermission(PERMISSIONS.ROOM_MANAGE), async (req, re
   try {
     const room = await Room.findByIdAndDelete(req.params.id);
     if (!room) return res.status(404).json({ message: "Room not found." });
+    await logAudit({ category: "Room Management", action: "deleted", description: `deleted room "${room.name}"`, user: req.user });
     res.json({ message: "Room deleted." });
   } catch (err) {
     console.error(err);

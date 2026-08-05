@@ -1,17 +1,19 @@
+import '../../styles/admin/settings.css';
 import { useCallback, useEffect, useState } from 'react';
 import Modal from '../../components/Modal';
 import PasswordInput from '../../components/PasswordInput';
 import PasswordRequirementsList from '../../components/PasswordRequirementsList';
 import { useAuth } from '../../context/AuthContext';
 import { settingsService } from '../../services/settings';
+import { auditLogService } from '../../services/auditLog';
 import { usersService } from '../../services/users';
 import { PASSWORD_REQUIREMENTS } from '../../utils/password';
 
 
 const SETTINGS_TABS = [
+  { key: 'profile', label: 'Profile' },
   { key: 'announcements', label: 'Announcements' },
   { key: 'audit', label: 'Audit Log' },
-  { key: 'profile', label: 'Profile' },
 ];
 
 function Settings() {
@@ -33,6 +35,10 @@ function Settings() {
         </div>
 
         <div className="set-content">
+          <div className={`set-subpanel${activeTab === 'profile' ? ' active' : ''}`} id="set-profile">
+            {activeTab === 'profile' && <ProfileTab />}
+          </div>
+
           <div className={`set-subpanel${activeTab === 'announcements' ? ' active' : ''}`} id="set-announcements">
             {activeTab === 'announcements' && (
               <>
@@ -41,11 +47,9 @@ function Settings() {
               </>
             )}
           </div>
+
           <div className={`set-subpanel${activeTab === 'audit' ? ' active' : ''}`} id="set-audit">
             {activeTab === 'audit' && <AuditLogTab />}
-          </div>
-          <div className={`set-subpanel${activeTab === 'profile' ? ' active' : ''}`} id="set-profile">
-            {activeTab === 'profile' && <ProfileTab />}
           </div>
         </div>
       </div>
@@ -54,16 +58,6 @@ function Settings() {
 }
 
 
-// ─────────────────────────────────────────────────────────────────────────
-// OperatingScheduleAndHolidays — renders as a sibling of AnnouncementsTab
-// inside the set-announcements subpanel (moved here in Phase 2, since the
-// old set-facilities subpanel was removed once Facility CRUD moved to
-// /admin/room-management).
-//
-// One component (not two) because it fetches both operating hours and
-// holidays from the single GET /api/settings/admin call and re-fetches
-// both together after every save/add/delete.
-// ─────────────────────────────────────────────────────────────────────────
 const DAY_PILLS = [
   { day: 1, label: 'Mon' },
   { day: 2, label: 'Tue' },
@@ -74,10 +68,6 @@ const DAY_PILLS = [
   { day: 0, label: 'Sun' },
 ];
 
-// Matches admin.html's static pre-load markup (Mon–Sat "on", Sun off) so
-// the pills don't visibly flash before the fetch resolves. Once settings
-// load, loadOperatingSettings()'s own fallback — all 7 days on — takes
-// over if the server has no openDays saved yet (see fetchSettings below).
 const DEFAULT_OPEN_DAYS_BEFORE_LOAD = [1, 2, 3, 4, 5, 6];
 
 function formatHolidayDate(dateStr) {
@@ -97,7 +87,7 @@ function OperatingScheduleAndHolidays() {
   const [openDays, setOpenDays] = useState(DEFAULT_OPEN_DAYS_BEFORE_LOAD);
   const [holidays, setHolidays] = useState([]);
 
-  const [saveState, setSaveState] = useState('idle'); // idle | saving | saved
+  const [saveState, setSaveState] = useState('idle');
   const [addingHoliday, setAddingHoliday] = useState(false);
 
   const fetchSettings = useCallback(async () => {
@@ -106,8 +96,6 @@ function OperatingScheduleAndHolidays() {
       const oh = settings.operatingHours || {};
       setOpenTime(oh.openTime || '06:00');
       setCloseTime(oh.closeTime || '22:00');
-      // Same fallback as the original loadOperatingSettings(): all 7 days
-      // on if the server document has no openDays array yet.
       setOpenDays(Array.isArray(oh.openDays) ? oh.openDays : [0, 1, 2, 3, 4, 5, 6]);
       setHolidays(settings.holidays || []);
     } catch (err) {
@@ -121,8 +109,6 @@ function OperatingScheduleAndHolidays() {
     fetchSettings();
   }, [fetchSettings]);
 
-  // Reimplements the original's generic delegated ".day-pill click toggles
-  // .on" listener as a per-pill state toggle — same visual result.
   function toggleDay(day) {
     setOpenDays((days) => (days.includes(day) ? days.filter((d) => d !== day) : [...days, day]));
   }
@@ -140,8 +126,6 @@ function OperatingScheduleAndHolidays() {
     }
   }
 
-  // Faithful port of the original's plain prompt()-based flow — see the
-  // file header note on why this isn't a new form/modal.
   async function handleAddHoliday() {
     if (!guardPermission('settings:manage', "You don't have permission to add holidays.")) return;
     const name = window.prompt('Holiday / closure name (e.g. "Christmas Day"):');
@@ -269,24 +253,14 @@ function OperatingScheduleAndHolidays() {
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────
-// AnnouncementsTab — PART 10c. Migrated from renderAnnouncementsList/
-// #add-announcement-btn/toggleAnnouncement/deleteAnnouncement in admin.js,
-// plus the #set-announcements markup in admin.html.
-//
-// Uses its own GET /api/settings/admin fetch rather than sharing state with
-// OperatingScheduleAndHolidays — the original also re-fetches the whole
-// settings document independently here (renderAnnouncementsList has its
-// own fetchAdminSettings() call), and this tab mounts/unmounts on its own
-// as the user switches set-tabs, so there's no shared lifecycle to hook into.
-// ─────────────────────────────────────────────────────────────────────────
+
 function AnnouncementsTab() {
   const { guardPermission } = useAuth();
 
   const [loading, setLoading] = useState(true);
   const [announcements, setAnnouncements] = useState([]);
   const [posting, setPosting] = useState(false);
-  const [busyId, setBusyId] = useState(null); // announcement currently being toggled/deleted
+  const [busyId, setBusyId] = useState(null);
 
   const fetchAnnouncements = useCallback(async () => {
     try {
@@ -303,8 +277,6 @@ function AnnouncementsTab() {
     fetchAnnouncements();
   }, [fetchAnnouncements]);
 
-  // Faithful port of the original's plain prompt()-based flow, same
-  // rationale as holiday entry in Part 10b.
   async function handleAddAnnouncement() {
     if (!guardPermission('settings:manage', "You don't have permission to post announcements.")) return;
     const title = window.prompt('Announcement title (e.g. "Weekend Promo"):');
@@ -364,38 +336,40 @@ function AnnouncementsTab() {
         Active announcements appear as the dismissible banner at the top of the public homepage. Inactive or expired
         ones stay here but won't show to guests.
       </p>
-      <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div className="announcement-list">
         {loading ? (
-          <div style={{ textAlign: 'center', color: 'var(--muted)', padding: '12px 0' }}>Loading…</div>
+          <div className="announcement-empty">Loading…</div>
         ) : announcements.length === 0 ? (
-          <div style={{ textAlign: 'center', color: 'var(--muted)', padding: '12px 0' }}>No announcements yet.</div>
+          <div className="announcement-empty">No announcements yet.</div>
         ) : (
           announcements.map((a) => (
-            <div className="card" style={{ padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 12 }} key={a._id}>
-              <span style={{ fontSize: '1.2rem' }}>{a.emoji || '📣'}</span>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 600, fontSize: '.85rem', color: 'var(--text)' }}>{a.title}</div>
-                <div style={{ fontSize: '.78rem', color: 'var(--muted)' }}>{a.message}</div>
+            <div className="announcement-row" key={a._id}>
+              <span className="announcement-icon">{a.emoji || '📣'}</span>
+              <div className="announcement-body">
+                <div className="announcement-title">{a.title}</div>
+                <div className="announcement-message">{a.message}</div>
               </div>
               <span className={`pill ${a.isActive ? 'pill-active' : 'pill-pending'}`}>
                 {a.isActive ? 'Active' : 'Inactive'}
               </span>
-              <button
-                type="button"
-                className="rm-btn"
-                disabled={busyId === a._id}
-                onClick={() => handleToggle(a._id, !a.isActive)}
-              >
-                {a.isActive ? 'Disable' : 'Enable'}
-              </button>
-              <button
-                type="button"
-                className="rm-btn danger"
-                disabled={busyId === a._id}
-                onClick={() => handleDelete(a._id)}
-              >
-                <i className="ti ti-trash"></i>
-              </button>
+              <div className="announcement-actions">
+                <button
+                  type="button"
+                  className="announcement-btn"
+                  disabled={busyId === a._id}
+                  onClick={() => handleToggle(a._id, !a.isActive)}
+                >
+                  {a.isActive ? 'Disable' : 'Enable'}
+                </button>
+                <button
+                  type="button"
+                  className="announcement-btn danger"
+                  disabled={busyId === a._id}
+                  onClick={() => handleDelete(a._id)}
+                >
+                  <i className="ti ti-trash"></i>
+                </button>
+              </div>
             </div>
           ))
         )}
@@ -404,49 +378,61 @@ function AnnouncementsTab() {
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────
-// AUDIT LOG tab — straight port of the #set-audit markup in admin.html.
-// Static/decorative, same as Reports.jsx: entries, actor name, and
-// timestamps are exactly the hardcoded strings admin.html shipped with —
-// no audit-log endpoint exists anywhere in Backend/routes.
-// ─────────────────────────────────────────────────────────────────────────
-const AUDIT_LOG_ENTRIES = [
-  { dotClass: '', text: <><b>Rivera Admin</b> updated KTV Private Room rate to ₱300/hr</>, time: 'Jun 25, 2026 · 9:12 AM' },
-  { dotClass: 'warn', text: <><b>Rivera Admin</b> changed closing hour from 12:00 AM to 10:00 PM</>, time: 'Jun 24, 2026 · 4:30 PM' },
-  { dotClass: '', text: <><b>Rivera Admin</b> added holiday closure — Christmas Day</>, time: 'Jun 23, 2026 · 11:05 AM' },
-  { dotClass: 'del', text: <><b>Rivera Admin</b> removed promo code WELCOME5</>, time: 'Jun 21, 2026 · 2:47 PM' },
-  { dotClass: '', text: <><b>Rivera Admin</b> added new facility — Family KTV Room</>, time: 'Jun 19, 2026 · 10:20 AM' },
-];
+function formatAuditTime(dateStr) {
+  return new Date(dateStr).toLocaleString(undefined, {
+    year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+  });
+}
+
+function auditDotClass(action) {
+  if (action === 'deleted') return 'del';
+  if (action === 'updated') return 'warn';
+  return '';
+}
 
 function AuditLogTab() {
+  const [loading, setLoading] = useState(true);
+  const [logs, setLogs] = useState([]);
+
+  useEffect(() => {
+    let active = true;
+    auditLogService.list(50)
+      .then((data) => { if (active) setLogs(data); })
+      .catch((err) => console.error(err))
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, []);
+
   return (
     <div className="card">
       <div className="card-head">
         <span className="card-title">Settings change history</span>
-        <span style={{ fontSize: '.72rem', color: 'var(--muted)' }}>Last 30 days</span>
+        <span style={{ fontSize: '.72rem', color: 'var(--muted)' }}>Announcements · Rooms · Users</span>
       </div>
       <div>
-        {AUDIT_LOG_ENTRIES.map((entry, i) => (
-          <div className="audit-item" key={i}>
-            <div className={`audit-dot${entry.dotClass ? ` ${entry.dotClass}` : ''}`}></div>
-            <div>
-              <div className="audit-text">{entry.text}</div>
-              <div className="audit-time">{entry.time}</div>
-            </div>
-          </div>
-        ))}
+        {loading ? (
+          <div style={{ textAlign: 'center', color: 'var(--muted)', padding: '12px 0' }}>Loading…</div>
+        ) : logs.length === 0 ? (
+          <div style={{ textAlign: 'center', color: 'var(--muted)', padding: '12px 0' }}>No changes recorded yet.</div>
+        ) : (
+          logs.map((entry) => {
+            const dotClass = auditDotClass(entry.action);
+            return (
+              <div className="audit-item" key={entry._id}>
+                <div className={`audit-dot${dotClass ? ` ${dotClass}` : ''}`}></div>
+                <div>
+                  <div className="audit-text"><b>{entry.performedByName}</b> {entry.description}</div>
+                  <div className="audit-time">{formatAuditTime(entry.createdAt)}</div>
+                </div>
+              </div>
+            );
+          })
+        )}
       </div>
     </div>
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────
-// PROFILE tab — moved here from the standalone Admin/Profile.jsx page,
-// now reached via Settings > Profile instead of its own /admin/profile
-// route. Logic/markup unchanged; only the outer page-level wrapper
-// (`.panel#panel-profile`) was dropped since it now nests inside this
-// page's own `.set-subpanel`.
-// ─────────────────────────────────────────────────────────────────────────
 function displayName(admin) {
   if (!admin) return 'Admin';
   const name = `${admin.firstName || ''} ${admin.lastName || ''}`.trim();
@@ -484,24 +470,17 @@ function ProfileTab() {
 
   async function handleSaveDetails() {
     if (!admin?._id) return;
-    // Trims each field before sending and reflects the trimmed values back
-    // into local state after a successful save, so the inputs match what
-    // was actually saved.
     const trimmedFirstName = firstName.trim();
     const trimmedLastName = lastName.trim();
     const trimmedPhone = phone.trim();
     setSavingDetails(true);
     try {
-      // email intentionally omitted.
       await usersService.updateProfile(admin._id, { firstName: trimmedFirstName, lastName: trimmedLastName, phone: trimmedPhone });
 
       setFirstName(trimmedFirstName);
       setLastName(trimmedLastName);
       setPhone(trimmedPhone);
 
-      // Updates the shared AuthContext `user` (so AdminSidebar's name
-      // reflects this immediately) and writes the merged object back to
-      // storage.
       updateUser({ firstName: trimmedFirstName, lastName: trimmedLastName, phone: trimmedPhone });
       alert('Profile updated.');
     } catch (err) {
@@ -545,6 +524,17 @@ function ProfileTab() {
             <span className="pmeta"><i className="ti ti-map-pin"></i>San Rafael, Bulacan</span>
           </div>
         </div>
+      </div>
+
+      <div className="metric-row">
+        {PROFILE_METRICS.map((m) => (
+          <div className="mc" key={m.label}>
+            <div className="mc-label">{m.label}</div>
+            <div className="mc-val" style={m.label === 'Account Created' ? { fontSize: '1rem' } : undefined}>
+              {m.value}
+            </div>
+          </div>
+        ))}
       </div>
 
       <div className="p2col">
@@ -625,17 +615,6 @@ function ProfileTab() {
             {savingPassword ? 'Updating…' : 'Update password'}
           </button>
         </div>
-      </div>
-
-      <div className="metric-row">
-        {PROFILE_METRICS.map((m) => (
-          <div className="mc" key={m.label}>
-            <div className="mc-label">{m.label}</div>
-            <div className="mc-val" style={m.label === 'Account Created' ? { fontSize: '1rem' } : undefined}>
-              {m.value}
-            </div>
-          </div>
-        ))}
       </div>
     </>
   );

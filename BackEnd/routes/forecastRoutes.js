@@ -2,26 +2,19 @@ const express = require("express");
 const router = express.Router();
 
 const Booking = require("../model/booking");
-const Sale = require("../model/sale");
 const { requirePermission } = require("../middleware/adminAuth");
 const { PERMISSIONS } = require("../utils/permissions");
 
-// Forecasting is Owner-only (see ROLE_PERMISSIONS in utils/permissions.js —
-// Supervisor gets every other permission Owner has, but not this one).
 router.use(requirePermission(PERMISSIONS.FORECASTING_VIEW));
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-const HISTORY_DAYS = 60;   // how far back we look for the trend
-const FORECAST_DAYS = 14;  // how far ahead we project
+const HISTORY_DAYS = 60;
+const FORECAST_DAYS = 14;
 
 function toDateKey(d) {
   return d.toISOString().slice(0, 10);
 }
 
-// Simple linear regression (least squares) over (x = day index, y = value),
-// used to project a trend line forward. Deliberately simple/explainable
-// rather than a black-box model — this is meant to give ownership a
-// directional read on demand, not a guaranteed number.
 function linearRegression(points) {
   const n = points.length;
   if (n === 0) return { slope: 0, intercept: 0 };
@@ -40,24 +33,17 @@ router.get("/", async (req, res) => {
     const now = new Date();
     const since = new Date(now.getTime() - HISTORY_DAYS * DAY_MS);
 
-    const [bookings, sales] = await Promise.all([
-      Booking.find({
-        createdAt: { $gte: since },
-        status: { $nin: [Booking.BOOKING_STATUS.REJECTED, Booking.BOOKING_STATUS.CANCELLED] },
-      }).select("createdAt amount roomLabel status"),
-      Sale.find({
-        createdAt: { $gte: since },
-        status: "Completed",
-      }).select("createdAt total"),
-    ]);
+    const bookings = await Booking.find({
+      createdAt: { $gte: since },
+      status: { $nin: [Booking.BOOKING_STATUS.REJECTED, Booking.BOOKING_STATUS.CANCELLED] },
+    }).select("createdAt amount roomLabel status");
 
-    // Bucket by day.
-    const byDay = new Map(); // dateKey -> { revenue, bookingCount }
+    const byDay = new Map();
     for (let i = 0; i <= HISTORY_DAYS; i++) {
       const key = toDateKey(new Date(since.getTime() + i * DAY_MS));
       byDay.set(key, { revenue: 0, bookingCount: 0 });
     }
-    const roomDemand = new Map(); // roomLabel -> count
+    const roomDemand = new Map();
 
     for (const b of bookings) {
       const key = toDateKey(new Date(b.createdAt));
@@ -67,11 +53,6 @@ router.get("/", async (req, res) => {
         bucket.bookingCount += 1;
       }
       roomDemand.set(b.roomLabel, (roomDemand.get(b.roomLabel) || 0) + 1);
-    }
-    for (const s of sales) {
-      const key = toDateKey(new Date(s.createdAt));
-      const bucket = byDay.get(key);
-      if (bucket) bucket.revenue += s.total || 0;
     }
 
     const days = Array.from(byDay.entries()).sort((a, b) => (a[0] < b[0] ? -1 : 1));

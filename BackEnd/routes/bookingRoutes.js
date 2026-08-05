@@ -2,6 +2,8 @@ const express = require("express");
 const router = express.Router();
 const Booking = require("../model/booking");
 const Settings = require("../model/settings");
+const BookingLock = require("../model/bookingLock");
+const { LOCK_DURATION_MINUTES } = BookingLock;
 const { requirePermission, ensureAuthenticated } = require("../middleware/adminAuth");
 const { paymentProofUpload } = require("../middleware/upload");
 const { PERMISSIONS, isAdminRole } = require("../utils/permissions");
@@ -15,18 +17,15 @@ router.get("/", requirePermission(PERMISSIONS.BOOKING_VIEW), async (req, res) =>
     if (req.query.paymentStatus) filter.paymentStatus = req.query.paymentStatus;
     if (req.query.room) filter.room = req.query.room;
     if (req.query.date) filter.date = req.query.date;
-    // Exact-match guest filters (distinct from the fuzzy `search` below) — used to pull
-    // a single guest's full booking history, e.g. "View All History".
     if (req.query.guestContact) filter.guestContact = req.query.guestContact;
     else if (req.query.guestName) filter.guestName = req.query.guestName;
     if (req.query.search) {
-      // Escape regex metacharacters so a search like "juan (2)" doesn't throw.
       const safe = req.query.search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       const re = new RegExp(safe, "i");
       filter.$or = [{ guestName: re }, { guestContact: re }, { reservationCode: re }];
     }
 
-    const bookings = await Booking.find(filter).sort({ createdAt: -1 });
+    const bookings = await Booking.find(filter).sort({ createdAt: -1 }).populate("room", "name");
     res.json(bookings);
   } catch (err) {
     console.error(err);
@@ -49,7 +48,12 @@ router.get("/availability", async (req, res) => {
     if (variantLabel) filter.variantLabel = variantLabel;
 
     const bookings = await Booking.find(filter).select("timeIn duration");
-    res.json(bookings.map(b => ({ timeIn: b.timeIn, duration: b.duration })));
+
+    const lockFilter = { room: roomId, date, expiresAt: { $gt: new Date() } };
+    if (variantLabel) lockFilter.variantLabel = variantLabel;
+    const locks = await BookingLock.find(lockFilter).select("timeIn duration");
+
+    res.json([...bookings, ...locks].map(b => ({ timeIn: b.timeIn, duration: b.duration })));
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Server error." });
@@ -59,7 +63,7 @@ router.get("/availability", async (req, res) => {
 
 router.get("/availability-month", async (req, res) => {
   try {
-    const { roomId, year, month, variantLabel } = req.query; // month is 1-12
+    const { roomId, year, month, variantLabel } = req.query;
     if (!roomId || !year || !month) {
       return res.status(400).json({ message: "roomId, year and month are required." });
     }
@@ -70,8 +74,6 @@ router.get("/availability-month", async (req, res) => {
       return res.status(400).json({ message: "Invalid year or month." });
     }
 
-    // Dates are stored as "YYYY-MM-DD" strings, so a plain lexical range over
-    // that same format is enough to bound the query to this month.
     const lastDay = new Date(y, m, 0).getDate();
     const startStr = `${y}-${String(m).padStart(2, "0")}-01`;
     const endStr = `${y}-${String(m).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
@@ -86,9 +88,17 @@ router.get("/availability-month", async (req, res) => {
 
     const bookings = await Booking.find(filter).select("date timeIn duration");
 
-    // Group by date so the client gets { "2026-07-14": [{timeIn, duration}, ...] }
+    const lockFilter = {
+      room: roomId,
+      date: { $gte: startStr, $lte: endStr },
+      expiresAt: { $gt: new Date() },
+    };
+    if (variantLabel) lockFilter.variantLabel = variantLabel;
+    if (req.session?.userId) lockFilter.lockedBy = { $ne: req.session.userId };
+    const locks = await BookingLock.find(lockFilter).select("date timeIn duration");
+
     const byDate = {};
-    bookings.forEach((b) => {
+    [...bookings, ...locks].forEach((b) => {
       if (!byDate[b.date]) byDate[b.date] = [];
       byDate[b.date].push({ timeIn: b.timeIn, duration: b.duration });
     });
@@ -97,6 +107,61 @@ router.get("/availability-month", async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Server error." });
+  }
+});
+
+router.post("/lock", ensureAuthenticated, async (req, res) => {
+  try {
+    const { roomId, variantLabel, date, timeIn, duration: durationRaw } = req.body;
+    const duration = Number(durationRaw);
+
+    if (!roomId || !date || !timeIn || !duration) {
+      return res.status(400).json({ message: "roomId, date, timeIn and duration are required." });
+    }
+
+    let lock;
+    try {
+      lock = await runInTransaction(async (session) => {
+        const { room } = await validateAndPriceBooking({
+          roomId,
+          variantLabel,
+          date,
+          timeIn,
+          duration,
+          isAdminBooking: false,
+          guestCount: undefined,
+          excludeLockUserId: req.user._id,
+          session,
+        });
+
+        await BookingLock.deleteMany({ lockedBy: req.user._id }).session(session);
+
+        const expiresAt = new Date(Date.now() + LOCK_DURATION_MINUTES * 60 * 1000);
+        const [created] = await BookingLock.create(
+          [{ room: room._id, variantLabel: variantLabel || null, date, timeIn, duration, lockedBy: req.user._id, expiresAt }],
+          { session }
+        );
+        return created;
+      });
+    } catch (e) {
+      return res.status(e.status || 500).json({ message: e.message || "Server error." });
+    }
+
+    res.status(201).json({ id: lock._id, expiresAt: lock.expiresAt });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error." });
+  }
+});
+
+router.delete("/lock/:id", ensureAuthenticated, async (req, res) => {
+  try {
+    const lock = await BookingLock.findOneAndDelete({ _id: req.params.id, lockedBy: req.user._id });
+    if (!lock) return res.status(404).json({ message: "Lock not found." });
+    res.json({ message: "Lock released." });
+  } catch (err) {
+    console.error(err);
+    res.status(400).json({ message: "Invalid lock id." });
   }
 });
 
@@ -129,20 +194,17 @@ router.post("/", ensureAuthenticated, paymentProofUpload.single("paymentScreensh
           guestCount: Number.isFinite(guestCount) && guestCount > 0 ? guestCount : 1,
           specialRequests: specialRequests || "",
           room: room._id,
-          roomLabel: room.roomNumber || room.name,
+          roomLabel: room.name,
           variantLabel: variantLabel || null,
           date,
           timeIn,
           duration,
           amount,
-          ...(paymentMethod ? { paymentMethod } : {}), // falls back to the schema's own "Cash" default
+          ...(paymentMethod ? { paymentMethod } : {}),
           bookedBy: req.session.userId,
-          // Walk-in / manual booking — no down payment flow, admin sets status directly
-          // (defaults to "Active" to match prior behavior of the Manual Booking modal).
           source: "walk-in",
           status: req.body.status || "Active",
           paymentStatus: "Paid",
-          // downPayment omitted — schema already defaults to 0
         });
 
         await saveWithReservationCode(b, room.name, undefined, session);
@@ -161,7 +223,7 @@ router.post("/", ensureAuthenticated, paymentProofUpload.single("paymentScreensh
 
 router.get("/mine", ensureAuthenticated, async (req, res) => {
   try {
-    const bookings = await Booking.find({ bookedBy: req.user._id }).sort({ createdAt: -1 });
+    const bookings = await Booking.find({ bookedBy: req.user._id }).sort({ createdAt: -1 }).populate("room", "name");
     res.json(bookings);
   } catch (err) {
     console.error(err);
@@ -171,7 +233,7 @@ router.get("/mine", ensureAuthenticated, async (req, res) => {
 
 router.get("/:id", ensureAuthenticated, async (req, res) => {
   try {
-    const booking = await Booking.findById(req.params.id);
+    const booking = await Booking.findById(req.params.id).populate("room", "name");
     if (!booking) return res.status(404).json({ message: "Booking not found." });
 
     if (String(booking.bookedBy) !== String(req.user._id) && !isAdminRole(req.user.role)) {
@@ -184,8 +246,6 @@ router.get("/:id", ensureAuthenticated, async (req, res) => {
   }
 });
 
-// ── Approve a booking's payment — admin only. Moves it from
-//    "Pending Payment Verification" to "Confirmed" and marks payment as Paid.
 router.put("/:id/approve", requirePermission(PERMISSIONS.BOOKING_MANAGE), async (req, res) => {
   try {
     const booking = await Booking.findByIdAndUpdate(
@@ -201,8 +261,6 @@ router.put("/:id/approve", requirePermission(PERMISSIONS.BOOKING_MANAGE), async 
   }
 });
 
-// ── Reject a booking's payment — admin only (e.g. screenshot doesn't match,
-//    wrong amount, fraudulent proof).
 router.put("/:id/reject", requirePermission(PERMISSIONS.BOOKING_MANAGE), async (req, res) => {
   try {
     const booking = await Booking.findByIdAndUpdate(
@@ -238,7 +296,6 @@ router.put("/:id", requirePermission(PERMISSIONS.BOOKING_MANAGE), async (req, re
   }
 });
 
-// ── Delete/cancel a booking — admin only
 router.delete("/:id", requirePermission(PERMISSIONS.BOOKING_MANAGE), async (req, res) => {
   try {
     const booking = await Booking.findByIdAndDelete(req.params.id);

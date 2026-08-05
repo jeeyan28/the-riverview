@@ -1,11 +1,6 @@
 import { useState } from 'react';
 import { Lock, Eye, EyeOff } from 'lucide-react';
 
-// Shared show/hide password field used by LoginForm and RegisterForm.
-// Renders `.input-wrap` (icon + input + toggle) + `.field-error`; the
-// surrounding `.field` div, label, and any per-page extras (e.g. "Forgot
-// password?", RegisterForm's strength checklist via `children`) stay in
-// the calling component.
 function PasswordInput({ id, name, placeholder, autoComplete, value, onChange, error, children }) {
   const [visible, setVisible] = useState(false);
 

@@ -4,9 +4,16 @@ export function dateKey(y, m, d) {
   return `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 }
 
-export function getRoomCapacity(room) {
-  const cap = Number(room?.capacity);
-  return Number.isFinite(cap) && cap > 0 ? cap : null;
+// Extracts a numeric guest cap from a room's free-text Max Pax value
+// (e.g. "6 pax" -> 6, "1–4 People" -> 4 — the highest number found, since
+// a range expresses a maximum). Returns null (no cap enforced) if the
+// text has no number in it.
+export function getPaxCapacity(paxText) {
+  if (!paxText) return null;
+  const matches = String(paxText).match(/\d+/g);
+  if (!matches || !matches.length) return null;
+  const max = Math.max(...matches.map(Number));
+  return max > 0 ? max : null;
 }
 
 const reservedCache = {};

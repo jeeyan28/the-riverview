@@ -1,7 +1,6 @@
-/* ─── Header user chip (shown instead of "Log in" once a user is logged in) ─── */
 .user-chip {
     position: relative;
-    display: none; /* toggled to flex via JS when a user is logged in */
+    display: none;
     align-items: center;
     gap: .5rem;
     cursor: pointer;
@@ -12,8 +11,8 @@
     transition: background .2s, border-color .2s;
     user-select: none;
 }
-.user-chip:hover { background: var(--nav-card); }
 
+.user-chip:hover { background: var(--nav-card); }
 .user-chip-avatar {
     width: 28px; height: 28px;
     border-radius: 50%;
@@ -25,6 +24,7 @@
     flex-shrink: 0;
     overflow: hidden;
 }
+
 .user-chip-avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
 .user-chip-name {
     font-size: .85rem;
@@ -35,10 +35,10 @@
     text-overflow: ellipsis;
     white-space: nowrap;
 }
+
 .user-chip > i { font-size: .65rem; color: var(--nav-muted); transition: transform .2s; }
 .user-chip-menu.open ~ i,
 .user-chip.open > i { transform: rotate(180deg); }
-
 .user-chip-menu {
     position: absolute;
     top: calc(100% + 10px);
@@ -54,6 +54,7 @@
     gap: 2px;
     z-index: 250;
 }
+
 .user-chip-menu.open { display: flex; }
 .user-chip-menu a,
 .user-chip-menu button {
@@ -71,16 +72,10 @@
     transition: background .15s;
     font-family: 'Inter', sans-serif;
 }
+
 .user-chip-menu a:hover,
 .user-chip-menu button:hover { background: var(--card-light); }
-/* Only Logout gets the warning color, and only on hover — matches
-   ProfileModal.jsx's .pf-logout pattern. Previously `.user-chip-menu
-   button { color: #d1483f; }` targeted every button in this menu
-   (My Profile / Admin Dashboard / Log out are all <button> elements
-   in Navbar.jsx, not just Logout), turning all three red by default. */
 #logout-button:hover { color: #e2554b; }
-
-/* ─── Profile page specifics (page shell reuses login.css) ─── */
 .profile-avatar-lg {
     width: 64px; height: 64px;
     border-radius: 50%;
@@ -91,12 +86,14 @@
     display: flex; align-items: center; justify-content: center;
     margin-bottom: 1rem;
 }
+
 .profile-tabs {
     display: flex;
     gap: .4rem;
     margin-bottom: 1.75rem;
     border-bottom: 1px solid var(--border, rgba(10,22,40,.1));
 }
+
 .profile-tab {
     background: none; border: none; cursor: pointer;
     padding: .7rem 1rem;
@@ -106,6 +103,7 @@
     border-bottom: 2px solid transparent;
     transition: color .2s, border-color .2s;
 }
+
 .profile-tab.active { color: #0A1628; border-color: #00C9A7; }
 .profile-panel { display: none; }
 .profile-panel.active { display: block; }

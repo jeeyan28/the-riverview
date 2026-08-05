@@ -1,5 +1,7 @@
 const crypto = require("crypto");
 const PAYMONGO_API_BASE = process.env.PAYMONGO_API_BASE || "https://api.paymongo.com/v1";
+const PAYMONGO_ALLOWED_METHODS = ["card", "gcash", "paymaya", "qrph"];
+const PAYMONGO_STATEMENT_DESCRIPTOR_MAX_LENGTH = 22;
 
 function getSecretKey() {
   const key = process.env.PAYMONGO_SECRET_KEY;
@@ -98,7 +100,7 @@ function sanitizeStatementDescriptor(value) {
   const trimmed = (value || "").toString().trim();
   const isNumericOnly = /^\d+$/.test(trimmed);
   const safe = !trimmed ? "Booking" : isNumericOnly ? `Room ${trimmed}` : trimmed;
-  return safe.slice(0, 22);
+  return safe.slice(0, PAYMONGO_STATEMENT_DESCRIPTOR_MAX_LENGTH);
 }
 
 async function createPaymentIntent({ amountPesos, description, statementDescriptor, metadata }) {
@@ -108,7 +110,7 @@ async function createPaymentIntent({ amountPesos, description, statementDescript
         amount: Math.round(amountPesos * 100),
         currency: "PHP",
         capture_type: "automatic",
-        payment_method_allowed: ["card", "gcash", "paymaya", "qrph"],
+        payment_method_allowed: PAYMONGO_ALLOWED_METHODS,
         payment_method_options: { card: { request_three_d_secure: "automatic" } },
         description: description || "Booking down payment",
         statement_descriptor: sanitizeStatementDescriptor(statementDescriptor),
@@ -186,6 +188,7 @@ function verifyWebhookSignature(rawBody, signatureHeader) {
 
 module.exports = {
   PAYMONGO_API_BASE,
+  PAYMONGO_ALLOWED_METHODS,
   getPublicKey,
   createPaymentIntent,
   retrievePaymentIntent,

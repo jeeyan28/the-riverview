@@ -1,3 +1,4 @@
+import '../../styles/admin/users.css';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import DataTable from '../../components/DataTable';
 import Modal from '../../components/Modal';
@@ -9,7 +10,6 @@ import { useAuth } from '../../context/AuthContext';
 import { usersService } from '../../services/users';
 import { PASSWORD_REQUIREMENTS } from '../../utils/password';
 
-
 const ROLE_LABELS = { user: 'User', staff: 'Staff', manager: 'Supervisor', super_admin: 'Owner' };
 const ROLE_BADGE_CLASS = { super_admin: 'pill-active', manager: 'pill-vacant', staff: 'pill-pending', user: 'pill-done' };
 
@@ -17,26 +17,21 @@ function Users() {
   const { initializing, guardPermission } = useAuth();
   const { confirm, confirmProps } = useConfirm();
 
-  /* ── filters ── */
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
   const searchDebounce = useRef(null);
 
-  /* ── data ── */
   const [users, setUsers] = useState([]);
   const [assignableRoles, setAssignableRoles] = useState([]);
+  const [assignableRoleChanges, setAssignableRoleChanges] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
 
-  /* ── modals ── */
   const [addOpen, setAddOpen] = useState(false);
-  const [roleChangeTarget, setRoleChangeTarget] = useState(null); // the user row, or null
+  const [roleChangeTarget, setRoleChangeTarget] = useState(null);
 
   const fetchUsers = useCallback(async () => {
-    // Wait for AuthContext's permission revalidation before gating, to
-    // avoid a false "no permission" flash on hard refresh.
     if (initializing) return;
-    // Re-checked on every call: initial load, search, and role-filter changes.
     if (!guardPermission('admin:manage', "You don't have permission to manage users.")) {
       setLoading(false);
       return;
@@ -47,6 +42,7 @@ function Users() {
       const data = await usersService.list({ search: search.trim(), role: roleFilter });
       setUsers(Array.isArray(data.users) ? data.users : []);
       setAssignableRoles(Array.isArray(data.assignableRoles) ? data.assignableRoles : []);
+      setAssignableRoleChanges(Array.isArray(data.assignableRoleChanges) ? data.assignableRoleChanges : []);
     } catch (err) {
       console.error(err);
       setLoadError(true);
@@ -59,20 +55,17 @@ function Users() {
     fetchUsers();
   }, [roleFilter, initializing]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Search is debounced 300ms, same as the original's debounce(renderUsersPanel, 300).
   useEffect(() => {
     clearTimeout(searchDebounce.current);
     searchDebounce.current = setTimeout(fetchUsers, 300);
     return () => clearTimeout(searchDebounce.current);
   }, [search]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Direct port of openAddUserModal()'s guard.
   function openAddUser() {
     if (!guardPermission('admin:manage', "You don't have permission to manage users.")) return;
     setAddOpen(true);
   }
 
-  /* ── row actions ── */
   async function toggleUserStatus(user) {
     const makeActive = !user.isActive;
     if (!(await confirm(
@@ -179,16 +172,13 @@ function Users() {
       </div>
 
       <AddUserModal open={addOpen} onClose={() => setAddOpen(false)} assignableRoles={assignableRoles} onCreated={fetchUsers} />
-      <RoleChangeModal user={roleChangeTarget} assignableRoles={assignableRoles} onClose={() => setRoleChangeTarget(null)} onSaved={fetchUsers} />
+      <RoleChangeModal user={roleChangeTarget} assignableRoles={assignableRoleChanges} onClose={() => setRoleChangeTarget(null)} onSaved={fetchUsers} />
 
       <ConfirmDialog {...confirmProps} />
     </div>
   );
 }
 
-// Add User modal (page-specific, same pattern as Bookings.jsx's modals).
-// Validation errors show inline so the form isn't cleared; status/delete
-// use alert() since those actions have already happened.
 function AddUserModal({ open, onClose, assignableRoles, onCreated }) {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -202,8 +192,6 @@ function AddUserModal({ open, onClose, assignableRoles, onCreated }) {
   const passwordChecks = PASSWORD_REQUIREMENTS.map((req) => ({ ...req, met: req.test(password) }));
   const passwordValid = passwordChecks.every((c) => c.met);
 
-  // Reset the form and default the role select whenever the modal (re)opens,
-  // matching openAddUserModal()'s field-clearing in the original.
   useEffect(() => {
     if (open) {
       setFirstName('');
@@ -302,8 +290,6 @@ function AddUserModal({ open, onClose, assignableRoles, onCreated }) {
   );
 }
 
-// Role Change modal (page-specific). `user` is the live row from Users()'s
-// state, so reopening it always reflects the current role.
 function RoleChangeModal({ user, assignableRoles, onClose, onSaved }) {
   const [role, setRole] = useState('');
   const [error, setError] = useState('');

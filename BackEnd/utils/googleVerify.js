@@ -1,18 +1,12 @@
 const { OAuth2Client } = require("google-auth-library");
 
-const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+const client = new OAuth2Client(
+  process.env.GOOGLE_CLIENT_ID,
+  process.env.GOOGLE_CLIENT_SECRET,
+  "postmessage"
+);
 
-/**
- * Verifies a Google ID token (the `credential` returned by Google Identity
- * Services in the browser) and returns { email, firstname, lastname, googleId }.
- * Throws if the token is invalid/expired/wrong audience.
- */
-async function verifyGoogleIdToken(idToken) {
-  const ticket = await client.verifyIdToken({
-    idToken,
-    audience: process.env.GOOGLE_CLIENT_ID,
-  });
-  const payload = ticket.getPayload();
+function mapGoogleProfile(payload) {
   return {
     email: (payload.email || "").toLowerCase(),
     firstname: payload.given_name || "",
@@ -23,4 +17,24 @@ async function verifyGoogleIdToken(idToken) {
   };
 }
 
-module.exports = { verifyGoogleIdToken };
+async function verifyGoogleIdToken(idToken) {
+  const ticket = await client.verifyIdToken({
+    idToken,
+    audience: process.env.GOOGLE_CLIENT_ID,
+  });
+  return mapGoogleProfile(ticket.getPayload());
+}
+
+async function exchangeGoogleAuthCode(code) {
+  const { tokens } = await client.getToken(code);
+  if (!tokens.id_token) {
+    throw new Error("Google did not return an ID token.");
+  }
+  const ticket = await client.verifyIdToken({
+    idToken: tokens.id_token,
+    audience: process.env.GOOGLE_CLIENT_ID,
+  });
+  return mapGoogleProfile(ticket.getPayload());
+}
+
+module.exports = { verifyGoogleIdToken, exchangeGoogleAuthCode };

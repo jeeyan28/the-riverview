@@ -1,3 +1,4 @@
+import '../../styles/admin/analytics.css';
 import { useEffect, useRef } from 'react';
 import { Chart } from 'chart.js/auto';
 

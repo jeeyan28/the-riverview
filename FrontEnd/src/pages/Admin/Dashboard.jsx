@@ -1,3 +1,4 @@
+import '../../styles/admin/dashboard.css';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import DataTable from '../../components/DataTable';
@@ -155,6 +156,7 @@ function Dashboard() {
             loading={bookingsLoading}
             emptyMessage={bookingsError ? 'Could not load bookings.' : 'No bookings yet.'}
             getRowKey={(b) => b._id}
+            paginate={false}
           />
         </div>
 

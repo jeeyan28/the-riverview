@@ -18,7 +18,7 @@ const {
   hashesMatch,
   checkAndBumpOtpRequestWindow,
 } = require("../utils/otp");
-const { verifyGoogleIdToken } = require("../utils/googleVerify");
+const { exchangeGoogleAuthCode } = require("../utils/googleVerify");
 const { normalizeName, validateName } = require("../utils/nameValidation");
 const { isAdminRole, getEffectivePermissions, roleLabel } = require("../utils/permissions");
 const { isPasswordStrongEnough, PASSWORD_POLICY_MESSAGE } = require("../utils/passwordPolicy");
@@ -489,14 +489,12 @@ router.post("/login", loginLimiter, async (req, res) => {
   }
 });
 
-// ── Google sign-in (customers get created on the fly; staff/manager/super_admin
-//    must already exist — Google can never grant someone admin access by itself)
 router.post("/google", async (req, res) => {
   try {
-    const { idToken } = req.body;
-    if (!idToken) return res.status(400).json({ message: "Missing Google credential." });
+    const { code } = req.body;
+    if (!code) return res.status(400).json({ message: "Missing Google credential." });
 
-    const profile = await verifyGoogleIdToken(idToken);
+    const profile = await exchangeGoogleAuthCode(code);
     if (!profile.email || !profile.emailVerified) {
       return res.status(401).json({ message: "Google account email is not verified." });
     }
@@ -504,11 +502,6 @@ router.post("/google", async (req, res) => {
     let user = await User.findOne({ $or: [{ googleId: profile.googleId }, { email: profile.email }] });
 
     if (!user) {
-      // New Google sign-in with no existing account → create as a regular customer.
-      // lastName is required at the schema level (model/user.js); Google
-      // almost always returns family_name, but a "-" fallback avoids a
-      // save() failure on the rare profile that omits it. Flagged in
-      // PROJECT_PROGRESS.md for review — no product decision was made here.
       user = await User.create({
         firstName: profile.firstname || "Guest",
         lastName: profile.lastname || "-",
@@ -517,8 +510,6 @@ router.post("/google", async (req, res) => {
         googleId: profile.googleId,
         googleProfilePicture: profile.picture || "",
         role: "user",
-        // Google already confirmed profile.emailVerified above, so this
-        // account is verified from creation — no OTP step needed.
         isVerified: true,
       });
     } else {
@@ -527,22 +518,15 @@ router.post("/google", async (req, res) => {
         return res.status(403).json({ message: "This account has been deactivated." });
       }
       if (!user.googleId) user.googleId = profile.googleId;
-      // Google is the source of truth for a Google-linked account's name —
-      // refresh it from the fresh profile on every login rather than only
-      // at first sign-in, so a name changed on Google is reflected here too.
       if (profile.firstname) user.firstName = profile.firstname;
       if (profile.lastname) user.lastName = profile.lastname;
       if (profile.picture) user.googleProfilePicture = profile.picture;
-      // Part 8: Google has already confirmed this email (checked above),
-      // so linking/signing in with Google supersedes any prior unverified
-      // state — an account should never be Google-locked-out.
       if (!user.isVerified) user.isVerified = true;
       await user.registerSuccessfulLogin();
     }
 
     await logLoginAttempt(req, { user, status: "success", method: "google" });
 
-    // Same reasoning as /login: regenerate on privilege change to avoid session fixation.
     await regenerateSession(req);
 
     req.session.userId = user._id.toString();

@@ -1,0 +1,114 @@
+/* ══════════════════════════════════════════════════════════════
+   ADMIN — DASHBOARD (pages/Admin/Dashboard.jsx)
+   Everything here is scoped to #panel-dashboard. Generic pieces the
+   dashboard also uses (.card, .mc, .pill, etc.) live in shared.css.
+   ══════════════════════════════════════════════════════════════ */
+
+/* ══════════════════════════════════════════
+   TIER 5 — DASHBOARD VISUAL MODERNIZATION
+   Scoped to #panel-dashboard so no other panel's look changes, and purely
+   visual — no selectors here touch anything that drives layout logic
+   (panel switching, gating, etc.) from earlier tiers.
+   ══════════════════════════════════════════ */
+#panel-dashboard{gap:18px;}
+
+/* Metric cards — icon badges, per-card accent color, soft depth + hover lift */
+#panel-dashboard .metric-row{gap:14px;}
+#panel-dashboard .mc{
+  position:relative;overflow:hidden;border-radius:16px;
+  box-shadow:0 1px 2px rgba(0,0,0,.18),0 10px 24px -18px rgba(0,0,0,.6);
+  transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease;
+}
+#panel-dashboard .mc::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--teal);opacity:.9;
+}
+#panel-dashboard .mc:hover{
+  transform:translateY(-2px);border-color:rgba(255,255,255,.14);
+  box-shadow:0 4px 10px rgba(0,0,0,.22),0 16px 32px -18px rgba(0,0,0,.65);
+}
+#panel-dashboard .metric-row .mc:nth-child(2)::before{background:var(--blue);}
+#panel-dashboard .metric-row .mc:nth-child(3)::before{background:var(--amber);}
+#panel-dashboard .metric-row .mc:nth-child(4)::before{background:var(--red);}
+
+#panel-dashboard .mc-label{gap:8px;margin-bottom:10px;}
+#panel-dashboard .mc-label i{
+  width:26px;height:26px;flex-shrink:0;border-radius:8px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:13px!important;background:var(--teal-soft);color:var(--teal);
+}
+#panel-dashboard .metric-row .mc:nth-child(2) .mc-label i{background:rgba(55,138,221,.14);color:var(--blue);}
+#panel-dashboard .metric-row .mc:nth-child(3) .mc-label i{background:rgba(239,159,39,.14);color:var(--amber);}
+#panel-dashboard .metric-row .mc:nth-child(4) .mc-label i{background:rgba(255,107,107,.14);color:var(--red);}
+#panel-dashboard .mc-val{letter-spacing:-.01em;}
+#panel-dashboard .mc-sub.up{font-weight:500;}
+
+/* Recent Bookings + Room Status row (was an inline-styled div; admin.js
+   swaps its inline style for this class — see enhanceDashboardStaticMarkup) */
+#panel-dashboard .dash-grid{display:grid;grid-template-columns:1.4fr 1fr;gap:14px;}
+
+/* Cards get a touch more depth on the dashboard specifically */
+#panel-dashboard .card{
+  border-radius:16px;
+  box-shadow:0 1px 2px rgba(0,0,0,.16),0 12px 28px -20px rgba(0,0,0,.6);
+  transition:box-shadow .18s ease,border-color .18s ease;
+}
+#panel-dashboard .card:hover{
+  border-color:rgba(255,255,255,.14);
+  box-shadow:0 2px 6px rgba(0,0,0,.2),0 18px 36px -20px rgba(0,0,0,.65);
+}
+
+/* Recent Bookings table — guest avatar + row hover */
+#panel-dashboard .dash-guest-cell{display:flex;align-items:center;gap:10px;}
+#panel-dashboard .dash-avatar{
+  width:26px;height:26px;border-radius:50%;flex-shrink:0;
+  background:var(--navy4);color:var(--teal);
+  display:flex;align-items:center;justify-content:center;
+  font-size:.66rem;font-weight:700;letter-spacing:.02em;
+}
+#panel-dashboard #dash-recent-bookings tr{transition:background-color .12s ease;}
+#panel-dashboard #dash-recent-bookings tr:hover td{background:var(--navy3);}
+
+#panel-dashboard .dash-room-status{display:flex;flex-direction:column;gap:7px;}
+
+/* Room Status list — replaces the old plain rows with a dot indicator */
+#panel-dashboard .dash-room-row{
+  display:flex;align-items:center;gap:10px;
+  padding:9px 12px;background:var(--navy3);border-radius:10px;
+  transition:background-color .12s ease,transform .12s ease;
+}
+#panel-dashboard .dash-room-row:hover{background:var(--navy4);transform:translateX(2px);}
+#panel-dashboard .dash-room-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+#panel-dashboard .dash-room-num{flex:1;font-size:.8rem;color:var(--text);}
+#panel-dashboard .dash-dot-active{background:var(--teal);box-shadow:0 0 0 3px rgba(0,201,167,.18);}
+#panel-dashboard .dash-dot-vacant{background:var(--blue);}
+#panel-dashboard .dash-dot-overdue{background:var(--amber);box-shadow:0 0 0 3px rgba(239,159,39,.16);}
+
+/* Shared empty/loading state used inside Recent Bookings + Room Status */
+#panel-dashboard .dash-empty-state{
+  text-align:center;color:var(--muted);padding:20px 0;font-size:.8rem;
+}
+
+/* Quick Actions — was 4 fully inline-styled buttons; admin.js re-skins them
+   into icon-tile buttons and applies these classes (inline style attribute
+   is removed, so no !important overrides are needed here). */
+#panel-dashboard .qa-row{display:flex;gap:10px;flex-wrap:wrap;}
+#panel-dashboard .qa-btn{
+  display:flex;align-items:center;gap:10px;
+  padding:10px 16px 10px 10px;border-radius:12px;
+  background:var(--navy3);border:1px solid var(--border);
+  color:var(--text);font-size:.82rem;font-weight:500;cursor:pointer;
+  font-family:var(--font-body);
+  transition:transform .15s ease,border-color .15s ease,background-color .15s ease;
+}
+#panel-dashboard .qa-btn:hover{
+  transform:translateY(-1px);border-color:rgba(0,201,167,.35);background:var(--navy4);
+}
+#panel-dashboard .qa-ico{
+  width:30px;height:30px;border-radius:9px;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  background:var(--teal-soft);color:var(--teal);font-size:15px;
+}
+#panel-dashboard .qa-btn:nth-child(2) .qa-ico{background:rgba(55,138,221,.14);color:var(--blue);}
+#panel-dashboard .qa-btn:nth-child(3) .qa-ico{background:rgba(239,159,39,.14);color:var(--amber);}
+#panel-dashboard .qa-btn:nth-child(4) .qa-ico{background:rgba(212,83,126,.14);color:var(--pink);}
+#panel-dashboard .qa-label{white-space:nowrap;}
