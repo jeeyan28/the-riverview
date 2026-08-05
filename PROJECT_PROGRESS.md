@@ -1,3 +1,0 @@
-# Project Progress
-
-## Current Task 
