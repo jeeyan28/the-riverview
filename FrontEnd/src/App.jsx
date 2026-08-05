@@ -5,10 +5,12 @@ import AdminLayout from './layouts/AdminLayout';
 import { useAuth } from './context/AuthContext';
 import Home from './pages/Home';
 import Rooms from './pages/Rooms';
+import Contact from './pages/Contact';
 import Login from './pages/Login';
 import Dashboard from './pages/Admin/Dashboard';
 import Bookings from './pages/Admin/Bookings';
 import Monitor from './pages/Admin/Monitor';
+import LobbyMonitor from './pages/Admin/LobbyMonitor';
 import Analytics from './pages/Admin/Analytics';
 import Users from './pages/Admin/Users';
 import Reports from './pages/Admin/Reports';
@@ -32,11 +34,14 @@ function App() {
       <Route element={<MainLayout />}>
         <Route path="/" element={<Home />} />
         <Route path="/rooms" element={<Rooms />} />
+        <Route path="/contact" element={<Contact />} />
       </Route>
 
       <Route element={<AuthLayout />}>
         <Route path="/login" element={<Login />} />
       </Route>
+
+      <Route path="/lobby-monitor" element={<LobbyMonitor />} />
 
       <Route path="/admin" element={<AdminLayout />}>
         <Route path="dashboard" element={<Dashboard />} />

@@ -2,18 +2,6 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-
-    <!-- Sets data-theme on <html> BEFORE React mounts — same inline script
-         as the original Frontend/index.html's <head>. Reads a saved
-         preference first (localStorage 'riverview-theme'), falling back to
-         the OS-level prefers-color-scheme when nothing has been saved yet.
-         This was missing from the React entry file (Phase 6 port only
-         carried over the icon/font <link> tags, not this script), which is
-         why MainLayout.jsx's theme useState initializer — which just reads
-         this attribute — was silently falling back to its own 'light'
-         default instead of ever seeing 'dark'. Fixed here rather than in
-         MainLayout.jsx, since MainLayout's fallback logic was already
-         correct; it just never had a script setting the attribute first. -->
     <script>
       (function () {
         var saved = localStorage.getItem('riverview-theme');
@@ -24,30 +12,18 @@
 
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Riverview</title>
-
-    <!-- Kept from the original site — Font Awesome icons used throughout
-         index.html/admin.html markup (fa-solid classes etc). Not replaced
-         with an npm icon package to avoid an unnecessary dependency and
-         to keep every existing icon class working unchanged. -->
     <link
       rel="stylesheet"
       href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css"
     />
-
-    <!-- Kept from the original admin.html — Tabler icon font, used by every
-         sb-item / topbar icon in the admin sidebar (ti-* classes). Added now
-         (Phase 6) because AdminLayout needs it to render its sidebar icons;
-         Chart.js (also used by admin.html, but only inside the Analytics/
-         Reports panels) is deferred until those pages are actually built in
-         Phase 8, to avoid loading a heavy script before anything needs it. -->
     <link
       rel="stylesheet"
       href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css"
     />
-
-    <!-- Kept from the original login.html/register.html — Google Identity
-         Services script for "Sign in with Google". Loaded globally here so
-         it's available regardless of which route/page mounts first. -->
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"
+    />
     <script src="https://accounts.google.com/gsi/client" async defer></script>
   </head>
   <body>

@@ -35,4 +35,10 @@ export const bookingsService = {
 
   /** Bookings for the current logged-in user — used by ProfileModal's booking history. */
   mine: () => apiRequest(`${BASE}/mine`, { fallbackMessage: 'Failed to load your booking history.' }),
+
+  /** @param {{roomId:string, variantLabel?:string, date:string, timeIn:string, duration:number}} payload */
+  lockSlot: (payload) => apiRequest(`${BASE}/lock`, { method: 'POST', body: payload, fallbackMessage: 'Failed to hold this time slot.' }),
+
+  /** @param {string} id */
+  releaseLock: (id) => apiRequest(`${BASE}/lock/${id}`, { method: 'DELETE', fallbackMessage: 'Failed to release the time slot hold.' }),
 };

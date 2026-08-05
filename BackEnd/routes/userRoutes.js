@@ -11,14 +11,12 @@ const {
   canManageTarget,
   canAssignRole,
   assignableRoles,
+  assignableRoleChanges,
 } = require("../utils/permissions");
 const { normalizeName, validateName } = require("../utils/nameValidation");
 const { isPasswordStrongEnough, PASSWORD_POLICY_MESSAGE } = require("../utils/passwordPolicy");
+const { logAudit } = require("../utils/auditLog");
 
-// Anyone may edit their own profile; editing someone else's requires the
-// admin:manage permission AND passing the same role-hierarchy check used by
-// the dedicated role/status endpoints below (a Supervisor must not be able
-// to edit an Owner's profile fields just because this route doesn't touch role/status).
 function canEditTarget(req, target) {
   if (req.session.userId === String(target._id)) return true;
   if (!isAdminRole(req.user.role) || !hasPermission(req.user, PERMISSIONS.ADMIN_MANAGE)) return false;
@@ -40,12 +38,6 @@ function shapeUser(u) {
   };
 }
 
-// ── List users (admins + customers), for the "Manage Users" panel.
-// Owner and Supervisor both have admin:manage, so both can view this list —
-// the UI decides per-row whether the "manage" actions are shown, using the
-// same canManageTarget() rule the server enforces below. Query params:
-//   ?role=staff|manager|super_admin|user   filter by role
-//   ?search=text                            match name/email
 router.get("/", requirePermission(PERMISSIONS.ADMIN_MANAGE), async (req, res) => {
   try {
     const filter = {};
@@ -61,16 +53,17 @@ router.get("/", requirePermission(PERMISSIONS.ADMIN_MANAGE), async (req, res) =>
       canManage: canManageTarget({ actor: req.user, target: u }).ok,
     }));
 
-    res.json({ users: shaped, assignableRoles: assignableRoles(req.user.role) });
+    res.json({
+      users: shaped,
+      assignableRoles: assignableRoles(req.user.role),
+      assignableRoleChanges: assignableRoleChanges(req.user.role),
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Server error." });
   }
 });
 
-// ── Create a new admin account (Staff / Supervisor / Owner).
-// Customer ("user") signups go through /api/auth/register instead — this
-// endpoint is specifically for the admin panel's "Manage Users" panel.
 router.post("/", requirePermission(PERMISSIONS.ADMIN_MANAGE), async (req, res) => {
   try {
     const { firstName, lastName, phone, email, password, role } = req.body;
@@ -105,6 +98,7 @@ router.post("/", requirePermission(PERMISSIONS.ADMIN_MANAGE), async (req, res) =
       role,
     });
 
+    await logAudit({ category: "Manage Users", action: "created", description: `created user account for ${user.firstName} ${user.lastName} (${roleLabel(user.role)})`, user: req.user });
     res.status(201).json({ user: shapeUser(user) });
   } catch (err) {
     console.error(err);
@@ -112,7 +106,6 @@ router.post("/", requirePermission(PERMISSIONS.ADMIN_MANAGE), async (req, res) =
   }
 });
 
-// ── Change a user's role.
 router.put("/:id/role", requirePermission(PERMISSIONS.ADMIN_MANAGE), async (req, res) => {
   try {
     const { role } = req.body;
@@ -127,6 +120,7 @@ router.put("/:id/role", requirePermission(PERMISSIONS.ADMIN_MANAGE), async (req,
 
     target.role = role;
     await target.save();
+    await logAudit({ category: "Manage Users", action: "updated", description: `changed ${target.firstName} ${target.lastName}'s role to ${roleLabel(role)}`, user: req.user });
     res.json({ user: shapeUser(target) });
   } catch (err) {
     console.error(err);
@@ -134,8 +128,6 @@ router.put("/:id/role", requirePermission(PERMISSIONS.ADMIN_MANAGE), async (req,
   }
 });
 
-// ── Activate / deactivate a user (soft-disable instead of deleting — keeps
-// booking/sales history intact for reporting).
 router.put("/:id/status", requirePermission(PERMISSIONS.ADMIN_MANAGE), async (req, res) => {
   try {
     const { isActive } = req.body;
@@ -147,6 +139,7 @@ router.put("/:id/status", requirePermission(PERMISSIONS.ADMIN_MANAGE), async (re
 
     target.isActive = !!isActive;
     await target.save();
+    await logAudit({ category: "Manage Users", action: "updated", description: `${target.isActive ? "activated" : "deactivated"} user ${target.firstName} ${target.lastName}`, user: req.user });
     res.json({ user: shapeUser(target) });
   } catch (err) {
     console.error(err);
@@ -154,7 +147,6 @@ router.put("/:id/status", requirePermission(PERMISSIONS.ADMIN_MANAGE), async (re
   }
 });
 
-// ── Delete a user account outright.
 router.delete("/:id", requirePermission(PERMISSIONS.ADMIN_MANAGE), async (req, res) => {
   try {
     const target = await User.findById(req.params.id);
@@ -164,6 +156,7 @@ router.delete("/:id", requirePermission(PERMISSIONS.ADMIN_MANAGE), async (req, r
     if (!manageCheck.ok) return res.status(403).json({ message: manageCheck.message });
 
     await User.findByIdAndDelete(req.params.id);
+    await logAudit({ category: "Manage Users", action: "deleted", description: `deleted user account for ${target.firstName} ${target.lastName}`, user: req.user });
     res.json({ message: "User deleted." });
   } catch (err) {
     console.error(err);
@@ -171,7 +164,6 @@ router.delete("/:id", requirePermission(PERMISSIONS.ADMIN_MANAGE), async (req, r
   }
 });
 
-// ── Update profile details (firstName/lastName/phone)
 router.put("/:id", ensureAuthenticated, async (req, res) => {
   try {
     const target = await User.findById(req.params.id);
@@ -206,9 +198,6 @@ router.put("/:id", ensureAuthenticated, async (req, res) => {
   }
 });
 
-// ── Change password (requires current password — even for admins editing
-//    their own account; admins editing someone else's account skip this
-//    check since they can't know the target's current password)
 router.put("/:id/password", ensureAuthenticated, async (req, res) => {
   try {
     const user = await User.findById(req.params.id).select("+password");
@@ -234,7 +223,7 @@ router.put("/:id/password", ensureAuthenticated, async (req, res) => {
       }
     }
 
-    user.password = newPassword; // re-hashed by the pre-save hook in model/user.js
+    user.password = newPassword;
     await user.save();
 
     res.json({ message: "Password updated." });

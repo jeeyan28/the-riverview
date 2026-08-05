@@ -1,0 +1,230 @@
+/* ══════════════════════════════════════════════════════════════
+   ADMIN — ROOM MONITOR (pages/Admin/Monitor.jsx)
+   ══════════════════════════════════════════════════════════════ */
+
+/* Muted single-line note used in place of action buttons (room-card
+   actions when the viewer lacks permission, or the room isn't actionable) */
+.rm-note{font-size:.82rem;color:var(--muted);}
+
+/* Generic side-by-side form-field layout (dropdown+delete button,
+   H/M/S duration inputs, add-new-option row, etc.) */
+.field-row{display:flex;gap:8px;}
+.field-row--top-gap{margin-top:8px;}
+.field-row--extend-gap{margin-top:10px;}
+.field-col{flex:1;}
+
+/* ── ROOM MONITOR — header (Live badge + subtitle) ── */
+.rm-page-head{display:flex;align-items:center;gap:10px;}
+.rm-page-sub{font-size:.78rem;color:var(--muted);}
+.live-badge{
+  display:inline-flex;align-items:center;gap:5px;padding:2px 9px;border-radius:20px;
+  background:rgba(22,163,74,.12);color:var(--green);font-size:.7rem;font-weight:700;
+}
+.live-badge .dot{width:6px;height:6px;border-radius:50%;background:var(--green);}
+
+/* ── ROOM MONITOR — facility filter + group headers ── */
+.fac-toolbar{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;}
+.fac-chips{display:flex;gap:8px;flex-wrap:wrap;}
+.fac-chip{
+  padding:6px 14px;border-radius:20px;background:var(--navy3);border:1px solid var(--border);
+  font-size:.76rem;color:var(--muted);cursor:pointer;font-family:var(--font-body);
+  transition:background .15s,border-color .15s,color .15s;
+}
+.fac-chip:hover{color:var(--text);}
+.fac-chip.active{background:var(--teal);color:#fff;border-color:var(--teal);}
+.rm-group{display:flex;flex-direction:column;gap:12px;}
+.rm-group-head{font-size:.86rem;font-weight:600;color:var(--text);}
+.rm-group-ico{color:var(--muted);margin-right:7px;font-size:.9rem;}
+.rm-group-count{font-size:.76rem;font-weight:400;color:var(--muted);}
+
+/* ── ROOM MONITOR GRID ── */
+.room-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:18px;}
+.rm{
+  position:relative;
+  background:var(--navy2);border:1.5px solid var(--border);border-radius:16px;padding:20px;
+  box-shadow:var(--shadow-sm);
+  transition:background .2s,border-color .2s,box-shadow .2s,transform .15s;
+  display:flex;flex-direction:column;min-height:170px;cursor:pointer;
+}
+.rm:hover{box-shadow:var(--shadow-md);transform:translateY(-2px);}
+.rm.occupied{border-color:rgba(0,201,167,.4);background:var(--teal-soft);}
+.rm.overdue{border-color:rgba(245,165,36,.4);background:rgba(245,165,36,.14);}
+.rm.vacant{border-color:rgba(37,99,235,.3);}
+.rm.available{border-color:var(--border);background:var(--navy2);}
+/* 'safe' = occupied room with >10min left — same green treatment as
+   Available, since the traffic-light color tracks remaining time, not
+   occupancy. Badge text still reads "Occupied" (see statusLabel). */
+.rm.safe{border-color:rgba(22,163,74,.4);background:rgba(22,163,74,.14);}
+.rm-head{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:14px;}
+.rm-head-right{display:flex;align-items:center;gap:8px;}
+.rm-name{font-weight:700;font-size:1.02rem;color:var(--text);}
+.rm-type{font-size:.8rem;color:var(--muted);}
+.rm-ico{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;}
+.rm-ico.ico-teal{background:var(--teal-soft);color:var(--teal);}
+.rm-ico.ico-amber{background:rgba(245,165,36,.14);color:var(--amber);}
+.rm-ico.ico-blue{background:rgba(37,99,235,.14);color:var(--blue);}
+.rm-ico.ico-green{background:rgba(22,163,74,.14);color:var(--green);}
+.rm-ico.ico-red{background:rgba(225,29,72,.14);color:var(--red);}
+
+/* Non-occupied card content — centered icon + status text, no rate shown */
+.rm-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;flex:1;padding:20px 0;color:var(--muted);}
+.rm-empty i{font-size:26px;}
+.rm-empty span{font-size:.84rem;font-weight:600;}
+.rm-rows{display:flex;flex-direction:column;gap:8px;margin-bottom:14px;}
+.rm-row{display:flex;justify-content:space-between;align-items:center;font-size:.84rem;}
+.rm-row .lbl{color:var(--muted);}
+.rm-row .val{color:var(--text);font-weight:500;}
+
+/* Status shown as a rounded pill with a dot, matching the reference's
+   status-badge treatment. status-{available|occupied|warning|expired|
+   overdue|vacant} mirrors the card's own state class (stateClass in
+   Monitor.jsx). */
+.rm-status-pill{
+  display:inline-flex;align-items:center;gap:6px;padding:3px 10px;
+  border-radius:20px;font-size:.72rem;font-weight:700;
+}
+.rm-status-pill .dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
+.rm-status-pill.status-available{background:var(--navy3);color:var(--muted);}
+.rm-status-pill.status-available .dot{background:var(--muted);}
+.rm-status-pill.status-safe{background:rgba(22,163,74,.12);color:var(--green);}
+.rm-status-pill.status-safe .dot{background:var(--green);}
+.rm-status-pill.status-occupied{background:var(--teal-soft);color:var(--teal);}
+.rm-status-pill.status-occupied .dot{background:var(--teal);}
+.rm-status-pill.status-warning{background:rgba(245,165,36,.12);color:var(--amber);}
+.rm-status-pill.status-warning .dot{background:var(--amber);}
+.rm-status-pill.status-expired{background:rgba(225,29,72,.12);color:var(--red);}
+.rm-status-pill.status-expired .dot{background:var(--red);}
+.rm-status-pill.status-overdue{background:rgba(245,165,36,.12);color:var(--amber);}
+.rm-status-pill.status-overdue .dot{background:var(--amber);}
+.rm-status-pill.status-vacant{background:rgba(37,99,235,.12);color:var(--blue);}
+.rm-status-pill.status-vacant .dot{background:var(--blue);}
+
+/* Room card — prominent timer block + footer (payment status / rate) */
+.rm-timer-row{display:flex;align-items:center;gap:12px;margin-bottom:14px;}
+.rm-timer-big{font-family:var(--font-display);font-size:1.35rem;font-weight:700;color:var(--text);font-variant-numeric:tabular-nums;line-height:1.15;}
+.rm-timer-big.warn{color:var(--amber);}
+.rm-timer-big.expired{color:var(--red);}
+.rm-timer-caption{font-size:.78rem;color:var(--muted);}
+.rm-timer-caption--standalone{font-size:.92rem;font-weight:600;color:var(--text);}
+.rm-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:auto;padding-top:10px;}
+.rm-foot-info{display:flex;align-items:center;gap:6px;font-size:.84rem;color:var(--text);font-weight:500;}
+.rm-foot-info i{color:var(--muted);}
+.rm-foot-info--paid{color:var(--green);}
+.rm-foot-info--unpaid{color:var(--red);}
+.rm-foot-price{font-size:.86rem;font-weight:700;color:var(--text);}
+
+/* Payment Status — display pill (Grid row + Table cell) */
+.pay-pill{
+  display:inline-flex;align-items:center;padding:3px 10px;border-radius:20px;
+  font-size:.72rem;font-weight:700;
+}
+.pay-pill.pay-paid{background:rgba(22,163,74,.12);color:var(--green);}
+.pay-pill.pay-unpaid{background:rgba(225,29,72,.12);color:var(--red);}
+
+/* Payment Status — manual toggle inside Start/Extend modal */
+.pay-toggle{display:inline-flex;background:var(--navy3);border:1px solid var(--border);border-radius:9px;padding:3px;gap:2px;}
+.pay-toggle-btn{
+  flex:1;padding:8px 14px;border-radius:7px;border:none;background:transparent;
+  color:var(--muted);font-size:.82rem;font-weight:600;cursor:pointer;font-family:var(--font-body);transition:background .15s,color .15s;
+}
+.pay-toggle-btn:hover{color:var(--text);}
+.pay-toggle-btn--paid.active{background:rgba(22,163,74,.16);color:var(--green);}
+.pay-toggle-btn--unpaid.active{background:rgba(225,29,72,.16);color:var(--red);}
+
+.rm-actions{display:flex;gap:10px;margin-top:auto;padding-top:6px;}
+
+/* ── ROOM MONITOR — Tier 2: walk-in countdown states ── */
+.rm.warning{border-color:rgba(245,165,36,.45);background:rgba(245,165,36,.16);}
+.rm.expired{
+  border-color:rgba(225,29,72,.45);background:rgba(225,29,72,.16);
+  box-shadow:0 0 0 1px rgba(225,29,72,.3),var(--shadow-sm);
+}
+.rm.blink-expired{animation:rm-blink 1s ease-in-out infinite;}
+@keyframes rm-blink{
+  0%,100%{box-shadow:0 0 0 1px rgba(225,29,72,.3);}
+  50%{box-shadow:0 0 0 4px rgba(225,29,72,.45);}
+}
+/* Gentle pulse on the red status pill itself (critical + expired), separate
+   from the stronger card-level blink reserved for past-end. */
+.rm-status-pill.status-expired{animation:rm-pill-pulse 1.8s ease-in-out infinite;}
+@keyframes rm-pill-pulse{
+  0%,100%{opacity:1;}
+  50%{opacity:.7;}
+}
+/* Red alert-triangle icon (critical + expired) pops up in the center of the
+   card at low opacity, fades out, and repeats every 3s — catches the eye
+   without a constant/distracting animation. */
+.rm-warning-pop{
+  position:absolute;top:50%;left:50%;z-index:5;pointer-events:none;
+  transform:translate(-50%,-50%) scale(.6);
+  font-size:2.6rem;color:var(--red);opacity:0;
+  animation:rm-warning-pop 3s ease-in-out infinite;
+}
+@keyframes rm-warning-pop{
+  0%,24%,100%{opacity:0;transform:translate(-50%,-50%) scale(.6);}
+  8%,16%{opacity:.55;transform:translate(-50%,-50%) scale(1);}
+  12%{transform:translate(-50%,-50%) scale(1.06);}
+}
+@media (prefers-reduced-motion: reduce){
+  .rm.blink-expired,.rm-table tbody tr.blink-expired,.rm-status-pill.status-expired,.rm-warning-pop,.rm-timer-warn-ico{animation:none;}
+  .rm-warning-pop{display:none;}
+}
+
+/* ── Grid / Table view toggle ── */
+.view-toggle{display:inline-flex;background:var(--navy3);border:1px solid var(--border);border-radius:9px;padding:3px;gap:2px;}
+.view-toggle-btn{
+  display:flex;align-items:center;gap:6px;padding:7px 12px;border-radius:7px;border:none;background:transparent;
+  color:var(--muted);font-size:.78rem;font-weight:600;cursor:pointer;font-family:var(--font-body);transition:background .15s,color .15s;
+}
+.view-toggle-btn:hover{color:var(--text);}
+.view-toggle-btn.active{background:var(--teal);color:#fff;}
+
+/* ── Table View ── */
+.rm-table-wrap{margin-top:0;}
+.rm-table{width:100%;border-collapse:collapse;font-size:.84rem;}
+.rm-table thead th{
+  position:sticky;top:0;background:var(--navy2);text-align:left;color:var(--muted);font-weight:600;font-size:.74rem;
+  text-transform:uppercase;letter-spacing:.03em;padding:12px 16px;border-bottom:1px solid var(--border);z-index:1;
+}
+.rm-table tbody td{padding:12px 16px;border-bottom:1px solid var(--border);vertical-align:middle;color:var(--text);}
+.rm-table tbody tr:hover{background:var(--navy3);}
+.rm-table tbody tr.blink-expired{animation:rm-row-blink 1s ease-in-out infinite;}
+@keyframes rm-row-blink{
+  0%,100%{background:transparent;}
+  50%{background:rgba(225,29,72,.1);}
+}
+.rm-actions--table{display:flex;gap:8px;margin-top:0;}
+.rm-actions--table .rm-btn{flex:0 0 auto;padding:6px 10px;font-size:.76rem;}
+.rm-timer{color:var(--text);font-variant-numeric:tabular-nums;}
+.rm-timer.warn{color:var(--amber);}
+.rm-timer.expired{color:var(--red);}
+.rm-timer-warn-ico{margin-right:5px;font-size:.9em;animation:rm-pill-pulse 1.8s ease-in-out infinite;}
+
+/* ── Duration presets / Add Time (SessionModal — Start & Extend) ── */
+
+/* ── Duration presets / Add Time (SessionModal — Start & Extend) ── */
+.aw-unit-lbl{font-size:.68rem;color:var(--text);text-align:center;margin-top:4px;}
+.aw-preset-row{display:flex;gap:6px;flex-wrap:wrap;}
+.aw-preset-btn{
+  padding:7px 14px;border-radius:8px;border:1px solid var(--border);
+  background:var(--navy3);color:var(--text);font-size:.78rem;font-weight:600;
+  cursor:pointer;font-family:var(--font-body);transition:background .15s,border-color .15s;
+}
+.aw-preset-btn:hover{background:var(--navy4);border-color:rgba(0,201,167,.4);}
+.aw-preset-btn--add{color:var(--teal);border-color:rgba(0,201,167,.35);background:var(--teal-soft);}
+.aw-preset-btn--add:hover{background:rgba(0,201,167,.18);}
+.aw-addtime-row{
+  display:flex;gap:8px;align-items:flex-end;margin-top:10px;padding:10px;
+  background:var(--navy3);border:1px solid var(--border);border-radius:9px;
+}
+.aw-addtime-row input{
+  width:100%;background:var(--navy2);border:1px solid var(--border);border-radius:8px;
+  padding:8px 10px;color:var(--text);font-family:var(--font-body);font-size:.82rem;outline:none;
+}
+.aw-addtime-row input:focus{border-color:rgba(0,201,167,.5);}
+.aw-addtime-btn{
+  flex:0 0 auto;padding:8px 16px;border-radius:8px;border:1px solid rgba(0,201,167,.35);
+  background:var(--teal-soft);color:var(--teal);font-size:.8rem;font-weight:600;
+  cursor:pointer;font-family:var(--font-body);
+}
+.aw-addtime-btn:hover{background:rgba(0,201,167,.18);}

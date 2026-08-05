@@ -1,0 +1,14 @@
+/* ══════════════════════════════════════════════════════════════
+   ADMIN — USERS (pages/Admin/Users.jsx)
+   The Add User / Role Change modals in Users.jsx are already
+   page-specific (defined inline in Users.jsx, not separate files),
+   so this file only holds the one style override they need.
+   ══════════════════════════════════════════════════════════════ */
+
+/* Add User modal's password field uses inline styles for its sibling
+   inputs (no .pfield wrapper); this matches that look for the input
+   nested inside PasswordInput's .input-wrap. */
+.aum-password-wrap .input-wrap input{
+  width:100%;background:var(--navy3);border:1px solid var(--border);border-radius:8px;
+  padding:9px 34px 9px 12px;color:var(--text);font-family:'Inter',sans-serif;font-size:.85rem;outline:none;
+}

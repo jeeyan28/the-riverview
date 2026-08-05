@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams, useLocation } from 'react-router-dom';
 import {
   Clock3, CalendarCheck, PartyPopper, Trophy,
   Zap, LayoutGrid, ShieldCheck,
@@ -7,9 +7,12 @@ import {
   HelpCircle, X,
 } from 'lucide-react';
 import { useSiteSettings } from '../hooks/useSiteSettings';
-import { resolveImageUrl } from '../utils/resolveImageUrl';
+import { useToast } from '../hooks/useToast';
 import { dateKey, fetchReservedHours } from '../utils/rooms';
 import BookingModal from '../components/BookingModal';
+import FacilityBookingCard from '../components/FacilityBookingCard';
+import FacilityCardSkeleton from '../components/FacilityCardSkeleton';
+import Toast from '../components/Toast';
 import { API_BASE_URL } from '../services/api';
 
 import heroImg4 from '../assets/pictures/RiverView_4.jpg';
@@ -19,7 +22,6 @@ import heroImg7 from '../assets/pictures/RiverView_7.jpg';
 import heroImg8 from '../assets/pictures/RiverView_8.jpg';
 import billiardsImg from '../assets/images/billiards.png';
 import courtImg from '../assets/images/court.png';
-import fallbackRoomImg from '../assets/pictures/Billiard.jpg';
 import heroBgImg from '../assets/images/main.png';
 
 const HERO_CAROUSEL_INTERVAL_MS = 4000;
@@ -32,9 +34,6 @@ const HERO_SLIDES = [
   { src: heroImg8, alt: 'Court 2' },
 ];
 
-// Shortest signed distance from `index` to `current` around the circular
-// slide order, e.g. with 5 slides: -2, -1, 0, 1, 2. Powers the coverflow
-// stack below — 0 is the big centered photo, ±1/±2 recede to the sides.
 function getOffset(index, current, total) {
   let diff = index - current;
   if (diff > total / 2) diff -= total;
@@ -42,7 +41,6 @@ function getOffset(index, current, total) {
   return diff;
 }
 
-// "Why Book Online?" benefit cards.
 const WHY_BOOK_CARDS = [
   { icon: CalendarCheck, title: 'Reserve in Advance', desc: "Lock in your preferred room before it's gone." },
   { icon: Zap, title: 'Faster Check-In', desc: 'Skip the wait — your room is ready when you arrive.' },
@@ -50,13 +48,8 @@ const WHY_BOOK_CARDS = [
   { icon: ShieldCheck, title: 'Secure Booking', desc: 'Your reservation and payment details stay protected.' },
 ];
 
-// "Helpful Information" cards — practical, optional notes, not warnings.
-// Opening hours text intentionally mirrors the hero's hardcoded string
-// (see PROJECT_PROGRESS.md) rather than adding a second, separately
-// formatted source for the same fact.
 const HELPFUL_INFO_CARDS = [
   { icon: DoorOpen, title: 'Walk-Ins Welcome', desc: 'Just show up — subject to availability.' },
-  { icon: CalendarDays, title: 'Book Ahead on Weekends', desc: 'Reservations are recommended on weekends and holidays.' },
   { icon: Grid2x2, title: 'Choose Your Room Type', desc: 'Solo, Big, or Shared — pick what fits your group.' },
   { icon: RefreshCcw, title: 'Availability Updates Often', desc: 'Room status refreshes regularly so what you see is accurate.' },
   { icon: Wallet, title: 'Down Payment May Apply', desc: 'A small deposit may be required to confirm your reservation.' },
@@ -64,19 +57,6 @@ const HELPFUL_INFO_CARDS = [
   { icon: Clock3, title: 'Open Daily', desc: '7AM to midnight, every day of the week.' },
   { icon: MessageCircle, title: 'Need Help?', desc: 'Have questions? Reach out — we\u2019re happy to help.' },
 ];
-
-// Keyword-based icon lookup for each facility feature tag — visual only,
-// falls back to a generic check icon for anything unrecognized.
-function getFeatureIcon(feature = '') {
-  const f = feature.toLowerCase();
-  if (f.includes('air') || f.includes('aircon')) return 'fa-snowflake';
-  if (f.includes('drink') || f.includes('bar')) return 'fa-martini-glass-citrus';
-  if (f.includes('wifi')) return 'fa-wifi';
-  if (f.includes('sound') || f.includes('music') || f.includes('speaker')) return 'fa-volume-high';
-  if (f.includes('tv') || f.includes('screen') || f.includes('projector')) return 'fa-tv';
-  if (f.includes('parking')) return 'fa-square-parking';
-  return 'fa-circle-check';
-}
 
 function HeroCarousel() {
   const [current, setCurrent] = useState(0);
@@ -97,12 +77,11 @@ function HeroCarousel() {
   useEffect(() => {
     start();
     return stop;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function goTo(index) {
     setCurrent((index + HERO_SLIDES.length) % HERO_SLIDES.length);
-    start(); // restart the interval, same as restart() in the original
+    start();
   }
 
   return (
@@ -158,77 +137,25 @@ function HeroCarousel() {
   );
 }
 
-function RoomCard({ room, liveStatus, onSelect }) {
-  const cardImage = room.image ? resolveImageUrl(room.image) : fallbackRoomImg;
-  const hasVariants = room.variants && room.variants.length > 0;
-  const startingPrice = hasVariants
-    ? Math.min(...room.variants.map((v) => v.price || 0))
-    : room.price || 0;
-  const roomTypeCount = hasVariants ? room.variants.length : 0;
-
-  // Status badge: starts on the admin-set status, and is upgraded to
-  // "Fully Booked" once refreshLiveRoomStatuses() (in the parent) resolves
-  // — see the `liveStatus` prop, which mirrors the original's async badge
-  // swap without touching the DOM directly.
-  const initiallyAvailable = room.status === 'Available';
-  const statusLabel = liveStatus || (initiallyAvailable ? 'Available' : 'Unavailable');
-  const statusClass =
-    statusLabel === 'Fully Booked'
-      ? 'room-status-fullybooked'
-      : initiallyAvailable
-      ? 'room-status-available'
-      : 'room-status-unavailable';
-
-  return (
-    <div className="room-card" data-room-id={room._id}>
-      <div className="room-card-img">
-        <img src={cardImage} alt={room.name} />
-      </div>
-      <div className="room-card-body">
-        <h3>{room.name}</h3>
-        <span className="price-amt">Starting at ₱{startingPrice}/hr</span>
-
-        {(roomTypeCount > 0 || (room.features && room.features.length > 0)) && (
-          <div className="room-card-tags">
-            {roomTypeCount > 0 && (
-              <span className="room-tag">
-                <i className="fa-solid fa-layer-group"></i>
-                {roomTypeCount} Room Type{roomTypeCount > 1 ? 's' : ''}
-              </span>
-            )}
-            {room.features && room.features.map((f, i) => (
-              <span className="room-tag" key={i}><i className={`fa-solid ${getFeatureIcon(f)}`}></i>{f}</span>
-            ))}
-          </div>
-        )}
-
-        <p className="room-card-desc">{room.description || ''}</p>
-
-        <a href="#" className="btn-select" onClick={(e) => { e.preventDefault(); onSelect(room); }}>
-          <i className="fa-solid fa-calendar-check"></i> Book Now
-        </a>
-      </div>
-    </div>
-  );
-}
-
 function Home() {
   const { settings, openHour, closeHour, loaded: settingsLoaded, refetch: refetchSettings } = useSiteSettings();
-  const [rooms, setRooms] = useState(null); // null = loading
+  const { toast, showToast } = useToast();
+  const [rooms, setRooms] = useState(null);
   const [loadError, setLoadError] = useState(false);
-  const [liveStatuses, setLiveStatuses] = useState({}); // { [roomId]: 'Fully Booked' }
+  const [liveStatuses, setLiveStatuses] = useState({});
 
-  const [bookingRoom, setBookingRoom] = useState(null); // room object, or null when closed
-  const [paymongoReturn, setPaymongoReturn] = useState(null); // { result, paymentIntentId }, or null
+  const [bookingRoom, setBookingRoom] = useState(null);
+  const [paymongoReturn, setPaymongoReturn] = useState(null);
   const [searchParams, setSearchParams] = useSearchParams();
-  const [helpOpen, setHelpOpen] = useState(false); // "?" floating Helpful Information panel
+  const [helpOpen, setHelpOpen] = useState(false);
+  const location = useLocation();
 
-  // handlePaymongoReturn (URL-reading half) — migrated 1:1 from js/index.js.
-  // Runs once on mount, exactly like the original's unconditional
-  // `handlePaymongoReturn();` call at the bottom of index.js. Cleans the
-  // URL immediately so refreshing/sharing it doesn't re-trigger this.
-  // Reads `paymentIntentId` (not `bookingId`) — no Booking exists until
-  // payment actually succeeds, so the PayMongo return URL can't carry one.
+  useEffect(() => {
+    if (!location.hash) return;
+    const id = location.hash.slice(1);
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
+  }, [location.hash]);
+
   useEffect(() => {
     const result = searchParams.get('paymongo');
     const paymentIntentId = searchParams.get('paymentIntentId');
@@ -236,10 +163,8 @@ function Home() {
 
     setPaymongoReturn({ result, paymentIntentId });
     setSearchParams({}, { replace: true });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // loadRooms — migrated 1:1 from js/index.js.
   useEffect(() => {
     let cancelled = false;
 
@@ -261,11 +186,6 @@ function Home() {
     };
   }, []);
 
-  // refreshLiveRoomStatuses — migrated 1:1 from js/index.js. Upgrades any
-  // "Available" badge to "Fully Booked" if every remaining operating hour
-  // today is already reserved for that specific room. Waits for site
-  // settings to load first so OPEN_HOUR/CLOSE_HOUR reflect the admin's
-  // actual Operating Schedule instead of the 7–24 defaults.
   useEffect(() => {
     if (!rooms || !rooms.length || !settingsLoaded) return;
     let cancelled = false;
@@ -281,15 +201,11 @@ function Home() {
           .filter((r) => r.status === 'Available')
           .map(async (room) => {
             try {
-              // No variantLabel here: this badge is a room-wide "nothing left
-              // to book today" summary, so it counts against the room's
-              // total units across every variant (falls back to 1 for rooms
-              // without variants) rather than any single variant's pool.
               const totalUnits = room.variants && room.variants.length
                 ? room.variants.reduce((sum, v) => sum + (Number(v.roomCount) || 1), 0)
                 : 1;
               const reserved = await fetchReservedHours(room._id, todayStr);
-              let fullyBooked = currentHour < closeHour; // only meaningful if time remains today
+              let fullyBooked = currentHour < closeHour;
               for (let h = currentHour; h < closeHour && fullyBooked; h++) {
                 if (Number(reserved?.[h] || 0) < totalUnits) fullyBooked = false;
               }
@@ -310,34 +226,23 @@ function Home() {
     };
   }, [rooms, settingsLoaded, openHour, closeHour]);
 
-  // Opens immediately with the (possibly stale) room from the page-load
-  // list so the modal isn't blank while loading, then swaps in a fresh
-  // fetch by id. Room data (roomCount, status, price) can change in admin
-  // any time after this page loaded, and the booking flow's availability
-  // math depends on that being current — otherwise the modal can show
-  // capacity that no longer matches what the backend will actually check.
-  // Settings (operating hours, fewSlotsThreshold) are refetched the same
-  // way — useSiteSettings only fetches once on mount, so without this an
-  // admin's hour/threshold change wouldn't show until a page reload.
   async function handleSelectRoom(room) {
     setBookingRoom(room);
     refetchSettings();
     try {
       const res = await fetch(`${API_BASE_URL}/api/rooms/${room._id}`, { credentials: 'include' });
-      if (res.ok) setBookingRoom(await res.json());
+      if (res.ok) {
+        setBookingRoom(await res.json());
+      } else if (res.status === 404) {
+        setBookingRoom(null);
+        setRooms((prev) => (prev ? prev.filter((r) => r._id !== room._id) : prev));
+        showToast('This facility is no longer available.', 'error');
+      }
     } catch (err) {
       console.error(err);
-      // keep the already-open stale room rather than blocking the flow
     }
   }
 
-  // Scroll-reveal — toggles `.is-visible` on `.reveal`/`.reveal-stagger`
-  // elements as they enter the viewport. This is the JS half of the
-  // `.reveal` system already defined in enhancements.css (that file's own
-  // comment says "classes toggled by enhancements.js" — that script never
-  // made it into the React migration, so the classes below were inert
-  // until now). Runs once on mount; each element animates in once, then
-  // is unobserved.
   useEffect(() => {
     const els = document.querySelectorAll('.reveal, .reveal-stagger');
     if (!els.length) return;
@@ -358,9 +263,6 @@ function Home() {
     return () => io.disconnect();
   }, []);
 
-  // Closes the modal regardless of which flow opened it — mirrors
-  // closeBooking() in the original (a single close path for both the
-  // room-booking flow and the PayMongo-return flow).
   function handleCloseBooking() {
     setBookingRoom(null);
     setPaymongoReturn(null);
@@ -368,7 +270,6 @@ function Home() {
 
   return (
     <>
-      {/* HERO */}
       <section className="hero" id="home">
         <div className="hero-bg" style={{ '--hero-bg-image': `url(${heroBgImg})` }}></div>
 
@@ -389,7 +290,6 @@ function Home() {
         </div>
       </section>
 
-      {/* ROOMS */}
       <section id="rooms">
         <div className="rooms-header reveal">
           <div>
@@ -406,9 +306,11 @@ function Home() {
 
         <div className="rooms-grid reveal-stagger" id="room-grid">
           {rooms === null && !loadError && (
-            <div className="text-center text-muted py-4 w-100">
-              Loading rooms…
-            </div>
+            <>
+              <FacilityCardSkeleton />
+              <FacilityCardSkeleton />
+              <FacilityCardSkeleton />
+            </>
           )}
           {loadError && (
             <div className="text-center text-muted py-4 w-100">
@@ -422,7 +324,7 @@ function Home() {
           )}
           {rooms !== null &&
             rooms.map((room) => (
-              <RoomCard
+              <FacilityBookingCard
                 key={room._id}
                 room={room}
                 liveStatus={liveStatuses[room._id]}
@@ -432,7 +334,6 @@ function Home() {
         </div>
       </section>
 
-      {/* WHY BOOK ONLINE */}
       <section className="why-book">
         <div className="why-book-inner reveal">
           <div className="section-label">Why Book Online?</div>
@@ -449,7 +350,6 @@ function Home() {
         </div>
       </section>
 
-      {/* SPACES SHOWCASE */}
       <section className="spaces-showcase" style={{ background: 'var(--surface-alt)' }}>
         <div className="spaces">
           <div className="spaces-header reveal">
@@ -492,7 +392,6 @@ function Home() {
         </div>
       </section>
 
-      {/* ABOUT */}
       <section id="about">
         <div className="about-inner">
           <div className="about-left reveal-left">
@@ -526,8 +425,6 @@ function Home() {
         </div>
       </section>
 
-      {/* HELPFUL INFORMATION — floating "?" widget, optional/informational
-          only, not a warning or required notice. */}
       <div className="help-widget">
         {helpOpen && (
           <div className="help-panel" role="dialog" aria-label="Helpful Information">
@@ -577,6 +474,8 @@ function Home() {
         closeHour={closeHour}
         settings={settings}
       />
+
+      <Toast {...toast} />
     </>
   );
 }

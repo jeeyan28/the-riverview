@@ -1,10 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { OTP_LENGTH } from '../utils/otp';
 
-// Six-box OTP entry: auto-focuses the first box on mount, advances focus as
-// digits are typed, Backspace moves back a box, and pasting a full code
-// fills all boxes at once. Shared by ForgotPasswordModal and RegisterForm
-// per FEATURE_REQUESTS.md ("do not duplicate ... OTP input component").
 function OtpInput({ value, onChange, idPrefix = 'otp', autoFocus = true }) {
   const inputRefs = useRef([]);
 

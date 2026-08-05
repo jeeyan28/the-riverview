@@ -3,20 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { bookingsService } from '../services/bookings';
 import { API_BASE_URL } from '../services/api';
+import { openBookingReceipt } from '../utils/receipt';
 import PasswordInput from './PasswordInput';
 import { PASSWORD_REQUIREMENTS } from '../utils/password';
-
-// ProfileModal — controlled modal (open/onClose props), rendered from
-// MainLayout so it's available on every page via the Navbar user-chip.
-// Segmented tabs: "Profile" (details + change password, session-based
-// accounts only) and "Booking history". Session state/verification comes
-// from AuthContext (useAuth) — see that file for revalidate()/logout().
 
 const EMPTY_DETAILS = { firstName: '', lastName: '', phone: '', email: '' };
 const EMPTY_PASSWORD = { currentPassword: '', newPassword: '', confirmPassword: '' };
 
-// Buckets the booking model's various statuses into the 3 chip colors
-// from the reference design (completed / upcoming / cancelled).
 function historyStatusClass(status) {
   if (['Confirmed', 'Active', 'Done'].includes(status)) return 'completed';
   if (['Rejected', 'Cancelled', 'Overdue'].includes(status)) return 'cancelled';
@@ -60,9 +53,6 @@ function ProfileModal({ open, onClose }) {
     });
   }
 
-  // openProfileModal — same guard as the original: no session, no modal.
-  // Runs each time `open` flips true (mirrors the original being called
-  // fresh from the user-chip menu click every time).
   useEffect(() => {
     if (!open) return;
 
@@ -96,11 +86,8 @@ function ProfileModal({ open, onClose }) {
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
-  // Body scroll lock while open — matches the original's
-  // document.body.style.overflow toggling in openProfileModal/closeProfileModal.
   useEffect(() => {
     document.body.style.overflow = open ? 'hidden' : '';
   }, [open]);
@@ -133,14 +120,9 @@ function ProfileModal({ open, onClose }) {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.message || 'Could not update your profile.');
 
-      // See header comment: the server response (shapeUser(target)) is the
-      // source of truth here, not just the locally typed values.
       const updated = { ...user, ...data };
       setUser(updated);
       pfRenderUser(updated);
-      // Keep AuthContext's shared `user` (what Navbar's chip reads) in sync
-      // immediately, instead of only writing to storage — updateUser()
-      // handles both the context state and the storage write.
       updateUser(data);
       pfShowToast('Profile updated.');
     } catch (err) {
@@ -247,7 +229,6 @@ function ProfileModal({ open, onClose }) {
                     initial
                   )}
                 </div>
-                {/* Static — no photo-upload endpoint wired up yet. */}
                 <button
                   type="button"
                   className="pf-edit-btn"
@@ -285,7 +266,6 @@ function ProfileModal({ open, onClose }) {
                 </div>
                 <div className="pf-field">
                   <label htmlFor="pfPhone">Phone number</label>
-                  {/* Flag+code is static — no country field on the user model yet. */}
                   <div className="pf-phone-field">
                     <span className="pf-flag-pick">🇵🇭 +63</span>
                     <input
@@ -315,10 +295,6 @@ function ProfileModal({ open, onClose }) {
               </form>
             </div>
 
-            {/* CHANGE PASSWORD — session-based accounts only; Google
-                accounts authenticate through Google, not a local password.
-                Not part of the reference mockup, kept as a real existing
-                feature and styled to match. */}
             {!isGoogleAccount && (
               <form id="pfPasswordForm" noValidate onSubmit={handlePasswordSubmit}>
                 <div className="pf-section-title pf-section-title--divider">Change password</div>
@@ -386,7 +362,6 @@ function ProfileModal({ open, onClose }) {
             )}
           </div>
 
-          {/* BOOKING HISTORY */}
           <div className={`pf-panel${activeTab === 'history' ? ' active' : ''}`}>
             <div className="pf-history-summary">
               <div className="pf-summary-card">
@@ -431,6 +406,13 @@ function ProfileModal({ open, onClose }) {
                   >
                     View
                   </button>
+                  <button
+                    type="button"
+                    className="pf-view-btn"
+                    onClick={() => openBookingReceipt(b)}
+                  >
+                    <i className="fa-solid fa-download"></i> Receipt
+                  </button>
                 </div>
               ))}
             </div>
@@ -463,13 +445,29 @@ function ProfileModal({ open, onClose }) {
                 <span className="pf-detail-value">{viewingBooking.reservationCode || '—'}</span>
               </div>
               <div className="pf-detail-row">
+                <span className="pf-detail-label">Booked by</span>
+                <span className="pf-detail-value">{viewingBooking.guestName || '—'}</span>
+              </div>
+              <div className="pf-detail-row">
+                <span className="pf-detail-label">Contact no.</span>
+                <span className="pf-detail-value">{viewingBooking.guestContact || '—'}</span>
+              </div>
+              <div className="pf-detail-row">
+                <span className="pf-detail-label">Email</span>
+                <span className="pf-detail-value">{viewingBooking.guestEmail || '—'}</span>
+              </div>
+              <div className="pf-detail-row">
                 <span className="pf-detail-label">Room</span>
                 <span className="pf-detail-value">
                   {viewingBooking.roomLabel}{viewingBooking.variantLabel ? ` · ${viewingBooking.variantLabel}` : ''}
                 </span>
               </div>
               <div className="pf-detail-row">
-                <span className="pf-detail-label">Date</span>
+                <span className="pf-detail-label">Facility</span>
+                <span className="pf-detail-value">{viewingBooking.room?.name || viewingBooking.roomLabel || '—'}</span>
+              </div>
+              <div className="pf-detail-row">
+                <span className="pf-detail-label">Booking date</span>
                 <span className="pf-detail-value">{viewingBooking.date}</span>
               </div>
               <div className="pf-detail-row">
@@ -479,6 +477,20 @@ function ProfileModal({ open, onClose }) {
               <div className="pf-detail-row">
                 <span className="pf-detail-label">Guests</span>
                 <span className="pf-detail-value">{viewingBooking.guestCount || 1}</span>
+              </div>
+              <div className="pf-detail-row">
+                <span className="pf-detail-label">Booked on</span>
+                <span className="pf-detail-value">
+                  {viewingBooking.createdAt
+                    ? new Date(viewingBooking.createdAt).toLocaleString(undefined, {
+                        month: 'long',
+                        day: 'numeric',
+                        year: 'numeric',
+                        hour: 'numeric',
+                        minute: '2-digit',
+                      })
+                    : '—'}
+                </span>
               </div>
               <div className="pf-detail-row">
                 <span className="pf-detail-label">Amount</span>
@@ -507,6 +519,9 @@ function ProfileModal({ open, onClose }) {
             <div className="pf-modal-actions">
               <button type="button" className="pf-btn pf-btn-ghost" onClick={() => setViewingBooking(null)}>
                 Close
+              </button>
+              <button type="button" className="pf-btn pf-btn-solid" onClick={() => openBookingReceipt(viewingBooking)}>
+                <i className="fa-solid fa-download"></i> Download Receipt
               </button>
             </div>
           </div>

@@ -2,10 +2,13 @@ const mongoose = require("mongoose");
 const Room = require("../model/room");
 const Booking = require("../model/booking");
 const Settings = require("../model/settings");
+const BookingLock = require("../model/bookingLock");
+const { sendReceiptEmail } = require("./mailer");
 
-function computeDownPayment(unitPrice) {
+function computeDownPayment(unitPrice, hours = 1) {
   const price = Number(unitPrice) || 0;
-  return Math.max(0, Math.round(price));
+  const h = Number(hours) || 1;
+  return Math.max(0, Math.round(price * h));
 }
 
 function getSlotCapacity(room, variantLabel) {
@@ -29,17 +32,14 @@ async function runInTransaction(fn) {
   }
 }
 
-async function validateAndPriceBooking({ roomId, variantLabel, date, timeIn, duration, isAdminBooking, guestCount, session }) {
+async function validateAndPriceBooking({ roomId, variantLabel, date, timeIn, duration, isAdminBooking, guestCount, excludeLockUserId, session }) {
   if (!roomId || !date || !timeIn || !duration) {
     throw { status: 400, message: "roomId, date, timeIn and duration are required." };
   }
   if (!Number.isFinite(duration) || duration <= 0) {
     throw { status: 400, message: "Duration must be greater than 0." };
   }
-
-  // Fetched once up front for online bookings — reused below for the
-  // duration check and the holiday/operating-hours checks, so there's only
-  // one Settings read per validation call.
+  
   const settings = isAdminBooking ? null : await Settings.getSingleton();
 
   if (!isAdminBooking) {
@@ -75,8 +75,6 @@ async function validateAndPriceBooking({ roomId, variantLabel, date, timeIn, dur
     throw { status: 400, message: "Could not determine price for this room/option." };
   }
 
-  // Pax / room-capacity validation. room.capacity of 0 (unset) means "no
-  // limit enforced" so rooms created before this field existed keep working.
   if (guestCount !== undefined && guestCount !== null && Number(room.capacity) > 0) {
     const pax = Number(guestCount);
     if (!Number.isFinite(pax) || pax < 1) {
@@ -97,9 +95,20 @@ async function validateAndPriceBooking({ roomId, variantLabel, date, timeIn, dur
   }).select("timeIn duration");
   const existing = await (session ? query.session(session) : query);
 
+  const lockFilter = {
+    room: room._id,
+    variantLabel: variantLabel || null,
+    date,
+    expiresAt: { $gt: new Date() },
+  };
+  if (excludeLockUserId) lockFilter.lockedBy = { $ne: excludeLockUserId };
+  const lockQuery = BookingLock.find(lockFilter).select("timeIn duration");
+  const activeLocks = await (session ? lockQuery.session(session) : lockQuery);
+  const occupied = [...existing, ...activeLocks];
+
   const endHourExclusive = Math.ceil(startHour + duration);
   for (let hour = startHour; hour < endHourExclusive; hour++) {
-    const bookedCount = existing.filter(b => {
+    const bookedCount = occupied.filter(b => {
       const bStart = parseInt(String(b.timeIn).split(":")[0], 10);
       return hour >= bStart && hour < bStart + b.duration;
     }).length;
@@ -127,7 +136,7 @@ async function validateAndPriceBooking({ roomId, variantLabel, date, timeIn, dur
     };
     const openHour = parseHour(oh.openTime, 0);
     let closeHour = parseHour(oh.closeTime, 24);
-    if (closeHour <= openHour) closeHour += 24; // "00:00" close = midnight/end-of-day
+    if (closeHour <= openHour) closeHour += 24;
     const endHour = startHour + duration;
     if (startHour < openHour || endHour > closeHour) {
       throw { status: 409, message: "That time is outside our operating hours. Please choose another slot." };
@@ -137,6 +146,19 @@ async function validateAndPriceBooking({ roomId, variantLabel, date, timeIn, dur
   return { room, amount, unitPrice };
 }
 
+
+async function releaseLockForSlot({ roomId, variantLabel, date, timeIn, duration, lockedBy, session }) {
+  const filter = {
+    room: roomId,
+    variantLabel: variantLabel || null,
+    date,
+    timeIn,
+    duration: Number(duration),
+    lockedBy,
+  };
+  const query = BookingLock.deleteOne(filter);
+  return session ? query.session(session) : query;
+}
 
 function facilityPrefix(facilityName) {
   const letters = String(facilityName || "").replace(/[^a-zA-Z]/g, "").toUpperCase();
@@ -166,7 +188,7 @@ async function saveWithReservationCode(booking, facilityName, attempts = 5, sess
       return booking;
     } catch (err) {
       if (err.code === 11000 && err.keyPattern?.reservationCode && i < attempts - 1) {
-        continue; // another request took this sequence number first — try the next one
+        continue;
       }
       throw err;
     }
@@ -179,8 +201,9 @@ async function finalizeBookingFromPayment({ paymentIntentId, metadata, paidPayme
 
   const { roomId, variantLabel, date, timeIn, duration, guestCount } = metadata || {};
 
+  let booking;
   try {
-    return await runInTransaction(async (session) => {
+    booking = await runInTransaction(async (session) => {
       let room;
       try {
         ({ room } = await validateAndPriceBooking({
@@ -191,6 +214,7 @@ async function finalizeBookingFromPayment({ paymentIntentId, metadata, paidPayme
           duration: Number(duration),
           isAdminBooking: false,
           guestCount: Number(guestCount),
+          excludeLockUserId: metadata.bookedBy || undefined,
           session,
         }));
       } catch (e) {
@@ -200,14 +224,14 @@ async function finalizeBookingFromPayment({ paymentIntentId, metadata, paidPayme
         throw err;
       }
 
-      const booking = new Booking({
+      const newBooking = new Booking({
         guestName: metadata.guestName,
         guestContact: metadata.guestContact || "",
         guestEmail: metadata.guestEmail || "",
         guestCount: Number(guestCount) || 1,
         specialRequests: metadata.specialRequests || "",
         room: room._id,
-        roomLabel: room.roomNumber || room.name,
+        roomLabel: room.name,
         variantLabel: variantLabel || null,
         date,
         timeIn,
@@ -224,16 +248,24 @@ async function finalizeBookingFromPayment({ paymentIntentId, metadata, paidPayme
         paymongoPaymentId: paidPaymentId || "",
       });
 
-      await saveWithReservationCode(booking, room.name, undefined, session);
-      return booking;
+      await saveWithReservationCode(newBooking, room.name, undefined, session);
+      if (metadata.bookedBy) {
+        await releaseLockForSlot({ roomId: room._id, variantLabel: variantLabel || null, date, timeIn, duration: Number(duration), lockedBy: metadata.bookedBy, session });
+      }
+      return newBooking;
     });
   } catch (err) {
     if (err.code === 11000 && err.keyPattern?.paymongoPaymentIntentId) {
-      // Lost the race — attach/poll/webhook already created it. Return that.
       return Booking.findOne({ paymongoPaymentIntentId: paymentIntentId });
     }
     throw err;
   }
+
+  sendReceiptEmail(booking).catch((err) => {
+    console.error(`Failed to send receipt email for booking ${booking.reservationCode}:`, err.message);
+  });
+
+  return booking;
 }
 
 module.exports = {
@@ -243,4 +275,5 @@ module.exports = {
   finalizeBookingFromPayment,
   getSlotCapacity,
   runInTransaction,
+  releaseLockForSlot,
 };

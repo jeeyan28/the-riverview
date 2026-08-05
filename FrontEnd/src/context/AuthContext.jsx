@@ -90,12 +90,12 @@ export function AuthProvider({ children }) {
     return data.user;
   }, []);
 
-  const loginWithGoogle = useCallback(async (idToken, rememberMe) => {
+  const loginWithGoogle = useCallback(async (code, rememberMe) => {
     const res = await fetch(`${API_BASE_URL}/api/auth/google`, {
       method: 'POST',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ idToken }),
+      body: JSON.stringify({ code }),
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.message || 'Google sign-in failed.');

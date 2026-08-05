@@ -1,0 +1,12 @@
+/* ══════════════════════════════════════════════════════════════
+   ADMIN — ANALYTICS (pages/Admin/Analytics.jsx)
+   Chart legend + chart container live in shared.css (reused by
+   Monitor and Forecasting too); this file only has the hourly-
+   traffic heatmap, which is unique to this page.
+   ══════════════════════════════════════════════════════════════ */
+
+.hm-cell{
+  display:inline-block;width:calc((100% - 16 * 4px) / 17);aspect-ratio:1;border-radius:4px;margin-right:4px;
+}
+#heatmap{display:flex;margin-top:6px;}
+.hm-labels{display:flex;justify-content:space-between;font-size:.66rem;color:var(--muted);margin-top:6px;}

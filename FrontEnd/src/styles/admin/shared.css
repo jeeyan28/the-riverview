@@ -1,0 +1,412 @@
+/* ══════════════════════════════════════════════════════════════
+   ADMIN — SHARED STYLES
+   Imported once (via AdminLayout.jsx) and available on every admin
+   page. Holds design tokens/theme, page chrome (sidebar/topbar/
+   content/panel switching), and primitives reused by 2+ admin pages
+   (cards, metric cards, tables, pills, buttons, tabs, modal shell,
+   filter bars, chart legends, password-field styling).
+
+   Split out of the original admin.css — no selectors or values were
+   changed, only reorganized by which page(s) use them. See
+   PROJECT_PROGRESS.md for the full breakdown of what moved where.
+   ══════════════════════════════════════════════════════════════ */
+
+#app select option{background:var(--navy2);color:var(--text);}
+
+body{
+  -webkit-font-smoothing:antialiased;
+}
+
+#app{
+  display:flex;min-height:100vh;background:var(--navy1);
+  color:var(--text);
+  font-family:var(--font-body);
+
+  /* Backgrounds */
+  --navy1:#F4F5FA;
+  --navy2:#FFFFFF;
+  --navy3:#F7F8FA;
+  --navy4:#EEF0F5;
+
+  /* Text */
+  --text:#1A1D29;
+  --muted:#6B7280;
+
+  /* Borders */
+  --border:rgba(16,24,40,.08);
+  --border-soft:rgba(16,24,40,.05);
+
+  /* Brand */
+  --blue:#2563EB;
+  --amber:#F5A524;
+  --pink:#EF3E6D;
+  --red:#E11D48;
+  --green:#16A34A;
+  --teal:#00C9A7; 
+  --teal-soft:rgba(0,201,167,.10);
+
+  /* Typography */
+  --font-body:'Inter',sans-serif;
+  --font-display:'Inter',sans-serif;
+
+  /* Shadows */
+  --shadow-sm:0 1px 3px rgba(16,24,40,.06),
+              0 1px 2px rgba(16,24,40,.04);
+
+  --shadow-md:0 4px 16px rgba(16,24,40,.08);
+
+  transition:background-color .2s ease,color .2s ease;
+}
+
+#app[data-theme="dark"]{
+  --navy1:#0F1420;
+  --navy2:#171D2D;
+  --navy3:#1E2637;
+  --navy4:#262F44;
+
+  --text:#E5E7EB;
+  --muted:#8B93A7;
+
+  --border:rgba(255,255,255,.08);
+  --border-soft:rgba(255,255,255,.05);
+
+  --blue:#3B82F6;
+  --amber:#FBBF24;
+  --pink:#F472B6;
+  --red:#F87171;
+  --green:#34D399;
+  --teal:#00C9A7;
+  --teal-soft:rgba(0,201,167,.16);
+}
+
+/* ── THEME TOGGLE ── */
+.theme-toggle{
+  position:relative;width:52px;height:28px;border-radius:20px;flex-shrink:0;
+  background:var(--navy3);border:1px solid var(--border);cursor:pointer;
+  display:flex;align-items:center;justify-content:space-between;padding:0 7px;
+  transition:background .18s ease,border-color .18s ease;
+}
+.theme-toggle:hover{background:var(--navy4);}
+.theme-toggle-icon{font-size:11px;color:var(--muted);}
+.theme-toggle-thumb{
+  position:absolute;top:2px;left:2px;width:22px;height:22px;border-radius:50%;
+  background:var(--teal);color:#fff;display:flex;align-items:center;justify-content:center;
+  font-size:11px;box-shadow:var(--shadow-sm);
+  transition:transform .2s ease,background .2s ease;
+}
+.theme-toggle[aria-checked="true"] .theme-toggle-thumb{transform:translateX(24px);}
+
+/* ── SIDEBAR ── */
+#sidebar{
+  width:220px;
+  flex-shrink:0;
+  background:var(--navy2);
+  border-right:1px solid var(--border);
+  box-shadow:var(--shadow-sm);
+  display:flex;
+  flex-direction:column;
+  padding:20px 14px;
+  position:sticky;
+  top:0;
+  height:100vh;
+  transition:width .18s ease,padding .18s ease;
+}
+#sidebar.collapsed{width:72px;padding:20px 10px;}
+.sb-brand{display:flex;align-items:center;gap:10px;padding:0 6px 20px;}
+#sidebar.collapsed .sb-brand{justify-content:center;padding:0 0 16px;}
+.sb-toggle-btn{
+  position:absolute;top:50%;right:-16px;transform:translateY(-50%);
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  width:32px;height:32px;border-radius:50%;border:1px solid var(--border);
+  background:var(--navy2);color:var(--muted);cursor:pointer;
+  box-shadow:var(--shadow-sm);z-index:6;font-size:15px;
+  transition:background .15s,color .15s;
+}
+.sb-toggle-btn:hover{background:var(--navy4);color:var(--text);}
+.sb-logo{
+  width:36px;height:36px;border-radius:10px;
+  background:linear-gradient(135deg,var(--teal),#0B8F76);
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--font-display);font-weight:700;font-size:.9rem;color:#fff;
+}
+.sb-title{font-family:var(--font-display);font-weight:700;font-size:1rem;color:var(--text);letter-spacing:-.01em;}
+.sb-sub{font-size:.68rem;color:var(--muted);}
+.sb-nav{display:flex;flex-direction:column;gap:2px;flex:1;}
+.sb-section{
+  font-size:.64rem;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--muted);margin:16px 10px 6px;font-weight:600;
+}
+.sb-item{
+  display:flex;align-items:center;gap:10px;
+  padding:9px 12px;border-radius:10px;border:none;
+  background:transparent;color:#4B5563;font-family:var(--font-body);
+  font-size:.83rem;text-align:left;cursor:pointer;transition:background .15s,color .15s;
+}
+.sb-item i{font-size:16px;color:var(--muted);width:18px;transition:color .15s;}
+.sb-item:hover{background:var(--navy3);color:var(--text);}
+.sb-item.active{background:var(--teal-soft);color:var(--teal);font-weight:600;}
+.sb-item.active i{color:var(--teal);}
+#sidebar.collapsed .sb-item{justify-content:center;padding:9px;}
+#sidebar.collapsed .sb-item i{width:auto;}
+.sb-bottom{border-top:1px solid var(--border);padding-top:12px;margin-top:8px;}
+.admin-info-row{
+  display:flex;align-items:center;gap:10px;padding:8px 10px;
+  border-radius:12px;background:var(--navy3);border:1px solid var(--border);
+}
+#sidebar.collapsed .admin-info-row{flex-direction:column;gap:8px;padding:10px 4px;}
+.admin-av{
+  width:32px;height:32px;border-radius:50%;
+  background:var(--navy4);display:flex;align-items:center;justify-content:center;
+  font-size:.72rem;font-weight:600;color:var(--teal);flex-shrink:0;
+}
+.admin-name{font-size:.8rem;color:var(--text);font-weight:600;}
+.admin-role{font-size:.68rem;color:var(--text);}
+
+/* ── MAIN ── */
+#main{flex:1;min-width:0;display:flex;flex-direction:column;}
+.topbar{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:16px 28px;border-bottom:1px solid var(--border);
+  background:var(--navy2);position:sticky;top:0;z-index:5;
+  box-shadow:var(--shadow-sm);
+}
+.page-title{font-family:var(--font-display);font-size:1.3rem;font-weight:700;color:var(--text);letter-spacing:-.01em;}
+.topbar-right{display:flex;align-items:center;gap:10px;}
+.tb-chip{
+  display:flex;align-items:center;gap:6px;
+  padding:6px 12px;border-radius:20px;background:var(--navy3);
+  border:1px solid var(--border);font-size:.74rem;color:var(--text);
+  transition:background .15s,border-color .15s;
+}
+.tb-chip i{font-size:13px;}
+.notif-btn{
+  position:relative;width:36px;height:36px;border-radius:50%;
+  background:var(--navy3);border:1px solid var(--border);color:#4B5563;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+  transition:background .15s;
+}
+.notif-btn:hover{background:var(--navy4);}
+.notif-dot{
+  position:absolute;top:6px;right:7px;width:7px;height:7px;
+  border-radius:50%;background:var(--red);border:1.5px solid var(--navy2);
+}
+.content{padding:22px 28px 60px;display:flex;flex-direction:column;gap:16px;}
+
+.panel{display:none;flex-direction:column;gap:16px;}
+.panel.active{display:flex;}
+
+/* ── METRIC CARDS, GENERIC CARD, TABLES, PILLS ── (Dashboard, Bookings, Analytics, Forecasting, Reports, LoginHistory, Users, Settings, RoomManagement) */
+
+.metric-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;}
+.mc{
+  background:var(--navy2);border:1px solid var(--border);border-radius:16px;
+  padding:16px 18px;box-shadow:var(--shadow-sm);
+}
+.mc-label{
+  display:flex;align-items:center;gap:6px;font-size:.74rem;color:var(--muted);margin-bottom:8px;
+}
+.mc-label i{font-size:14px;}
+.mc-val{font-family:var(--font-display);font-size:1.6rem;font-weight:700;color:var(--text);}
+.mc-sub{font-size:.72rem;color:var(--muted);margin-top:4px;display:flex;align-items:center;gap:4px;}
+.mc-sub.up{color:var(--green);}
+.mc-sub.dn{color:var(--red);}
+
+/* ── GENERIC CARD ── */
+.card{
+  background:var(--navy2);border:1px solid var(--border);border-radius:16px;padding:18px;
+  box-shadow:var(--shadow-sm);
+}
+.card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+.card-title{font-size:.92rem;font-weight:600;color:var(--text);}
+.card-action{background:none;border:none;color:var(--teal);font-size:.76rem;cursor:pointer;font-family:var(--font-body);}
+.card-action:hover{color:#d92e5c;}
+.tbl td .card-action{font-size:.9rem;padding:4px 6px;border-radius:6px;transition:background .15s;}
+.tbl td .card-action:hover{background:var(--navy3);}
+
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+
+/* ── TABLES ── */
+.tbl{width:100%;border-collapse:collapse;}
+.tbl th{
+  text-align:left;font-size:.68rem;text-transform:uppercase;letter-spacing:.04em;
+  color:var(--muted);font-weight:500;padding:8px 10px;border-bottom:1px solid var(--border);
+}
+.tbl td{
+  padding:10px;font-size:.8rem;color:var(--text);border-bottom:1px solid var(--border-soft);
+}
+.tbl tr:last-child td{border-bottom:none;}
+
+/* ── PILLS ── */
+.pill{
+  display:inline-flex;align-items:center;padding:3px 10px;border-radius:20px;
+  font-size:.68rem;font-weight:600;
+}
+.pill-active{background:var(--teal-soft);color:var(--teal);}
+.pill-pending{background:rgba(245,165,36,.14);color:var(--amber);}
+.pill-done{background:rgba(107,114,128,.14);color:var(--muted);}
+.pill-overdue{background:rgba(225,29,72,.14);color:var(--red);}
+.pill-vacant{background:rgba(37,99,235,.14);color:var(--blue);}
+
+/* Empty/loading state spanning a full CSS grid (e.g. room-grid) */
+.room-grid-empty{grid-column:1/-1;text-align:center;color:var(--muted);padding:24px 0;}
+
+/* ── SHARED BUTTONS ── (used across 2+ pages) */
+
+.cancel-btn{
+  padding:9px 20px;border-radius:9px;border:1px solid var(--border);background:transparent;
+  color:var(--text);font-size:.8rem;cursor:pointer;font-family:var(--font-body);
+}
+.cancel-btn:hover{background:var(--navy3);}
+.save-btn{
+  padding:9px 20px;border-radius:9px;border:none;background:var(--teal);
+  color:#fff;font-weight:600;font-size:.8rem;cursor:pointer;font-family:var(--font-body);
+}
+.save-btn:hover{background:#d92e5c;}
+
+.fac-head{display:flex;align-items:center;justify-content:space-between;}
+.fac-head-left{display:flex;align-items:center;gap:10px;font-size:.92rem;font-weight:600;color:var(--text);}
+.fac-head-left i{color:var(--teal);font-size:18px;}
+.btn-teal{
+  display:flex;align-items:center;gap:6px;padding:9px 16px;border-radius:9px;
+  border:1px solid rgba(0,201,167,.35);background:var(--teal-soft);color:var(--teal);
+  font-size:.8rem;font-weight:600;cursor:pointer;font-family:var(--font-body);
+}
+.btn-teal:hover{background:rgba(0,201,167,.18);}
+
+.rm-btn{
+  flex:1;padding:10px;border-radius:9px;border:1px solid var(--border);
+  background:var(--navy3);color:var(--text);font-size:.82rem;cursor:pointer;font-family:var(--font-body);
+  transition:background .15s,border-color .15s;
+}
+.rm-btn:hover{background:var(--navy4);}
+.rm-btn.danger{color:var(--red);border-color:rgba(225,29,72,.3);}
+.rm-btn.danger:hover{background:rgba(225,29,72,.08);}
+.rm-btn.primary{background:var(--teal-soft);color:var(--teal);border-color:rgba(0,201,167,.35);font-weight:600;}
+.rm-btn.primary:hover{background:rgba(0,201,167,.18);}
+
+/* ── FILTER BAR ── (LoginHistory, Users) */
+
+/* ── USERS FILTER BAR ── */
+.users-filters{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;}
+.users-filter-input{
+  background:var(--navy3);border:1px solid var(--border);border-radius:8px;
+  padding:8px 12px;color:var(--text);font-size:.82rem;font-family:var(--font-body);outline:none;
+}
+
+/* ── CHART LEGEND / CHART CONTAINER ── (Monitor, Analytics, Forecasting) */
+
+.legend{display:flex;gap:14px;margin-bottom:10px;flex-wrap:wrap;}
+.legend-item{display:flex;align-items:center;gap:6px;font-size:.72rem;color:var(--muted);}
+.legend-dot{width:8px;height:8px;border-radius:50%;}
+.chart-wrap{height:220px;position:relative;}
+
+/* ── SETTINGS-STYLE TABS ── (Settings, RoomManagement, LoginHistory) */
+
+/* ── SETTINGS TABS ── */
+.set-layout{display:flex;gap:20px;align-items:flex-start;}
+.set-tabs{
+  display:flex;flex-direction:column;background:var(--navy2);border:1px solid var(--border);
+  border-radius:12px;padding:4px;width:180px;flex-shrink:0;
+}
+.set-tab{
+  flex:none;text-align:left;padding:10px 12px;border:none;background:transparent;color:var(--muted);
+  font-size:.82rem;font-weight:500;border-radius:9px;cursor:pointer;font-family:var(--font-body);
+}
+.set-tab.active{background:var(--teal-soft);color:var(--teal);}
+.set-content{flex:1;min-width:0;display:flex;flex-direction:column;gap:16px;}
+
+/* ── PASSWORD FIELD (PasswordInput.jsx / PasswordRequirementsList.jsx) ── (Users' Add User modal, Settings' password change) */
+
+/* Password show/hide toggle + unmet-requirements checklist (PasswordInput.jsx
+   + PASSWORD_REQUIREMENTS, reused from Registration/Reset-Password). Admin
+   fields have no leading icon, unlike the auth forms, so .input-icon is
+   suppressed and only right padding for the toggle button is added. */
+#app .input-wrap{position:relative;}
+#app .input-wrap .input-icon{display:none;}
+#app .input-wrap input{padding-right:34px;}
+#app .input-wrap .toggle-pw{
+  position:absolute;right:10px;top:50%;transform:translateY(-50%);
+  background:none;border:none;color:var(--muted);cursor:pointer;font-size:.85rem;padding:2px;line-height:1;
+}
+#app .input-wrap .toggle-pw:hover{color:var(--teal);}
+#app .field-error{font-size:.72rem;color:var(--red);display:none;margin-top:4px;}
+#app .password-requirements{
+  list-style:none;margin:6px 0 0;padding:0;display:flex;flex-direction:column;gap:4px;
+}
+#app .password-requirements li{display:flex;align-items:center;gap:6px;font-size:.72rem;color:var(--red);line-height:1.3;transition:color .15s ease;}
+#app .password-requirements li.met{color:var(--green);}
+#app .password-requirements .requirement-icon{font-size:.66rem;line-height:1;min-width:1em;}
+
+/* ── MODAL SHELL (Modal.jsx) ── used by Bookings, Monitor, RoomManagement, Settings, Users */
+
+/* ══════════════════════════════════════════
+   MODALS
+   ══════════════════════════════════════════ */
+.modal-bg{
+  display:none;position:fixed;inset:0;background:rgba(6,10,18,.7);
+  backdrop-filter:blur(3px);z-index:50;align-items:center;justify-content:center;padding:20px;
+}
+.modal-bg.open{display:flex;}
+.modal-box{
+  background:var(--navy2);border:1px solid var(--border);border-radius:16px;
+  padding:24px;width:100%;max-width:400px;max-height:90vh;overflow-y:auto;
+}
+.modal-box.modal-lg{max-width:520px;}
+.modal-box.modal-xl{max-width:640px;}
+.modal-box.modal-2xl{max-width:960px;}
+.modal-title{font-family:var(--font-display);font-size:1.1rem;font-weight:700;margin-bottom:16px;color:var(--text);}
+.modal-lg-title{font-family:var(--font-display);font-size:1.15rem;font-weight:700;color:var(--text);}
+.modal-lg-sub{font-size:.78rem;color:var(--muted);margin-bottom:18px;}
+
+/* ── SHARED MODAL FIELD/ACTION ROW ── (Bookings, Monitor) */
+
+.mfield{margin-bottom:12px;}
+.mfield label{display:block;font-size:.72rem;color:var(--muted);margin-bottom:5px;}
+.mfield input,.mfield select{
+  width:100%;background:var(--navy3);border:1px solid var(--border);border-radius:9px;
+  padding:10px 12px;color:var(--text);font-family:var(--font-body);font-size:.84rem;outline:none;
+}
+.mfield input:focus,.mfield select:focus{border-color:rgba(0,201,167,.5);}
+
+.modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:18px;}
+.btn-cancel{
+  padding:9px 18px;border-radius:9px;border:1px solid var(--border);background:transparent;
+  color:var(--text);font-size:.8rem;cursor:pointer;font-family:var(--font-body);
+}
+.btn-cancel:hover{background:var(--navy3);}
+.btn-confirm{
+  padding:9px 18px;border-radius:9px;border:none;background:var(--teal);
+  color:#fff;font-weight:600;font-size:.8rem;cursor:pointer;font-family:var(--font-body);
+}
+.btn-confirm:hover{background:#d92e5c;}
+.btn-confirm:disabled,.btn-save:disabled{opacity:.6;cursor:default;}
+
+/* ── FLUSH CARD (table wrapper) ── (Bookings, Monitor) */
+
+/* Flush card — no padding, hidden overflow (table wrappers) */
+.card-flush{padding:0;overflow:hidden;overflow-x:auto;}
+
+/* ── DATATABLE PAGINATION ── (DataTable.jsx — every admin table that
+   doesn't opt out with paginate={false}) */
+.dt-pagination{
+  display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;
+  padding:12px 4px 2px;font-size:.78rem;color:var(--muted);
+}
+.dt-pagination-size{display:flex;align-items:center;gap:8px;}
+.dt-pagination-size select{min-width:64px;padding:6px 10px;}
+.dt-pagination-nav{display:flex;align-items:center;gap:10px;}
+
+/* ── RESPONSIVE ── touches selectors across several pages, kept together */
+
+/* ── RESPONSIVE ── */
+@media (max-width:900px){
+  #sidebar{display:none;}
+  .metric-row{grid-template-columns:repeat(2,1fr);}
+  .two-col,.settings-grid,.p2col,.frow,.sched-2col,.bd-grid{grid-template-columns:1fr;}
+  .rep-grid{grid-template-columns:1fr;}
+  .content{padding:16px;}
+  .set-layout{flex-direction:column;}
+  .set-tabs{flex-direction:row;width:100%;}
+  #panel-dashboard .dash-grid{grid-template-columns:1fr;}
+  .dt-pagination{flex-direction:column;align-items:flex-start;}
+}

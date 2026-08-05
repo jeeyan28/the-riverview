@@ -1,0 +1,76 @@
+/* ══════════════════════════════════════════════════════════════
+   ADMIN — BOOKINGS (pages/Admin/Bookings.jsx)
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── FILTER BAR ── */
+
+/* ── BOOKINGS FILTER BAR ── */
+.bk-toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;}
+.bk-filters{display:flex;gap:8px;flex-wrap:wrap;}
+.bk-filter-input{
+  font-size:.78rem;padding:8px 12px;border-radius:9px;border:1px solid var(--border);
+  background:var(--navy3);color:var(--text);font-family:var(--font-body);outline:none;min-width:150px;
+}
+.bk-filter-input:focus{border-color:rgba(0,201,167,.5);}
+.bk-clear-btn{
+  font-size:.78rem;padding:8px 12px;border-radius:9px;border:1px solid var(--border);
+  background:none;color:var(--muted);font-family:var(--font-body);cursor:pointer;
+}
+.bk-clear-btn:hover{background:var(--navy3);}
+
+/* ── ROW ACTION BUTTON ── */
+
+/* Row-level text action button (View/Approve/Edit/Delete, etc.) — color is
+   set inline per action since it varies by row/status. */
+.tbl-action-btn{
+  display:inline-flex;align-items:center;gap:4px;
+  border:1px solid var(--border);background:var(--navy3);
+  font-size:.75rem;font-weight:600;cursor:pointer;border-radius:8px;
+  font-family:var(--font-body);padding:6px 12px;
+  transition:background .15s ease,border-color .15s ease,transform .05s ease;
+}
+.tbl-action-btn:hover{background:var(--navy4);border-color:rgba(16,24,40,.16);}
+.tbl-action-btn:active{transform:translateY(1px);}
+
+/* ── BOOKING DETAILS MODAL ── */
+
+/* Booking Details modal (View button on the Bookings table) */
+.bd-section{margin-top:18px;padding-top:16px;border-top:1px solid var(--border);}
+.bd-section:first-of-type{margin-top:16px;}
+.bd-section-title{display:flex;align-items:center;gap:7px;font-size:.85rem;font-weight:700;color:var(--text);margin-bottom:12px;}
+.bd-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;}
+.bd-field label{display:block;font-size:.68rem;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);margin-bottom:4px;}
+.bd-field p{font-size:.85rem;color:var(--text);font-weight:500;word-break:break-word;}
+.bd-notes-label{font-size:.68rem;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);margin-bottom:6px;}
+.bd-notes-body{font-size:.84rem;color:var(--text);line-height:1.5;white-space:pre-wrap;}
+.bd-screenshot{max-width:220px;width:100%;border-radius:10px;border:1px solid var(--border);cursor:pointer;display:block;}
+.bd-screenshot-hint{font-size:.7rem;color:var(--muted);margin-top:6px;}
+
+/* ── BOOKINGS CALENDAR — NOT CURRENTLY USED ──
+   PROJECT_PROGRESS.md note: Bookings.jsx has a comment confirming the
+   calendar view that uses these classes is "not wired up yet" (its
+   data is computed but never rendered). Kept here in case the
+   calendar view is finished later; safe to delete if it's abandoned. */
+
+/* ── BOOKINGS CALENDAR (Phase 8, Admin) ──
+   MIGRATION NOTE: in the original project these rules lived in a <style>
+   block inside admin.html's own <head>, NOT in css/admin.css — every other
+   admin panel's CSS lives in this file, so they're consolidated here rather
+   than re-introducing a second inline stylesheet just for one panel. Purely
+   an organizational move; no class names, selectors, or values changed. */
+.bkcal-nav-btn{width:28px;height:28px;border-radius:8px;background:var(--navy3);border:1px solid var(--border);color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:.75rem;}
+.bkcal-nav-btn:hover{background:var(--navy4);}
+.bkcal-month-label{font-size:.85rem;font-weight:600;color:var(--text);min-width:120px;text-align:center;}
+.bkcal-today-btn{font-size:.72rem;padding:5px 10px;border-radius:7px;border:1px solid var(--border);background:none;color:var(--muted);cursor:pointer;font-family:var(--font-body);}
+.bkcal-today-btn:hover{background:var(--navy3);}
+.bkcal-weekdays,.bkcal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;}
+.bkcal-weekdays{margin-bottom:4px;}
+.bkcal-weekday-label{text-align:center;font-size:.65rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;padding:2px 0;}
+.bkcal-day{aspect-ratio:1;border-radius:8px;background:var(--navy3);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;cursor:pointer;position:relative;font-size:.78rem;color:var(--text);border:1px solid transparent;transition:background .15s,border-color .15s;}
+.bkcal-day:hover{background:var(--teal-soft);border-color:rgba(0,201,167,.3);}
+.bkcal-day--empty{visibility:hidden;cursor:default;}
+.bkcal-day.is-today{box-shadow:inset 0 0 0 1px var(--teal);}
+.bkcal-day.is-selected{background:var(--teal);border-color:var(--teal);color:#fff;font-weight:700;}
+.bkcal-day.has-bookings .bkcal-dot{background:var(--blue);color:#fff;}
+.bkcal-day.is-selected .bkcal-dot{background:#fff;color:var(--teal);}
+.bkcal-dot{font-size:.6rem;font-weight:700;background:var(--navy4);color:var(--muted);border-radius:10px;padding:0 5px;min-width:14px;text-align:center;}

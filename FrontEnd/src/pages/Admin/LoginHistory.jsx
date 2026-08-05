@@ -1,3 +1,4 @@
+import '../../styles/admin/login-history.css';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import DataTable from '../../components/DataTable';
 import { loginHistoryService } from '../../services/loginHistory';
@@ -130,6 +131,7 @@ function LoginHistory() {
           loading={loading}
           emptyMessage={loadError ? 'Failed to load login history.' : 'No login activity yet.'}
           getRowKey={(e) => e._id}
+          paginate={false}
         />
 
         {!loading && !loadError && totalPages > 1 && (

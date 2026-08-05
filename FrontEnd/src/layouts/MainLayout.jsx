@@ -1,18 +1,24 @@
 import { useEffect, useState } from 'react';
-import { Outlet } from 'react-router-dom';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import '../styles/style.css';
 import '../styles/enhancements.css';
 import '../styles/auth-ui.css';
+import '../styles/skeleton.css';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import ProfileModal from '../components/ProfileModal';
+import PageSkeleton from '../components/PageSkeleton';
+import PageTransition from '../components/PageTransition';
 import { useTheme } from '../hooks/useTheme';
-
+import { useAuth } from '../context/AuthContext';
+import { useSiteSettings } from '../hooks/useSiteSettings';
 
 const PROMO_DISMISS_KEY = 'riverview-promo-dismissed';
 
 function MainLayout() {
+  const { initializing } = useAuth();
+  const { settings } = useSiteSettings();
+  const announcement = settings.announcements?.[0] || null;
   const [theme, toggleTheme] = useTheme();
   const [promoVisible, setPromoVisible] = useState(
     () => sessionStorage.getItem(PROMO_DISMISS_KEY) !== '1'
@@ -21,29 +27,22 @@ function MainLayout() {
   const [scrolled, setScrolled] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
 
-  // Keeps --banner-h in sync so the page content below the fixed header
-  // doesn't jump/overlap when the banner is dismissed. Mirrors
-  // setBannerHeightVar() from the old index.js — including the
-  // window 'resize' listener the original registered (missed in the
-  // initial port; added back here since the banner's height can change
-  // on viewport resize/orientation change, not just on dismiss).
   useEffect(() => {
-    const banner = document.getElementById('promo-banner');
     function setBannerHeightVar() {
+      const banner = document.getElementById('promo-banner');
       const h = promoVisible && banner ? banner.offsetHeight : 0;
       document.documentElement.style.setProperty('--banner-h', `${h}px`);
     }
     setBannerHeightVar();
     window.addEventListener('resize', setBannerHeightVar);
     return () => window.removeEventListener('resize', setBannerHeightVar);
-  }, [promoVisible]);
+  }, [promoVisible, announcement]);
 
   function dismissPromo() {
     setPromoVisible(false);
     sessionStorage.setItem(PROMO_DISMISS_KEY, '1');
   }
 
-  // Header "scrolled" shadow/background state.
   useEffect(() => {
     function onScroll() {
       setScrolled(window.scrollY > 40);
@@ -52,14 +51,18 @@ function MainLayout() {
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
-  // Prevent body scroll while the mobile nav drawer is open.
   useEffect(() => {
     document.body.style.overflow = mobileNavOpen ? 'hidden' : '';
   }, [mobileNavOpen]);
 
+  if (initializing) {
+    return <PageSkeleton />;
+  }
+
   return (
     <>
       <Navbar
+        announcement={announcement}
         promoVisible={promoVisible}
         onDismissPromo={dismissPromo}
         mobileNavOpen={mobileNavOpen}
@@ -72,7 +75,7 @@ function MainLayout() {
       />
 
       <main>
-        <Outlet />
+        <PageTransition />
       </main>
 
       <Footer />

@@ -1,3 +1,4 @@
+import '../../styles/admin/reports.css';
 const REPORT_ITEMS = [
   { icon: 'file-spreadsheet', bg: 'rgba(239,62,109,.1)', color: 'var(--teal)', name: 'Daily Booking Report', date: 'Today, Jun 25 2026' },
   { icon: 'file-analytics', bg: 'rgba(55,138,221,.1)', color: '#378ADD', name: 'Weekly Revenue Summary', date: 'Jun 19–25 2026' },

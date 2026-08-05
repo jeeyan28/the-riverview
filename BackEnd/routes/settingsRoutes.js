@@ -4,10 +4,8 @@ const Settings = require("../model/settings");
 const { requirePermission } = require("../middleware/adminAuth");
 const { PERMISSIONS } = require("../utils/permissions");
 const { paymentMethodQrUpload } = require("../middleware/upload");
+const { logAudit } = require("../utils/auditLog");
 
-// ── Public — the homepage needs this with NO login to show the operating
-//    hours banner, block holiday dates on the booking calendar, and render
-//    any active announcements. Never expose `updatedBy` or full history here.
 router.get("/", async (req, res) => {
   try {
     const settings = await Settings.getSingleton();
@@ -21,8 +19,6 @@ router.get("/", async (req, res) => {
       announcements: settings.announcements
         .filter(a => a.isActive && (!a.expiresAt || a.expiresAt > now))
         .map(a => ({ _id: a._id, title: a.title, message: a.message, emoji: a.emoji })),
-      // Only active methods, and only what the booking page's payment step
-      // needs to render a button + QR — never expose timestamps/history here.
       paymentMethods: settings.paymentMethods
         .filter(pm => pm.isActive)
         .map(pm => ({ _id: pm._id, name: pm.name, qrImage: pm.qrImage })),
@@ -33,8 +29,6 @@ router.get("/", async (req, res) => {
   }
 });
 
-// ── Full settings document (includes inactive/expired announcements) —
-//    admin only, used by the Settings > Promotion/Announcements admin UI.
 router.get("/admin", requirePermission(PERMISSIONS.SETTINGS_VIEW), async (req, res) => {
   try {
     const settings = await Settings.getSingleton();
@@ -45,7 +39,6 @@ router.get("/admin", requirePermission(PERMISSIONS.SETTINGS_VIEW), async (req, r
   }
 });
 
-// ── Update operating hours — manager/super_admin only
 router.put("/operating-hours", requirePermission(PERMISSIONS.SETTINGS_MANAGE), async (req, res) => {
   try {
     const { openTime, closeTime, openDays, minOnlineDurationHours, maxOnlineDurationHours } = req.body;
@@ -72,7 +65,6 @@ router.put("/operating-hours", requirePermission(PERMISSIONS.SETTINGS_MANAGE), a
   }
 });
 
-// ── Add a holiday / closure date — manager/super_admin only
 router.post("/holidays", requirePermission(PERMISSIONS.SETTINGS_MANAGE), async (req, res) => {
   try {
     const { name, date, fullDay, note } = req.body;
@@ -91,7 +83,6 @@ router.post("/holidays", requirePermission(PERMISSIONS.SETTINGS_MANAGE), async (
   }
 });
 
-// ── Delete a holiday / closure date — manager/super_admin only
 router.delete("/holidays/:id", requirePermission(PERMISSIONS.SETTINGS_MANAGE), async (req, res) => {
   try {
     const settings = await Settings.getSingleton();
@@ -110,7 +101,6 @@ router.delete("/holidays/:id", requirePermission(PERMISSIONS.SETTINGS_MANAGE), a
   }
 });
 
-// ── Create an announcement — manager/super_admin only
 router.post("/announcements", requirePermission(PERMISSIONS.SETTINGS_MANAGE), async (req, res) => {
   try {
     const { title, message, emoji, isActive, expiresAt } = req.body;
@@ -127,14 +117,15 @@ router.post("/announcements", requirePermission(PERMISSIONS.SETTINGS_MANAGE), as
     settings.updatedBy = req.user._id;
     settings.updatedAt = new Date();
     await settings.save();
-    res.status(201).json(settings.announcements[settings.announcements.length - 1]);
+    const created = settings.announcements[settings.announcements.length - 1];
+    await logAudit({ category: "Announcement", action: "created", description: `posted announcement "${created.title}"`, user: req.user });
+    res.status(201).json(created);
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Server error." });
   }
 });
 
-// ── Update an announcement (e.g. toggle isActive) — manager/super_admin only
 router.put("/announcements/:id", requirePermission(PERMISSIONS.SETTINGS_MANAGE), async (req, res) => {
   try {
     const settings = await Settings.getSingleton();
@@ -151,6 +142,7 @@ router.put("/announcements/:id", requirePermission(PERMISSIONS.SETTINGS_MANAGE),
     settings.updatedBy = req.user._id;
     settings.updatedAt = new Date();
     await settings.save();
+    await logAudit({ category: "Announcement", action: "updated", description: `updated announcement "${ann.title}"`, user: req.user });
     res.json(ann);
   } catch (err) {
     console.error(err);
@@ -158,18 +150,17 @@ router.put("/announcements/:id", requirePermission(PERMISSIONS.SETTINGS_MANAGE),
   }
 });
 
-// ── Delete an announcement — manager/super_admin only
 router.delete("/announcements/:id", requirePermission(PERMISSIONS.SETTINGS_MANAGE), async (req, res) => {
   try {
     const settings = await Settings.getSingleton();
-    const before = settings.announcements.length;
+    const target = settings.announcements.id(req.params.id);
+    if (!target) return res.status(404).json({ message: "Announcement not found." });
+    const removedTitle = target.title;
     settings.announcements = settings.announcements.filter(a => String(a._id) !== req.params.id);
-    if (settings.announcements.length === before) {
-      return res.status(404).json({ message: "Announcement not found." });
-    }
     settings.updatedBy = req.user._id;
     settings.updatedAt = new Date();
     await settings.save();
+    await logAudit({ category: "Announcement", action: "deleted", description: `removed announcement "${removedTitle}"`, user: req.user });
     res.json({ message: "Announcement removed." });
   } catch (err) {
     console.error(err);
@@ -177,11 +168,6 @@ router.delete("/announcements/:id", requirePermission(PERMISSIONS.SETTINGS_MANAG
   }
 });
 
-// ── Add a payment method (e.g. "GCash", "Maya", or any wallet the business
-//    adds) — manager/super_admin only. QR image is optional at create time
-//    (an admin can add the button first, upload the QR right after) but a
-//    method with no qrImage simply won't have a scannable code on the
-//    booking page yet.
 router.post("/payment-methods", requirePermission(PERMISSIONS.SETTINGS_MANAGE), paymentMethodQrUpload.single("qrImage"), async (req, res) => {
   try {
     const { name, isActive } = req.body;
@@ -204,10 +190,6 @@ router.post("/payment-methods", requirePermission(PERMISSIONS.SETTINGS_MANAGE), 
   }
 });
 
-// ── Update a payment method — rename it, replace its QR image, or flip
-//    isActive to show/hide its button on the live booking page (e.g. mark
-//    it unavailable while a wallet is down, then flip it back on later).
-//    manager/super_admin only.
 router.put("/payment-methods/:id", requirePermission(PERMISSIONS.SETTINGS_MANAGE), paymentMethodQrUpload.single("qrImage"), async (req, res) => {
   try {
     const settings = await Settings.getSingleton();
@@ -229,7 +211,6 @@ router.put("/payment-methods/:id", requirePermission(PERMISSIONS.SETTINGS_MANAGE
   }
 });
 
-// ── Delete a payment method — manager/super_admin only
 router.delete("/payment-methods/:id", requirePermission(PERMISSIONS.SETTINGS_MANAGE), async (req, res) => {
   try {
     const settings = await Settings.getSingleton();

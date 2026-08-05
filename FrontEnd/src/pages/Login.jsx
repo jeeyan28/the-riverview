@@ -1,11 +1,9 @@
 import { useState, useRef, useLayoutEffect } from 'react';
 import { Link } from 'react-router-dom';
-import LoginForm from '../components/LoginForm';
-import RegisterForm from '../components/RegisterForm';
+import { User } from 'lucide-react';
+import AuthForm from '../components/AuthForm';
 import ForgotPasswordModal from '../components/ForgotPasswordModal';
 import logo from "../assets/logo/logoo.png";
-import heroIllustration from '../assets/pictures/login-hero.png';
-
 
 function Login() {
   const [isLogin, setIsLogin] = useState(true);
@@ -21,11 +19,9 @@ function Login() {
 
   return (
     <main className="login-page">
-      <div className="login-background" aria-hidden="true">
-        <div
-          className="login-background-image"
-          style={{ backgroundImage: `url(${heroIllustration})` }}
-        />
+
+      <div className="login-background">
+        <div className="login-background-image" />
         <div className="login-background-overlay" />
       </div>
 
@@ -65,8 +61,9 @@ function Login() {
             <div className="login-card-header">
               {isLogin ? (
                 <>
-                  <h2>Welcome back</h2>
-                  <p>Sign in to continue.</p>
+                  <div className="login-avatar"><User size={18} /></div>
+                  <h2>Welcome back </h2>
+                  <p>Continue where you left off.</p>
                 </>
               ) : (
                 <>
@@ -77,14 +74,11 @@ function Login() {
             </div>
 
             <div className="auth-card-body">
-              {isLogin ? (
-                <LoginForm
-                  onSwitchToRegister={() => setIsLogin(false)}
-                  onForgotPassword={() => setShowForgotPassword(true)}
-                />
-              ) : (
-                <RegisterForm onSwitchToLogin={() => setIsLogin(true)} />
-              )}
+              <AuthForm
+                mode={isLogin ? 'login' : 'register'}
+                onSwitchMode={() => setIsLogin((v) => !v)}
+                onForgotPassword={() => setShowForgotPassword(true)}
+              />
             </div>
           </div>
         </aside>
@@ -96,10 +90,6 @@ function Login() {
         onClose={() => setShowForgotPassword(false)}
         onReturnToLogin={() => {
           setShowForgotPassword(false);
-          // LoginForm's email input keeps id="email" and stays mounted
-          // behind the modal (only rendered while isLogin, which is the
-          // only state Forgot Password is reachable from), so it's safe
-          // to focus directly rather than threading a ref through.
           requestAnimationFrame(() => document.getElementById('email')?.focus());
         }}
       />

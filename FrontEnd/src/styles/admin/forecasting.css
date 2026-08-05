@@ -1,0 +1,8 @@
+/* ══════════════════════════════════════════════════════════════
+   ADMIN — FORECASTING (pages/Admin/Forecasting.jsx)
+   Forecasting.jsx currently uses only shared classes (.card, .mc,
+   .chart-wrap, .legend, .two-col, .tbl — all in shared.css) and has
+   no page-specific rules of its own. This file is intentionally
+   near-empty; add page-specific styles here if/when this page grows
+   its own look.
+   ══════════════════════════════════════════════════════════════ */
