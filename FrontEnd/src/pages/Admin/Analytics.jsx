@@ -85,22 +85,22 @@ function Analytics() {
     <div className="panel active" id="panel-analytics">
       <div className="metric-row">
         <div className="mc">
-          <div className="mc-label">Weekly Revenue</div>
+          <div className="mc-label"><i className="ti ti-currency-peso"></i> Weekly Revenue</div>
           <div className="mc-val">₱38,200</div>
-          <div className="mc-sub up">+8% vs last week</div>
+          <div className="mc-sub up"><i className="ti ti-arrow-up-right"></i> +8% vs last week</div>
         </div>
         <div className="mc">
-          <div className="mc-label">Avg Session</div>
+          <div className="mc-label"><i className="ti ti-clock-hour-4"></i> Avg Session</div>
           <div className="mc-val">1.8 hrs</div>
           <div className="mc-sub">per booking</div>
         </div>
         <div className="mc">
-          <div className="mc-label">Top Room</div>
+          <div className="mc-label"><i className="ti ti-trophy"></i> Top Room</div>
           <div className="mc-val">Billiards</div>
           <div className="mc-sub">58% of bookings</div>
         </div>
         <div className="mc">
-          <div className="mc-label">Peak Hour</div>
+          <div className="mc-label"><i className="ti ti-flame"></i> Peak Hour</div>
           <div className="mc-val">7–9 PM</div>
           <div className="mc-sub">busiest window</div>
         </div>
@@ -109,7 +109,10 @@ function Analytics() {
       <div className="two-col">
         <div className="card">
           <div className="card-head">
-            <span className="card-title">Daily revenue this week (₱)</span>
+            <div>
+              <span className="card-title"><i className="ti ti-chart-bar"></i> Daily revenue this week</span>
+              <p className="card-subtitle">Total booking revenue collected per day (₱)</p>
+            </div>
           </div>
           <div className="legend">
             <div className="legend-item">
@@ -125,7 +128,10 @@ function Analytics() {
         </div>
         <div className="card">
           <div className="card-head">
-            <span className="card-title">Bookings by room type</span>
+            <div>
+              <span className="card-title"><i className="ti ti-chart-donut"></i> Bookings by room type</span>
+              <p className="card-subtitle">Share of total bookings this week</p>
+            </div>
           </div>
           <div className="legend">
             <div className="legend-item">
@@ -145,17 +151,24 @@ function Analytics() {
               VIP 8%
             </div>
           </div>
-          <div className="chart-wrap">
+          <div className="chart-wrap chart-wrap-donut">
             <canvas ref={roomsCanvasRef} aria-label="Donut chart of bookings by room type">
               Billiards 58%, KTV 22%, Basketball Court 12%, VIP 8%.
             </canvas>
+            <div className="donut-center">
+              <span className="donut-center-val">142</span>
+              <span className="donut-center-label">Bookings</span>
+            </div>
           </div>
         </div>
       </div>
 
       <div className="card">
         <div className="card-head">
-          <span className="card-title">Hourly traffic — bookings per hour</span>
+          <div>
+            <span className="card-title"><i className="ti ti-clock"></i> Hourly traffic</span>
+            <p className="card-subtitle">Bookings started per hour, 7AM–12AM</p>
+          </div>
         </div>
         <div id="heatmap" ref={heatmapRef} />
         <div className="hm-labels">
@@ -166,6 +179,11 @@ function Analytics() {
           <span>7PM</span>
           <span>10PM</span>
           <span>12AM</span>
+        </div>
+        <div className="hm-scale">
+          <span>Fewer bookings</span>
+          <div className="hm-scale-bar" />
+          <span>More bookings</span>
         </div>
       </div>
     </div>

@@ -13,6 +13,8 @@ const FORM_STEPS = [
   { key: 'rooms', label: 'Rooms' },
 ];
 
+const ROOM_STATUS_PILL_CLASS = { Available: 'pill-active', Maintenance: 'pill-pending', Unavailable: 'pill-overdue' };
+
 function emptyVariant() {
   return { label: '', price: '', pax: '', roomNumber: '', roomCount: 1, status: 'Available', image: '', features: [] };
 }
@@ -21,7 +23,7 @@ function emptyFacilityForm() {
   return {
     name: '',
     description: '',
-    variants: [], // the Rooms belonging to this facility — at least one is required; starting price is always the cheapest room's rate
+    variants: [],
   };
 }
 
@@ -45,17 +47,18 @@ function RoomManagement() {
   const [rooms, setRooms] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState('all');
+  const [search, setSearch] = useState('');
 
   const [modalOpen, setModalOpen] = useState(false);
-  const [editingId, setEditingId] = useState(null); // null = Add mode
+  const [editingId, setEditingId] = useState(null);
   const [formStep, setFormStep] = useState('facility');
-  const [activeRoomIndex, setActiveRoomIndex] = useState(null); // null = Room list view; number = editing that Room
+  const [activeRoomIndex, setActiveRoomIndex] = useState(null);
   const [addingNewCategory, setAddingNewCategory] = useState(false);
   const [form, setForm] = useState(emptyFacilityForm());
   const [existingImageUrl, setExistingImageUrl] = useState('');
   const [selectedImageFile, setSelectedImageFile] = useState(null);
-  const [variantImageFiles, setVariantImageFiles] = useState({}); // { [roomIndex]: File }
-  const [variantImagePreviews, setVariantImagePreviews] = useState({}); // { [roomIndex]: blobUrl }
+  const [variantImageFiles, setVariantImageFiles] = useState({});
+  const [variantImagePreviews, setVariantImagePreviews] = useState({});
   const [featureInput, setFeatureInput] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -63,7 +66,6 @@ function RoomManagement() {
     setLoading(true);
     try {
       const data = await roomsService.list();
-      // Tolerate features/variants arriving as strings from an older backend.
       const normalized = (Array.isArray(data) ? data : []).map((r) => ({
         ...r,
         features: Array.isArray(r.features)
@@ -146,7 +148,6 @@ function RoomManagement() {
     setSelectedImageFile(null);
   }
 
-  /* ── Rooms (within the facility being edited) ── */
   function addRoom() {
     const newIndex = form.variants.length;
     setForm((f) => ({ ...f, variants: [...f.variants, emptyVariant()] }));
@@ -161,9 +162,6 @@ function RoomManagement() {
     }));
   }
 
-  // Shifts map keys down by one past the removed index, dropping the
-  // removed entry — keeps variantImageFiles/variantImagePreviews aligned
-  // with form.variants after a room is deleted.
   function reindexAfterRemove(map, removedIndex) {
     const next = {};
     Object.keys(map).forEach((key) => {
@@ -206,7 +204,6 @@ function RoomManagement() {
     return null;
   }
 
-  /* ── per-room amenity chips ── */
   function addVariantFeature(i) {
     const raw = featureInput.trim();
     if (!raw) return;
@@ -239,7 +236,6 @@ function RoomManagement() {
     }));
   }
 
-  /* ── save / remove ── */
   async function handleSave() {
     if (!guardPermission('room:manage')) return;
     if (!form.name.trim()) {
@@ -255,6 +251,16 @@ function RoomManagement() {
     const cleanVariantEntries = form.variants
       .map((v, originalIndex) => ({ v, originalIndex }))
       .filter(({ v }) => v.label.trim() !== '' || v.price !== '');
+    const invalidRoomNumber = cleanVariantEntries.find(({ v }) => {
+      const trimmed = (v.roomNumber || '').trim();
+      if (!trimmed) return false;
+      const parsed = parseInt(trimmed, 10);
+      return Number.isFinite(parsed) && parsed <= 0;
+    });
+    if (invalidRoomNumber) {
+      alert(`Room No. for "${invalidRoomNumber.v.label || 'Untitled Room'}" must be greater than 0, or left blank to auto-assign one.`);
+      return;
+    }
     const cleanVariants = cleanVariantEntries.map(({ v }) => ({
       label: v.label.trim(),
       price: Number(v.price) || 0,
@@ -279,8 +285,6 @@ function RoomManagement() {
       formData.append('variants', JSON.stringify(cleanVariants));
       if (selectedImageFile) formData.append('image', selectedImageFile);
 
-      // Map each pending Room image file to its position in the final
-      // cleanVariants array (filtering above may have shifted indices).
       const variantImageIndexes = [];
       cleanVariantEntries.forEach(({ originalIndex }, newIndex) => {
         const file = variantImageFiles[originalIndex];
@@ -355,7 +359,33 @@ function RoomManagement() {
     () => Array.from(new Set(rooms.map((r) => r.name).filter(Boolean))).sort(),
     [rooms]
   );
-  const visibleRooms = selectedCategory === 'all' ? rooms : rooms.filter((r) => r.name === selectedCategory);
+
+  const visibleRooms = useMemo(() => {
+    let list = selectedCategory === 'all' ? rooms : rooms.filter((r) => r.name === selectedCategory);
+    const q = search.trim().toLowerCase();
+    if (q) {
+      list = list.filter(
+        (r) => r.name.toLowerCase().includes(q) || (r.description || '').toLowerCase().includes(q)
+      );
+    }
+    return list;
+  }, [rooms, selectedCategory, search]);
+
+  const stats = useMemo(() => {
+    const allVariants = visibleRooms.flatMap((r) => r.variants || []);
+    return {
+      facilities: visibleRooms.length,
+      totalRooms: allVariants.length,
+      available: allVariants.filter((v) => v.status === 'Available').length,
+      maintenance: allVariants.filter((v) => v.status === 'Maintenance').length,
+    };
+  }, [visibleRooms]);
+
+  function clearFilters() {
+    setSearch('');
+    setSelectedCategory('all');
+  }
+
   const facilityImagePreviewUrl = useMemo(
     () => (selectedImageFile ? URL.createObjectURL(selectedImageFile) : existingImageUrl),
     [selectedImageFile, existingImageUrl]
@@ -373,10 +403,6 @@ function RoomManagement() {
 
   const activeRoom = activeRoomIndex !== null ? form.variants[activeRoomIndex] : null;
 
-  // Another facility already using this exact category name (case-insensitive,
-  // excluding the one currently being edited) — creating/renaming to this
-  // would silently produce two disconnected cards under the same category
-  // instead of one facility with more rooms.
   const normalizedName = form.name.trim().toLowerCase();
   const duplicateCategoryRoom =
     normalizedName === ''
@@ -386,6 +412,25 @@ function RoomManagement() {
 
   return (
     <div className="panel active" id="panel-room-management">
+      <div className="metric-row">
+        <div className="mc">
+          <div className="mc-label"><i className="ti ti-building"></i> Total Facilities</div>
+          <div className="mc-val">{stats.facilities.toLocaleString()}</div>
+        </div>
+        <div className="mc">
+          <div className="mc-label"><i className="ti ti-door"></i> Total Rooms</div>
+          <div className="mc-val">{stats.totalRooms.toLocaleString()}</div>
+        </div>
+        <div className="mc">
+          <div className="mc-label"><i className="ti ti-circle-check"></i> Available</div>
+          <div className="mc-val">{stats.available.toLocaleString()}</div>
+        </div>
+        <div className="mc">
+          <div className="mc-label"><i className="ti ti-tool"></i> Under Maintenance</div>
+          <div className="mc-val">{stats.maintenance.toLocaleString()}</div>
+        </div>
+      </div>
+
       <div className="card">
         <div className="fac-head">
           <div className="fac-head-left">
@@ -400,14 +445,59 @@ function RoomManagement() {
         </div>
       </div>
 
+      <div className="card fac-toolbar-card">
+        <div className="fac-toolbar">
+          <div className="fac-search-wrap">
+            <i className="ti ti-search fac-search-icon"></i>
+            <input
+              type="text"
+              placeholder="Search facility name or description…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="fac-filter-input fac-search-input"
+            />
+          </div>
+          {(search || selectedCategory !== 'all') && (
+            <button type="button" className="fac-clear-btn" onClick={clearFilters}>
+              <i className="ti ti-x"></i> Clear
+            </button>
+          )}
+        </div>
+        <div className="fac-results-row">
+          {loading ? 'Loading facilities…' : `${visibleRooms.length.toLocaleString()} facilit${visibleRooms.length === 1 ? 'y' : 'ies'} found`}
+        </div>
+      </div>
+
       <div className="set-layout">
+        <div className="set-tabs fac-cat-tabs">
+          <button
+            type="button"
+            className={`set-tab${selectedCategory === 'all' ? ' active' : ''}`}
+            onClick={() => setSelectedCategory('all')}
+          >
+            <span>All Categories</span>
+            <span className="fac-cat-count">{rooms.length}</span>
+          </button>
+          {categories.map((cat) => (
+            <button
+              type="button"
+              key={cat}
+              className={`set-tab${selectedCategory === cat ? ' active' : ''}`}
+              onClick={() => setSelectedCategory(cat)}
+            >
+              <span>{cat}</span>
+              <span className="fac-cat-count">{rooms.filter((r) => r.name === cat).length}</span>
+            </button>
+          ))}
+        </div>
+
         <div className="set-content">
           <div className="fac-grid" id="fac-grid">
             {loading ? (
               <div className="room-grid-empty">Loading facilities…</div>
             ) : visibleRooms.length === 0 ? (
               <div className="room-grid-empty">
-                {rooms.length === 0 ? 'No facilities yet. Click "Add Facility" to create one.' : 'No facilities in this category yet.'}
+                {rooms.length === 0 ? 'No facilities yet. Click "Add Facility" to create one.' : 'No facilities match your filters.'}
               </div>
             ) : (
               visibleRooms.map((r) => {
@@ -472,7 +562,6 @@ function RoomManagement() {
         </div>
       </div>
 
-      {/* ── Facility Add/Edit modal ── */}
       <Modal open={modalOpen} onClose={closeModal} size="2xl">
         <div className="modal-lg-title">{editingId ? 'Edit Facility' : 'Add Facility'}</div>
         <div className="modal-lg-sub">
@@ -493,7 +582,9 @@ function RoomManagement() {
                 }}
               >
                 <span className="fm-step-dot-num">{state === 'done' ? <i className="ti ti-check"></i> : i + 1}</span>
-                <span className="fm-step-dot-label">{s.label}</span>
+                <span className="fm-step-dot-label">
+                  {s.label}{s.key === 'rooms' && form.variants.length > 0 ? ` (${form.variants.length})` : ''}
+                </span>
               </button>
             );
           })}
@@ -504,7 +595,7 @@ function RoomManagement() {
             {formStep === 'facility' && (
               <>
                 <div className="ffield">
-                  <label className="flabel">Category</label>
+                  <label className="flabel"><i className="ti ti-category"></i> Category</label>
                   <span className="flabel-hint">Pick an existing category, or add a new one.</span>
 
                   {addingNewCategory ? (
@@ -531,9 +622,6 @@ function RoomManagement() {
                           setAddingNewCategory(true);
                           return;
                         }
-                        // Picking a category that belongs to a different existing
-                        // facility means "go edit that facility", not "create a
-                        // second one with the same name".
                         const existingRoom = rooms.find((r) => r.name === val && r._id !== editingId);
                         if (existingRoom) {
                           openEditModal(existingRoom);
@@ -563,7 +651,7 @@ function RoomManagement() {
                 </div>
 
                 <div className="ffield">
-                  <label className="flabel">Description</label>
+                  <label className="flabel"><i className="ti ti-file-text"></i> Description</label>
                   <textarea
                     placeholder="Short description guests will see"
                     value={form.description}
@@ -572,7 +660,7 @@ function RoomManagement() {
                 </div>
 
                 <div className="ffield">
-                  <label className="flabel">Facility Image</label>
+                  <label className="flabel"><i className="ti ti-photo"></i> Facility Image</label>
                   <span className="flabel-hint">Shown on the category card in the main catalogue grid.</span>
                   <ImageUploadPreview
                     icon="ti-photo"
@@ -591,7 +679,7 @@ function RoomManagement() {
             {formStep === 'rooms' && activeRoom === null && (
               <div className="ffield">
                 <div className="flabel-row">
-                  <label className="flabel">Rooms</label>
+                  <label className="flabel"><i className="ti ti-door"></i> Rooms</label>
                   <span className="flabel-hint">Each room is what guests actually pick and book — its own name, rate, pax, and photo.</span>
                 </div>
 
@@ -605,9 +693,12 @@ function RoomManagement() {
                           {variantThumbSrc(i, v) ? <img src={variantThumbSrc(i, v)} alt="" /> : <i className="ti ti-photo"></i>}
                         </div>
                         <div className="fm-room-list-info">
-                          <div className="fm-room-list-name">{v.label || 'Untitled Room'}</div>
+                          <div className="fm-room-list-name-row">
+                            <span className="fm-room-list-name">{v.label || 'Untitled Room'}</span>
+                            <span className={`pill ${ROOM_STATUS_PILL_CLASS[v.status] || 'pill-done'}`}>{v.status || 'Available'}</span>
+                          </div>
                           <div className="fm-room-list-meta">
-                            ₱{v.price || 0}/hr{v.pax ? ` · ${v.pax}` : ''}
+                            ₱{v.price || 0}/hr{v.pax ? ` · ${v.pax}` : ''}{v.roomNumber ? ` · Room No.${v.roomNumber}` : ''}
                           </div>
                         </div>
                         <div className="fm-room-list-actions">
@@ -661,6 +752,15 @@ function RoomManagement() {
                       value={activeRoom.pax} onChange={(e) => updateVariant(activeRoomIndex, 'pax', e.target.value)}
                     />
                   </div>
+                </div>
+
+                <div className="ffield">
+                  <label className="flabel">Room No.</label>
+                  <span className="flabel-hint">Must match the Room No. used in Room Monitoring for "Start Now" on due bookings to work.</span>
+                  <input
+                    type="text" placeholder="e.g. 101"
+                    value={activeRoom.roomNumber} onChange={(e) => updateVariant(activeRoomIndex, 'roomNumber', e.target.value)}
+                  />
                 </div>
 
                 <div className="frow">

@@ -11,6 +11,26 @@ function computeDownPayment(unitPrice, hours = 1) {
   return Math.max(0, Math.round(price * h));
 }
 
+function bookingStartMs(dateStr, timeIn) {
+  const [y, m, d] = String(dateStr).split("-").map(Number);
+  const hour = parseInt(String(timeIn).split(":")[0], 10) || 0;
+  return new Date(y, (m || 1) - 1, d || 1, hour).getTime();
+}
+
+async function voidExpiredBookings() {
+  const now = Date.now();
+  const confirmed = await Booking.find({ status: Booking.BOOKING_STATUS.CONFIRMED }).select("date timeIn downPaymentHours");
+  const expiredIds = confirmed
+    .filter((b) => {
+      const holdHours = Math.max(1, Number(b.downPaymentHours) || 1);
+      return bookingStartMs(b.date, b.timeIn) + holdHours * 3600000 < now;
+    })
+    .map((b) => b._id);
+  if (expiredIds.length) {
+    await Booking.updateMany({ _id: { $in: expiredIds } }, { status: Booking.BOOKING_STATUS.CANCELLED });
+  }
+}
+
 function getSlotCapacity(room, variantLabel) {
   if (room.variants && room.variants.length && variantLabel) {
     const variant = room.variants.find(v => v.label === variantLabel);
@@ -244,6 +264,7 @@ async function finalizeBookingFromPayment({ paymentIntentId, metadata, paidPayme
         status: "Confirmed",
         paymentStatus: "Paid",
         downPayment: Number(metadata.downPayment) || 0,
+        downPaymentHours: Number(metadata.downPaymentHours) || 1,
         paymongoPaymentIntentId: paymentIntentId,
         paymongoPaymentId: paidPaymentId || "",
       });
@@ -276,4 +297,6 @@ module.exports = {
   getSlotCapacity,
   runInTransaction,
   releaseLockForSlot,
+  bookingStartMs,
+  voidExpiredBookings,
 };

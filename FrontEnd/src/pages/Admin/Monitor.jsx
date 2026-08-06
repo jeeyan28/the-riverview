@@ -1,10 +1,14 @@
 import '../../styles/admin/monitor.css';
 import { useEffect, useState } from 'react';
 import Modal from '../../components/Modal';
+import DataTable from '../../components/DataTable';
+import Pagination from '../../components/Pagination';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import { useConfirm } from '../../hooks/useConfirm';
 import { useAuth } from '../../context/AuthContext';
 import { monitorRoomsService, roomSessionsService } from '../../services/monitoring';
+import { bookingsService } from '../../services/bookings';
+import { dateKey } from '../../utils/rooms';
 import {
   useRoomMonitorData,
   normalizeRoom,
@@ -18,10 +22,23 @@ import {
 
 const FACILITY_ICONS = { Billiards: 'bi-disc', Karaoke: 'bi-mic', 'Private Rooms': 'bi-door-open', 'Rental Court': 'bi-trophy' };
 const FACILITY_ICON_DEFAULT = 'bi-building';
+const DUE_BOOKINGS_POLL_MS = 20 * 1000;
+
+function getBookingRoomTarget(booking) {
+  const facilityName = booking.room?.name;
+  if (!facilityName) return null;
+  const variants = Array.isArray(booking.room?.variants) ? booking.room.variants : [];
+  const variant = booking.variantLabel ? variants.find((v) => v.label === booking.variantLabel) : null;
+  const roomName = variant?.label || booking.variantLabel || booking.roomLabel;
+  if (!roomName) return null;
+  return { facilityName, roomName, roomNumber: variant?.roomNumber || '' };
+}
 
 function Monitor() {
   const { hasPermission, guardPermission } = useAuth();
   const canManage = hasPermission('room:manage');
+  const canManageBookings = hasPermission('booking:manage');
+  const canStartFromBooking = canManage || canManageBookings;
   const { confirm, confirmProps } = useConfirm();
 
   const {
@@ -38,22 +55,54 @@ function Monitor() {
   const [roomNameFilter, setRoomNameFilter] = useState('All');
   const [sortBy, setSortBy] = useState('default');
   const [detailRoomId, setDetailRoomId] = useState(null);
+  const [dueBookings, setDueBookings] = useState([]);
+  const [gridPage, setGridPage] = useState(1);
+  const [gridPageSize, setGridPageSize] = useState(10);
+
+  async function fetchDueBookings() {
+    if (!canStartFromBooking) return;
+    try {
+      const today = dateKey(new Date().getFullYear(), new Date().getMonth(), new Date().getDate());
+      const data = await bookingsService.list({ status: 'Confirmed' });
+      const list = Array.isArray(data) ? data : [];
+      setDueBookings(list.filter((b) => b.date <= today));
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  useEffect(() => {
+    fetchDueBookings();
+    const handle = setInterval(fetchDueBookings, DUE_BOOKINGS_POLL_MS);
+    return () => clearInterval(handle);
+  }, []);
+
+  useEffect(() => {
+    setGridPage(1);
+  }, [facilityFilter, roomNameFilter, sortBy, viewMode, rooms.length]);
 
   function selectFacilityFilter(name) {
     setFacilityFilter(name);
     setRoomNameFilter('All');
   }
 
-  async function endSession(sessionId, roomId) {
+  async function endSession(sessionId, roomId, paid) {
     if (!guardPermission('room:manage')) return;
-    if (!(await confirm('End this session now? The room will be marked Available.', { confirmText: 'End Session' }))) return;
+    const message = paid
+      ? 'End this session and settle the remaining balance as Paid? The room will be marked Available.'
+      : 'End this session without recording payment? The room will be marked Available and no sale will be recorded.';
+    if (!(await confirm(message, { confirmText: paid ? 'End & Mark Paid' : 'End without Payment' }))) return;
     try {
-      await roomSessionsService.finish(sessionId);
+      const result = await roomSessionsService.end(sessionId, paid);
 
-      try {
-        const updatedRoom = await monitorRoomsService.updateStatus(roomId, 'Available');
-        setRooms((prev) => prev.map((r) => (r._id === roomId ? normalizeRoom({ ...r, ...updatedRoom }) : r)));
-      } catch {}
+      if (result?.roomDeleted) {
+        setRooms((prev) => prev.filter((r) => r._id !== roomId));
+      } else {
+        try {
+          const updatedRoom = await monitorRoomsService.updateStatus(roomId, 'Available');
+          setRooms((prev) => prev.map((r) => (r._id === roomId ? normalizeRoom({ ...r, ...updatedRoom }) : r)));
+        } catch {}
+      }
 
       await fetchMonitorSessions();
     } catch (err) {
@@ -70,28 +119,45 @@ function Monitor() {
     if (!guardPermission('room:manage')) return;
     setModal({ mode: 'extend', fixedRoom: room, session });
   }
+  function openStartFromBooking(booking, matchedRoom, roomTarget) {
+    if (!canStartFromBooking) return;
+    setModal({
+      mode: 'start',
+      fixedRoom: matchedRoom,
+      roomTarget: matchedRoom ? null : roomTarget,
+      session: null,
+      bookingId: booking._id,
+      initialGuestName: booking.guestName,
+      initialDurationHours: booking.duration,
+      downPaymentInfo: { paid: booking.downPayment || 0, total: booking.amount || 0 },
+    });
+  }
 
-  async function handleModalSubmit({ mode, roomId, sessionId, totalHours, paymentMethod, paymentStatus }) {
-    if (!guardPermission('room:manage')) return;
+  async function handleModalSubmit({ mode, roomId, roomTarget, sessionId, totalHours, paymentMethod, paymentStatus, guestName, bookingId }) {
+    if (mode !== 'extend' && bookingId) {
+      if (!canStartFromBooking) return;
+    } else if (!guardPermission('room:manage')) {
+      return;
+    }
 
     if (mode === 'extend') {
-      await roomSessionsService.update(sessionId, {
-        startTime: new Date().toISOString(),
-        duration: totalHours,
-        paymentMethod,
-        paymentStatus,
-      });
+      await roomSessionsService.extend(sessionId, { addedHours: totalHours, paymentStatus });
     } else {
-      await roomSessionsService.create({ roomId, duration: totalHours, paymentMethod, paymentStatus });
+      const created = await roomSessionsService.create({ roomId, roomTarget, duration: totalHours, paymentMethod, paymentStatus, guestName, bookingId });
 
       try {
-        const updatedRoom = await monitorRoomsService.updateStatus(roomId, 'Occupied');
-        setRooms((prev) => prev.map((r) => (r._id === roomId ? normalizeRoom({ ...r, ...updatedRoom }) : r)));
+        const updatedRoom = await monitorRoomsService.updateStatus(created.room, 'Occupied');
+        setRooms((prev) => {
+          const exists = prev.some((r) => r._id === created.room);
+          if (exists) return prev.map((r) => (r._id === created.room ? normalizeRoom({ ...r, ...updatedRoom }) : r));
+          return [...prev, normalizeRoom(updatedRoom)];
+        });
       } catch {}
     }
 
     setModal(null);
     await fetchMonitorSessions();
+    if (bookingId) await fetchDueBookings();
   }
 
   async function handleAddRoom({ facilityName, roomName, roomNumber, price }) {
@@ -144,9 +210,12 @@ function Monitor() {
     }
     return list;
   })();
+  const gridTotalPages = Math.max(1, Math.ceil(visibleRooms.length / gridPageSize));
+  const safeGridPage = Math.min(gridPage, gridTotalPages);
+  const pagedGridRooms = visibleRooms.slice((safeGridPage - 1) * gridPageSize, safeGridPage * gridPageSize);
   const facilityGroups = [];
   const groupIndex = new Map();
-  visibleRooms.forEach((r) => {
+  pagedGridRooms.forEach((r) => {
     if (!groupIndex.has(r.facilityName)) {
       groupIndex.set(r.facilityName, []);
       facilityGroups.push([r.facilityName, groupIndex.get(r.facilityName)]);
@@ -157,14 +226,126 @@ function Monitor() {
   const detailRoom = detailRoomId ? rooms.find((r) => r._id === detailRoomId) || null : null;
   const detailView = detailRoom ? buildRoomView(detailRoom, sessions) : null;
 
+  const roomTableColumns = [
+    {
+      key: 'room',
+      label: 'Room',
+      sortable: true,
+      sortValue: (r) => Number(r.roomNumber) || r.roomNumber,
+      render: (r) => (
+        <>
+          <div className="rm-name">Room {r.roomNumber}</div>
+          <div className="rm-type">{r.facilityName}{r.hasCustomName ? ` · ${r.roomName}` : ''}</div>
+        </>
+      ),
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      render: (r) => {
+        const { stateClass, statusLabel } = buildRoomView(r, sessions);
+        return <span className={`rm-status-pill status-${stateClass}`}><span className="dot"></span>{statusLabel}</span>;
+      },
+    },
+    {
+      key: 'guest',
+      label: 'Guest',
+      sortable: true,
+      sortValue: (r) => buildRoomView(r, sessions).occupancy?.guestName || '',
+      render: (r) => buildRoomView(r, sessions).occupancy?.guestName || '—',
+    },
+    {
+      key: 'start',
+      label: 'Start',
+      render: (r) => {
+        const { occupancy } = buildRoomView(r, sessions);
+        return occupancy ? formatStartTime(occupancy) : '—';
+      },
+    },
+    {
+      key: 'end',
+      label: 'End',
+      render: (r) => {
+        const { occupancy } = buildRoomView(r, sessions);
+        return occupancy ? formatEndTime(occupancy) : '—';
+      },
+    },
+    {
+      key: 'remaining',
+      label: 'Remaining',
+      sortable: true,
+      sortValue: (r) => {
+        const { occupancy } = buildRoomView(r, sessions);
+        return occupancy ? sessionEnd(occupancy).getTime() : Number.POSITIVE_INFINITY;
+      },
+      render: (r) => {
+        const { occupancy, remaining, isPastEnd, isCritical, isWarning } = buildRoomView(r, sessions);
+        return (
+          <span className={`rm-timer${isWarning ? ' warn' : ''}${(isPastEnd || isCritical) ? ' expired' : ''}`}>
+            {occupancy && (isCritical || isPastEnd) && (
+              <i className="bi bi-exclamation-triangle-fill rm-timer-warn-ico"></i>
+            )}
+            {occupancy ? formatTimeRemaining(remaining, isPastEnd) : '—'}
+          </span>
+        );
+      },
+    },
+    {
+      key: 'payment',
+      label: 'Payment',
+      sortable: true,
+      sortValue: (r) => buildRoomView(r, sessions).occupancy?.paymentStatus || '',
+      render: (r) => {
+        const { occupancy } = buildRoomView(r, sessions);
+        return occupancy ? (
+          <span className={`pay-pill pay-${(occupancy.paymentStatus || 'Unpaid').toLowerCase()}`}>{occupancy.paymentStatus || 'Unpaid'}</span>
+        ) : '—';
+      },
+    },
+    {
+      key: 'actions',
+      label: 'Action',
+      render: (r) => {
+        const { occupancy } = buildRoomView(r, sessions);
+        return (
+          <div className="rm-actions rm-actions--table">
+            {occupancy ? (
+              canManage ? (
+                <>
+                  <button className="rm-btn" onClick={() => openExtendModal(occupancy, r)}><i className="bi bi-pencil-square"></i>Extend</button>
+                  <button className="rm-btn" onClick={() => endSession(occupancy._id, r._id, true)}><i className="bi bi-check2-circle"></i>End & Mark Paid</button>
+                  <button className="rm-btn danger" onClick={() => endSession(occupancy._id, r._id, false)}><i className="bi bi-trash"></i>End without Payment</button>
+                </>
+              ) : (
+                <span className="rm-note">In use</span>
+              )
+            ) : r.status === 'Available' ? (
+              canManage ? (
+                <>
+                  <button className="rm-btn primary" onClick={() => openStartSessionModal(r)}><i className="bi bi-play-fill"></i>Start Session</button>
+                  <button className="rm-btn" onClick={() => setEditRoomId(r._id)}><i className="bi bi-pencil-square"></i>Edit</button>
+                  <button className="rm-btn danger" onClick={() => deleteRoom(r._id)}><i className="bi bi-trash"></i>Delete</button>
+                </>
+              ) : (
+                <span className="rm-note">No permission</span>
+              )
+            ) : (
+              <span className="rm-note">{r.status}</span>
+            )}
+          </div>
+        );
+      },
+    },
+  ];
+
   return (
     <div className="panel active" id="panel-monitor">
-      <div className="d-flex align-items-center justify-content-between">
+      <div className="rm-toolbar-head">
         <div className="rm-page-head">
           <span className="live-badge"><span className="dot"></span>Live</span>
           <span className="rm-page-sub">Real-time room status and session monitoring</span>
         </div>
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+        <div className="rm-toolbar-actions">
           <div className="view-toggle" role="group" aria-label="Switch view">
             <button
               type="button"
@@ -191,6 +372,80 @@ function Monitor() {
           )}
         </div>
       </div>
+
+      {canStartFromBooking && dueBookings.length > 0 && (
+        <div className="card card-flush rm-table-wrap rm-due-wrap">
+          <div className="rm-group-head">Bookings Due</div>
+          <table className="rm-table">
+            <thead>
+              <tr>
+                <th>Guest</th>
+                <th>Facility / Room</th>
+                <th>Scheduled</th>
+                <th>Downpayment</th>
+                <th>Status</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {dueBookings
+                .slice()
+                .sort((a, b) => a.timeIn.localeCompare(b.timeIn))
+                .map((b) => {
+                  const roomTarget = getBookingRoomTarget(b);
+                  const matchedRoom = roomTarget
+                    ? rooms.find((r) => r.facilityName === roomTarget.facilityName && r.roomNumber === roomTarget.roomNumber)
+                      || (!roomTarget.roomNumber ? rooms.find((r) => r.facilityName === roomTarget.facilityName && r.roomName === roomTarget.roomName && r.status === 'Available') : null)
+                      || null
+                    : null;
+                  const scheduledStart = new Date(`${b.date}T${String(b.timeIn).padStart(5, '0')}:00`);
+                  const isDue = scheduledStart.getTime() <= Date.now();
+                  const occupancy = matchedRoom ? findRoomOccupancy(matchedRoom._id, sessions) : null;
+                  const hasConflict = matchedRoom && occupancy;
+                  return (
+                    <tr key={b._id} className={isDue ? 'blink-expired' : ''}>
+                      <td>{b.guestName}</td>
+                      <td>
+                        <div className="rm-name">{b.roomLabel}</div>
+                        <div className="rm-type">
+                          {matchedRoom
+                            ? `Room No.${matchedRoom.roomNumber}`
+                            : roomTarget
+                              ? roomTarget.roomNumber
+                                ? `Room No.${roomTarget.roomNumber} (will be created)`
+                                : 'Room No. will be auto-assigned'
+                              : 'No matching Room Monitor room'}
+                        </div>
+                      </td>
+                      <td>{scheduledStart.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</td>
+                      <td>₱{(b.downPayment || 0).toFixed(2)} / ₱{(b.amount || 0).toFixed(2)}</td>
+                      <td>
+                        <span className={`rm-status-pill ${isDue ? 'status-expired' : 'status-warning'}`}>
+                          <span className="dot"></span>{isDue ? 'Due Now' : 'Upcoming'}
+                        </span>
+                        {hasConflict && (
+                          <div style={{ fontSize: '.72rem', color: 'var(--red)', marginTop: '4px' }}>
+                            Room occupied — end that session first
+                          </div>
+                        )}
+                      </td>
+                      <td>
+                        <button
+                          className="rm-btn"
+                          disabled={!roomTarget || hasConflict}
+                          title={!roomTarget ? 'Could not determine this booking\'s room.' : hasConflict ? 'End the current session on this room first.' : ''}
+                          onClick={() => openStartFromBooking(b, matchedRoom, roomTarget)}
+                        >
+                          <i className="bi bi-play-circle"></i>Start Now
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {loading ? (
         <div className="room-grid"><div className="room-grid-empty">Loading rooms…</div></div>
@@ -354,79 +609,26 @@ function Monitor() {
               </div>
             </div>
           ))}
+          <Pagination
+            page={safeGridPage}
+            pageSize={gridPageSize}
+            totalItems={visibleRooms.length}
+            onPageChange={setGridPage}
+            onPageSizeChange={(n) => { setGridPageSize(n); setGridPage(1); }}
+            itemLabel="rooms"
+          />
         </>
       ) : (
         <div className="card card-flush rm-table-wrap">
-          <table className="rm-table">
-            <thead>
-              <tr>
-                <th>Room</th>
-                <th>Status</th>
-                <th>Start</th>
-                <th>End</th>
-                <th>Remaining</th>
-                <th>Payment</th>
-                <th>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {visibleRooms.map((r) => {
-                const v = buildRoomView(r, sessions);
-                const { occupancy, remaining, isPastEnd, isCritical, isWarning, stateClass, statusLabel } = v;
-
-                return (
-                  <tr key={r._id} className={v.blinkClass ? 'blink-expired' : ''}>
-                    <td>
-                      <div className="rm-name">Room {r.roomNumber}</div>
-                      <div className="rm-type">{r.facilityName}{r.hasCustomName ? ` · ${r.roomName}` : ''}</div>
-                    </td>
-                    <td><span className={`rm-status-pill status-${stateClass}`}><span className="dot"></span>{statusLabel}</span></td>
-                    <td>{occupancy ? formatStartTime(occupancy) : '—'}</td>
-                    <td>{occupancy ? formatEndTime(occupancy) : '—'}</td>
-                    <td>
-                      <span className={`rm-timer${isWarning ? ' warn' : ''}${(isPastEnd || isCritical) ? ' expired' : ''}`}>
-                        {occupancy && (isCritical || isPastEnd) && (
-                          <i className="bi bi-exclamation-triangle-fill rm-timer-warn-ico"></i>
-                        )}
-                        {occupancy ? formatTimeRemaining(remaining, isPastEnd) : '—'}
-                      </span>
-                    </td>
-                    <td>
-                      {occupancy ? (
-                        <span className={`pay-pill pay-${(occupancy.paymentStatus || 'Unpaid').toLowerCase()}`}>{occupancy.paymentStatus || 'Unpaid'}</span>
-                      ) : '—'}
-                    </td>
-                    <td>
-                      <div className="rm-actions rm-actions--table">
-                        {occupancy ? (
-                          canManage ? (
-                            <>
-                              <button className="rm-btn" onClick={() => openExtendModal(occupancy, r)}><i className="bi bi-pencil-square"></i>Extend</button>
-                              <button className="rm-btn danger" onClick={() => endSession(occupancy._id, r._id)}><i className="bi bi-trash"></i>End</button>
-                            </>
-                          ) : (
-                            <span className="rm-note">In use</span>
-                          )
-                        ) : r.status === 'Available' ? (
-                          canManage ? (
-                            <>
-                              <button className="rm-btn primary" onClick={() => openStartSessionModal(r)}><i className="bi bi-play-fill"></i>Start Session</button>
-                              <button className="rm-btn" onClick={() => setEditRoomId(r._id)}><i className="bi bi-pencil-square"></i>Edit</button>
-                              <button className="rm-btn danger" onClick={() => deleteRoom(r._id)}><i className="bi bi-trash"></i>Delete</button>
-                            </>
-                          ) : (
-                            <span className="rm-note">No permission</span>
-                          )
-                        ) : (
-                          <span className="rm-note">{r.status}</span>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+          <DataTable
+            tableClassName="tbl rm-table"
+            columns={roomTableColumns}
+            rows={visibleRooms}
+            getRowKey={(r) => r._id}
+            getRowClassName={(r) => (buildRoomView(r, sessions).blinkClass ? 'blink-expired' : undefined)}
+            emptyMessage="No rooms match the current filters."
+            itemLabel="rooms"
+          />
         </div>
       )}
         </>
@@ -451,9 +653,13 @@ function Monitor() {
           setDetailRoomId(null);
           openExtendModal(detailView.occupancy, detailRoom);
         }}
-        onEndSession={() => {
+        onEndSessionPaid={() => {
           setDetailRoomId(null);
-          endSession(detailView.occupancy._id, detailRoom._id);
+          endSession(detailView.occupancy._id, detailRoom._id, true);
+        }}
+        onEndSessionUnpaid={() => {
+          setDetailRoomId(null);
+          endSession(detailView.occupancy._id, detailRoom._id, false);
         }}
         onEdit={() => {
           setDetailRoomId(null);
@@ -470,7 +676,7 @@ function Monitor() {
   );
 }
 
-function RoomDetailModal({ room, view, onClose, canManage, onExtend, onEndSession, onEdit, onDelete }) {
+function RoomDetailModal({ room, view, onClose, canManage, onExtend, onEndSessionPaid, onEndSessionUnpaid, onEdit, onDelete }) {
   const title = room ? `${room.roomName} — ${room.facilityName}` : 'Room details';
 
   return (
@@ -487,11 +693,15 @@ function RoomDetailModal({ room, view, onClose, canManage, onExtend, onEndSessio
             <div className="rm-row"><span className="lbl">Room No.</span><span className="val">{room.roomNumber}</span></div>
             {view.occupancy ? (
               <>
+                {view.occupancy.guestName && (
+                  <div className="rm-row"><span className="lbl">Guest</span><span className="val">{view.occupancy.guestName}</span></div>
+                )}
                 <div className="rm-row"><span className="lbl">Payment Method</span><span className="val">{view.occupancy.paymentMethod || '—'}</span></div>
                 <div className="rm-row">
                   <span className="lbl">Payment Status</span>
                   <span className={`pay-pill pay-${(view.occupancy.paymentStatus || 'Unpaid').toLowerCase()}`}>{view.occupancy.paymentStatus || 'Unpaid'}</span>
                 </div>
+                <div className="rm-row"><span className="lbl">Amount</span><span className="val">₱{(view.occupancy.amount || 0).toFixed(2)}</span></div>
                 <div className="rm-row"><span className="lbl">Start Time</span><span className="val">{formatStartTime(view.occupancy)}</span></div>
                 <div className="rm-row"><span className="lbl">End Time</span><span className="val">{formatEndTime(view.occupancy)}</span></div>
                 <div className="rm-row">
@@ -510,7 +720,8 @@ function RoomDetailModal({ room, view, onClose, canManage, onExtend, onEndSessio
               canManage && (
                 <>
                   <button className="rm-btn" onClick={onExtend}><i className="bi bi-pencil-square"></i>Extend</button>
-                  <button className="rm-btn danger" onClick={onEndSession}><i className="bi bi-trash"></i>End Session</button>
+                  <button className="rm-btn" onClick={onEndSessionPaid}><i className="bi bi-check2-circle"></i>End & Mark Paid</button>
+                  <button className="rm-btn danger" onClick={onEndSessionUnpaid}><i className="bi bi-trash"></i>End without Payment</button>
                 </>
               )
             ) : room.status === 'Available' ? (
@@ -617,7 +828,6 @@ function RoomFormModal({ open, onClose, onSubmit, existingFacilities, rooms, ini
     setRoomNumber(initialRoom?.roomNumber || '');
     setPrice(initialRoom ? String(initialRoom.price ?? '') : '');
     setFacilityOptions(loadPresets(FACILITY_PRESETS_KEY, existingFacilities));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, initialRoom]);
 
   useEffect(() => {
@@ -676,6 +886,11 @@ function RoomFormModal({ open, onClose, onSubmit, existingFacilities, rooms, ini
     const trimmedRoomNumber = roomNumber.trim();
     if (!trimmedFacility || !trimmedRoomName || !trimmedRoomNumber) {
       alert('Please fill in Facility, Room Name, and Room No.');
+      return;
+    }
+    const parsedRoomNumber = parseInt(trimmedRoomNumber, 10);
+    if (Number.isFinite(parsedRoomNumber) && parsedRoomNumber <= 0) {
+      alert('Room No. must be greater than 0.');
       return;
     }
     const trimmedPrice = price.trim();
@@ -759,33 +974,33 @@ function SessionModal({ modal, onClose, onSubmit }) {
   const [seconds, setSeconds] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('Cash');
   const [paymentStatus, setPaymentStatus] = useState('Unpaid');
+  const [guestName, setGuestName] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [addTimeOpen, setAddTimeOpen] = useState(false);
-  const [addHours, setAddHours] = useState('');
-  const [addMinutes, setAddMinutes] = useState('');
 
   const isExtend = modal?.mode === 'extend';
+  const fromBooking = !isExtend && !!modal?.bookingId;
 
   useEffect(() => {
     if (!modal) return;
 
-    setAddTimeOpen(false);
-    setAddHours('');
-    setAddMinutes('');
-
     if (modal.mode === 'extend' && modal.session) {
-      const remainingMs = Math.max(0, sessionEnd(modal.session).getTime() - Date.now());
-      setDurationFromHours(remainingMs > 0 ? remainingMs / 3600000 : 1 / 3600);
-      setPaymentMethod(modal.session.paymentMethod || 'Cash');
-      setPaymentStatus(modal.session.paymentStatus || 'Unpaid');
+      setHours('');
+      setMinutes('');
+      setSeconds('');
+      setPaymentStatus('Unpaid');
+    } else if (fromBooking) {
+      setDurationFromHours(modal.initialDurationHours || 0);
+      setPaymentMethod('Cash');
+      setPaymentStatus('Unpaid');
+      setGuestName(modal.initialGuestName || '');
     } else {
       setHours('');
       setMinutes('');
       setSeconds('');
       setPaymentMethod('Cash');
       setPaymentStatus('Unpaid');
+      setGuestName('');
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modal]);
 
   function setDurationFromHours(totalHours) {
@@ -804,19 +1019,6 @@ function SessionModal({ modal, onClose, onSubmit }) {
     setSeconds(String(totalSeconds % 60));
   }
 
-  function handleAddTime() {
-    const deltaSeconds = (Math.max(0, Number(addHours) || 0) * 3600) + (Math.max(0, Number(addMinutes) || 0) * 60);
-    if (!deltaSeconds) return;
-    const currentSeconds = (Number(hours) || 0) * 3600 + (Number(minutes) || 0) * 60 + (Number(seconds) || 0);
-    const totalSeconds = Math.max(1, Math.min(24 * 3600, currentSeconds + deltaSeconds));
-    setHours(String(Math.floor(totalSeconds / 3600)));
-    setMinutes(String(Math.floor((totalSeconds % 3600) / 60)));
-    setSeconds(String(totalSeconds % 60));
-    setAddTimeOpen(false);
-    setAddHours('');
-    setAddMinutes('');
-  }
-
   function collectDurationHours() {
     const h = Math.max(0, Number(hours) || 0);
     const m = Math.max(0, Number(minutes) || 0);
@@ -827,11 +1029,11 @@ function SessionModal({ modal, onClose, onSubmit }) {
   async function handleSubmit() {
     const totalHours = collectDurationHours();
     if (!totalHours || totalHours < 1 / 3600) {
-      alert('Duration must be at least 1 second.');
+      alert(isExtend ? 'Hours to add must be at least 1 second.' : 'Duration must be at least 1 second.');
       return;
     }
     if (totalHours > 24) {
-      alert('Duration cannot exceed 24 hours.');
+      alert(isExtend ? 'Hours to add cannot exceed 24 hours.' : 'Duration cannot exceed 24 hours.');
       return;
     }
 
@@ -839,11 +1041,14 @@ function SessionModal({ modal, onClose, onSubmit }) {
     try {
       await onSubmit({
         mode: modal.mode,
-        roomId: modal.fixedRoom._id,
+        roomId: modal.fixedRoom?._id,
+        roomTarget: modal.roomTarget,
         sessionId: modal.session?._id,
         totalHours,
         paymentMethod,
         paymentStatus,
+        guestName,
+        bookingId: modal.bookingId,
       });
     } catch (err) {
       console.error(err);
@@ -853,9 +1058,13 @@ function SessionModal({ modal, onClose, onSubmit }) {
     }
   }
 
-  const fixedRoomLabel = modal?.fixedRoom ? `${modal.fixedRoom.roomName} — Room No. ${modal.fixedRoom.roomNumber} (${modal.fixedRoom.facilityName})` : '';
-  const fixedRoomRate = modal?.fixedRoom ? `₱${modal.fixedRoom.price}/hr` : '';
-  const title = isExtend ? `Extend Session — ${modal?.fixedRoom?.roomName || ''}` : 'Start Session';
+  const fixedRoomLabel = modal?.fixedRoom
+    ? `${modal.fixedRoom.roomName} — Room No. ${modal.fixedRoom.roomNumber} (${modal.fixedRoom.facilityName})`
+    : modal?.roomTarget
+      ? `${modal.roomTarget.roomName} — ${modal.roomTarget.roomNumber ? `Room No. ${modal.roomTarget.roomNumber} ` : ''}(${modal.roomTarget.facilityName}) — will be created`
+      : '';
+  const fixedRoomRate = modal?.fixedRoom ? `₱${modal.fixedRoom.price}/hr` : modal?.roomTarget ? '—' : '';
+  const title = isExtend ? `Extend Session — ${modal?.fixedRoom?.roomName || ''}` : fromBooking ? 'Start Session from Booking' : 'Start Session';
 
   return (
     <Modal open={!!modal} onClose={onClose} title={title}>
@@ -869,48 +1078,35 @@ function SessionModal({ modal, onClose, onSubmit }) {
           )}
 
           <div className="mfield">
-            <label>Duration (Hours / Minutes / Seconds)</label>
+            <label>{isExtend ? 'Hours to Add (Hours / Minutes / Seconds)' : 'Duration (Hours / Minutes / Seconds)'}</label>
 
             {isExtend && (
-              <>
-                <div className="aw-preset-row">
-                  {EXTEND_PRESETS.map((p) => (
-                    <button key={p.label} type="button" className="aw-preset-btn" onClick={() => setDurationFromHours(p.mins / 60)}>{p.label}</button>
-                  ))}
-                  <button type="button" className="aw-preset-btn aw-preset-btn--add" onClick={() => setAddTimeOpen((v) => !v)}>+ Add Time</button>
-                </div>
-                {addTimeOpen && (
-                  <div className="aw-addtime-row">
-                    <div className="field-col">
-                      <input type="number" min="0" step="1" value={addHours} onChange={(e) => setAddHours(e.target.value)} placeholder="0" />
-                      <div className="aw-unit-lbl">Hours</div>
-                    </div>
-                    <div className="field-col">
-                      <input type="number" min="0" step="1" value={addMinutes} onChange={(e) => setAddMinutes(e.target.value)} placeholder="0" />
-                      <div className="aw-unit-lbl">Minutes</div>
-                    </div>
-                    <button type="button" className="aw-addtime-btn" onClick={handleAddTime}>Add</button>
-                  </div>
-                )}
-              </>
+              <div className="aw-preset-row">
+                {EXTEND_PRESETS.map((p) => (
+                  <button key={p.label} type="button" className="aw-preset-btn" onClick={() => setDurationFromHours(p.mins / 60)}>{p.label}</button>
+                ))}
+              </div>
             )}
 
             <div className={`field-row${isExtend ? ' field-row--extend-gap' : ''}`}>
               <div className="field-col">
-                <input type="number" min="0" step="1" value={hours} onChange={(e) => handleHmsChange('hours', e.target.value)} />
+                <input type="number" min="0" step="1" value={hours} disabled={fromBooking} onChange={(e) => handleHmsChange('hours', e.target.value)} />
                 <div className="aw-unit-lbl">Hours</div>
               </div>
               <div className="field-col">
-                <input type="number" min="0" step="1" value={minutes} onChange={(e) => handleHmsChange('minutes', e.target.value)} />
+                <input type="number" min="0" step="1" value={minutes} disabled={fromBooking} onChange={(e) => handleHmsChange('minutes', e.target.value)} />
                 <div className="aw-unit-lbl">Minutes</div>
               </div>
               <div className="field-col">
-                <input type="number" min="0" step="1" value={seconds} onChange={(e) => handleHmsChange('seconds', e.target.value)} />
+                <input type="number" min="0" step="1" value={seconds} disabled={fromBooking} onChange={(e) => handleHmsChange('seconds', e.target.value)} />
                 <div className="aw-unit-lbl">Seconds</div>
               </div>
             </div>
+            {fromBooking && (
+              <p style={{ margin: '6px 0 0', fontSize: '.72rem', color: 'var(--muted)' }}>Duration is fixed to what the guest booked.</p>
+            )}
 
-            {!isExtend && (
+            {!isExtend && !fromBooking && (
               <div className="aw-preset-row" style={{ marginTop: '9px' }}>
                 {DURATION_PRESETS.map((p) => (
                   <button key={p.label} type="button" className="aw-preset-btn" onClick={() => setDurationFromHours(p.mins / 60)}>{p.label}</button>
@@ -921,6 +1117,13 @@ function SessionModal({ modal, onClose, onSubmit }) {
 
           {!isExtend && (
             <div className="mfield">
+              <label>Guest Name{fromBooking ? '' : ' (optional)'}</label>
+              <input type="text" value={guestName} onChange={(e) => setGuestName(e.target.value)} placeholder="e.g. Juan Dela Cruz" />
+            </div>
+          )}
+
+          {!isExtend && !fromBooking && (
+            <div className="mfield">
               <label>Payment Method</label>
               <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)}>
                 <option value="Cash">Cash</option>
@@ -930,25 +1133,34 @@ function SessionModal({ modal, onClose, onSubmit }) {
             </div>
           )}
 
-          <div className="mfield">
-            <label>Payment Status</label>
-            <div className="pay-toggle" role="group" aria-label="Payment status">
-              <button
-                type="button"
-                className={`pay-toggle-btn pay-toggle-btn--paid${paymentStatus === 'Paid' ? ' active' : ''}`}
-                onClick={() => setPaymentStatus('Paid')}
-              >
-                Paid
-              </button>
-              <button
-                type="button"
-                className={`pay-toggle-btn pay-toggle-btn--unpaid${paymentStatus === 'Unpaid' ? ' active' : ''}`}
-                onClick={() => setPaymentStatus('Unpaid')}
-              >
-                Unpaid
-              </button>
+          {fromBooking ? (
+            <div className="mfield">
+              <label>Payment</label>
+              <p style={{ margin: 0, fontSize: '.82rem', color: 'var(--muted)' }}>
+                Downpayment already paid online: ₱{(modal.downPaymentInfo?.paid || 0).toFixed(2)} of ₱{(modal.downPaymentInfo?.total || 0).toFixed(2)}. Applied automatically.
+              </p>
             </div>
-          </div>
+          ) : (
+            <div className="mfield">
+              <label>{isExtend ? 'Payment Status (for added time)' : 'Payment Status'}</label>
+              <div className="pay-toggle" role="group" aria-label="Payment status">
+                <button
+                  type="button"
+                  className={`pay-toggle-btn pay-toggle-btn--paid${paymentStatus === 'Paid' ? ' active' : ''}`}
+                  onClick={() => setPaymentStatus('Paid')}
+                >
+                  Paid
+                </button>
+                <button
+                  type="button"
+                  className={`pay-toggle-btn pay-toggle-btn--unpaid${paymentStatus === 'Unpaid' ? ' active' : ''}`}
+                  onClick={() => setPaymentStatus('Unpaid')}
+                >
+                  Unpaid
+                </button>
+              </div>
+            </div>
+          )}
 
           <div className="modal-actions">
             <button className="btn-cancel" onClick={onClose}>Cancel</button>

@@ -1,14 +1,40 @@
-/* ══════════════════════════════════════════════════════════════
-   ADMIN — USERS (pages/Admin/Users.jsx)
-   The Add User / Role Change modals in Users.jsx are already
-   page-specific (defined inline in Users.jsx, not separate files),
-   so this file only holds the one style override they need.
-   ══════════════════════════════════════════════════════════════ */
-
-/* Add User modal's password field uses inline styles for its sibling
-   inputs (no .pfield wrapper); this matches that look for the input
-   nested inside PasswordInput's .input-wrap. */
 .aum-password-wrap .input-wrap input{
   width:100%;background:var(--navy3);border:1px solid var(--border);border-radius:8px;
   padding:9px 34px 9px 12px;color:var(--text);font-family:'Inter',sans-serif;font-size:.85rem;outline:none;
+}
+
+.um-toolbar-card{display:flex;flex-direction:column;gap:10px;padding:14px 16px;}
+.um-toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;}
+.um-search-wrap{position:relative;flex:1;min-width:220px;max-width:340px;}
+.um-search-icon{position:absolute;left:11px;top:50%;transform:translateY(-50%);font-size:14px;color:var(--muted);pointer-events:none;}
+.um-search-input{width:100%;}
+.um-filters{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.um-filter-input{
+  font-size:.78rem;padding:8px 12px;border-radius:9px;border:1px solid var(--border);
+  background:var(--navy3);color:var(--text);font-family:var(--font-body);outline:none;min-width:150px;
+}
+.um-search-wrap .um-filter-input{padding-left:32px;}
+.um-filter-input:focus{border-color:rgba(0,201,167,.5);}
+.um-clear-btn{
+  display:inline-flex;align-items:center;gap:4px;
+  font-size:.78rem;padding:8px 12px;border-radius:9px;border:1px solid var(--border);
+  background:none;color:var(--muted);font-family:var(--font-body);cursor:pointer;
+}
+.um-clear-btn:hover{background:var(--navy3);color:var(--text);}
+.um-add-btn{margin-left:2px;}
+.um-results-row{font-size:.76rem;color:var(--muted);border-top:1px solid var(--border-soft);padding-top:10px;}
+
+.um-user{display:flex;align-items:center;gap:10px;}
+.um-avatar{
+  flex-shrink:0;width:32px;height:32px;border-radius:50%;
+  background:var(--teal-soft);color:var(--teal);
+  display:flex;align-items:center;justify-content:center;
+  font-size:.7rem;font-weight:700;
+}
+.um-user-info{display:flex;flex-direction:column;gap:1px;min-width:0;}
+.um-user-name{font-size:.82rem;font-weight:600;color:var(--text);}
+.um-user-email{font-size:.72rem;color:var(--muted);}
+
+@media (max-width:900px){
+  .um-search-wrap{max-width:none;width:100%;}
 }

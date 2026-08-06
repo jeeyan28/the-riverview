@@ -6,6 +6,7 @@ import ConfirmDialog from '../../components/ConfirmDialog';
 import { useConfirm } from '../../hooks/useConfirm';
 import { dateKey } from '../../utils/rooms';
 import { resolveImageUrl } from '../../utils/resolveImageUrl';
+import { formatPeso } from '../../utils/currency';
 import { useAuth } from '../../context/AuthContext';
 import { useSiteSettings } from '../../hooks/useSiteSettings';
 import { roomsService } from '../../services/rooms';
@@ -49,6 +50,28 @@ function shortBookingId(b) {
 
 function facilityName(b) {
   return b.room?.name || b.roomLabel || '—';
+}
+
+function initials(name) {
+  const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return '?';
+  return (parts[0][0] + (parts[1]?.[0] || '')).toUpperCase();
+}
+
+function formatDate(dateStr) {
+  if (!dateStr) return '—';
+  const d = new Date(`${dateStr}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return dateStr;
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function formatTime(timeStr) {
+  if (!timeStr) return '—';
+  const [h, m] = timeStr.split(':').map(Number);
+  if (Number.isNaN(h)) return timeStr;
+  const period = h >= 12 ? 'PM' : 'AM';
+  const hour12 = h % 12 || 12;
+  return `${hour12}:${String(m || 0).padStart(2, '0')} ${period}`;
 }
 
 function Bookings() {
@@ -259,17 +282,54 @@ function Bookings() {
   }
 
   const columns = [
-    { key: 'reservationCode', label: 'Reservation Code', render: (b) => b.reservationCode || shortBookingId(b) },
-    { key: 'guestName', label: 'Customer' },
-    { key: 'guestContact', label: 'Phone', render: (b) => b.guestContact || '—' },
-    { key: 'roomLabel', label: 'Facility Name', render: (b) => facilityName(b) },
-    { key: 'variantLabel', label: 'Room', render: (b) => b.variantLabel || 'Standard' },
-    { key: 'date', label: 'Booking Date' },
-    { key: 'timeIn', label: 'Time' },
-    { key: 'duration', label: 'Hours', render: (b) => `${b.duration}h` },
+    {
+      key: 'reservationCode',
+      label: 'Reservation',
+      sortable: true,
+      sortValue: (b) => b.reservationCode || shortBookingId(b),
+      render: (b) => <span className="bk-code">{b.reservationCode || shortBookingId(b)}</span>,
+    },
+    {
+      key: 'guestName',
+      label: 'Customer',
+      sortable: true,
+      render: (b) => (
+        <div className="bk-customer">
+          <span className="bk-avatar">{initials(b.guestName)}</span>
+          <div className="bk-customer-info">
+            <span className="bk-customer-name">{b.guestName || '—'}</span>
+            <span className="bk-customer-phone">{b.guestContact || '—'}</span>
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: 'roomLabel',
+      label: 'Facility',
+      sortable: true,
+      sortValue: (b) => facilityName(b),
+      render: (b) => (
+        <div className="bk-facility">
+          <span>{facilityName(b)}</span>
+          <span className="bk-facility-room">{b.variantLabel || 'Standard'}</span>
+        </div>
+      ),
+    },
+    {
+      key: 'date',
+      label: 'Schedule',
+      sortable: true,
+      render: (b) => (
+        <div className="bk-schedule">
+          <span>{formatDate(b.date)}</span>
+          <span className="bk-facility-room">{formatTime(b.timeIn)} · {b.duration}h</span>
+        </div>
+      ),
+    },
     {
       key: 'paymentStatus',
       label: 'Payment',
+      sortable: true,
       render: (b) =>
         b.paymentScreenshot ? (
           <span
@@ -287,6 +347,7 @@ function Bookings() {
     {
       key: 'status',
       label: 'Status',
+      sortable: true,
       render: (b) => <span className={`pill ${STATUS_PILL_CLASS[b.status] || 'pill-pending'}`}>{b.status}</span>,
     },
     {
@@ -350,48 +411,57 @@ function Bookings() {
         </div>
       </div>
 
-      <div className="bk-toolbar">
-        <div className="bk-filters">
-          <input
-            type="text"
-            className="bk-filter-input"
-            placeholder="Search name, phone, or reservation code…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-          <select className="bk-filter-input" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-            <option value="">All Status</option>
-            {BOOKING_STATUSES.map((s) => (
-              <option key={s} value={s}>{s}</option>
-            ))}
-          </select>
-          <select className="bk-filter-input" value={paymentFilter} onChange={(e) => setPaymentFilter(e.target.value)}>
-            <option value="">All Payment Status</option>
-            {PAYMENT_STATUSES.map((s) => (
-              <option key={s} value={s}>{s}</option>
-            ))}
-          </select>
-          <select className="bk-filter-input" value={roomFilter} onChange={(e) => setRoomFilter(e.target.value)}>
-            <option value="">All Facilities</option>
-            {rooms.map((r) => (
-              <option key={r._id} value={r._id}>
-                {r.name}
-              </option>
-            ))}
-          </select>
-          <input
-            type="date"
-            className="bk-filter-input"
-            title="Filter by exact date"
-            value={dateFilter}
-            onChange={(e) => setDateFilter(e.target.value)}
-          />
-          <button type="button" className="bk-clear-btn" onClick={clearFilters}>
-            Clear
-          </button>
+      <div className="card bk-toolbar-card">
+        <div className="bk-toolbar">
+          <div className="bk-search-wrap">
+            <i className="ti ti-search bk-search-icon"></i>
+            <input
+              type="text"
+              className="bk-filter-input bk-search-input"
+              placeholder="Search name, phone, or reservation code…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+          <div className="bk-filters">
+            <select className="bk-filter-input" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+              <option value="">All Status</option>
+              {BOOKING_STATUSES.map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+            <select className="bk-filter-input" value={paymentFilter} onChange={(e) => setPaymentFilter(e.target.value)}>
+              <option value="">All Payment Status</option>
+              {PAYMENT_STATUSES.map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+            <select className="bk-filter-input" value={roomFilter} onChange={(e) => setRoomFilter(e.target.value)}>
+              <option value="">All Facilities</option>
+              {rooms.map((r) => (
+                <option key={r._id} value={r._id}>
+                  {r.name}
+                </option>
+              ))}
+            </select>
+            <input
+              type="date"
+              className="bk-filter-input"
+              title="Filter by exact date"
+              value={dateFilter}
+              onChange={(e) => setDateFilter(e.target.value)}
+            />
+            {(search || statusFilter || paymentFilter || roomFilter || dateFilter) && (
+              <button type="button" className="bk-clear-btn" onClick={clearFilters}>
+                <i className="ti ti-x"></i> Clear
+              </button>
+            )}
+          </div>
+        </div>
+        <div className="bk-results-row">
+          {loading ? 'Loading bookings…' : `${bookings.length.toLocaleString()} booking${bookings.length === 1 ? '' : 's'} found`}
         </div>
       </div>
-
 
       <div className="card card-flush">
         <DataTable
@@ -415,7 +485,7 @@ function Bookings() {
                 style={{ maxWidth: '100%', maxHeight: '60vh', borderRadius: 10 }}
               />
               <p style={{ fontSize: '.8rem', color: 'var(--muted)', marginTop: 10 }}>
-                {proofBooking.guestName} · {facilityName(proofBooking)} · ₱{(proofBooking.downPayment || 0).toLocaleString()} down payment via {proofBooking.paymentMethod}
+                {proofBooking.guestName} · {facilityName(proofBooking)} · {formatPeso(proofBooking.downPayment)} down payment via {proofBooking.paymentMethod}
               </p>
             </div>
             <div className="modal-actions">
@@ -442,10 +512,10 @@ function Bookings() {
         )}
       </Modal>
 
-      <Modal open={!!detailBooking} onClose={() => setDetailId(null)} size="xl">
+      <Modal open={!!detailBooking} onClose={() => setDetailId(null)} size="2xl">
         {detailBooking && (
           <>
-            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+            <div className="bd-header">
               <div>
                 <div className="modal-lg-title">Booking Details</div>
                 <p className="modal-lg-sub" style={{ marginBottom: 0 }}>Reservation Code: {detailBooking.reservationCode || shortBookingId(detailBooking)}</p>
@@ -455,112 +525,114 @@ function Bookings() {
               </span>
             </div>
 
-            <div className="bd-section two-col">
-              <div>
-                <div className="bd-section-title"><i className="ti ti-user"></i> Customer Information</div>
-                <div className="bd-grid" style={{ gridTemplateColumns: '1fr 1fr' }}>
-                  <div className="bd-field"><label>Customer Name</label><p>{detailBooking.guestName || '—'}</p></div>
-                  <div className="bd-field">
-                    <label>Email</label>
-                    <p>{detailBooking.guestEmail || (String(detailBooking.guestContact || '').includes('@') ? detailBooking.guestContact : '—')}</p>
+            <div className="bd-body">
+              <div className="bd-row">
+                <div className="bd-card">
+                  <div className="bd-section-title"><i className="ti ti-user"></i> Customer Information</div>
+                  <div className="bd-grid">
+                    <div className="bd-field"><label>Customer Name</label><p>{detailBooking.guestName || '—'}</p></div>
+                    <div className="bd-field">
+                      <label>Email</label>
+                      <p>{detailBooking.guestEmail || (String(detailBooking.guestContact || '').includes('@') ? detailBooking.guestContact : '—')}</p>
+                    </div>
+                    <div className="bd-field">
+                      <label>Phone Number</label>
+                      <p>{detailBooking.guestContact && !String(detailBooking.guestContact).includes('@') ? detailBooking.guestContact : detailBooking.guestContact || '—'}</p>
+                    </div>
+                    <div className="bd-field"><label>Number of Guests</label><p>{detailBooking.guestCount ? String(detailBooking.guestCount) : '—'}</p></div>
                   </div>
-                  <div className="bd-field">
-                    <label>Phone Number</label>
-                    <p>{detailBooking.guestContact && !String(detailBooking.guestContact).includes('@') ? detailBooking.guestContact : detailBooking.guestContact || '—'}</p>
+                </div>
+
+                <div className="bd-card">
+                  <div className="bd-section-title"><i className="ti ti-credit-card"></i> Payment Breakdown</div>
+                  <div className="bd-grid">
+                    <div className="bd-field"><label>Downpayment</label><p>{formatPeso(detailBooking.downPayment)}</p></div>
+                    <div className="bd-field"><label>Remaining Balance</label><p>{formatPeso((detailBooking.amount || 0) - (detailBooking.downPayment || 0))}</p></div>
+                    <div className="bd-field"><label>Total Amount</label><p>{formatPeso(detailBooking.amount)}</p></div>
+                    <div className="bd-field"><label>Payment Method</label><p>{detailBooking.paymentMethod || '—'}</p></div>
                   </div>
-                  <div className="bd-field"><label>Number of Guests</label><p>{detailBooking.guestCount ? String(detailBooking.guestCount) : '—'}</p></div>
                 </div>
               </div>
 
-              <div>
-                <div className="bd-section-title"><i className="ti ti-credit-card"></i> Payment Breakdown</div>
-                <div className="bd-grid" style={{ gridTemplateColumns: '1fr 1fr' }}>
-                  <div className="bd-field"><label>Downpayment</label><p>₱{Number(detailBooking.downPayment || 0).toLocaleString()}</p></div>
-                  <div className="bd-field"><label>Remaining Balance</label><p>₱{Number((detailBooking.amount || 0) - (detailBooking.downPayment || 0)).toLocaleString()}</p></div>
-                  <div className="bd-field"><label>Total Amount</label><p>₱{Number(detailBooking.amount || 0).toLocaleString()}</p></div>
-                  <div className="bd-field"><label>Payment Method</label><p>{detailBooking.paymentMethod || '—'}</p></div>
+              <div className="bd-row">
+                <div className="bd-card">
+                  <div className="bd-section-title"><i className="ti ti-calendar-event"></i> Booking Specifications</div>
+                  <div className="bd-grid">
+                    <div className="bd-field"><label>Facility Name</label><p>{facilityName(detailBooking)}</p></div>
+                    <div className="bd-field"><label>Room</label><p>{detailBooking.variantLabel || '—'}</p></div>
+                    <div className="bd-field"><label>Booking Date</label><p>{detailBooking.date || '—'}</p></div>
+                    <div className="bd-field"><label>Check-in Time</label><p>{detailBooking.timeIn || '—'}</p></div>
+                    <div className="bd-field"><label>Duration</label><p>{detailBooking.duration ? `${detailBooking.duration} hr${detailBooking.duration > 1 ? 's' : ''}` : '—'}</p></div>
+                    <div className="bd-field"><label>Booked On</label><p>{detailBooking.createdAt ? new Date(detailBooking.createdAt).toLocaleString(undefined, { month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }) : '—'}</p></div>
+                  </div>
                 </div>
+
+                <div className="bd-card">
+                  <div className="bd-section-title"><i className="ti ti-history"></i> Customer Booking History</div>
+                  <div className="card card-flush">
+                    <table className="tbl">
+                      <thead style={{ background: 'var(--navy3)' }}>
+                        <tr><th style={{ padding: '8px 10px' }}>Date</th><th>Room</th><th>Hrs</th><th>Status</th></tr>
+                      </thead>
+                      <tbody>
+                        {historyForDetail.length === 0 ? (
+                          <tr><td colSpan={4} style={{ textAlign: 'center', color: 'var(--muted)', padding: '10px 0', fontSize: '.8rem' }}>No previous bookings from this guest.</td></tr>
+                        ) : (
+                          historyForDetail.map((h) => (
+                            <tr key={h._id}>
+                              <td style={{ padding: '8px 10px' }}>{h.date}</td>
+                              <td>{facilityName(h)}</td>
+                              <td>{h.duration}hrs</td>
+                              <td><span className={`pill ${STATUS_PILL_CLASS[h.status] || 'pill-pending'}`}>{shortStatusLabel(h.status)}</span></td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                  {historyForDetail.length > 0 && (
+                    <button
+                      type="button"
+                      className="tbl-action-btn"
+                      style={{ color: 'var(--text)', marginTop: 10 }}
+                      onClick={openFullHistory}
+                    >
+                      View All History
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {detailBooking.paymentScreenshot && (
+                <div className="bd-card">
+                  <div className="bd-section-title"><i className="ti ti-receipt"></i> Payment Screenshot</div>
+                  <img
+                    className="bd-screenshot"
+                    src={resolveImageUrl(detailBooking.paymentScreenshot)}
+                    alt="Payment screenshot sent by the guest"
+                    onClick={() => setProofId(detailBooking._id)}
+                    style={{ cursor: 'pointer' }}
+                  />
+                  <p className="bd-screenshot-hint">Click to view full size, approve, or reject.</p>
+                </div>
+              )}
+
+              {detailBooking.paymentProvider === 'paymongo' && (
+                <div className="bd-card">
+                  <div className="bd-section-title"><i className="ti ti-credit-card"></i> Payment</div>
+                  <p style={{ fontSize: '.85rem', color: 'var(--muted)', margin: 0 }}>
+                    Paid automatically online via PayMongo — confirmed and verified directly, no screenshot or manual approval needed.
+                  </p>
+                </div>
+              )}
+
+              <div className="bd-card">
+                <div className="bd-section-title"><i className="ti ti-file-text"></i> Special Requests / Notes</div>
+                <p className="bd-notes-body">{detailBooking.specialRequests?.trim() || 'No special requests provided.'}</p>
               </div>
             </div>
 
-            <div className="bd-section two-col">
-              <div>
-                <div className="bd-section-title"><i className="ti ti-calendar-event"></i> Booking Specifications</div>
-                <div className="bd-grid" style={{ gridTemplateColumns: '1fr 1fr' }}>
-                  <div className="bd-field"><label>Facility Name</label><p>{facilityName(detailBooking)}</p></div>
-                  <div className="bd-field"><label>Room</label><p>{detailBooking.variantLabel || '—'}</p></div>
-                  <div className="bd-field"><label>Booking Date</label><p>{detailBooking.date || '—'}</p></div>
-                  <div className="bd-field"><label>Check-in Time</label><p>{detailBooking.timeIn || '—'}</p></div>
-                  <div className="bd-field"><label>Duration</label><p>{detailBooking.duration ? `${detailBooking.duration} hr${detailBooking.duration > 1 ? 's' : ''}` : '—'}</p></div>
-                  <div className="bd-field"><label>Booked On</label><p>{detailBooking.createdAt ? new Date(detailBooking.createdAt).toLocaleString(undefined, { month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }) : '—'}</p></div>
-                </div>
-              </div>
-
-              <div>
-                <div className="bd-section-title"><i className="ti ti-history"></i> Customer Booking History</div>
-                <div className="card card-flush">
-                  <table className="tbl">
-                    <thead style={{ background: 'var(--navy3)' }}>
-                      <tr><th style={{ padding: '8px 10px' }}>Date</th><th>Room</th><th>Hrs</th><th>Status</th></tr>
-                    </thead>
-                    <tbody>
-                      {historyForDetail.length === 0 ? (
-                        <tr><td colSpan={4} style={{ textAlign: 'center', color: 'var(--muted)', padding: '10px 0', fontSize: '.8rem' }}>No previous bookings from this guest.</td></tr>
-                      ) : (
-                        historyForDetail.map((h) => (
-                          <tr key={h._id}>
-                            <td style={{ padding: '8px 10px' }}>{h.date}</td>
-                            <td>{facilityName(h)}</td>
-                            <td>{h.duration}hrs</td>
-                            <td><span className={`pill ${STATUS_PILL_CLASS[h.status] || 'pill-pending'}`}>{shortStatusLabel(h.status)}</span></td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-                {historyForDetail.length > 0 && (
-                  <button
-                    type="button"
-                    className="tbl-action-btn"
-                    style={{ color: 'var(--text)', marginTop: 6 }}
-                    onClick={openFullHistory}
-                  >
-                    View All History
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {detailBooking.paymentScreenshot && (
-              <div className="bd-section">
-                <div className="bd-section-title"><i className="ti ti-receipt"></i> Payment Screenshot</div>
-                <img
-                  className="bd-screenshot"
-                  src={resolveImageUrl(detailBooking.paymentScreenshot)}
-                  alt="Payment screenshot sent by the guest"
-                  onClick={() => setProofId(detailBooking._id)}
-                  style={{ cursor: 'pointer' }}
-                />
-                <p className="bd-screenshot-hint">Click to view full size, approve, or reject.</p>
-              </div>
-            )}
-
-            {detailBooking.paymentProvider === 'paymongo' && (
-              <div className="bd-section">
-                <div className="bd-section-title"><i className="ti ti-credit-card"></i> Payment</div>
-                <p style={{ fontSize: '.85rem', color: 'var(--muted)', margin: 0 }}>
-                  Paid automatically online via PayMongo — confirmed and verified directly, no screenshot or manual approval needed.
-                </p>
-              </div>
-            )}
-
-            <div className="bd-section">
-              <div className="bd-section-title"><i className="ti ti-file-text"></i> Special Requests / Notes</div>
-              <p className="bd-notes-body">{detailBooking.specialRequests?.trim() || 'No special requests provided.'}</p>
-            </div>
-
-            <div className="modal-actions" style={{ justifyContent: 'space-between' }}>
+            <div className="modal-actions bd-footer" style={{ justifyContent: 'space-between' }}>
               <div style={{ display: 'flex', gap: 10 }}>
                 {canManage && (
                   <button

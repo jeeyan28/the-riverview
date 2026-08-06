@@ -1,11 +1,9 @@
-import { useEffect, useState } from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import logo from '../assets/logo/logoo.png';
 
-// Icon-only collapse state, remembered per admin via localStorage (client-
-// side only — no backend field for this, it's a pure UI preference).
 const SIDEBAR_COLLAPSED_KEY = 'rv_admin_sidebar_collapsed';
-
 
 const MANAGER_UP = ['manager', 'super_admin'];
 
@@ -37,8 +35,6 @@ const NAV_SECTIONS = [
   },
 ];
 
-// Exported so AdminLayout can look up the matching page-title without
-// duplicating this list.
 export const PAGE_TITLES = {
   dashboard: 'Dashboard',
   monitor: 'Room Monitor',
@@ -68,9 +64,11 @@ function initialsOf(user) {
   return (initials || 'A').toUpperCase();
 }
 
-function AdminSidebar({ onNavigate }) {
+function AdminSidebar() {
   const { user, roleLabel, hasPermission, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const navRef = useRef(null);
 
   const [collapsed, setCollapsed] = useState(() => {
     try {
@@ -84,10 +82,13 @@ function AdminSidebar({ onNavigate }) {
     try {
       localStorage.setItem(SIDEBAR_COLLAPSED_KEY, collapsed ? '1' : '0');
     } catch {
-      // Storage unavailable (private mode, etc.) — collapse still works
-      // for the session, it just won't persist.
     }
   }, [collapsed]);
+
+  useEffect(() => {
+    const activeItem = navRef.current?.querySelector('.sb-item.active');
+    activeItem?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }, [location.pathname]);
 
   async function handleLogout() {
     await logout();
@@ -107,7 +108,7 @@ function AdminSidebar({ onNavigate }) {
       </button>
 
       <div className="sb-brand">
-        <div className="sb-logo">RV</div>
+        <img className="sb-logo" src={logo} alt="Riverview Logo" />
         {!collapsed && (
           <div>
             <div className="sb-title">Riverview</div>
@@ -116,25 +117,14 @@ function AdminSidebar({ onNavigate }) {
         )}
       </div>
 
-      <div className="sb-nav">
+      <div className="sb-nav" ref={navRef}>
         {NAV_SECTIONS.map((section) => {
           const visibleItems = section.items.filter(
             (item) =>
               (!item.permission || hasPermission(item.permission)) &&
               (!item.roles || item.roles.includes(user?.role))
           );
-          // A section with every item hidden (e.g. a Staff account seeing
-          // an all-gated "Admin" section) still shows its label in the
-          // original's DOM-hiding approach only because admin.html never
-          // hides the <div class="sb-section"> heading itself — only the
-          // <button> below it. Reproduced faithfully: skip rendering the
-          // section only if it has zero items to begin with, never based
-          // on how many survived the permission filter.
           if (visibleItems.length === 0 && section.items.length > 0) {
-            // Still render the heading with no items beneath it, matching
-            // that original per-button (not per-section) hiding behavior.
-            // Skipped entirely when collapsed — no room, and no items to
-            // label anyway.
             return collapsed ? null : (
               <div key={section.label}>
                 <div className="sb-section">{section.label}</div>
@@ -149,8 +139,8 @@ function AdminSidebar({ onNavigate }) {
                   key={item.to}
                   to={item.to}
                   className={({ isActive }) => `sb-item${isActive ? ' active' : ''}`}
-                  onClick={() => onNavigate?.(PAGE_TITLES[item.to.split('/').pop()])}
-                  title={collapsed ? item.label : undefined}
+                  title={item.label}
+                  data-tooltip={item.label}
                 >
                   <i className={`ti ${item.icon}`}></i>
                   {!collapsed && item.label}
@@ -163,7 +153,7 @@ function AdminSidebar({ onNavigate }) {
 
       <div className="sb-bottom">
         <div className="admin-info-row">
-          <div className="admin-av" id="sb-admin-av" title={collapsed ? fullName(user) : undefined}>
+          <div className="admin-av" id="sb-admin-av" title={fullName(user)} data-tooltip={fullName(user)}>
             {initialsOf(user)}
           </div>
           {!collapsed && (
@@ -173,11 +163,11 @@ function AdminSidebar({ onNavigate }) {
             </div>
           )}
           <i
-            className="ti ti-logout"
+            className="ti ti-logout sb-logout-icon"
             id="admin-logout-btn"
             onClick={handleLogout}
             title="Logout"
-            style={{ fontSize: 14, color: 'var(--muted)', marginLeft: collapsed ? 0 : 'auto', cursor: 'pointer' }}
+            style={{ fontSize: 14, marginLeft: collapsed ? 0 : 'auto' }}
           ></i>
         </div>
       </div>

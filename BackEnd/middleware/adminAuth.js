@@ -1,7 +1,6 @@
 const { hasPermission, isAdminRole } = require("../utils/permissions");
 const User = require("../model/user");
 
-// Requires an active session (any logged-in user, customer or admin).
 async function ensureAuthenticated(req, res, next) {
   if (!req.session || !req.session.userId) {
     return res.status(401).json({ message: "Not logged in." });
@@ -18,10 +17,6 @@ async function ensureAuthenticated(req, res, next) {
   }
 }
 
-// Requires the session user to be staff/manager/super_admin.
-// Uses isAdminRole() from utils/permissions.js as the single source of truth
-// for "what counts as an admin role" — previously this list was hardcoded here
-// too, so the two could silently drift out of sync as roles changed.
 function ensureAdmin(req, res, next) {
   ensureAuthenticated(req, res, () => {
     if (!isAdminRole(req.user.role)) {
@@ -42,6 +37,17 @@ function requirePermission(permission) {
   };
 }
 
+function requireAnyPermission(...permissions) {
+  return (req, res, next) => {
+    ensureAdmin(req, res, () => {
+      if (!permissions.some((p) => hasPermission(req.user, p))) {
+        return res.status(403).json({ message: "You do not have permission to do that." });
+      }
+      next();
+    });
+  };
+}
+
 function requireRole(...roles) {
   return (req, res, next) => {
     ensureAdmin(req, res, () => {
@@ -53,4 +59,4 @@ function requireRole(...roles) {
   };
 }
 
-module.exports = { ensureAuthenticated, ensureAdmin, requirePermission, requireRole };
+module.exports = { ensureAuthenticated, ensureAdmin, requirePermission, requireAnyPermission, requireRole };

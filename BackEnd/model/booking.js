@@ -1,13 +1,8 @@
 const mongoose = require("mongoose");
 
-// Single source of truth for booking duration bounds. bookingHelper.js's
-// admin-booking cap check reads MAX_DURATION_HOURS from here instead of
-// repeating the literal.
-const MIN_DURATION_HOURS = 1 / 3600; // 1 second
+const MIN_DURATION_HOURS = 1 / 3600;
 const MAX_DURATION_HOURS = 24;
 
-// Single source of truth for status/paymentStatus values. bookingRoutes.js
-// and forecastRoutes.js read from these instead of retyping the strings.
 const BOOKING_STATUS = {
   PENDING: "Pending",
   PENDING_PAYMENT_VERIFICATION: "Pending Payment Verification",
@@ -52,7 +47,8 @@ const bookingSchema = new mongoose.Schema({
     default: PAYMENT_STATUS.UNPAID
   },
   downPayment:       { type: Number, default: 0, min: 0 },
-  paymentScreenshot: { type: String, default: "" }, 
+  downPaymentHours:  { type: Number, default: 1, min: 1 },
+  paymentScreenshot: { type: String, default: "" },
   paymentMethod: { type: String, default: "Cash", trim: true },
   paymentProvider: { type: String, enum: ["manual", "paymongo"], default: "manual" },
   paymongoPaymentIntentId: { type: String, index: { unique: true, sparse: true } },
@@ -60,7 +56,7 @@ const bookingSchema = new mongoose.Schema({
   paymongoPaymentId: { type: String, default: "" },
   source:        { type: String, enum: ["online", "walk-in"], default: "online" },
   bookedBy:      { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-  reviewedBy:    { type: mongoose.Schema.Types.ObjectId, ref: "User" }, // admin who approved/rejected the payment
+  reviewedBy:    { type: mongoose.Schema.Types.ObjectId, ref: "User" },
   reviewedAt:    { type: Date },
   createdAt:     { type: Date, default: Date.now }
 });

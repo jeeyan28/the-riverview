@@ -1,9 +1,16 @@
+import { useEffect } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useLocation, useOutlet } from 'react-router-dom';
 
 function PageTransition() {
   const location = useLocation();
   const outlet = useOutlet();
+
+  useEffect(() => {
+    if (!location.hash) {
+      window.scrollTo(0, 0);
+    }
+  }, [location.pathname]);
 
   return (
     <AnimatePresence mode="wait">

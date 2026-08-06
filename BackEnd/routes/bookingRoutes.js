@@ -7,11 +7,17 @@ const { LOCK_DURATION_MINUTES } = BookingLock;
 const { requirePermission, ensureAuthenticated } = require("../middleware/adminAuth");
 const { paymentProofUpload } = require("../middleware/upload");
 const { PERMISSIONS, isAdminRole } = require("../utils/permissions");
-const { validateAndPriceBooking, computeDownPayment, saveWithReservationCode, runInTransaction } = require("../utils/bookingHelper");
+const { validateAndPriceBooking, computeDownPayment, saveWithReservationCode, runInTransaction, voidExpiredBookings } = require("../utils/bookingHelper");
 
 
 router.get("/", requirePermission(PERMISSIONS.BOOKING_VIEW), async (req, res) => {
   try {
+    try {
+      await voidExpiredBookings();
+    } catch (e) {
+      console.error("voidExpiredBookings failed:", e.message);
+    }
+
     const filter = {};
     if (req.query.status) filter.status = req.query.status;
     if (req.query.paymentStatus) filter.paymentStatus = req.query.paymentStatus;
@@ -25,7 +31,7 @@ router.get("/", requirePermission(PERMISSIONS.BOOKING_VIEW), async (req, res) =>
       filter.$or = [{ guestName: re }, { guestContact: re }, { reservationCode: re }];
     }
 
-    const bookings = await Booking.find(filter).sort({ createdAt: -1 }).populate("room", "name");
+    const bookings = await Booking.find(filter).sort({ createdAt: -1 }).populate("room", "name variants");
     res.json(bookings);
   } catch (err) {
     console.error(err);

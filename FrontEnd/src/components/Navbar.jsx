@@ -22,6 +22,7 @@ function Navbar({
   const navigate = useNavigate();
   const location = useLocation();
   const isHome = location.pathname === '/';
+  const isRooms = location.pathname === '/rooms';
   const isContact = location.pathname === '/contact';
 
   const [activeSection, setActiveSection] = useState('home');
@@ -106,7 +107,7 @@ function Navbar({
         </nav>
 
         <div className="nav-buttons">
-          {isHome && <ThemeToggle id="nav-theme-toggle" theme={theme} onToggle={onToggleTheme} />}
+          {(isHome || isRooms || isContact) && <ThemeToggle id="nav-theme-toggle" theme={theme} onToggle={onToggleTheme} />}
 
           <Link
             to="/login"
@@ -176,7 +177,7 @@ function Navbar({
 
       <div className={`mobile-nav${mobileNavOpen ? ' open' : ''}`} id="mobile-nav">
         <button className="mobile-nav-close" id="nav-close" onClick={onCloseMobileNav}>✕</button>
-        {isHome && <ThemeToggle id="mobile-theme-toggle" theme={theme} onToggle={onToggleTheme} style={{ marginBottom: '1rem' }} />}
+        {(isHome || isRooms || isContact) && <ThemeToggle id="mobile-theme-toggle" theme={theme} onToggle={onToggleTheme} style={{ marginBottom: '1rem' }} />}
         <a href="/#home" onClick={(e) => { handleSectionLink(e, 'home'); onCloseMobileNav(); }}>Home</a>
         <a href="/#rooms" onClick={(e) => { handleSectionLink(e, 'rooms'); onCloseMobileNav(); }}>Rooms</a>
         <a href="/#about" onClick={(e) => { handleSectionLink(e, 'about'); onCloseMobileNav(); }}>About</a>

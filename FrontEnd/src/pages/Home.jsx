@@ -3,7 +3,8 @@ import { Link, useSearchParams, useLocation } from 'react-router-dom';
 import {
   Clock3, CalendarCheck, PartyPopper, Trophy,
   Zap, LayoutGrid, ShieldCheck,
-  DoorOpen, CalendarDays, Grid2x2, RefreshCcw, Wallet, FileText, MessageCircle,
+  DoorOpen, CalendarDays, Wallet, FileText, MessageCircle,
+  Timer, Hourglass, CheckCircle2,
   HelpCircle, X,
 } from 'lucide-react';
 import { useSiteSettings } from '../hooks/useSiteSettings';
@@ -48,14 +49,32 @@ const WHY_BOOK_CARDS = [
   { icon: ShieldCheck, title: 'Secure Booking', desc: 'Your reservation and payment details stay protected.' },
 ];
 
+const BOOKING_STEPS = [
+  {
+    icon: CalendarDays,
+    title: 'Choose Your Slot',
+    desc: 'Pick your preferred date, time, and reserve right on our booking page.',
+  },
+  {
+    icon: Wallet,
+    title: 'Pay the Down Payment',
+    desc: 'Pay a down payment equal to the 1-hour rate directly online via GCash, Maya, or Credit/Debit Card.',
+  },
+  {
+    icon: CheckCircle2,
+    title: 'Get Confirmed',
+    desc: 'Once your payment succeeds, your reservation is automatically confirmed and finalized — no extra steps.',
+  },
+];
+
 const HELPFUL_INFO_CARDS = [
-  { icon: DoorOpen, title: 'Walk-Ins Welcome', desc: 'Just show up — subject to availability.' },
-  { icon: Grid2x2, title: 'Choose Your Room Type', desc: 'Solo, Big, or Shared — pick what fits your group.' },
-  { icon: RefreshCcw, title: 'Availability Updates Often', desc: 'Room status refreshes regularly so what you see is accurate.' },
-  { icon: Wallet, title: 'Down Payment May Apply', desc: 'A small deposit may be required to confirm your reservation.' },
-  { icon: FileText, title: 'Flexible Policies', desc: 'Cancellation and rescheduling options may apply — just ask.' },
+  { icon: Wallet, title: 'Down Payment Required', desc: "All bookings require a down payment equal to your first hour's rate to be approved." },
+  { icon: Timer, title: '20-Minute Payment Window', desc: 'Complete your online payment within 20 minutes, or the slot is released to other customers.' },
+  { icon: Hourglass, title: '5-Hour Maximum Rental', desc: 'You can book up to 5 hours per transaction.' },
+  { icon: DoorOpen, title: 'Arrive On Time', desc: 'Since your first hour is prepaid, you must arrive at least 20 minutes before your first booked hour ends, or the system will automatically cancel your booking.' },
+  { icon: FileText, title: 'Non-Refundable', desc: 'All down payments are strictly non-refundable, especially for no-shows.' },
   { icon: Clock3, title: 'Open Daily', desc: '7AM to midnight, every day of the week.' },
-  { icon: MessageCircle, title: 'Need Help?', desc: 'Have questions? Reach out — we\u2019re happy to help.' },
+  { icon: MessageCircle, title: 'Need Help?', desc: 'Questions or issues? Message our official Facebook page "The Riverview" we\u2019re happy to help.' },
 ];
 
 function HeroCarousel() {
@@ -287,6 +306,23 @@ function Home() {
           </div>
 
           <HeroCarousel />
+        </div>
+      </section>
+
+      <section className="how-it-works">
+        <div className="how-it-works-inner reveal">
+          <div className="section-label">3 Easy Steps</div>
+          <h2>Booking takes less than a minute.</h2>
+        </div>
+        <div className="steps-grid reveal-stagger">
+          {BOOKING_STEPS.map((s, i) => (
+            <div className="step-card" key={s.title}>
+              <div className="step-num">{i + 1}</div>
+              <div className="step-card-icon"><s.icon size={18} color="var(--teal)" /></div>
+              <h4>{s.title}</h4>
+              <p>{s.desc}</p>
+            </div>
+          ))}
         </div>
       </section>
 
