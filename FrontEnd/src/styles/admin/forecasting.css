@@ -1,8 +1,4 @@
-/* ══════════════════════════════════════════════════════════════
-   ADMIN — FORECASTING (pages/Admin/Forecasting.jsx)
-   Forecasting.jsx currently uses only shared classes (.card, .mc,
-   .chart-wrap, .legend, .two-col, .tbl — all in shared.css) and has
-   no page-specific rules of its own. This file is intentionally
-   near-empty; add page-specific styles here if/when this page grows
-   its own look.
-   ══════════════════════════════════════════════════════════════ */
+.fc-sma-select{width:100%;margin-top:2px;}
+.fc-chart-skeleton{width:100%;height:100%;border-radius:12px;}
+.fc-table-skeleton{display:flex;flex-direction:column;gap:10px;}
+.fc-skeleton-row{height:32px;border-radius:8px;}

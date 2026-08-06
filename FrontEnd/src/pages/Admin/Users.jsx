@@ -1,5 +1,5 @@
 import '../../styles/admin/users.css';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import DataTable from '../../components/DataTable';
 import Modal from '../../components/Modal';
 import ConfirmDialog from '../../components/ConfirmDialog';
@@ -12,6 +12,13 @@ import { PASSWORD_REQUIREMENTS } from '../../utils/password';
 
 const ROLE_LABELS = { user: 'User', staff: 'Staff', manager: 'Supervisor', super_admin: 'Owner' };
 const ROLE_BADGE_CLASS = { super_admin: 'pill-active', manager: 'pill-vacant', staff: 'pill-pending', user: 'pill-done' };
+const SEARCH_DEBOUNCE_MS = 300;
+
+function initials(firstName, lastName) {
+  const a = (firstName || '').trim()[0] || '';
+  const b = (lastName || '').trim()[0] || '';
+  return (a + b).toUpperCase() || '?';
+}
 
 function Users() {
   const { initializing, guardPermission } = useAuth();
@@ -57,13 +64,28 @@ function Users() {
 
   useEffect(() => {
     clearTimeout(searchDebounce.current);
-    searchDebounce.current = setTimeout(fetchUsers, 300);
+    searchDebounce.current = setTimeout(fetchUsers, SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(searchDebounce.current);
   }, [search]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const stats = useMemo(
+    () => ({
+      total: users.length,
+      active: users.filter((u) => u.isActive).length,
+      deactivated: users.filter((u) => !u.isActive).length,
+      staff: users.filter((u) => u.role !== 'user').length,
+    }),
+    [users]
+  );
 
   function openAddUser() {
     if (!guardPermission('admin:manage', "You don't have permission to manage users.")) return;
     setAddOpen(true);
+  }
+
+  function clearFilters() {
+    setSearch('');
+    setRoleFilter('');
   }
 
   async function toggleUserStatus(user) {
@@ -91,21 +113,40 @@ function Users() {
   }
 
   const columns = [
-    { key: 'name', label: 'Name', render: (u) => `${u.firstName} ${u.lastName}` },
-    { key: 'email', label: 'Email' },
+    {
+      key: 'name',
+      label: 'User',
+      sortable: true,
+      sortValue: (u) => `${u.firstName} ${u.lastName}`,
+      render: (u) => (
+        <div className="um-user">
+          <div className="um-avatar">{initials(u.firstName, u.lastName)}</div>
+          <div className="um-user-info">
+            <span className="um-user-name">{u.firstName} {u.lastName}</span>
+            <span className="um-user-email">{u.email}</span>
+          </div>
+        </div>
+      ),
+    },
     {
       key: 'role',
       label: 'Role',
+      sortable: true,
+      sortValue: (u) => u.roleLabel || ROLE_LABELS[u.role] || u.role,
       render: (u) => <span className={`pill ${ROLE_BADGE_CLASS[u.role] || 'pill-done'}`}>{u.roleLabel || ROLE_LABELS[u.role] || u.role}</span>,
     },
     {
       key: 'status',
       label: 'Status',
+      sortable: true,
+      sortValue: (u) => (u.isActive ? 1 : 0),
       render: (u) => (u.isActive ? <span className="pill pill-active">Active</span> : <span className="pill pill-overdue">Deactivated</span>),
     },
     {
       key: 'lastLoginAt',
       label: 'Last Login',
+      sortable: true,
+      sortValue: (u) => (u.lastLoginAt ? new Date(u.lastLoginAt).getTime() : 0),
       render: (u) => (u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleString() : 'Never'),
     },
     {
@@ -132,41 +173,72 @@ function Users() {
 
   return (
     <div className="panel active" id="panel-users">
-      <div className="card">
-        <div className="card-head">
-          <span className="card-title">Manage Users</span>
-          <button className="card-action" onClick={openAddUser}>
-            <i className="ti ti-plus"></i> Add User
-          </button>
+      <div className="metric-row">
+        <div className="mc">
+          <div className="mc-label"><i className="ti ti-users"></i> Total Users</div>
+          <div className="mc-val">{stats.total.toLocaleString()}</div>
         </div>
-        <div className="users-filters">
-          <input
-            id="users-search"
-            type="text"
-            placeholder="Search name or email…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="users-filter-input"
-            style={{ flex: 1, minWidth: 200 }}
-          />
-          <select
-            id="users-role-filter"
-            value={roleFilter}
-            onChange={(e) => setRoleFilter(e.target.value)}
-            className="users-filter-input"
-          >
-            <option value="">All roles</option>
-            <option value="super_admin">Owner</option>
-            <option value="manager">Supervisor</option>
-            <option value="staff">Staff</option>
-            <option value="user">User</option>
-          </select>
+        <div className="mc">
+          <div className="mc-label"><i className="ti ti-user-check"></i> Active</div>
+          <div className="mc-val">{stats.active.toLocaleString()}</div>
         </div>
+        <div className="mc">
+          <div className="mc-label"><i className="ti ti-user-off"></i> Deactivated</div>
+          <div className="mc-val">{stats.deactivated.toLocaleString()}</div>
+        </div>
+        <div className="mc">
+          <div className="mc-label"><i className="ti ti-shield-cog"></i> Staff &amp; Admins</div>
+          <div className="mc-val">{stats.staff.toLocaleString()}</div>
+        </div>
+      </div>
+
+      <div className="card um-toolbar-card">
+        <div className="um-toolbar">
+          <div className="um-search-wrap">
+            <i className="ti ti-search um-search-icon"></i>
+            <input
+              id="users-search"
+              type="text"
+              placeholder="Search name or email…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="um-filter-input um-search-input"
+            />
+          </div>
+          <div className="um-filters">
+            <select
+              id="users-role-filter"
+              value={roleFilter}
+              onChange={(e) => setRoleFilter(e.target.value)}
+              className="um-filter-input"
+            >
+              <option value="">All roles</option>
+              <option value="super_admin">Owner</option>
+              <option value="manager">Supervisor</option>
+              <option value="staff">Staff</option>
+              <option value="user">User</option>
+            </select>
+            {(search || roleFilter) && (
+              <button type="button" className="um-clear-btn" onClick={clearFilters}>
+                <i className="ti ti-x"></i> Clear
+              </button>
+            )}
+            <button className="btn-teal um-add-btn" onClick={openAddUser}>
+              <i className="ti ti-plus"></i> Add User
+            </button>
+          </div>
+        </div>
+        <div className="um-results-row">
+          {loading ? 'Loading users…' : `${users.length.toLocaleString()} user${users.length === 1 ? '' : 's'} found`}
+        </div>
+      </div>
+
+      <div className="card card-flush">
         <DataTable
           columns={columns}
           rows={loadError ? [] : users}
           loading={loading}
-          emptyMessage={loadError ? 'Failed to load users.' : 'No users found.'}
+          emptyMessage={loadError ? 'Failed to load users.' : 'No users match your filters.'}
           getRowKey={(u) => u._id}
         />
       </div>

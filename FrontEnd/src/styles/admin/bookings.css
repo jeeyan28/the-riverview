@@ -1,11 +1,8 @@
-/* ══════════════════════════════════════════════════════════════
-   ADMIN — BOOKINGS (pages/Admin/Bookings.jsx)
-   ══════════════════════════════════════════════════════════════ */
-
-/* ── FILTER BAR ── */
-
-/* ── BOOKINGS FILTER BAR ── */
+.bk-toolbar-card{display:flex;flex-direction:column;gap:10px;padding:14px 16px;}
 .bk-toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;}
+.bk-search-wrap{position:relative;flex:1;min-width:220px;max-width:340px;}
+.bk-search-icon{position:absolute;left:11px;top:50%;transform:translateY(-50%);font-size:14px;color:var(--muted);pointer-events:none;}
+.bk-search-input{width:100%;padding-left:32px;}
 .bk-filters{display:flex;gap:8px;flex-wrap:wrap;}
 .bk-filter-input{
   font-size:.78rem;padding:8px 12px;border-radius:9px;border:1px solid var(--border);
@@ -13,15 +10,13 @@
 }
 .bk-filter-input:focus{border-color:rgba(0,201,167,.5);}
 .bk-clear-btn{
+  display:inline-flex;align-items:center;gap:4px;
   font-size:.78rem;padding:8px 12px;border-radius:9px;border:1px solid var(--border);
   background:none;color:var(--muted);font-family:var(--font-body);cursor:pointer;
 }
-.bk-clear-btn:hover{background:var(--navy3);}
+.bk-clear-btn:hover{background:var(--navy3);color:var(--text);}
+.bk-results-row{font-size:.76rem;color:var(--muted);padding-top:2px;border-top:1px solid var(--border-soft);padding-top:10px;}
 
-/* ── ROW ACTION BUTTON ── */
-
-/* Row-level text action button (View/Approve/Edit/Delete, etc.) — color is
-   set inline per action since it varies by row/status. */
 .tbl-action-btn{
   display:inline-flex;align-items:center;gap:4px;
   border:1px solid var(--border);background:var(--navy3);
@@ -32,32 +27,41 @@
 .tbl-action-btn:hover{background:var(--navy4);border-color:rgba(16,24,40,.16);}
 .tbl-action-btn:active{transform:translateY(1px);}
 
-/* ── BOOKING DETAILS MODAL ── */
+.bk-code{font-family:var(--font-display);font-size:.78rem;font-weight:600;color:var(--text);}
 
-/* Booking Details modal (View button on the Bookings table) */
+.bk-customer{display:flex;align-items:center;gap:10px;}
+.bk-avatar{
+  flex-shrink:0;width:32px;height:32px;border-radius:50%;
+  background:var(--teal-soft);color:var(--teal);
+  display:flex;align-items:center;justify-content:center;
+  font-size:.7rem;font-weight:700;
+}
+.bk-customer-info{display:flex;flex-direction:column;gap:1px;min-width:0;}
+.bk-customer-name{font-size:.82rem;font-weight:600;color:var(--text);}
+.bk-customer-phone{font-size:.72rem;color:var(--muted);}
+
+.bk-facility{display:flex;flex-direction:column;gap:1px;}
+.bk-facility-room{font-size:.72rem;color:var(--muted);}
+
+.bk-schedule{display:flex;flex-direction:column;gap:1px;}
+
+.bd-header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding-bottom:16px;border-bottom:1px solid var(--border);}
+.bd-body{display:flex;flex-direction:column;gap:14px;margin-top:16px;}
+.bd-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start;}
+.bd-card{background:var(--navy3);border:1px solid var(--border);border-radius:14px;padding:16px 18px;}
 .bd-section{margin-top:18px;padding-top:16px;border-top:1px solid var(--border);}
 .bd-section:first-of-type{margin-top:16px;}
-.bd-section-title{display:flex;align-items:center;gap:7px;font-size:.85rem;font-weight:700;color:var(--text);margin-bottom:12px;}
-.bd-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;}
-.bd-field label{display:block;font-size:.68rem;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);margin-bottom:4px;}
-.bd-field p{font-size:.85rem;color:var(--text);font-weight:500;word-break:break-word;}
+.bd-section-title{display:flex;align-items:center;gap:7px;font-size:.85rem;font-weight:700;color:var(--text);margin-bottom:14px;}
+.bd-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.bd-field{background:var(--navy2);border:1px solid var(--border-soft);border-radius:10px;padding:8px 10px;}
+.bd-field label{display:block;font-size:.66rem;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);margin-bottom:3px;}
+.bd-field p{font-size:.85rem;color:var(--text);font-weight:500;word-break:break-word;margin:0;}
 .bd-notes-label{font-size:.68rem;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);margin-bottom:6px;}
-.bd-notes-body{font-size:.84rem;color:var(--text);line-height:1.5;white-space:pre-wrap;}
+.bd-notes-body{font-size:.84rem;color:var(--text);line-height:1.5;white-space:pre-wrap;margin:0;}
 .bd-screenshot{max-width:220px;width:100%;border-radius:10px;border:1px solid var(--border);cursor:pointer;display:block;}
-.bd-screenshot-hint{font-size:.7rem;color:var(--muted);margin-top:6px;}
+.bd-screenshot-hint{font-size:.7rem;color:var(--muted);margin-top:8px;}
+.bd-footer{border-top:1px solid var(--border);padding-top:16px;margin-top:18px;}
 
-/* ── BOOKINGS CALENDAR — NOT CURRENTLY USED ──
-   PROJECT_PROGRESS.md note: Bookings.jsx has a comment confirming the
-   calendar view that uses these classes is "not wired up yet" (its
-   data is computed but never rendered). Kept here in case the
-   calendar view is finished later; safe to delete if it's abandoned. */
-
-/* ── BOOKINGS CALENDAR (Phase 8, Admin) ──
-   MIGRATION NOTE: in the original project these rules lived in a <style>
-   block inside admin.html's own <head>, NOT in css/admin.css — every other
-   admin panel's CSS lives in this file, so they're consolidated here rather
-   than re-introducing a second inline stylesheet just for one panel. Purely
-   an organizational move; no class names, selectors, or values changed. */
 .bkcal-nav-btn{width:28px;height:28px;border-radius:8px;background:var(--navy3);border:1px solid var(--border);color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:.75rem;}
 .bkcal-nav-btn:hover{background:var(--navy4);}
 .bkcal-month-label{font-size:.85rem;font-weight:600;color:var(--text);min-width:120px;text-align:center;}
@@ -74,3 +78,7 @@
 .bkcal-day.has-bookings .bkcal-dot{background:var(--blue);color:#fff;}
 .bkcal-day.is-selected .bkcal-dot{background:#fff;color:var(--teal);}
 .bkcal-dot{font-size:.6rem;font-weight:700;background:var(--navy4);color:var(--muted);border-radius:10px;padding:0 5px;min-width:14px;text-align:center;}
+
+@media (max-width:900px){
+  .bk-search-wrap{max-width:none;width:100%;}
+}

@@ -4,6 +4,7 @@ import { User } from 'lucide-react';
 import AuthForm from '../components/AuthForm';
 import ForgotPasswordModal from '../components/ForgotPasswordModal';
 import logo from "../assets/logo/logoo.png";
+import loginIllustration from "../assets/images/login-illustration.jpg";
 
 function Login() {
   const [isLogin, setIsLogin] = useState(true);
@@ -21,7 +22,11 @@ function Login() {
     <main className="login-page">
 
       <div className="login-background">
-        <div className="login-background-image" />
+        <div
+          className="login-background-image"
+          style={{ backgroundImage: `url(${loginIllustration})` }}
+        />
+        <div className="login-background-tint" />
         <div className="login-background-overlay" />
       </div>
 

@@ -6,6 +6,8 @@ import { useAuth } from './context/AuthContext';
 import Home from './pages/Home';
 import Rooms from './pages/Rooms';
 import Contact from './pages/Contact';
+import TermsOfService from './pages/TermsOfService';
+import PrivacyPolicy from './pages/PrivacyPolicy';
 import Login from './pages/Login';
 import Dashboard from './pages/Admin/Dashboard';
 import Bookings from './pages/Admin/Bookings';
@@ -35,6 +37,8 @@ function App() {
         <Route path="/" element={<Home />} />
         <Route path="/rooms" element={<Rooms />} />
         <Route path="/contact" element={<Contact />} />
+        <Route path="/terms" element={<TermsOfService />} />
+        <Route path="/privacy" element={<PrivacyPolicy />} />
       </Route>
 
       <Route element={<AuthLayout />}>

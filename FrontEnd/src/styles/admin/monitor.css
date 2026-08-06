@@ -1,28 +1,21 @@
-/* ══════════════════════════════════════════════════════════════
-   ADMIN — ROOM MONITOR (pages/Admin/Monitor.jsx)
-   ══════════════════════════════════════════════════════════════ */
-
-/* Muted single-line note used in place of action buttons (room-card
-   actions when the viewer lacks permission, or the room isn't actionable) */
 .rm-note{font-size:.82rem;color:var(--muted);}
 
-/* Generic side-by-side form-field layout (dropdown+delete button,
-   H/M/S duration inputs, add-new-option row, etc.) */
 .field-row{display:flex;gap:8px;}
 .field-row--top-gap{margin-top:8px;}
 .field-row--extend-gap{margin-top:10px;}
 .field-col{flex:1;}
 
-/* ── ROOM MONITOR — header (Live badge + subtitle) ── */
 .rm-page-head{display:flex;align-items:center;gap:10px;}
 .rm-page-sub{font-size:.78rem;color:var(--muted);}
+.rm-toolbar-head{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;}
+.rm-toolbar-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.rm-due-wrap{margin-top:14px;margin-bottom:14px;}
 .live-badge{
   display:inline-flex;align-items:center;gap:5px;padding:2px 9px;border-radius:20px;
   background:rgba(22,163,74,.12);color:var(--green);font-size:.7rem;font-weight:700;
 }
 .live-badge .dot{width:6px;height:6px;border-radius:50%;background:var(--green);}
 
-/* ── ROOM MONITOR — facility filter + group headers ── */
 .fac-toolbar{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;}
 .fac-chips{display:flex;gap:8px;flex-wrap:wrap;}
 .fac-chip{
@@ -37,7 +30,6 @@
 .rm-group-ico{color:var(--muted);margin-right:7px;font-size:.9rem;}
 .rm-group-count{font-size:.76rem;font-weight:400;color:var(--muted);}
 
-/* ── ROOM MONITOR GRID ── */
 .room-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:18px;}
 .rm{
   position:relative;
@@ -51,9 +43,6 @@
 .rm.overdue{border-color:rgba(245,165,36,.4);background:rgba(245,165,36,.14);}
 .rm.vacant{border-color:rgba(37,99,235,.3);}
 .rm.available{border-color:var(--border);background:var(--navy2);}
-/* 'safe' = occupied room with >10min left — same green treatment as
-   Available, since the traffic-light color tracks remaining time, not
-   occupancy. Badge text still reads "Occupied" (see statusLabel). */
 .rm.safe{border-color:rgba(22,163,74,.4);background:rgba(22,163,74,.14);}
 .rm-head{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:14px;}
 .rm-head-right{display:flex;align-items:center;gap:8px;}
@@ -66,7 +55,6 @@
 .rm-ico.ico-green{background:rgba(22,163,74,.14);color:var(--green);}
 .rm-ico.ico-red{background:rgba(225,29,72,.14);color:var(--red);}
 
-/* Non-occupied card content — centered icon + status text, no rate shown */
 .rm-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;flex:1;padding:20px 0;color:var(--muted);}
 .rm-empty i{font-size:26px;}
 .rm-empty span{font-size:.84rem;font-weight:600;}
@@ -75,10 +63,6 @@
 .rm-row .lbl{color:var(--muted);}
 .rm-row .val{color:var(--text);font-weight:500;}
 
-/* Status shown as a rounded pill with a dot, matching the reference's
-   status-badge treatment. status-{available|occupied|warning|expired|
-   overdue|vacant} mirrors the card's own state class (stateClass in
-   Monitor.jsx). */
 .rm-status-pill{
   display:inline-flex;align-items:center;gap:6px;padding:3px 10px;
   border-radius:20px;font-size:.72rem;font-weight:700;
@@ -99,7 +83,6 @@
 .rm-status-pill.status-vacant{background:rgba(37,99,235,.12);color:var(--blue);}
 .rm-status-pill.status-vacant .dot{background:var(--blue);}
 
-/* Room card — prominent timer block + footer (payment status / rate) */
 .rm-timer-row{display:flex;align-items:center;gap:12px;margin-bottom:14px;}
 .rm-timer-big{font-family:var(--font-display);font-size:1.35rem;font-weight:700;color:var(--text);font-variant-numeric:tabular-nums;line-height:1.15;}
 .rm-timer-big.warn{color:var(--amber);}
@@ -113,7 +96,6 @@
 .rm-foot-info--unpaid{color:var(--red);}
 .rm-foot-price{font-size:.86rem;font-weight:700;color:var(--text);}
 
-/* Payment Status — display pill (Grid row + Table cell) */
 .pay-pill{
   display:inline-flex;align-items:center;padding:3px 10px;border-radius:20px;
   font-size:.72rem;font-weight:700;
@@ -121,7 +103,6 @@
 .pay-pill.pay-paid{background:rgba(22,163,74,.12);color:var(--green);}
 .pay-pill.pay-unpaid{background:rgba(225,29,72,.12);color:var(--red);}
 
-/* Payment Status — manual toggle inside Start/Extend modal */
 .pay-toggle{display:inline-flex;background:var(--navy3);border:1px solid var(--border);border-radius:9px;padding:3px;gap:2px;}
 .pay-toggle-btn{
   flex:1;padding:8px 14px;border-radius:7px;border:none;background:transparent;
@@ -133,7 +114,6 @@
 
 .rm-actions{display:flex;gap:10px;margin-top:auto;padding-top:6px;}
 
-/* ── ROOM MONITOR — Tier 2: walk-in countdown states ── */
 .rm.warning{border-color:rgba(245,165,36,.45);background:rgba(245,165,36,.16);}
 .rm.expired{
   border-color:rgba(225,29,72,.45);background:rgba(225,29,72,.16);
@@ -144,16 +124,11 @@
   0%,100%{box-shadow:0 0 0 1px rgba(225,29,72,.3);}
   50%{box-shadow:0 0 0 4px rgba(225,29,72,.45);}
 }
-/* Gentle pulse on the red status pill itself (critical + expired), separate
-   from the stronger card-level blink reserved for past-end. */
 .rm-status-pill.status-expired{animation:rm-pill-pulse 1.8s ease-in-out infinite;}
 @keyframes rm-pill-pulse{
   0%,100%{opacity:1;}
   50%{opacity:.7;}
 }
-/* Red alert-triangle icon (critical + expired) pops up in the center of the
-   card at low opacity, fades out, and repeats every 3s — catches the eye
-   without a constant/distracting animation. */
 .rm-warning-pop{
   position:absolute;top:50%;left:50%;z-index:5;pointer-events:none;
   transform:translate(-50%,-50%) scale(.6);
@@ -170,7 +145,6 @@
   .rm-warning-pop{display:none;}
 }
 
-/* ── Grid / Table view toggle ── */
 .view-toggle{display:inline-flex;background:var(--navy3);border:1px solid var(--border);border-radius:9px;padding:3px;gap:2px;}
 .view-toggle-btn{
   display:flex;align-items:center;gap:6px;padding:7px 12px;border-radius:7px;border:none;background:transparent;
@@ -179,7 +153,6 @@
 .view-toggle-btn:hover{color:var(--text);}
 .view-toggle-btn.active{background:var(--teal);color:#fff;}
 
-/* ── Table View ── */
 .rm-table-wrap{margin-top:0;}
 .rm-table{width:100%;border-collapse:collapse;font-size:.84rem;}
 .rm-table thead th{
@@ -200,9 +173,6 @@
 .rm-timer.expired{color:var(--red);}
 .rm-timer-warn-ico{margin-right:5px;font-size:.9em;animation:rm-pill-pulse 1.8s ease-in-out infinite;}
 
-/* ── Duration presets / Add Time (SessionModal — Start & Extend) ── */
-
-/* ── Duration presets / Add Time (SessionModal — Start & Extend) ── */
 .aw-unit-lbl{font-size:.68rem;color:var(--text);text-align:center;margin-top:4px;}
 .aw-preset-row{display:flex;gap:6px;flex-wrap:wrap;}
 .aw-preset-btn{
@@ -211,20 +181,16 @@
   cursor:pointer;font-family:var(--font-body);transition:background .15s,border-color .15s;
 }
 .aw-preset-btn:hover{background:var(--navy4);border-color:rgba(0,201,167,.4);}
-.aw-preset-btn--add{color:var(--teal);border-color:rgba(0,201,167,.35);background:var(--teal-soft);}
-.aw-preset-btn--add:hover{background:rgba(0,201,167,.18);}
-.aw-addtime-row{
-  display:flex;gap:8px;align-items:flex-end;margin-top:10px;padding:10px;
-  background:var(--navy3);border:1px solid var(--border);border-radius:9px;
+
+@media (max-width:900px){
+  .rm-toolbar-actions{width:100%;justify-content:flex-start;}
+  .room-grid{grid-template-columns:1fr;}
+  .rm-timer-big{font-size:1.2rem;}
+  .rm-actions--table{flex-wrap:wrap;}
 }
-.aw-addtime-row input{
-  width:100%;background:var(--navy2);border:1px solid var(--border);border-radius:8px;
-  padding:8px 10px;color:var(--text);font-family:var(--font-body);font-size:.82rem;outline:none;
+@media (max-width:640px){
+  .rm-page-head{flex-wrap:wrap;}
+  .rm-toolbar-actions{flex-direction:column;align-items:stretch;}
+  .rm-toolbar-actions .rm-btn{text-align:center;}
+  .rm-toolbar-actions .btn-teal{justify-content:center;}
 }
-.aw-addtime-row input:focus{border-color:rgba(0,201,167,.5);}
-.aw-addtime-btn{
-  flex:0 0 auto;padding:8px 16px;border-radius:8px;border:1px solid rgba(0,201,167,.35);
-  background:var(--teal-soft);color:var(--teal);font-size:.8rem;font-weight:600;
-  cursor:pointer;font-family:var(--font-body);
-}
-.aw-addtime-btn:hover{background:rgba(0,201,167,.18);}

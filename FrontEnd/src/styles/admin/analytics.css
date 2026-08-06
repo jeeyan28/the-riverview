@@ -1,12 +1,25 @@
-/* ══════════════════════════════════════════════════════════════
-   ADMIN — ANALYTICS (pages/Admin/Analytics.jsx)
-   Chart legend + chart container live in shared.css (reused by
-   Monitor and Forecasting too); this file only has the hourly-
-   traffic heatmap, which is unique to this page.
-   ══════════════════════════════════════════════════════════════ */
+.chart-wrap-donut{position:relative;}
+.donut-center{
+  position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  display:flex;flex-direction:column;align-items:center;pointer-events:none;
+}
+.donut-center-val{font-family:var(--font-display);font-size:1.5rem;font-weight:700;color:var(--text);}
+.donut-center-label{font-size:.68rem;color:var(--muted);}
 
 .hm-cell{
   display:inline-block;width:calc((100% - 16 * 4px) / 17);aspect-ratio:1;border-radius:4px;margin-right:4px;
+  transition:transform .1s ease;
 }
+.hm-cell:hover{transform:scale(1.15);}
 #heatmap{display:flex;margin-top:6px;}
 .hm-labels{display:flex;justify-content:space-between;font-size:.66rem;color:var(--muted);margin-top:6px;}
+.hm-scale{display:flex;align-items:center;gap:8px;margin-top:14px;font-size:.68rem;color:var(--muted);}
+.hm-scale-bar{
+  flex:1;max-width:140px;height:6px;border-radius:4px;
+  background:linear-gradient(90deg, rgba(239,62,109,.08), rgba(239,62,109,.9));
+}
+
+@media (max-width:900px){
+  .donut-center-val{font-size:1.15rem;}
+  .hm-labels{font-size:.6rem;}
+}

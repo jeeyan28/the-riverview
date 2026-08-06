@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 
 const Booking = require("../model/booking");
+const { RoomSession } = require("../model/monitoring");
 const { requirePermission } = require("../middleware/adminAuth");
 const { PERMISSIONS } = require("../utils/permissions");
 
@@ -10,36 +11,51 @@ router.use(requirePermission(PERMISSIONS.FORECASTING_VIEW));
 const DAY_MS = 24 * 60 * 60 * 1000;
 const HISTORY_DAYS = 60;
 const FORECAST_DAYS = 14;
+const VALID_WINDOWS = [7, 14, 30];
+const DEFAULT_WINDOW = 7;
 
 function toDateKey(d) {
   return d.toISOString().slice(0, 10);
 }
 
-function linearRegression(points) {
-  const n = points.length;
-  if (n === 0) return { slope: 0, intercept: 0 };
-  let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
-  for (const [x, y] of points) {
-    sumX += x; sumY += y; sumXY += x * y; sumXX += x * x;
-  }
-  const denom = n * sumXX - sumX * sumX;
-  const slope = denom === 0 ? 0 : (n * sumXY - sumX * sumY) / denom;
-  const intercept = (sumY - slope * sumX) / n;
-  return { slope, intercept };
+function movingAverage(values, window) {
+  const slice = values.slice(-window);
+  if (!slice.length) return 0;
+  return slice.reduce((sum, v) => sum + v, 0) / slice.length;
+}
+
+function direction(series, window) {
+  const recent = movingAverage(series, window);
+  const prior = movingAverage(series.slice(0, -window), window);
+  if (recent > prior) return "up";
+  if (recent < prior) return "down";
+  return "flat";
+}
+
+function percentChange(series, window) {
+  const recent = movingAverage(series, window);
+  const prior = movingAverage(series.slice(0, -window), window);
+  if (!prior) return 0;
+  return Math.round(((recent - prior) / prior) * 1000) / 10;
 }
 
 router.get("/", async (req, res) => {
   try {
-    const now = new Date();
-    const since = new Date(now.getTime() - HISTORY_DAYS * DAY_MS);
+    const window = VALID_WINDOWS.includes(Number(req.query.window)) ? Number(req.query.window) : DEFAULT_WINDOW;
 
-    const bookings = await Booking.find({
-      createdAt: { $gte: since },
-      status: { $nin: [Booking.BOOKING_STATUS.REJECTED, Booking.BOOKING_STATUS.CANCELLED] },
-    }).select("createdAt amount roomLabel status");
+    const now = new Date();
+    const since = new Date(now.getTime() - (HISTORY_DAYS - 1) * DAY_MS);
+
+    const [bookings, sessions] = await Promise.all([
+      Booking.find({
+        createdAt: { $gte: since },
+        status: { $nin: [Booking.BOOKING_STATUS.REJECTED, Booking.BOOKING_STATUS.CANCELLED] },
+      }).select("createdAt amount roomLabel status"),
+      RoomSession.find({ startTime: { $gte: since } }).select("startTime amount"),
+    ]);
 
     const byDay = new Map();
-    for (let i = 0; i <= HISTORY_DAYS; i++) {
+    for (let i = 0; i < HISTORY_DAYS; i++) {
       const key = toDateKey(new Date(since.getTime() + i * DAY_MS));
       byDay.set(key, { revenue: 0, bookingCount: 0 });
     }
@@ -55,23 +71,29 @@ router.get("/", async (req, res) => {
       roomDemand.set(b.roomLabel, (roomDemand.get(b.roomLabel) || 0) + 1);
     }
 
+    for (const s of sessions) {
+      const key = toDateKey(new Date(s.startTime));
+      const bucket = byDay.get(key);
+      if (bucket) {
+        bucket.revenue += s.amount || 0;
+      }
+    }
+
     const days = Array.from(byDay.entries()).sort((a, b) => (a[0] < b[0] ? -1 : 1));
 
-    const revenuePoints = days.map(([, v], idx) => [idx, v.revenue]);
-    const bookingPoints = days.map(([, v], idx) => [idx, v.bookingCount]);
+    const revenueSeries = days.map(([, v]) => v.revenue);
+    const bookingSeries = days.map(([, v]) => v.bookingCount);
 
-    const revenueTrend = linearRegression(revenuePoints);
-    const bookingTrend = linearRegression(bookingPoints);
+    const projectedRevenuePerDay = Math.max(0, Math.round(movingAverage(revenueSeries, window)));
+    const projectedBookingsPerDay = Math.max(0, Math.round(movingAverage(bookingSeries, window)));
 
-    const lastIndex = days.length - 1;
     const projection = [];
     for (let i = 1; i <= FORECAST_DAYS; i++) {
-      const x = lastIndex + i;
       const date = toDateKey(new Date(now.getTime() + i * DAY_MS));
       projection.push({
         date,
-        projectedRevenue: Math.max(0, Math.round(revenueTrend.slope * x + revenueTrend.intercept)),
-        projectedBookings: Math.max(0, Math.round(bookingTrend.slope * x + bookingTrend.intercept)),
+        projectedRevenue: projectedRevenuePerDay,
+        projectedBookings: projectedBookingsPerDay,
       });
     }
 
@@ -81,12 +103,16 @@ router.get("/", async (req, res) => {
       .map(([roomLabel, count]) => ({ roomLabel, count }));
 
     res.json({
+      window,
+      validWindows: VALID_WINDOWS,
       history: days.map(([date, v]) => ({ date, revenue: v.revenue, bookingCount: v.bookingCount })),
       projection,
       topRooms,
       trend: {
-        revenueDirection: revenueTrend.slope > 0 ? "up" : revenueTrend.slope < 0 ? "down" : "flat",
-        bookingDirection: bookingTrend.slope > 0 ? "up" : bookingTrend.slope < 0 ? "down" : "flat",
+        revenueDirection: direction(revenueSeries, window),
+        bookingDirection: direction(bookingSeries, window),
+        revenuePercent: percentChange(revenueSeries, window),
+        bookingPercent: percentChange(bookingSeries, window),
       },
     });
   } catch (err) {

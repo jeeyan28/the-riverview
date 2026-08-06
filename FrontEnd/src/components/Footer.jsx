@@ -76,6 +76,10 @@ function Footer() {
             <span><span className="teal-dot"></span>© 2026 The Riverview. All rights reserved.</span>
             <span>0355 Caingin, San Rafael, Philippines, 3008</span>
           </div>
+          <div className="footer-legal-links">
+            <Link to="/terms">Terms of Service</Link>
+            <Link to="/privacy">Privacy Policy</Link>
+          </div>
           <a href="/#home" className="footer-back-top" onClick={(e) => handleSectionLink(e, 'home')}>
             Back to top <i className="fa-solid fa-arrow-up"></i>
           </a>

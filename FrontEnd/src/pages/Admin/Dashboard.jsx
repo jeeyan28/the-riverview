@@ -2,10 +2,10 @@ import '../../styles/admin/dashboard.css';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import DataTable from '../../components/DataTable';
-
-
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+import { dashboardService } from '../../services/dashboard';
+import { roomsService } from '../../services/rooms';
+import { bookingsService } from '../../services/bookings';
+import { formatPeso } from '../../utils/currency';
 
 const STATUS_PILL_CLASS = {
   Active: 'pill-active',
@@ -44,6 +44,11 @@ function initialsOf(name) {
   );
 }
 
+function facilityBreakdownLabel(byFacility) {
+  if (!byFacility || byFacility.length === 0) return 'No active sessions';
+  return byFacility.map((f) => `${f.count} ${f.facilityName}`).join(' · ');
+}
+
 function Dashboard() {
   const navigate = useNavigate();
 
@@ -55,6 +60,10 @@ function Dashboard() {
   const [bookingsLoading, setBookingsLoading] = useState(true);
   const [bookingsError, setBookingsError] = useState(false);
 
+  const [summary, setSummary] = useState(null);
+  const [summaryLoading, setSummaryLoading] = useState(true);
+  const [summaryError, setSummaryError] = useState(false);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -62,9 +71,7 @@ function Dashboard() {
       setRoomsLoading(true);
       setRoomsError(false);
       try {
-        const res = await fetch(`${API_BASE_URL}/api/rooms`, { credentials: 'include' });
-        if (!res.ok) throw new Error('Failed to load rooms.');
-        const data = await res.json();
+        const data = await roomsService.list();
         if (!cancelled) setRooms(Array.isArray(data) ? data : []);
       } catch (err) {
         console.error(err);
@@ -78,9 +85,7 @@ function Dashboard() {
       setBookingsLoading(true);
       setBookingsError(false);
       try {
-        const res = await fetch(`${API_BASE_URL}/api/bookings`, { credentials: 'include' });
-        if (!res.ok) throw new Error('Failed to load bookings.');
-        const data = await res.json();
+        const data = await bookingsService.list();
         if (!cancelled) setRecentBookings((Array.isArray(data) ? data : []).slice(0, 5));
       } catch (err) {
         console.error(err);
@@ -90,8 +95,23 @@ function Dashboard() {
       }
     }
 
+    async function loadSummary() {
+      setSummaryLoading(true);
+      setSummaryError(false);
+      try {
+        const data = await dashboardService.getSummary();
+        if (!cancelled) setSummary(data);
+      } catch (err) {
+        console.error(err);
+        if (!cancelled) setSummaryError(true);
+      } finally {
+        if (!cancelled) setSummaryLoading(false);
+      }
+    }
+
     loadRooms();
     loadRecentBookings();
+    loadSummary();
     return () => {
       cancelled = true;
     };
@@ -117,28 +137,48 @@ function Dashboard() {
     },
   ];
 
+  const bookingsDelta = summary?.todayBookings?.deltaVsYesterday ?? 0;
+  const revenuePercent = summary?.todayRevenue?.percentVsAvg ?? 0;
+  const overdueCount = summary?.overdueRooms?.count ?? 0;
+
   return (
     <div className="panel active" id="panel-dashboard">
       <div className="metric-row">
         <div className="mc">
           <div className="mc-label"><i className="ti ti-calendar-check"></i>Today's Bookings</div>
-          <div className="mc-val">14</div>
-          <div className="mc-sub up"><i className="ti ti-trending-up"></i> +3 vs yesterday</div>
+          <div className="mc-val">{summaryLoading ? '—' : summaryError ? '—' : summary.todayBookings.count}</div>
+          {!summaryLoading && !summaryError && (
+            <div className={`mc-sub ${bookingsDelta > 0 ? 'up' : bookingsDelta < 0 ? 'dn' : ''}`}>
+              {bookingsDelta !== 0 && <i className={`ti ${bookingsDelta > 0 ? 'ti-trending-up' : 'ti-trending-down'}`}></i>}
+              {bookingsDelta > 0 ? `+${bookingsDelta} vs yesterday` : bookingsDelta < 0 ? `${bookingsDelta} vs yesterday` : 'Same as yesterday'}
+            </div>
+          )}
         </div>
         <div className="mc">
           <div className="mc-label"><i className="ti ti-door-enter"></i>Active Sessions</div>
-          <div className="mc-val">7</div>
-          <div className="mc-sub">4 Billiards · 2 KTV · 1 Court</div>
+          <div className="mc-val">{summaryLoading ? '—' : summaryError ? '—' : summary.activeSessions.count}</div>
+          {!summaryLoading && !summaryError && (
+            <div className="mc-sub">{facilityBreakdownLabel(summary.activeSessions.byFacility)}</div>
+          )}
         </div>
         <div className="mc">
           <div className="mc-label"><i className="ti ti-cash"></i>Today's Revenue</div>
-          <div className="mc-val">₱6,450</div>
-          <div className="mc-sub up"><i className="ti ti-trending-up"></i> +12% vs avg</div>
+          <div className="mc-val">{summaryLoading ? '—' : summaryError ? '—' : formatPeso(summary.todayRevenue.amount)}</div>
+          {!summaryLoading && !summaryError && (
+            <div className={`mc-sub ${summary.todayRevenue.direction === 'up' ? 'up' : summary.todayRevenue.direction === 'down' ? 'dn' : ''}`}>
+              {summary.todayRevenue.direction !== 'flat' && (
+                <i className={`ti ${summary.todayRevenue.direction === 'up' ? 'ti-trending-up' : 'ti-trending-down'}`}></i>
+              )}
+              {summary.todayRevenue.direction === 'flat' ? 'On par with avg' : `${revenuePercent > 0 ? '+' : ''}${revenuePercent}% vs avg`}
+            </div>
+          )}
         </div>
         <div className="mc">
           <div className="mc-label"><i className="ti ti-alert-triangle"></i>Overdue Rooms</div>
-          <div className="mc-val">2</div>
-          <div className="mc-sub dn">Needs attention</div>
+          <div className="mc-val">{summaryLoading ? '—' : summaryError ? '—' : overdueCount}</div>
+          {!summaryLoading && !summaryError && (
+            <div className={`mc-sub ${overdueCount > 0 ? 'dn' : 'up'}`}>{overdueCount > 0 ? 'Needs attention' : 'All caught up'}</div>
+          )}
         </div>
       </div>
 

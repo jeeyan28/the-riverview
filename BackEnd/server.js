@@ -98,6 +98,8 @@ app.use("/api/login-history", require("./routes/loginHistoryRoutes"));
 app.use("/api/settings", require("./routes/settingsRoutes"));
 app.use("/api/audit-logs", require("./routes/auditLogRoutes"));
 app.use("/api/forecast", require("./routes/forecastRoutes"));
+app.use("/api/dashboard", require("./routes/dashboardRoutes"));
+app.use("/api/reports", require("./routes/reportRoutes"));
 app.use("/api/payments/paymongo", require("./routes/paymongoRoutes").router);
 
 app.use((err, req, res, next) => {

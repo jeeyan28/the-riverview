@@ -1,0 +1,47 @@
+.drp-root{position:relative;display:inline-block;}
+
+.drp-trigger{
+  display:flex;align-items:center;gap:8px;padding:7px 12px;border-radius:8px;
+  border:1px solid var(--border);background:var(--navy3);color:var(--text);
+  font-size:.82rem;font-family:var(--font-body);cursor:pointer;transition:background .15s;
+}
+.drp-trigger:hover{background:var(--navy4);}
+.drp-trigger i{font-size:15px;color:var(--muted);}
+
+.drp-popover{
+  position:absolute;top:calc(100% + 8px);left:0;z-index:20;
+  background:var(--navy2);border:1px solid var(--border);border-radius:12px;
+  box-shadow:var(--shadow-md);padding:14px;display:flex;gap:14px;width:max-content;
+}
+
+.drp-presets{display:flex;flex-direction:column;gap:4px;padding-right:12px;border-right:1px solid var(--border);min-width:120px;}
+.drp-preset-btn{
+  text-align:left;padding:7px 10px;border-radius:7px;border:none;background:transparent;
+  color:var(--text);font-size:.78rem;font-family:var(--font-body);cursor:pointer;transition:background .15s;
+}
+.drp-preset-btn:hover{background:var(--navy4);}
+
+.drp-calendar{width:260px;}
+
+.drp-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
+.drp-nav-label{font-size:.82rem;font-weight:600;color:var(--text);}
+.drp-nav-btn{
+  width:26px;height:26px;border-radius:7px;border:1px solid var(--border);background:var(--navy3);
+  color:var(--text);display:flex;align-items:center;justify-content:center;cursor:pointer;
+}
+.drp-nav-btn:hover{background:var(--navy4);}
+
+.drp-weekdays{display:grid;grid-template-columns:repeat(7,1fr);text-align:center;margin-bottom:4px;}
+.drp-weekdays span{font-size:.68rem;color:var(--muted);}
+
+.drp-days{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;}
+.drp-day{
+  aspect-ratio:1;border:none;background:transparent;border-radius:7px;font-size:.76rem;color:var(--text);
+  cursor:pointer;font-family:var(--font-body);
+}
+.drp-day:hover{background:var(--navy4);}
+.drp-day-muted{color:var(--muted);opacity:.5;}
+.drp-day-in-range{background:var(--teal-soft);border-radius:0;}
+.drp-day-selected{background:var(--teal);color:#fff;}
+
+.drp-hint{margin-top:8px;font-size:.72rem;color:var(--muted);text-align:center;}

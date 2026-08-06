@@ -1,21 +1,18 @@
 import { useEffect, useState } from 'react';
-import { Navigate, Outlet } from 'react-router-dom';
+import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import '../styles/admin/shared.css';
-import AdminSidebar from '../components/AdminSidebar';
+import AdminSidebar, { PAGE_TITLES } from '../components/AdminSidebar';
 import ThemeToggle from '../components/ThemeToggle';
 import { useAuth } from '../context/AuthContext';
 
-// Light/dark preference, remembered per admin — same pattern as the
-// sidebar's collapsed state (client-side only, no backend field).
 const ADMIN_THEME_KEY = 'rv_admin_theme';
 
 function AdminLayout() {
-  // AdminSidebar reads `user`/`logout` itself via useAuth() directly — this
-  // layout only needs the two route-guard fields.
   const { initializing, isAdmin } = useAuth();
+  const location = useLocation();
+  const pageTitle = PAGE_TITLES[location.pathname.split('/').pop()] || 'Dashboard';
   const [liveTime, setLiveTime] = useState('');
-  const [pageTitle, setPageTitle] = useState('Dashboard');
   const [theme, setTheme] = useState(() => {
     try {
       return localStorage.getItem(ADMIN_THEME_KEY) === 'dark' ? 'dark' : 'light';
@@ -28,8 +25,6 @@ function AdminLayout() {
     try {
       localStorage.setItem(ADMIN_THEME_KEY, theme);
     } catch {
-      // Storage unavailable (private mode, etc.) — theme still applies
-      // for the session, it just won't persist.
     }
   }, [theme]);
 
@@ -37,7 +32,6 @@ function AdminLayout() {
     setTheme((t) => (t === 'dark' ? 'light' : 'dark'));
   }
 
-  // Same one-second clock chip as the old #live-time span.
   useEffect(() => {
     function tick() {
       setLiveTime(new Date().toLocaleTimeString());
@@ -48,11 +42,6 @@ function AdminLayout() {
   }, []);
 
   if (initializing) {
-    // Deliberately plain/unstyled — this is only visible for the brief
-    // window of the first /api/auth/me round-trip, same moment
-    // guardAdminPage() used to leave the old static admin.html sitting
-    // there un-interactive with no loading indicator at all. A minimal
-    // one is strictly better than nothing and not worth over-designing.
     return (
       <div style={{ padding: '3rem', fontFamily: 'sans-serif', color: 'var(--muted, #888)' }}>
         Checking your session…
@@ -66,17 +55,14 @@ function AdminLayout() {
 
   return (
     <div id="app" data-theme={theme}>
-      <AdminSidebar onNavigate={setPageTitle} />
+      <AdminSidebar />
 
-      {/* ── MAIN ── */}
       <div id="main">
         <div className="topbar">
           <span className="page-title" id="page-title">{pageTitle}</span>
           <div className="topbar-right">
             <div className="tb-chip"><i className="ti ti-map-pin"></i>San Rafael Caingin</div>
             <div className="tb-chip"><i className="ti ti-clock"></i><span id="live-time">{liveTime}</span></div>
-            {/* Same login session works on the public site — this just navigates,
-                it never logs the admin out or requires them to sign in again. */}
             <a
               className="tb-chip"
               id="view-user-site-btn"

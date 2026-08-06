@@ -1,16 +1,3 @@
-/* ══════════════════════════════════════════════════════════════
-   ADMIN — SHARED STYLES
-   Imported once (via AdminLayout.jsx) and available on every admin
-   page. Holds design tokens/theme, page chrome (sidebar/topbar/
-   content/panel switching), and primitives reused by 2+ admin pages
-   (cards, metric cards, tables, pills, buttons, tabs, modal shell,
-   filter bars, chart legends, password-field styling).
-
-   Split out of the original admin.css — no selectors or values were
-   changed, only reorganized by which page(s) use them. See
-   PROJECT_PROGRESS.md for the full breakdown of what moved where.
-   ══════════════════════════════════════════════════════════════ */
-
 #app select option{background:var(--navy2);color:var(--text);}
 
 body{
@@ -22,34 +9,28 @@ body{
   color:var(--text);
   font-family:var(--font-body);
 
-  /* Backgrounds */
   --navy1:#F4F5FA;
   --navy2:#FFFFFF;
   --navy3:#F7F8FA;
   --navy4:#EEF0F5;
 
-  /* Text */
   --text:#1A1D29;
   --muted:#6B7280;
 
-  /* Borders */
   --border:rgba(16,24,40,.08);
   --border-soft:rgba(16,24,40,.05);
 
-  /* Brand */
   --blue:#2563EB;
   --amber:#F5A524;
   --pink:#EF3E6D;
   --red:#E11D48;
   --green:#16A34A;
-  --teal:#00C9A7; 
+  --teal:#00C9A7;
   --teal-soft:rgba(0,201,167,.10);
 
-  /* Typography */
   --font-body:'Inter',sans-serif;
   --font-display:'Inter',sans-serif;
 
-  /* Shadows */
   --shadow-sm:0 1px 3px rgba(16,24,40,.06),
               0 1px 2px rgba(16,24,40,.04);
 
@@ -79,7 +60,6 @@ body{
   --teal-soft:rgba(0,201,167,.16);
 }
 
-/* ── THEME TOGGLE ── */
 .theme-toggle{
   position:relative;width:52px;height:28px;border-radius:20px;flex-shrink:0;
   background:var(--navy3);border:1px solid var(--border);cursor:pointer;
@@ -96,7 +76,6 @@ body{
 }
 .theme-toggle[aria-checked="true"] .theme-toggle-thumb{transform:translateX(24px);}
 
-/* ── SIDEBAR ── */
 #sidebar{
   width:220px;
   flex-shrink:0;
@@ -124,35 +103,53 @@ body{
 }
 .sb-toggle-btn:hover{background:var(--navy4);color:var(--text);}
 .sb-logo{
-  width:36px;height:36px;border-radius:10px;
-  background:linear-gradient(135deg,var(--teal),#0B8F76);
-  display:flex;align-items:center;justify-content:center;
-  font-family:var(--font-display);font-weight:700;font-size:.9rem;color:#fff;
+  width:36px;height:36px;border-radius:50%;flex-shrink:0;
+  object-fit:cover;box-shadow:var(--shadow-sm);border:1px solid var(--border);
 }
 .sb-title{font-family:var(--font-display);font-weight:700;font-size:1rem;color:var(--text);letter-spacing:-.01em;}
 .sb-sub{font-size:.68rem;color:var(--muted);}
-.sb-nav{display:flex;flex-direction:column;gap:2px;flex:1;}
+.sb-nav{display:flex;flex-direction:column;gap:2px;flex:1;overflow-y:auto;overflow-x:hidden;scroll-behavior:smooth;}
+.sb-nav::-webkit-scrollbar{width:4px;}
+.sb-nav::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px;}
 .sb-section{
   font-size:.64rem;letter-spacing:.08em;text-transform:uppercase;
   color:var(--muted);margin:16px 10px 6px;font-weight:600;
 }
 .sb-item{
-  display:flex;align-items:center;gap:10px;
-  padding:9px 12px;border-radius:10px;border:none;
+  position:relative;display:flex;align-items:center;gap:10px;
+  padding:9px 12px 9px 10px;border-radius:10px;border:none;border-left:2px solid transparent;
   background:transparent;color:#4B5563;font-family:var(--font-body);
-  font-size:.83rem;text-align:left;cursor:pointer;transition:background .15s,color .15s;
+  font-size:.83rem;text-align:left;cursor:pointer;text-decoration:none;
+  transition:background .15s,color .15s,border-color .18s ease;
 }
 .sb-item i{font-size:16px;color:var(--muted);width:18px;transition:color .15s;}
 .sb-item:hover{background:var(--navy3);color:var(--text);}
-.sb-item.active{background:var(--teal-soft);color:var(--teal);font-weight:600;}
+.sb-item.active{background:var(--teal-soft);color:var(--teal);font-weight:600;border-left-color:var(--teal);}
 .sb-item.active i{color:var(--teal);}
-#sidebar.collapsed .sb-item{justify-content:center;padding:9px;}
+#sidebar.collapsed .sb-item{justify-content:center;padding:9px;border-left:none;}
+#sidebar.collapsed .sb-item.active{box-shadow:inset 0 0 0 1px rgba(0,201,167,.35);}
 #sidebar.collapsed .sb-item i{width:auto;}
+
+.sb-item[data-tooltip],.admin-av[data-tooltip]{position:relative;}
+#sidebar.collapsed .sb-item[data-tooltip]::after,
+#sidebar.collapsed .admin-av[data-tooltip]::after{
+  content:attr(data-tooltip);position:absolute;left:calc(100% + 12px);top:50%;
+  transform:translateY(-50%) translateX(-4px);white-space:nowrap;pointer-events:none;
+  background:var(--text);color:var(--navy2);font-size:.72rem;font-weight:600;
+  padding:6px 10px;border-radius:7px;box-shadow:var(--shadow-md);
+  opacity:0;visibility:hidden;transition:opacity .15s ease,transform .15s ease;z-index:20;
+}
+#sidebar.collapsed .sb-item[data-tooltip]:hover::after,
+#sidebar.collapsed .admin-av[data-tooltip]:hover::after{
+  opacity:1;visibility:visible;transform:translateY(-50%) translateX(0);
+}
 .sb-bottom{border-top:1px solid var(--border);padding-top:12px;margin-top:8px;}
 .admin-info-row{
   display:flex;align-items:center;gap:10px;padding:8px 10px;
   border-radius:12px;background:var(--navy3);border:1px solid var(--border);
+  transition:background .15s ease,border-color .15s ease;
 }
+.admin-info-row:hover{background:var(--navy4);}
 #sidebar.collapsed .admin-info-row{flex-direction:column;gap:8px;padding:10px 4px;}
 .admin-av{
   width:32px;height:32px;border-radius:50%;
@@ -161,8 +158,9 @@ body{
 }
 .admin-name{font-size:.8rem;color:var(--text);font-weight:600;}
 .admin-role{font-size:.68rem;color:var(--text);}
+.sb-logout-icon{color:var(--muted);cursor:pointer;transition:color .15s ease;}
+.sb-logout-icon:hover{color:var(--red);}
 
-/* ── MAIN ── */
 #main{flex:1;min-width:0;display:flex;flex-direction:column;}
 .topbar{
   display:flex;align-items:center;justify-content:space-between;
@@ -195,8 +193,6 @@ body{
 .panel{display:none;flex-direction:column;gap:16px;}
 .panel.active{display:flex;}
 
-/* ── METRIC CARDS, GENERIC CARD, TABLES, PILLS ── (Dashboard, Bookings, Analytics, Forecasting, Reports, LoginHistory, Users, Settings, RoomManagement) */
-
 .metric-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;}
 .mc{
   background:var(--navy2);border:1px solid var(--border);border-radius:16px;
@@ -208,16 +204,18 @@ body{
 .mc-label i{font-size:14px;}
 .mc-val{font-family:var(--font-display);font-size:1.6rem;font-weight:700;color:var(--text);}
 .mc-sub{font-size:.72rem;color:var(--muted);margin-top:4px;display:flex;align-items:center;gap:4px;}
+.mc-sub i{font-size:12px;}
 .mc-sub.up{color:var(--green);}
 .mc-sub.dn{color:var(--red);}
 
-/* ── GENERIC CARD ── */
 .card{
   background:var(--navy2);border:1px solid var(--border);border-radius:16px;padding:18px;
   box-shadow:var(--shadow-sm);
 }
 .card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
-.card-title{font-size:.92rem;font-weight:600;color:var(--text);}
+.card-title{font-size:.92rem;font-weight:600;color:var(--text);display:inline-flex;align-items:center;gap:7px;}
+.card-title i{color:var(--teal);font-size:16px;}
+.card-subtitle{font-size:.74rem;color:var(--muted);margin:3px 0 0;}
 .card-action{background:none;border:none;color:var(--teal);font-size:.76rem;cursor:pointer;font-family:var(--font-body);}
 .card-action:hover{color:#d92e5c;}
 .tbl td .card-action{font-size:.9rem;padding:4px 6px;border-radius:6px;transition:background .15s;}
@@ -225,7 +223,6 @@ body{
 
 .two-col{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
 
-/* ── TABLES ── */
 .tbl{width:100%;border-collapse:collapse;}
 .tbl th{
   text-align:left;font-size:.68rem;text-transform:uppercase;letter-spacing:.04em;
@@ -235,8 +232,15 @@ body{
   padding:10px;font-size:.8rem;color:var(--text);border-bottom:1px solid var(--border-soft);
 }
 .tbl tr:last-child td{border-bottom:none;}
+.tbl tbody tr{transition:background .12s ease;}
+.tbl tbody tr:hover{background:var(--navy3);}
 
-/* ── PILLS ── */
+.tbl-th-sortable{cursor:pointer;user-select:none;}
+.tbl-th-inner{display:inline-flex;align-items:center;gap:4px;}
+.tbl-sort-icon{font-size:12px;color:var(--border);transition:color .12s ease;}
+.tbl-th-sortable:hover .tbl-sort-icon{color:var(--muted);}
+.tbl-sort-icon.is-active{color:var(--teal);}
+
 .pill{
   display:inline-flex;align-items:center;padding:3px 10px;border-radius:20px;
   font-size:.68rem;font-weight:600;
@@ -247,10 +251,7 @@ body{
 .pill-overdue{background:rgba(225,29,72,.14);color:var(--red);}
 .pill-vacant{background:rgba(37,99,235,.14);color:var(--blue);}
 
-/* Empty/loading state spanning a full CSS grid (e.g. room-grid) */
 .room-grid-empty{grid-column:1/-1;text-align:center;color:var(--muted);padding:24px 0;}
-
-/* ── SHARED BUTTONS ── (used across 2+ pages) */
 
 .cancel-btn{
   padding:9px 20px;border-radius:9px;border:1px solid var(--border);background:transparent;
@@ -284,25 +285,17 @@ body{
 .rm-btn.primary{background:var(--teal-soft);color:var(--teal);border-color:rgba(0,201,167,.35);font-weight:600;}
 .rm-btn.primary:hover{background:rgba(0,201,167,.18);}
 
-/* ── FILTER BAR ── (LoginHistory, Users) */
-
-/* ── USERS FILTER BAR ── */
 .users-filters{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;}
 .users-filter-input{
   background:var(--navy3);border:1px solid var(--border);border-radius:8px;
   padding:8px 12px;color:var(--text);font-size:.82rem;font-family:var(--font-body);outline:none;
 }
 
-/* ── CHART LEGEND / CHART CONTAINER ── (Monitor, Analytics, Forecasting) */
-
 .legend{display:flex;gap:14px;margin-bottom:10px;flex-wrap:wrap;}
 .legend-item{display:flex;align-items:center;gap:6px;font-size:.72rem;color:var(--muted);}
 .legend-dot{width:8px;height:8px;border-radius:50%;}
 .chart-wrap{height:220px;position:relative;}
 
-/* ── SETTINGS-STYLE TABS ── (Settings, RoomManagement, LoginHistory) */
-
-/* ── SETTINGS TABS ── */
 .set-layout{display:flex;gap:20px;align-items:flex-start;}
 .set-tabs{
   display:flex;flex-direction:column;background:var(--navy2);border:1px solid var(--border);
@@ -315,12 +308,6 @@ body{
 .set-tab.active{background:var(--teal-soft);color:var(--teal);}
 .set-content{flex:1;min-width:0;display:flex;flex-direction:column;gap:16px;}
 
-/* ── PASSWORD FIELD (PasswordInput.jsx / PasswordRequirementsList.jsx) ── (Users' Add User modal, Settings' password change) */
-
-/* Password show/hide toggle + unmet-requirements checklist (PasswordInput.jsx
-   + PASSWORD_REQUIREMENTS, reused from Registration/Reset-Password). Admin
-   fields have no leading icon, unlike the auth forms, so .input-icon is
-   suppressed and only right padding for the toggle button is added. */
 #app .input-wrap{position:relative;}
 #app .input-wrap .input-icon{display:none;}
 #app .input-wrap input{padding-right:34px;}
@@ -337,11 +324,6 @@ body{
 #app .password-requirements li.met{color:var(--green);}
 #app .password-requirements .requirement-icon{font-size:.66rem;line-height:1;min-width:1em;}
 
-/* ── MODAL SHELL (Modal.jsx) ── used by Bookings, Monitor, RoomManagement, Settings, Users */
-
-/* ══════════════════════════════════════════
-   MODALS
-   ══════════════════════════════════════════ */
 .modal-bg{
   display:none;position:fixed;inset:0;background:rgba(6,10,18,.7);
   backdrop-filter:blur(3px);z-index:50;align-items:center;justify-content:center;padding:20px;
@@ -357,8 +339,6 @@ body{
 .modal-title{font-family:var(--font-display);font-size:1.1rem;font-weight:700;margin-bottom:16px;color:var(--text);}
 .modal-lg-title{font-family:var(--font-display);font-size:1.15rem;font-weight:700;color:var(--text);}
 .modal-lg-sub{font-size:.78rem;color:var(--muted);margin-bottom:18px;}
-
-/* ── SHARED MODAL FIELD/ACTION ROW ── (Bookings, Monitor) */
 
 .mfield{margin-bottom:12px;}
 .mfield label{display:block;font-size:.72rem;color:var(--muted);margin-bottom:5px;}
@@ -381,13 +361,8 @@ body{
 .btn-confirm:hover{background:#d92e5c;}
 .btn-confirm:disabled,.btn-save:disabled{opacity:.6;cursor:default;}
 
-/* ── FLUSH CARD (table wrapper) ── (Bookings, Monitor) */
-
-/* Flush card — no padding, hidden overflow (table wrappers) */
 .card-flush{padding:0;overflow:hidden;overflow-x:auto;}
 
-/* ── DATATABLE PAGINATION ── (DataTable.jsx — every admin table that
-   doesn't opt out with paginate={false}) */
 .dt-pagination{
   display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;
   padding:12px 4px 2px;font-size:.78rem;color:var(--muted);
@@ -396,13 +371,10 @@ body{
 .dt-pagination-size select{min-width:64px;padding:6px 10px;}
 .dt-pagination-nav{display:flex;align-items:center;gap:10px;}
 
-/* ── RESPONSIVE ── touches selectors across several pages, kept together */
-
-/* ── RESPONSIVE ── */
 @media (max-width:900px){
   #sidebar{display:none;}
   .metric-row{grid-template-columns:repeat(2,1fr);}
-  .two-col,.settings-grid,.p2col,.frow,.sched-2col,.bd-grid{grid-template-columns:1fr;}
+  .two-col,.settings-grid,.p2col,.frow,.sched-2col,.bd-grid,.bd-row{grid-template-columns:1fr;}
   .rep-grid{grid-template-columns:1fr;}
   .content{padding:16px;}
   .set-layout{flex-direction:column;}

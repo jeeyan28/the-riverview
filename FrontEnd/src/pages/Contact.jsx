@@ -92,6 +92,17 @@ function Contact() {
           >
             <i className="fa-brands fa-facebook-f"></i>
           </a>
+          <a
+                href="https://www.tiktok.com/@the.riverview?is_from_webapp=1&sender_device=pc"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Visit The Riverview on TikTok"
+                title="Follow us on TikTok"
+                class="social-link"
+              >
+                <i class="bi bi-tiktok"></i>
+                <span class="visually-hidden">TikTok</span>
+              </a>
         </div>
       </div>
     </section>

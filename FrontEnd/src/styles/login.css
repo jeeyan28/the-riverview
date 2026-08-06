@@ -33,20 +33,40 @@
 
 .login-page .login-background-image{
     position:absolute;
+    inset:-3%;
+    background-size:cover;
+    background-position:center 38%;
+    background-repeat:no-repeat;
+    animation: login-bg-drift 26s ease-in-out infinite alternate;
+    will-change: transform;
+}
+
+@keyframes login-bg-drift{
+    from{ transform: scale(1); }
+    to{ transform: scale(1.06); }
+}
+
+@media (prefers-reduced-motion: reduce){
+    .login-page .login-background-image{ animation: none; }
+}
+
+.login-page .login-background-tint{
+    position:absolute;
     inset:0;
     background:
-        radial-gradient(600px circle at 12% 18%, rgba(25,216,195,.16), transparent 60%),
-        radial-gradient(560px circle at 88% 82%, rgba(38,230,209,.13), transparent 60%),
-        radial-gradient(500px circle at 60% -5%, rgba(25,216,195,.10), transparent 55%),
-        radial-gradient(circle, rgba(255,255,255,.06) 1px, transparent 1px);
-    background-size:auto,auto,auto,28px 28px;
-    background-position:0 0,0 0,0 0,0 0;
+        radial-gradient(560px circle at 10% 15%, rgba(25,216,195,.14), transparent 60%),
+        radial-gradient(circle, rgba(255,255,255,.05) 1px, transparent 1px);
+    background-size:auto,26px 26px;
+    mix-blend-mode:screen;
+    opacity:.6;
 }
 
 .login-page .login-background-overlay{
     position:absolute;
     inset:0;
-    background: linear-gradient( 90deg, rgba(13,23,38,.15) 0%, rgba(13,23,38,.18) 35%, rgba(13,23,38,.38) 58%, rgba(13,23,38,.74) 76%, rgba(13,23,38,.96) 100% );
+    background:
+        linear-gradient(90deg, rgba(9,16,27,.72) 0%, rgba(9,16,27,.62) 28%, rgba(9,16,27,.66) 46%, rgba(9,16,27,.84) 66%, rgba(9,16,27,.97) 100%),
+        linear-gradient(to bottom, rgba(9,16,27,.55) 0%, rgba(9,16,27,.05) 26%, rgba(9,16,27,.05) 68%, rgba(9,16,27,.75) 100%);
 }
 
 .login-page .login-header{
@@ -98,6 +118,7 @@
     max-width:480px;
     padding-right:80px;
     animation:fadeUp .8s ease;
+    text-shadow: 0 2px 24px rgba(0,0,0,.35);
 }
 
 .login-page .login-badge{
@@ -138,7 +159,7 @@
     backdrop-filter:blur(var(--blur));
     -webkit-backdrop-filter:blur(var(--blur));
     border:1px solid var(--ovl-08);
-    box-shadow:var(--shadow);
+    box-shadow:var(--shadow), inset 0 1px 0 rgba(255,255,255,.05);
     padding:32px;
     animation:fadeUp .9s ease;
     display:flex;
