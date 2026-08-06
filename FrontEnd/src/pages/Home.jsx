@@ -63,7 +63,7 @@ const BOOKING_STEPS = [
   {
     icon: CheckCircle2,
     title: 'Get Confirmed',
-    desc: 'Once your payment succeeds, your reservation is automatically confirmed and finalized — no extra steps.',
+    desc: 'Once your payment succeeds, your reservation is automatically confirmed and finalized — no more extra steps.',
   },
 ];
 
