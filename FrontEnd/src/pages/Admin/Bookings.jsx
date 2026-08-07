@@ -7,6 +7,7 @@ import { useConfirm } from '../../hooks/useConfirm';
 import { dateKey } from '../../utils/rooms';
 import { resolveImageUrl } from '../../utils/resolveImageUrl';
 import { formatPeso } from '../../utils/currency';
+import { guestPhoneDisplay } from '../../utils/receipt';
 import { useAuth } from '../../context/AuthContext';
 import { useSiteSettings } from '../../hooks/useSiteSettings';
 import { roomsService } from '../../services/rooms';
@@ -24,15 +25,8 @@ const STATUS_PILL_CLASS = {
   Confirmed: 'pill-active',
   Rejected: 'pill-overdue',
 };
-const PAYMENT_PILL_CLASS = {
-  Unpaid: 'pill-done',
-  'Pending Verification': 'pill-pending',
-  Paid: 'pill-active',
-  Rejected: 'pill-overdue',
-};
 const BOOKING_STATUSES = ['Pending Payment Verification', 'Confirmed', 'Rejected', 'Ongoing', 'Pending', 'Done', 'Overdue', 'Cancelled'];
 const EDITABLE_BOOKING_STATUSES = BOOKING_STATUSES.filter((s) => s !== 'Done');
-const PAYMENT_STATUSES = Object.keys(PAYMENT_PILL_CLASS);
 const PAYMENT_METHODS = ['Cash', 'GCash', 'Maya'];
 const SEARCH_DEBOUNCE_MS = 350;
 const MAX_GUEST_HISTORY_ROWS = 5;
@@ -51,6 +45,22 @@ function shortBookingId(b) {
 
 function facilityName(b) {
   return b.room?.name || b.roomLabel || '—';
+}
+
+function isFullPayment(b) {
+  const hours = Number(b.downPaymentHours) || 0;
+  const duration = Number(b.duration) || 0;
+  return hours >= duration || (b.amount && b.downPayment >= b.amount);
+}
+
+function paymentPlanLabel(b) {
+  if (isFullPayment(b)) return 'Full payment';
+  const hours = Number(b.downPaymentHours) || 1;
+  return `Downpayment (${hours} hr${hours === 1 ? '' : 's'})`;
+}
+
+function paymentPlanPillClass(b) {
+  return isFullPayment(b) ? 'pill-active' : 'pill-pending';
 }
 
 function initials(name) {
@@ -83,7 +93,6 @@ function Bookings() {
 
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
-  const [paymentFilter, setPaymentFilter] = useState('');
   const [roomFilter, setRoomFilter] = useState('');
   const [dateFilter, setDateFilter] = useState('');
   const searchDebounce = useRef(null);
@@ -124,7 +133,6 @@ function Bookings() {
       const data = await bookingsService.list({
         search: search.trim(),
         status: statusFilter,
-        paymentStatus: paymentFilter,
         room: roomFilter,
         date: dateFilter,
       });
@@ -135,11 +143,11 @@ function Bookings() {
     } finally {
       setLoading(false);
     }
-  }, [search, statusFilter, paymentFilter, roomFilter, dateFilter]);
+  }, [search, statusFilter, roomFilter, dateFilter]);
 
   useEffect(() => {
     fetchBookings();
-  }, [statusFilter, paymentFilter, roomFilter, dateFilter]);
+  }, [statusFilter, roomFilter, dateFilter]);
 
   useEffect(() => {
     clearTimeout(searchDebounce.current);
@@ -155,7 +163,6 @@ function Bookings() {
   function clearFilters() {
     setSearch('');
     setStatusFilter('');
-    setPaymentFilter('');
     setRoomFilter('');
     setDateFilter('');
   }
@@ -228,7 +235,7 @@ function Bookings() {
   const stats = useMemo(
     () => ({
       total: bookings.length,
-      pendingPayments: bookings.filter((b) => ['Unpaid', 'Pending Verification'].includes(b.paymentStatus)).length,
+      pendingPayments: bookings.filter((b) => b.status === 'Pending').length,
       activeGuests: bookings.filter((b) => b.status === 'Ongoing').length,
       cancelled: bookings.filter((b) => b.status === 'Cancelled').length,
     }),
@@ -299,7 +306,7 @@ function Bookings() {
           <span className="bk-avatar">{initials(b.guestName)}</span>
           <div className="bk-customer-info">
             <span className="bk-customer-name">{b.guestName || '—'}</span>
-            <span className="bk-customer-phone">{b.guestContact || '—'}</span>
+            <span className="bk-customer-phone">{guestPhoneDisplay(b.guestContact)}</span>
           </div>
         </div>
       ),
@@ -334,15 +341,15 @@ function Bookings() {
       render: (b) =>
         b.paymentScreenshot ? (
           <span
-            className={`pill ${PAYMENT_PILL_CLASS[b.paymentStatus] || 'pill-pending'}`}
+            className={`pill ${paymentPlanPillClass(b)}`}
             style={{ cursor: 'pointer' }}
             title="Click to view screenshot"
             onClick={() => setProofId(b._id)}
           >
-            {b.paymentStatus}
+            {paymentPlanLabel(b)}
           </span>
         ) : (
-          <span className={`pill ${PAYMENT_PILL_CLASS[b.paymentStatus] || 'pill-pending'}`}>{b.paymentStatus}</span>
+          <span className={`pill ${paymentPlanPillClass(b)}`}>{paymentPlanLabel(b)}</span>
         ),
     },
     {
@@ -426,12 +433,6 @@ function Bookings() {
                 <option key={s} value={s}>{s}</option>
               ))}
             </select>
-            <select className="bk-filter-input" value={paymentFilter} onChange={(e) => setPaymentFilter(e.target.value)}>
-              <option value="">All Payment Status</option>
-              {PAYMENT_STATUSES.map((s) => (
-                <option key={s} value={s}>{s}</option>
-              ))}
-            </select>
             <select className="bk-filter-input" value={roomFilter} onChange={(e) => setRoomFilter(e.target.value)}>
               <option value="">All Facilities</option>
               {rooms.map((r) => (
@@ -447,7 +448,7 @@ function Bookings() {
               value={dateFilter}
               onChange={(e) => setDateFilter(e.target.value)}
             />
-            {(search || statusFilter || paymentFilter || roomFilter || dateFilter) && (
+            {(search || statusFilter || roomFilter || dateFilter) && (
               <button type="button" className="bk-clear-btn" onClick={clearFilters}>
                 <i className="ti ti-x"></i> Clear
               </button>
@@ -533,7 +534,7 @@ function Bookings() {
                     </div>
                     <div className="bd-field">
                       <label>Phone Number</label>
-                      <p>{detailBooking.guestContact && !String(detailBooking.guestContact).includes('@') ? detailBooking.guestContact : detailBooking.guestContact || '—'}</p>
+                      <p>{guestPhoneDisplay(detailBooking.guestContact)}</p>
                     </div>
                     <div className="bd-field"><label>Number of Guests</label><p>{detailBooking.guestCount ? String(detailBooking.guestCount) : '—'}</p></div>
                   </div>
@@ -761,7 +762,6 @@ function EditBookingModal({ booking, rooms, onClose, onSaved, minDuration, maxDu
   const [paymentMethod, setPaymentMethod] = useState('Cash');
   const [downPayment, setDownPayment] = useState(0);
   const [amount, setAmount] = useState(0);
-  const [paymentStatus, setPaymentStatus] = useState('Unpaid');
   const [status, setStatus] = useState('Pending');
   const [specialRequests, setSpecialRequests] = useState('');
   const [saving, setSaving] = useState(false);
@@ -780,7 +780,6 @@ function EditBookingModal({ booking, rooms, onClose, onSaved, minDuration, maxDu
       setPaymentMethod(booking.paymentMethod || 'Cash');
       setDownPayment(booking.downPayment || 0);
       setAmount(booking.amount || 0);
-      setPaymentStatus(booking.paymentStatus || 'Unpaid');
       setStatus(booking.status || 'Pending');
       setSpecialRequests(booking.specialRequests || '');
     }
@@ -825,7 +824,6 @@ function EditBookingModal({ booking, rooms, onClose, onSaved, minDuration, maxDu
         paymentMethod,
         downPayment: Number(downPayment) || 0,
         amount: Number(amount) || 0,
-        paymentStatus,
         status,
         specialRequests: specialRequests.trim(),
       });
@@ -887,14 +885,6 @@ function EditBookingModal({ booking, rooms, onClose, onSaved, minDuration, maxDu
               <div className="mfield">
                 <label>Total amount (₱)</label>
                 <input type="number" min="0" value={amount} onChange={(e) => setAmount(e.target.value)} />
-              </div>
-              <div className="mfield">
-                <label>Payment status</label>
-                <select value={paymentStatus} onChange={(e) => setPaymentStatus(e.target.value)}>
-                  {PAYMENT_STATUSES.map((s) => (
-                    <option key={s} value={s}>{s}</option>
-                  ))}
-                </select>
               </div>
             </div>
           </div>

@@ -7,7 +7,7 @@ const { LOCK_DURATION_MINUTES } = BookingLock;
 const { requirePermission, ensureAuthenticated } = require("../middleware/adminAuth");
 const { paymentProofUpload } = require("../middleware/upload");
 const { PERMISSIONS, isAdminRole } = require("../utils/permissions");
-const { validateAndPriceBooking, computeDownPayment, saveWithReservationCode, runInTransaction, voidExpiredBookings, bookingStartMs } = require("../utils/bookingHelper");
+const { validateAndPriceBooking, computeDownPayment, saveWithReservationCode, runInTransaction, voidExpiredBookings, updateBookingLifecycleStatuses, bookingStartMs } = require("../utils/bookingHelper");
 
 
 router.get("/", requirePermission(PERMISSIONS.BOOKING_VIEW), async (req, res) => {
@@ -16,6 +16,11 @@ router.get("/", requirePermission(PERMISSIONS.BOOKING_VIEW), async (req, res) =>
       await voidExpiredBookings();
     } catch (e) {
       console.error("voidExpiredBookings failed:", e.message);
+    }
+    try {
+      await updateBookingLifecycleStatuses();
+    } catch (e) {
+      console.error("updateBookingLifecycleStatuses failed:", e.message);
     }
 
     const filter = {};

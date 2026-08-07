@@ -36,8 +36,6 @@ function Reports() {
   const [editSessionId, setEditSessionId] = useState(null);
 
   const [search, setSearch] = useState('');
-  const [paymentFilter, setPaymentFilter] = useState('');
-  const [timingFilter, setTimingFilter] = useState('');
 
   async function fetchFinishedSessions() {
     setSessionsLoading(true);
@@ -80,15 +78,15 @@ function Reports() {
     }
   }
 
-  async function voidSession(session) {
+  async function deleteSession(session) {
     if (!guardPermission('room:manage')) return;
-    if (!(await confirm('Void this session record? Its amount will be zeroed out and it will no longer count as a sale.', { confirmText: 'Void' }))) return;
+    if (!(await confirm('Delete this session record permanently? This cannot be undone.', { confirmText: 'Delete' }))) return;
     try {
-      await roomSessionsService.editFinished(session._id, { amount: 0, paidAmount: 0, paymentStatus: 'Unpaid' });
+      await roomSessionsService.remove(session._id);
       await fetchFinishedSessions();
     } catch (err) {
       console.error(err);
-      alert(err.message || 'Could not void this session.');
+      alert(err.message || 'Could not delete this session.');
     }
   }
 
@@ -108,21 +106,17 @@ function Reports() {
 
   const summary = useMemo(() => {
     const totalSales = recentlyFinished.reduce((sum, s) => sum + (s.amount || 0), 0);
-    const paidCount = recentlyFinished.filter((s) => (s.paymentStatus || 'Unpaid') === 'Paid').length;
-    const unpaidCount = recentlyFinished.length - paidCount;
-    return { totalSales, transactions: recentlyFinished.length, paidCount, unpaidCount };
+    return { totalSales, transactions: recentlyFinished.length };
   }, [recentlyFinished]);
 
   const visibleSessions = useMemo(() => {
     const term = search.trim().toLowerCase();
     return recentlyFinished.filter((s) => {
-      if (paymentFilter && (s.paymentStatus || 'Unpaid') !== paymentFilter) return false;
-      if (timingFilter && (s.paymentTiming || 'Before') !== timingFilter) return false;
       if (!term) return true;
       const haystack = `${s.guestName || ''} ${s.room?.facilityName || s.facilityName || ''} ${s.room?.roomNumber ?? s.roomNumber ?? ''}`.toLowerCase();
       return haystack.includes(term);
     });
-  }, [recentlyFinished, search, paymentFilter, timingFilter]);
+  }, [recentlyFinished, search]);
 
   const columns = [
     {
@@ -143,22 +137,12 @@ function Reports() {
     },
     { key: 'amount', label: 'Amount', render: (s) => formatPeso(s.amount) },
     {
-      key: 'payment',
-      label: 'Payment',
-      render: (s) => <span className={`pay-pill pay-${(s.paymentStatus || 'Unpaid').toLowerCase()}`}>{s.paymentStatus || 'Unpaid'}</span>,
-    },
-    {
-      key: 'timing',
-      label: 'Timing',
-      render: (s) => <span className="pay-timing-tag">{s.paymentTiming === 'After' ? 'Pay After' : 'Pay Before'}</span>,
-    },
-    {
       key: 'actions',
       label: 'Action',
       render: (s) => (
         <div className="rm-actions rm-actions--table">
           <button className="rm-btn" onClick={() => setEditSessionId(s._id)}><i className="bi bi-pencil-square"></i>Edit</button>
-          <button className="rm-btn danger" onClick={() => voidSession(s)}><i className="bi bi-x-circle"></i>Void</button>
+          <button className="rm-btn danger" onClick={() => deleteSession(s)}><i className="bi bi-trash"></i>Delete</button>
         </div>
       ),
     },
@@ -206,16 +190,6 @@ function Reports() {
               <div className="mc-val">{sessionsLoading ? '—' : summary.transactions}</div>
               <div className="mc-sub">Sessions ended in last 24h</div>
             </div>
-            <div className="mc">
-              <div className="mc-label"><i className="ti ti-circle-check"></i>Paid</div>
-              <div className="mc-val">{sessionsLoading ? '—' : summary.paidCount}</div>
-              <div className="mc-sub up">Fully settled</div>
-            </div>
-            <div className="mc">
-              <div className="mc-label"><i className="ti ti-circle-x"></i>Unpaid / Balance</div>
-              <div className="mc-val">{sessionsLoading ? '—' : summary.unpaidCount}</div>
-              <div className={`mc-sub ${summary.unpaidCount > 0 ? 'dn' : ''}`}>{summary.unpaidCount > 0 ? 'Needs follow-up' : 'All clear'}</div>
-            </div>
           </div>
 
           <div className="card card-flush rep-log-card">
@@ -231,24 +205,6 @@ function Reports() {
                     onChange={(e) => setSearch(e.target.value)}
                   />
                 </div>
-                <select
-                  className="users-filter-input"
-                  value={paymentFilter}
-                  onChange={(e) => setPaymentFilter(e.target.value)}
-                >
-                  <option value="">All payment status</option>
-                  <option value="Paid">Paid</option>
-                  <option value="Unpaid">Unpaid</option>
-                </select>
-                <select
-                  className="users-filter-input"
-                  value={timingFilter}
-                  onChange={(e) => setTimingFilter(e.target.value)}
-                >
-                  <option value="">All payment timing</option>
-                  <option value="Before">Pay Before</option>
-                  <option value="After">Pay After</option>
-                </select>
               </div>
             </div>
 
@@ -279,14 +235,12 @@ function Reports() {
 function EditFinishedSessionModal({ session, onClose, onSubmit }) {
   const [guestName, setGuestName] = useState('');
   const [amount, setAmount] = useState('');
-  const [paymentStatus, setPaymentStatus] = useState('Unpaid');
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     if (!session) return;
     setGuestName(session.guestName || '');
     setAmount(String(session.amount ?? 0));
-    setPaymentStatus(session.paymentStatus || 'Unpaid');
   }, [session]);
 
   async function handleSubmit() {
@@ -297,7 +251,7 @@ function EditFinishedSessionModal({ session, onClose, onSubmit }) {
     }
     setSubmitting(true);
     try {
-      await onSubmit(session._id, { amount: parsedAmount, guestName, paymentStatus });
+      await onSubmit(session._id, { amount: parsedAmount, guestName });
     } catch (err) {
       console.error(err);
       alert(err.message || 'Could not save this correction.');
@@ -317,25 +271,6 @@ function EditFinishedSessionModal({ session, onClose, onSubmit }) {
           <div className="mfield">
             <label>Amount (₱)</label>
             <input type="number" min="0" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} />
-          </div>
-          <div className="mfield">
-            <label>Payment Status</label>
-            <div className="pay-toggle" role="group" aria-label="Payment status">
-              <button
-                type="button"
-                className={`pay-toggle-btn pay-toggle-btn--paid${paymentStatus === 'Paid' ? ' active' : ''}`}
-                onClick={() => setPaymentStatus('Paid')}
-              >
-                Paid
-              </button>
-              <button
-                type="button"
-                className={`pay-toggle-btn pay-toggle-btn--unpaid${paymentStatus === 'Unpaid' ? ' active' : ''}`}
-                onClick={() => setPaymentStatus('Unpaid')}
-              >
-                Unpaid
-              </button>
-            </div>
           </div>
           <div className="modal-actions">
             <button className="btn-cancel" onClick={onClose}>Cancel</button>

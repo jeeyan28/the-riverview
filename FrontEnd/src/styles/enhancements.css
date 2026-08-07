@@ -21,7 +21,7 @@
     .hero-bg, .hero-carousel, .hero-intro-avatar { transform: none !important; }
 }
 
-html { scroll-behavior: smooth; scroll-padding-top: calc(var(--header-h, 68px) + var(--banner-h, 0px) + 16px); }
+html { scroll-behavior: smooth; scroll-padding-top: calc(var(--header-h, 68px) + 16px); }
 
 a:focus-visible,
 button:focus-visible,
@@ -89,7 +89,7 @@ nav a::after {
 }
 nav a:hover::after, nav a.active::after { width: 20px; }
 
-.btn-login, .btn-book, .promo-close {
+.btn-login, .btn-book {
     position: relative; overflow: hidden;
     transition: transform var(--dur-fast) var(--ease-out),
                 background var(--dur-fast) var(--ease-out),
@@ -108,6 +108,24 @@ nav a:hover::after, nav a.active::after { width: 20px; }
 }
 
 .hamburger span { transition: all .3s var(--ease-smooth) !important; }
+
+.announcements-panel.open { animation: announcementsPanelIn var(--dur-fast) var(--ease-smooth); }
+@keyframes announcementsPanelIn {
+    from { opacity: 0; transform: translateY(-6px) scale(.97); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.announcement-item-close {
+    transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out) !important;
+}
+.announcement-item-close:hover { transform: rotate(90deg); }
+
+.announcement-item {
+    transition: background var(--dur-fast) var(--ease-out) !important;
+}
+
+.announcements-bell-btn {
+    transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out) !important;
+}
 
 .rv-ripple-host { position: relative; overflow: hidden; }
 .rv-ripple {

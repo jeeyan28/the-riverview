@@ -4,6 +4,7 @@ const Booking = require("../model/booking");
 const Settings = require("../model/settings");
 const BookingLock = require("../model/bookingLock");
 const { sendReceiptEmail } = require("./mailer");
+const { TIME_ZONE } = require("./constants");
 
 function computeDownPayment(unitPrice, hours = 1) {
   const price = Number(unitPrice) || 0;
@@ -28,6 +29,26 @@ async function voidExpiredBookings() {
     .map((b) => b._id);
   if (expiredIds.length) {
     await Booking.updateMany({ _id: { $in: expiredIds } }, { status: Booking.BOOKING_STATUS.CANCELLED });
+  }
+}
+
+async function updateBookingLifecycleStatuses() {
+  const todayKey = new Intl.DateTimeFormat("en-CA", { timeZone: TIME_ZONE }).format(new Date());
+
+  const stale = await Booking.find({
+    date: { $lt: todayKey },
+    status: {
+      $in: [
+        Booking.BOOKING_STATUS.PENDING,
+        Booking.BOOKING_STATUS.PENDING_PAYMENT_VERIFICATION,
+        Booking.BOOKING_STATUS.AWAITING_ONLINE_PAYMENT,
+        Booking.BOOKING_STATUS.CONFIRMED,
+        Booking.BOOKING_STATUS.ONGOING,
+      ],
+    },
+  }).select("_id");
+  if (stale.length) {
+    await Booking.updateMany({ _id: { $in: stale.map((b) => b._id) } }, { status: Booking.BOOKING_STATUS.OVERDUE });
   }
 }
 
@@ -299,4 +320,5 @@ module.exports = {
   releaseLockForSlot,
   bookingStartMs,
   voidExpiredBookings,
+  updateBookingLifecycleStatuses,
 };
