@@ -3,8 +3,7 @@ import '../../styles/skeleton.css';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Chart } from 'chart.js/auto';
 import { formatPeso } from '../../utils/currency';
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+import { API_BASE_URL } from '../../services/api';
 
 const TREND_WORD = { up: 'Trending up', down: 'Trending down', flat: 'Flat' };
 
