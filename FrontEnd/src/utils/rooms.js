@@ -58,7 +58,7 @@ export function clearReservedHours(
 
 const monthAvailabilityCache = {};
 
-export async function loadMonthAvailability(roomId, year, month /* 1-12 */, variantLabel) {
+export async function loadMonthAvailability(roomId, year, month, variantLabel) {
   const key = `${roomId}|${year}-${month}|${variantLabel || ''}`;
   if (monthAvailabilityCache[key]) return monthAvailabilityCache[key];
 
@@ -79,7 +79,7 @@ export async function loadMonthAvailability(roomId, year, month /* 1-12 */, vari
   return monthAvailabilityCache[key];
 }
 
-export function clearMonthAvailability(roomId, year, month /* 1-12 */) {
+export function clearMonthAvailability(roomId, year, month) {
   const prefix = `${roomId}|${year}-${month}|`;
   Object.keys(monthAvailabilityCache).forEach((key) => {
     if (key.startsWith(prefix)) delete monthAvailabilityCache[key];
@@ -150,6 +150,57 @@ export function getFacilityAvailability(reserved, openHour, closeHour, opts = {}
 
 export function computeDownPayment(unitPrice) {
   return Math.max(0, Math.round(Number(unitPrice) || 0));
+}
+
+export function isHourBooked(hour, reserved, totalRooms) {
+  return Number(reserved?.[hour] || 0) >= totalRooms;
+}
+
+export function canBookDuration(startHour, duration, closeHour, reserved, totalRooms) {
+  if (startHour + duration > closeHour) return false;
+  for (let hour = startHour; hour < startHour + duration; hour++) {
+    const bookedRooms = Number(reserved?.[hour] || 0);
+    if (bookedRooms >= totalRooms) return false;
+  }
+  return true;
+}
+
+export function getSlotState(startHour, duration, closeHour, reserved, totalRooms) {
+  if (isHourBooked(startHour, reserved, totalRooms)) return 'booked';
+  if (startHour + duration > closeHour) return 'insufficient';
+  if (!canBookDuration(startHour, duration, closeHour, reserved, totalRooms)) return 'booked';
+  return 'available';
+}
+
+export function getLatestStartTime(openHour, closeHour, duration) {
+  const latest = closeHour - duration;
+  return latest >= openHour ? latest : null;
+}
+
+export function buildHourCounts(dayBookings) {
+  const counts = {};
+  (dayBookings || []).forEach((b) => {
+    const start = parseInt(String(b.timeIn).split(':')[0], 10);
+    for (let h = start; h < start + Number(b.duration); h++) {
+      counts[h] = (counts[h] || 0) + 1;
+    }
+  });
+  return counts;
+}
+
+export function getFreeHourCount(dayBookings, openHour, closeHour, totalRooms) {
+  const reserved = buildHourCounts(dayBookings);
+  let count = 0;
+  for (let h = openHour; h < closeHour; h++) {
+    if (!isHourBooked(h, reserved, totalRooms)) count++;
+  }
+  return count;
+}
+
+export function getTimePeriod(hour) {
+  if (hour < 12) return 'Morning';
+  if (hour < 17) return 'Afternoon';
+  return 'Evening';
 }
 
 export function priceOptionsFor(room) {

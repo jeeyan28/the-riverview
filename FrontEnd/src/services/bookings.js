@@ -31,6 +31,8 @@ export const bookingsService = {
 
   mine: () => apiRequest(`${BASE}/mine`, { fallbackMessage: 'Failed to load your booking history.' }),
 
+  reschedule: (id, payload) => apiRequest(`${BASE}/${id}/reschedule`, { method: 'PUT', body: payload, fallbackMessage: 'Failed to reschedule your reservation.' }),
+
   lockSlot: (payload) => apiRequest(`${BASE}/lock`, { method: 'POST', body: payload, fallbackMessage: 'Failed to hold this time slot.' }),
 
   releaseLock: (id) => apiRequest(`${BASE}/lock/${id}`, { method: 'DELETE', fallbackMessage: 'Failed to release the time slot hold.' }),
