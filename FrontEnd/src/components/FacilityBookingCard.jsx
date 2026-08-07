@@ -1,8 +1,6 @@
 import { resolveImageUrl } from '../utils/resolveImageUrl';
 import fallbackRoomImg from '../assets/pictures/Billiard.jpg';
 
-// Keyword-based icon lookup for each facility feature tag — visual only,
-// falls back to a generic check icon for anything unrecognized.
 function getFeatureIcon(feature = '') {
   const f = feature.toLowerCase();
   if (f.includes('air') || f.includes('aircon')) return 'fa-snowflake';
@@ -14,11 +12,6 @@ function getFeatureIcon(feature = '') {
   return 'fa-circle-check';
 }
 
-// The facility card shown on the landing page before a guest clicks "Book
-// Now" — i.e. what they see BEFORE the Booking Modal's room-picker step
-// (that's RoomOptionCard, a different card for a different moment). Pass
-// `onSelect` to make "Book Now" functional (Home.jsx); omit it for a
-// static preview (Room Management's live preview) — same markup either way.
 function FacilityBookingCard({ room, liveStatus, onSelect }) {
   const cardImage = room.image ? resolveImageUrl(room.image) : fallbackRoomImg;
   const hasVariants = room.variants && room.variants.length > 0;
@@ -27,14 +20,11 @@ function FacilityBookingCard({ room, liveStatus, onSelect }) {
     : Number(room.price) || 0;
   const roomTypeCount = hasVariants ? room.variants.length : 0;
 
-  const initiallyAvailable = room.status === 'Available';
-  const statusLabel = liveStatus || (initiallyAvailable ? 'Available' : 'Unavailable');
+  const statusLabel = liveStatus || 'Available';
   const statusClass =
-    statusLabel === 'Fully Booked'
+    statusLabel === 'Fully Reserved'
       ? 'room-status-fullybooked'
-      : initiallyAvailable
-      ? 'room-status-available'
-      : 'room-status-unavailable';
+      : 'room-status-available';
 
   const interactive = typeof onSelect === 'function';
 
@@ -65,11 +55,11 @@ function FacilityBookingCard({ room, liveStatus, onSelect }) {
 
         {interactive ? (
           <a href="#" className="btn-select" onClick={(e) => { e.preventDefault(); onSelect(room); }}>
-            <i className="fa-solid fa-calendar-check"></i> Book Now
+            <i className="fa-solid fa-calendar-check"></i> Reserve Now
           </a>
         ) : (
           <span className="btn-select btn-select--preview">
-            <i className="fa-solid fa-calendar-check"></i> Book Now
+            <i className="fa-solid fa-calendar-check"></i> Reserve Now
           </span>
         )}
       </div>

@@ -3,12 +3,12 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import DataTable from '../../components/DataTable';
 import { dashboardService } from '../../services/dashboard';
-import { roomsService } from '../../services/rooms';
+import { monitorRoomsService } from '../../services/monitoring';
 import { bookingsService } from '../../services/bookings';
 import { formatPeso } from '../../utils/currency';
 
 const STATUS_PILL_CLASS = {
-  Active: 'pill-active',
+  Ongoing: 'pill-active',
   Pending: 'pill-pending',
   Done: 'pill-done',
   Overdue: 'pill-overdue',
@@ -71,7 +71,7 @@ function Dashboard() {
       setRoomsLoading(true);
       setRoomsError(false);
       try {
-        const data = await roomsService.list();
+        const data = await monitorRoomsService.list();
         if (!cancelled) setRooms(Array.isArray(data) ? data : []);
       } catch (err) {
         console.error(err);
@@ -145,7 +145,7 @@ function Dashboard() {
     <div className="panel active" id="panel-dashboard">
       <div className="metric-row">
         <div className="mc">
-          <div className="mc-label"><i className="ti ti-calendar-check"></i>Today's Bookings</div>
+          <div className="mc-label"><i className="ti ti-calendar-check"></i>Today's Reservations</div>
           <div className="mc-val">{summaryLoading ? '—' : summaryError ? '—' : summary.todayBookings.count}</div>
           {!summaryLoading && !summaryError && (
             <div className={`mc-sub ${bookingsDelta > 0 ? 'up' : bookingsDelta < 0 ? 'dn' : ''}`}>
@@ -185,7 +185,7 @@ function Dashboard() {
       <div className="dash-grid">
         <div className="card">
           <div className="card-head">
-            <span className="card-title">Recent Bookings</span>
+            <span className="card-title">Recent Reservations</span>
             <button className="card-action" onClick={() => navigate('/admin/bookings')}>
               View all →
             </button>
@@ -194,7 +194,7 @@ function Dashboard() {
             columns={recentColumns}
             rows={recentBookings}
             loading={bookingsLoading}
-            emptyMessage={bookingsError ? 'Could not load bookings.' : 'No bookings yet.'}
+            emptyMessage={bookingsError ? 'Could not load reservations.' : 'No reservations yet.'}
             getRowKey={(b) => b._id}
             paginate={false}
           />
@@ -227,7 +227,7 @@ function Dashboard() {
         <div className="qa-row">
           <button className="qa-btn" onClick={() => navigate('/admin/bookings?openManualBooking=1')}>
             <span className="qa-ico"><i className="ti ti-plus"></i></span>
-            <span className="qa-label">Add Booking</span>
+            <span className="qa-label">Add Reservation</span>
           </button>
           <button className="qa-btn" onClick={() => navigate('/admin/monitor')}>
             <span className="qa-ico"><i className="ti ti-device-desktop-analytics"></i></span>

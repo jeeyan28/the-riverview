@@ -26,6 +26,7 @@ const roomSessionSchema = new mongoose.Schema({
   paidAmount: { type: Number, default: 0, min: 0 },
   paymentMethod: { type: String, default: "Cash", trim: true },
   paymentStatus: { type: String, enum: ["Paid", "Unpaid"], default: "Unpaid" },
+  paymentTiming: { type: String, enum: ["Before", "After"], default: "Before" },
   status: {
     type: String,
     enum: ["Active", "Finished"],

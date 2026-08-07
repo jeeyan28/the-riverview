@@ -101,7 +101,7 @@ sessionsRouter.get("/", ensureAdmin, async (req, res) => {
 
 sessionsRouter.post("/", requireAnyPermission(PERMISSIONS.ROOM_MANAGE, PERMISSIONS.BOOKING_MANAGE), async (req, res) => {
   try {
-    const { roomId, duration, paymentMethod, paymentStatus, guestName, bookingId, roomTarget } = req.body;
+    const { roomId, duration, paymentMethod, paymentStatus, paymentTiming, guestName, bookingId, roomTarget } = req.body;
 
     if (!bookingId && !hasPermission(req.user, PERMISSIONS.ROOM_MANAGE)) {
       return res.status(403).json({ message: "You do not have permission to do that." });
@@ -116,6 +116,9 @@ sessionsRouter.post("/", requireAnyPermission(PERMISSIONS.ROOM_MANAGE, PERMISSIO
     if (paymentStatus !== undefined && !["Paid", "Unpaid"].includes(paymentStatus)) {
       return res.status(400).json({ message: "Invalid payment status." });
     }
+    if (paymentTiming !== undefined && !["Before", "After"].includes(paymentTiming)) {
+      return res.status(400).json({ message: "Invalid payment timing." });
+    }
 
     let room;
     if (roomId) {
@@ -123,28 +126,60 @@ sessionsRouter.post("/", requireAnyPermission(PERMISSIONS.ROOM_MANAGE, PERMISSIO
       if (!room) return res.status(404).json({ message: "Room not found." });
     } else if (bookingId && roomTarget) {
       const { facilityName, roomName } = roomTarget;
-      let { roomNumber } = roomTarget;
       if (!facilityName || !roomName) {
         return res.status(400).json({ message: "roomTarget requires facilityName and roomName." });
       }
-      const parsedRoomNumber = parseInt(roomNumber, 10);
-      const hasValidRoomNumber = !!roomNumber && !(Number.isFinite(parsedRoomNumber) && parsedRoomNumber <= 0);
-      if (hasValidRoomNumber) {
-        room = await MonitorRoom.findOne({ facilityName, roomNumber });
-      }
-      if (!room && !hasValidRoomNumber) {
-        room = await MonitorRoom.findOne({ facilityName, roomName, status: "Available" });
-      }
-      if (!room) {
-        if (!hasValidRoomNumber) {
-          const existingRooms = await MonitorRoom.find({ facilityName }).select("roomNumber").lean();
-          const usedNumbers = new Set(existingRooms.map((r) => parseInt(r.roomNumber, 10)).filter((n) => Number.isFinite(n) && n > 0));
-          let nextNumber = 1;
-          while (usedNumbers.has(nextNumber)) nextNumber++;
-          roomNumber = String(nextNumber);
+      const startingRoomNumber = parseInt(roomTarget.startingRoomNumber, 10);
+      const roomCount = parseInt(roomTarget.roomCount, 10);
+      const hasValidRange = Number.isFinite(startingRoomNumber) && startingRoomNumber > 0 && Number.isFinite(roomCount) && roomCount > 0;
+
+      if (hasValidRange) {
+        const rangeEnd = startingRoomNumber + roomCount - 1;
+        const facilityRooms = await MonitorRoom.find({ facilityName });
+        const inRange = facilityRooms
+          .map((r) => ({ doc: r, num: parseInt(r.roomNumber, 10) }))
+          .filter((r) => Number.isFinite(r.num) && r.num >= startingRoomNumber && r.num <= rangeEnd)
+          .sort((a, b) => a.num - b.num);
+
+        const availableInRange = inRange.find((r) => r.doc.status === "Available");
+        if (availableInRange) {
+          room = availableInRange.doc;
+        } else {
+          const usedInRange = new Set(inRange.map((r) => r.num));
+          let nextInRange = startingRoomNumber;
+          while (nextInRange <= rangeEnd && usedInRange.has(nextInRange)) nextInRange++;
+          let targetNumber;
+          if (nextInRange <= rangeEnd) {
+            targetNumber = nextInRange;
+          } else {
+            const usedAll = new Set(facilityRooms.map((r) => parseInt(r.roomNumber, 10)).filter((n) => Number.isFinite(n) && n > 0));
+            targetNumber = rangeEnd + 1;
+            while (usedAll.has(targetNumber)) targetNumber++;
+          }
+          room = new MonitorRoom({ facilityName, roomName, roomNumber: String(targetNumber), price: 0, isTemporary: true });
+          await room.save();
         }
-        room = new MonitorRoom({ facilityName, roomName, roomNumber, price: 0, isTemporary: true });
-        await room.save();
+      } else {
+        let { roomNumber } = roomTarget;
+        const parsedRoomNumber = parseInt(roomNumber, 10);
+        const hasValidRoomNumber = !!roomNumber && !(Number.isFinite(parsedRoomNumber) && parsedRoomNumber <= 0);
+        if (hasValidRoomNumber) {
+          room = await MonitorRoom.findOne({ facilityName, roomNumber });
+        }
+        if (!room && !hasValidRoomNumber) {
+          room = await MonitorRoom.findOne({ facilityName, roomName, status: "Available" });
+        }
+        if (!room) {
+          if (!hasValidRoomNumber) {
+            const existingRooms = await MonitorRoom.find({ facilityName }).select("roomNumber").lean();
+            const usedNumbers = new Set(existingRooms.map((r) => parseInt(r.roomNumber, 10)).filter((n) => Number.isFinite(n) && n > 0));
+            let nextNumber = 1;
+            while (usedNumbers.has(nextNumber)) nextNumber++;
+            roomNumber = String(nextNumber);
+          }
+          room = new MonitorRoom({ facilityName, roomName, roomNumber, price: 0, isTemporary: true });
+          await room.save();
+        }
       }
     } else {
       return res.status(400).json({ message: "roomId, or bookingId with roomTarget, is required." });
@@ -186,13 +221,14 @@ sessionsRouter.post("/", requireAnyPermission(PERMISSIONS.ROOM_MANAGE, PERMISSIO
       paidAmount,
       paymentMethod: paymentMethod || (booking ? booking.paymentMethod : "Cash"),
       paymentStatus: resolvedPaymentStatus,
+      paymentTiming: paymentTiming || "Before",
       createdBy: req.user._id,
     });
 
     await session.save();
 
     if (booking) {
-      booking.status = Booking.BOOKING_STATUS.ACTIVE;
+      booking.status = Booking.BOOKING_STATUS.ONGOING;
       await booking.save();
     }
 
@@ -280,6 +316,10 @@ sessionsRouter.put("/:id/end", requirePermission(PERMISSIONS.ROOM_MANAGE), async
 
     await session.save();
 
+    if (session.booking) {
+      await Booking.findByIdAndUpdate(session.booking, { status: Booking.BOOKING_STATUS.DONE });
+    }
+
     let roomDeleted = false;
     if (room?.isTemporary) {
       await MonitorRoom.findByIdAndDelete(room._id);
@@ -295,10 +335,13 @@ sessionsRouter.put("/:id/end", requirePermission(PERMISSIONS.ROOM_MANAGE), async
 
 sessionsRouter.put("/:id", requirePermission(PERMISSIONS.ROOM_MANAGE), async (req, res) => {
   try {
-    const { amount, paidAmount, paymentStatus, guestName } = req.body;
+    const { amount, paidAmount, paymentStatus, paymentTiming, guestName } = req.body;
 
     if (paymentStatus !== undefined && !["Paid", "Unpaid"].includes(paymentStatus)) {
       return res.status(400).json({ message: "Invalid payment status." });
+    }
+    if (paymentTiming !== undefined && !["Before", "After"].includes(paymentTiming)) {
+      return res.status(400).json({ message: "Invalid payment timing." });
     }
     if (amount !== undefined && amount < 0) {
       return res.status(400).json({ message: "Amount cannot be negative." });
@@ -316,6 +359,7 @@ sessionsRouter.put("/:id", requirePermission(PERMISSIONS.ROOM_MANAGE), async (re
     if (amount !== undefined) session.amount = amount;
     if (paidAmount !== undefined) session.paidAmount = paidAmount;
     if (guestName !== undefined) session.guestName = String(guestName).trim();
+    if (paymentTiming !== undefined) session.paymentTiming = paymentTiming;
     if (paymentStatus !== undefined) {
       session.paymentStatus = paymentStatus;
       session.paidAmount = paymentStatus === "Paid" ? session.amount : 0;

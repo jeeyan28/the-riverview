@@ -9,7 +9,7 @@ const BOOKING_STATUS = {
   AWAITING_ONLINE_PAYMENT: "Awaiting Online Payment",
   CONFIRMED: "Confirmed",
   REJECTED: "Rejected",
-  ACTIVE: "Active",
+  ONGOING: "Ongoing",
   DONE: "Done",
   OVERDUE: "Overdue",
   CANCELLED: "Cancelled",

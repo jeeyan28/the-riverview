@@ -221,7 +221,7 @@ function OperatingScheduleAndHolidays() {
           </button>
         </div>
         <div className="holiday-note">
-          Customers cannot book on these dates. The reservation calendar will automatically block them, and each
+          Customers cannot reserve on these dates. The reservation calendar will automatically block them, and each
           upcoming date also appears in the announcement banner at the top of the homepage.
         </div>
         <div className="holiday-list" style={{ marginTop: 10 }}>
@@ -446,7 +446,7 @@ function initialsOf(admin) {
 
 const PROFILE_METRICS = [
   { label: 'Total Logins', value: '142' },
-  { label: 'Bookings Managed', value: '388' },
+  { label: 'Reservations Managed', value: '388' },
   { label: 'Reports Generated', value: '27' },
   { label: 'Account Created', value: 'Jan 2026' },
 ];

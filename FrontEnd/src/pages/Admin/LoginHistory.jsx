@@ -53,7 +53,6 @@ function LoginHistory() {
     fetchHistory();
   }, [tab, statusFilter, page]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Debounced search, same 300ms pattern as Users.jsx.
   useEffect(() => {
     clearTimeout(searchDebounce.current);
     searchDebounce.current = setTimeout(() => {
@@ -79,7 +78,6 @@ function LoginHistory() {
       : []),
     { key: 'method', label: 'Method', render: (e) => METHOD_LABELS[e.method] || e.method },
     { key: 'status', label: 'Status', render: statusPill },
-    { key: 'ip', label: 'IP Address', render: (e) => e.ip || '—' },
     { key: 'createdAt', label: 'Date & Time', render: (e) => new Date(e.createdAt).toLocaleString() },
   ];
 

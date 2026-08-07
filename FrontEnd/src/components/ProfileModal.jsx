@@ -11,7 +11,7 @@ const EMPTY_DETAILS = { firstName: '', lastName: '', phone: '', email: '' };
 const EMPTY_PASSWORD = { currentPassword: '', newPassword: '', confirmPassword: '' };
 
 function historyStatusClass(status) {
-  if (['Confirmed', 'Active', 'Done'].includes(status)) return 'completed';
+  if (['Confirmed', 'Ongoing', 'Done'].includes(status)) return 'completed';
   if (['Rejected', 'Cancelled', 'Overdue'].includes(status)) return 'cancelled';
   return 'upcoming';
 }
@@ -77,7 +77,7 @@ function ProfileModal({ open, onClose }) {
         const data = await bookingsService.mine();
         if (!cancelled) setBookings(Array.isArray(data) ? data : []);
       } catch (err) {
-        if (!cancelled) setBookingsError(err.message || 'Could not load your bookings.');
+        if (!cancelled) setBookingsError(err.message || 'Could not load your reservations.');
       } finally {
         if (!cancelled) setLoadingBookings(false);
       }
@@ -215,7 +215,7 @@ function ProfileModal({ open, onClose }) {
               aria-selected={activeTab === 'history'}
               onClick={() => setActiveTab('history')}
             >
-              Booking history
+              Reservation history
             </button>
           </div>
 
@@ -366,7 +366,7 @@ function ProfileModal({ open, onClose }) {
             <div className="pf-history-summary">
               <div className="pf-summary-card">
                 <div className="pf-summary-num">{bookings.length}</div>
-                <div className="pf-summary-label">Total bookings</div>
+                <div className="pf-summary-label">Total reservations</div>
               </div>
               <div className="pf-summary-card">
                 <div className="pf-summary-num">{completedBookings.length}</div>
@@ -379,10 +379,10 @@ function ProfileModal({ open, onClose }) {
             </div>
 
             <div className="pf-history">
-              {loadingBookings && <p className="pf-history-empty">Loading your bookings…</p>}
+              {loadingBookings && <p className="pf-history-empty">Loading your reservations…</p>}
               {!loadingBookings && bookingsError && <p className="pf-history-empty">{bookingsError}</p>}
               {!loadingBookings && !bookingsError && bookings.length === 0 && (
-                <p className="pf-history-empty">You haven't made any bookings yet.</p>
+                <p className="pf-history-empty">You haven't made any reservations yet.</p>
               )}
               {!loadingBookings && !bookingsError && bookings.map((b) => (
                 <div className="pf-booking-row" key={b._id}>
@@ -433,7 +433,7 @@ function ProfileModal({ open, onClose }) {
         >
           <div className="pf-modal">
             <div className="pf-modal-head">
-              <h2 className="pf-modal-title">Booking details</h2>
+              <h2 className="pf-modal-title">Reservation details</h2>
               <button className="pf-close" aria-label="Close" onClick={() => setViewingBooking(null)}>
                 <i className="fa-solid fa-xmark"></i>
               </button>
@@ -445,7 +445,7 @@ function ProfileModal({ open, onClose }) {
                 <span className="pf-detail-value">{viewingBooking.reservationCode || '—'}</span>
               </div>
               <div className="pf-detail-row">
-                <span className="pf-detail-label">Booked by</span>
+                <span className="pf-detail-label">Reserved by</span>
                 <span className="pf-detail-value">{viewingBooking.guestName || '—'}</span>
               </div>
               <div className="pf-detail-row">
@@ -467,7 +467,7 @@ function ProfileModal({ open, onClose }) {
                 <span className="pf-detail-value">{viewingBooking.room?.name || viewingBooking.roomLabel || '—'}</span>
               </div>
               <div className="pf-detail-row">
-                <span className="pf-detail-label">Booking date</span>
+                <span className="pf-detail-label">Reservation date</span>
                 <span className="pf-detail-value">{viewingBooking.date}</span>
               </div>
               <div className="pf-detail-row">
@@ -479,7 +479,7 @@ function ProfileModal({ open, onClose }) {
                 <span className="pf-detail-value">{viewingBooking.guestCount || 1}</span>
               </div>
               <div className="pf-detail-row">
-                <span className="pf-detail-label">Booked on</span>
+                <span className="pf-detail-label">Reserved on</span>
                 <span className="pf-detail-value">
                   {viewingBooking.createdAt
                     ? new Date(viewingBooking.createdAt).toLocaleString(undefined, {

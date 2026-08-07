@@ -2,3 +2,32 @@
 .fc-chart-skeleton{width:100%;height:100%;border-radius:12px;}
 .fc-table-skeleton{display:flex;flex-direction:column;gap:10px;}
 .fc-skeleton-row{height:32px;border-radius:8px;}
+
+.fc-insights-list{display:flex;flex-direction:column;gap:10px;margin:0;padding:0;list-style:none;}
+.fc-insight{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:10px;background:var(--navy3);border:1px solid var(--border-soft);}
+.fc-insight-icon{flex:0 0 auto;width:28px;height:28px;border-radius:8px;background:var(--teal-soft);color:var(--teal);display:flex;align-items:center;justify-content:center;font-size:.95rem;}
+.fc-insight-text{font-size:.83rem;color:var(--text);line-height:1.45;}
+
+.fc-weekday-list{display:flex;flex-direction:column;gap:8px;}
+.fc-weekday-row{display:grid;grid-template-columns:88px 1fr auto;align-items:center;gap:10px;}
+.fc-weekday-name{font-size:.78rem;color:var(--muted);}
+.fc-weekday-bar-track{height:8px;border-radius:6px;background:var(--navy4);overflow:hidden;}
+.fc-weekday-bar-fill{height:100%;border-radius:6px;background:var(--teal);}
+.fc-weekday-bar-fill.best{background:var(--teal);}
+.fc-weekday-bar-fill.worst{background:var(--red);}
+.fc-weekday-val{font-size:.78rem;color:var(--text);font-weight:600;min-width:40px;text-align:right;}
+
+.fc-ai-summary{font-size:.87rem;color:var(--text);line-height:1.55;margin:0 0 14px;}
+.fc-ai-columns{display:grid;grid-template-columns:1fr 1fr;gap:18px;}
+@media (max-width:760px){.fc-ai-columns{grid-template-columns:1fr;}}
+.fc-ai-section-title{display:flex;align-items:center;gap:6px;font-size:.72rem;font-weight:700;letter-spacing:.03em;text-transform:uppercase;color:var(--muted);margin:0 0 8px;}
+.fc-ai-list{display:flex;flex-direction:column;gap:8px;margin:0;padding:0;list-style:none;}
+.fc-ai-list li{display:flex;align-items:flex-start;gap:8px;font-size:.83rem;color:var(--text);line-height:1.45;}
+.fc-ai-list.risks li{color:var(--muted);}
+.fc-ai-list li i{flex:0 0 auto;margin-top:2px;color:var(--teal);font-size:.85rem;}
+.fc-ai-list.risks li i{color:var(--red);}
+.fc-ai-fallback{display:flex;align-items:flex-start;gap:10px;padding:12px;border-radius:10px;background:var(--navy3);border:1px solid var(--border-soft);font-size:.83rem;color:var(--muted);line-height:1.5;}
+.fc-ai-badge{display:inline-flex;align-items:center;gap:5px;font-size:.68rem;font-weight:700;letter-spacing:.03em;text-transform:uppercase;color:var(--teal);background:var(--teal-soft);border-radius:999px;padding:3px 9px;margin-left:8px;vertical-align:middle;}
+
+.fc-chart-note{font-size:.72rem;color:var(--muted);margin-top:6px;display:flex;align-items:center;gap:6px;}
+

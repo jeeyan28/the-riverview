@@ -49,7 +49,7 @@ function Login() {
             Unwind.
           </h1>
           <p>
-            Book billiards and recreation spaces with
+            Reserve billiards and recreation spaces with
             real-time availability in one seamless experience.
           </p>
         </div>

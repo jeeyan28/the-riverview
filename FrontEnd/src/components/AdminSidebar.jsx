@@ -13,7 +13,7 @@ const NAV_SECTIONS = [
     items: [
       { to: '/admin/dashboard', icon: 'ti-layout-dashboard', label: 'Dashboard', roles: MANAGER_UP },
       { to: '/admin/monitor', icon: 'ti-device-desktop-analytics', label: 'Room Monitor' },
-      { to: '/admin/bookings', icon: 'ti-calendar-event', label: 'Bookings' },
+      { to: '/admin/bookings', icon: 'ti-calendar-event', label: 'Reservations' },
     ],
   },
   {
@@ -38,7 +38,7 @@ const NAV_SECTIONS = [
 export const PAGE_TITLES = {
   dashboard: 'Dashboard',
   monitor: 'Room Monitor',
-  bookings: 'Bookings',
+  bookings: 'Reservations',
   analytics: 'Analytics',
   reports: 'Reports',
   forecasting: 'Forecasting',

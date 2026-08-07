@@ -16,7 +16,7 @@ const FORM_STEPS = [
 const ROOM_STATUS_PILL_CLASS = { Available: 'pill-active', Maintenance: 'pill-pending', Unavailable: 'pill-overdue' };
 
 function emptyVariant() {
-  return { label: '', price: '', pax: '', roomNumber: '', roomCount: 1, status: 'Available', image: '', features: [] };
+  return { label: '', price: '', pax: '', startingRoomNumber: '', roomCount: 1, status: 'Available', image: '', features: [] };
 }
 
 function emptyFacilityForm() {
@@ -30,6 +30,21 @@ function emptyFacilityForm() {
 function lowestRoomPrice(variants) {
   if (!variants || !variants.length) return 0;
   return Math.min(...variants.map((v) => Number(v.price) || 0));
+}
+
+function roomNumberRangeLabel(v) {
+  const start = Math.max(1, Number(v.startingRoomNumber) || 1);
+  const count = Math.max(1, Number(v.roomCount) || 1);
+  return count > 1 ? `Rooms ${start}–${start + count - 1}` : `Room ${start}`;
+}
+
+function statusCounts(variants) {
+  const list = variants || [];
+  return {
+    available: list.filter((v) => v.status === 'Available').length,
+    maintenance: list.filter((v) => v.status === 'Maintenance').length,
+    unavailable: list.filter((v) => v.status === 'Unavailable').length,
+  };
 }
 
 function safeParseJson(str, fallback) {
@@ -125,7 +140,7 @@ function RoomManagement() {
       description: room.description || '',
       variants: (room.variants || []).map((v) => ({
         ...v,
-        roomNumber: v.roomNumber || '',
+        startingRoomNumber: v.startingRoomNumber ?? '',
         roomCount: v.roomCount ?? 1,
         status: v.status || 'Available',
         features: Array.isArray(v.features) ? v.features : [],
@@ -252,20 +267,19 @@ function RoomManagement() {
       .map((v, originalIndex) => ({ v, originalIndex }))
       .filter(({ v }) => v.label.trim() !== '' || v.price !== '');
     const invalidRoomNumber = cleanVariantEntries.find(({ v }) => {
-      const trimmed = (v.roomNumber || '').trim();
-      if (!trimmed) return false;
-      const parsed = parseInt(trimmed, 10);
-      return Number.isFinite(parsed) && parsed <= 0;
+      if (v.startingRoomNumber === '' || v.startingRoomNumber === null || v.startingRoomNumber === undefined) return false;
+      const parsed = Number(v.startingRoomNumber);
+      return !Number.isFinite(parsed) || parsed <= 0;
     });
     if (invalidRoomNumber) {
-      alert(`Room No. for "${invalidRoomNumber.v.label || 'Untitled Room'}" must be greater than 0, or left blank to auto-assign one.`);
+      alert(`Starting Room No. for "${invalidRoomNumber.v.label || 'Untitled Room'}" must be greater than 0, or left blank to default to 1.`);
       return;
     }
     const cleanVariants = cleanVariantEntries.map(({ v }) => ({
       label: v.label.trim(),
       price: Number(v.price) || 0,
       pax: (v.pax || '').trim(),
-      roomNumber: (v.roomNumber || '').trim(),
+      startingRoomNumber: Math.max(1, Number(v.startingRoomNumber) || 1),
       roomCount: Math.max(1, Number(v.roomCount) || 1),
       status: v.status || 'Available',
       image: v.image || '',
@@ -414,20 +428,32 @@ function RoomManagement() {
     <div className="panel active" id="panel-room-management">
       <div className="metric-row">
         <div className="mc">
-          <div className="mc-label"><i className="ti ti-building"></i> Total Facilities</div>
-          <div className="mc-val">{stats.facilities.toLocaleString()}</div>
+          <div className="mc-icon"><i className="ti ti-building"></i></div>
+          <div className="mc-info">
+            <div className="mc-label">Total Facilities</div>
+            <div className="mc-val">{stats.facilities.toLocaleString()}</div>
+          </div>
         </div>
         <div className="mc">
-          <div className="mc-label"><i className="ti ti-door"></i> Total Rooms</div>
-          <div className="mc-val">{stats.totalRooms.toLocaleString()}</div>
+          <div className="mc-icon"><i className="ti ti-door"></i></div>
+          <div className="mc-info">
+            <div className="mc-label">Total Rooms</div>
+            <div className="mc-val">{stats.totalRooms.toLocaleString()}</div>
+          </div>
         </div>
         <div className="mc">
-          <div className="mc-label"><i className="ti ti-circle-check"></i> Available</div>
-          <div className="mc-val">{stats.available.toLocaleString()}</div>
+          <div className="mc-icon"><i className="ti ti-circle-check"></i></div>
+          <div className="mc-info">
+            <div className="mc-label">Available</div>
+            <div className="mc-val">{stats.available.toLocaleString()}</div>
+          </div>
         </div>
         <div className="mc">
-          <div className="mc-label"><i className="ti ti-tool"></i> Under Maintenance</div>
-          <div className="mc-val">{stats.maintenance.toLocaleString()}</div>
+          <div className="mc-icon"><i className="ti ti-tool"></i></div>
+          <div className="mc-info">
+            <div className="mc-label">Under Maintenance</div>
+            <div className="mc-val">{stats.maintenance.toLocaleString()}</div>
+          </div>
         </div>
       </div>
 
@@ -435,7 +461,10 @@ function RoomManagement() {
         <div className="fac-head">
           <div className="fac-head-left">
             <i className="ti ti-building"></i>
-            <span className="fac-head-title">Manage your Facility</span>
+            <div>
+              <div className="fac-head-title">Manage your Facility</div>
+              <div className="fac-head-sub">Add facilities, then define the rooms guests can reserve.</div>
+            </div>
           </div>
           {canManage && (
             <button className="btn-teal" onClick={openAddModal}>
@@ -497,45 +526,57 @@ function RoomManagement() {
               <div className="room-grid-empty">Loading facilities…</div>
             ) : visibleRooms.length === 0 ? (
               <div className="room-grid-empty">
+                <i className="ti ti-building"></i>
                 {rooms.length === 0 ? 'No facilities yet. Click "Add Facility" to create one.' : 'No facilities match your filters.'}
               </div>
             ) : (
               visibleRooms.map((r) => {
                 const hasVariants = r.variants && r.variants.length > 0;
-                const topPrice = hasVariants ? `From ₱${lowestRoomPrice(r.variants)}/hr` : '—';
+                const topPrice = hasVariants ? `From ₱${lowestRoomPrice(r.variants)}/hr` : 'No rooms yet';
+                const counts = statusCounts(r.variants);
+                const shownVariants = r.variants ? r.variants.slice(0, 3) : [];
+                const extraVariants = hasVariants ? r.variants.length - shownVariants.length : 0;
                 return (
                   <div className="fac-card" key={r._id}>
-                    <div className="fac-img">
+                    <div className="fac-card-media">
                       {r.image ? (
-                        <img src={resolveImageUrl(r.image)} alt={r.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        <img src={resolveImageUrl(r.image)} alt={r.name} />
                       ) : (
-                        <>
-                          <i className="ti ti-photo" style={{ fontSize: 22, marginRight: 6 }}></i>
-                          {r.name} Image
-                        </>
+                        <div className="fac-card-noimg">
+                          <i className="ti ti-photo"></i>
+                          No image
+                        </div>
                       )}
+                      <span className="fac-card-badge">{topPrice}</span>
                     </div>
                     <div className="fac-body">
                       <div className="fac-title-row">
-                        <div>
-                          <div className="fac-name">{r.name}</div>
-                          <div className="fac-meta">{hasVariants ? `${r.variants.length} room${r.variants.length > 1 ? 's' : ''}` : 'No rooms yet'}</div>
-                        </div>
-                        <div className="fac-price">{topPrice}</div>
+                        <div className="fac-name">{r.name}</div>
+                        <div className="fac-meta">{hasVariants ? `${r.variants.length} room type${r.variants.length > 1 ? 's' : ''}` : 'No rooms yet'}</div>
                       </div>
+
                       {hasVariants && (
-                        <div className="fac-variants">
-                          {r.variants.map((v, i) => (
-                            <div className="fac-variant-row" key={i}>
-                              <span className="fv-label">
-                                {v.label}
-                              </span>
-                              <span className="fv-price">₱{v.price}/hr</span>
-                            </div>
-                          ))}
+                        <div className="fac-status-row">
+                          {counts.available > 0 && <span className="pill pill-active">{counts.available} Available</span>}
+                          {counts.maintenance > 0 && <span className="pill pill-pending">{counts.maintenance} Maintenance</span>}
+                          {counts.unavailable > 0 && <span className="pill pill-overdue">{counts.unavailable} Unavailable</span>}
                         </div>
                       )}
-                      <div className="fac-desc">{r.description || ''}</div>
+
+                      {r.description && <div className="fac-desc">{r.description}</div>}
+
+                      {hasVariants && (
+                        <div className="fac-variants">
+                          {shownVariants.map((v, i) => (
+                            <span className="fac-variant-chip" key={i}>
+                              {v.label} <span className="fv-price">₱{v.price}</span>
+                              <span className="fv-room-range">{roomNumberRangeLabel(v)}</span>
+                            </span>
+                          ))}
+                          {extraVariants > 0 && <span className="fac-variant-more">+{extraVariants} more</span>}
+                        </div>
+                      )}
+
                       <div className="fac-actions">
                         {canManage ? (
                           <>
@@ -563,29 +604,38 @@ function RoomManagement() {
       </div>
 
       <Modal open={modalOpen} onClose={closeModal} size="2xl">
-        <div className="modal-lg-title">{editingId ? 'Edit Facility' : 'Add Facility'}</div>
-        <div className="modal-lg-sub">
-          {editingId ? 'Update this facility and the rooms that belong to it.' : 'Add a new facility to your listing.'}
+        <div className="fm-modal-header">
+          <div>
+            <div className="modal-lg-title">{editingId ? 'Edit Facility' : 'Add Facility'}</div>
+            <div className="modal-lg-sub">
+              {editingId ? 'Update this facility and the rooms that belong to it.' : 'Add a new facility to your listing.'}
+            </div>
+          </div>
+          <button type="button" className="fm-close-btn" title="Close" onClick={closeModal}>
+            <i className="ti ti-x"></i>
+          </button>
         </div>
 
         <div className="fm-stepper">
           {FORM_STEPS.map((s, i) => {
             const state = i < stepIndex ? 'done' : i === stepIndex ? 'active' : 'upcoming';
             return (
-              <button
-                type="button"
-                key={s.key}
-                className={`fm-step-dot fm-step-dot--${state}`}
-                onClick={() => {
-                  setFormStep(s.key);
-                  if (s.key !== 'rooms') setActiveRoomIndex(null);
-                }}
-              >
-                <span className="fm-step-dot-num">{state === 'done' ? <i className="ti ti-check"></i> : i + 1}</span>
-                <span className="fm-step-dot-label">
-                  {s.label}{s.key === 'rooms' && form.variants.length > 0 ? ` (${form.variants.length})` : ''}
-                </span>
-              </button>
+              <div key={s.key} style={{ display: 'flex', alignItems: 'center' }}>
+                {i > 0 && <span className="fm-step-connector"></span>}
+                <button
+                  type="button"
+                  className={`fm-step-dot fm-step-dot--${state}`}
+                  onClick={() => {
+                    setFormStep(s.key);
+                    if (s.key !== 'rooms') setActiveRoomIndex(null);
+                  }}
+                >
+                  <span className="fm-step-dot-num">{state === 'done' ? <i className="ti ti-check"></i> : i + 1}</span>
+                  <span className="fm-step-dot-label">
+                    {s.label}{s.key === 'rooms' && form.variants.length > 0 ? ` (${form.variants.length})` : ''}
+                  </span>
+                </button>
+              </div>
             );
           })}
         </div>
@@ -594,6 +644,7 @@ function RoomManagement() {
           <div className="fm-form-col">
             {formStep === 'facility' && (
               <>
+                <div className="fm-section">
                 <div className="ffield">
                   <label className="flabel"><i className="ti ti-category"></i> Category</label>
                   <span className="flabel-hint">Pick an existing category, or add a new one.</span>
@@ -649,7 +700,9 @@ function RoomManagement() {
                     </div>
                   )}
                 </div>
+                </div>
 
+                <div className="fm-section">
                 <div className="ffield">
                   <label className="flabel"><i className="ti ti-file-text"></i> Description</label>
                   <textarea
@@ -658,20 +711,25 @@ function RoomManagement() {
                     onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
                   />
                 </div>
+                </div>
 
+                <div className="fm-section">
                 <div className="ffield">
                   <label className="flabel"><i className="ti ti-photo"></i> Facility Image</label>
                   <span className="flabel-hint">Shown on the category card in the main catalogue grid.</span>
+                  <div className="fm-upload-zone">
                   <ImageUploadPreview
                     icon="ti-photo"
                     title={existingImageUrl || selectedImageFile ? 'Click to change image' : 'Click to upload facility image'}
                     subtitle="PNG, JPG up to 10MB"
                     accept="image/png,image/jpeg"
                     maxSizeMB={10}
-                    maxHeight={110}
+                    maxHeight={140}
                     value={existingImageUrl}
                     onFileSelect={setSelectedImageFile}
                   />
+                  </div>
+                </div>
                 </div>
               </>
             )}
@@ -680,46 +738,49 @@ function RoomManagement() {
               <div className="ffield">
                 <div className="flabel-row">
                   <label className="flabel"><i className="ti ti-door"></i> Rooms</label>
-                  <span className="flabel-hint">Each room is what guests actually pick and book — its own name, rate, pax, and photo.</span>
+                  <span className="flabel-hint">Each room is what guests actually pick and reserve — its own name, rate, pax, and photo.</span>
                 </div>
 
                 {form.variants.length === 0 ? (
                   <div className="variant-empty">No rooms yet — add one to get started.</div>
-                ) : (
-                  <div className="fm-room-list">
-                    {form.variants.map((v, i) => (
-                      <div className="fm-room-list-item" key={i}>
-                        <div className="fm-room-list-thumb">
-                          {variantThumbSrc(i, v) ? <img src={variantThumbSrc(i, v)} alt="" /> : <i className="ti ti-photo"></i>}
-                        </div>
-                        <div className="fm-room-list-info">
-                          <div className="fm-room-list-name-row">
-                            <span className="fm-room-list-name">{v.label || 'Untitled Room'}</span>
-                            <span className={`pill ${ROOM_STATUS_PILL_CLASS[v.status] || 'pill-done'}`}>{v.status || 'Available'}</span>
-                          </div>
-                          <div className="fm-room-list-meta">
-                            ₱{v.price || 0}/hr{v.pax ? ` · ${v.pax}` : ''}{v.roomNumber ? ` · Room No.${v.roomNumber}` : ''}
-                          </div>
-                        </div>
-                        <div className="fm-room-list-actions">
-                          <button
-                            type="button" className="fac-icon-btn" title="Edit room"
-                            onClick={() => { setFeatureInput(''); setActiveRoomIndex(i); }}
-                          >
-                            <i className="ti ti-edit"></i>
-                          </button>
-                          <button type="button" className="fac-icon-btn del" title="Remove room" onClick={() => removeVariantRow(i)}>
-                            <i className="ti ti-trash"></i>
-                          </button>
+                ) : null}
+
+                <div className="fm-room-grid">
+                  {form.variants.map((v, i) => (
+                    <div
+                      className="fm-room-card" key={i}
+                      onClick={() => { setFeatureInput(''); setActiveRoomIndex(i); }}
+                    >
+                      <div className="fm-room-card-media">
+                        {variantThumbSrc(i, v) ? <img src={variantThumbSrc(i, v)} alt="" /> : <i className="ti ti-photo"></i>}
+                        <span className={`pill ${ROOM_STATUS_PILL_CLASS[v.status] || 'pill-done'}`}>{v.status || 'Available'}</span>
+                      </div>
+                      <div className="fm-room-card-body">
+                        <div className="fm-room-card-name">{v.label || 'Untitled Room'}</div>
+                        <div className="fm-room-card-meta">
+                          ₱{v.price || 0}/hr{v.pax ? ` · ${v.pax}` : ''} · {roomNumberRangeLabel(v)}
                         </div>
                       </div>
-                    ))}
-                  </div>
-                )}
-
-                <button type="button" className="add-row-btn" onClick={addRoom}>
-                  <i className="ti ti-plus"></i>Add Room
-                </button>
+                      <div className="fm-room-card-actions">
+                        <button
+                          type="button" title="Edit room"
+                          onClick={(e) => { e.stopPropagation(); setFeatureInput(''); setActiveRoomIndex(i); }}
+                        >
+                          <i className="ti ti-edit"></i>
+                        </button>
+                        <button
+                          type="button" className="del" title="Remove room"
+                          onClick={(e) => { e.stopPropagation(); removeVariantRow(i); }}
+                        >
+                          <i className="ti ti-trash"></i>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  <button type="button" className="fm-room-add-card" onClick={addRoom}>
+                    <i className="ti ti-plus"></i>Add Room
+                  </button>
+                </div>
               </div>
             )}
 
@@ -729,105 +790,124 @@ function RoomManagement() {
                   <i className="ti ti-arrow-left"></i> Back to Rooms
                 </button>
 
-                <div className="ffield">
-                  <label className="flabel">Room Name</label>
-                  <input
-                    type="text" placeholder="e.g. Big Room"
-                    value={activeRoom.label} onChange={(e) => updateVariant(activeRoomIndex, 'label', e.target.value)}
-                  />
-                </div>
-
-                <div className="frow">
+                <div className="fm-section">
+                  <div className="fm-section-title"><i className="ti ti-info-circle"></i> Basic Details</div>
                   <div className="ffield">
-                    <label className="flabel">Rate (₱/hr)</label>
+                    <label className="flabel">Room Name</label>
                     <input
-                      type="number" min={0} placeholder="0"
-                      value={activeRoom.price} onChange={(e) => updateVariant(activeRoomIndex, 'price', e.target.value)}
+                      type="text" placeholder="e.g. Big Room"
+                      value={activeRoom.label} onChange={(e) => updateVariant(activeRoomIndex, 'label', e.target.value)}
                     />
                   </div>
-                  <div className="ffield">
-                    <label className="flabel">Max Pax</label>
-                    <input
-                      type="text" placeholder="e.g. 6 pax"
-                      value={activeRoom.pax} onChange={(e) => updateVariant(activeRoomIndex, 'pax', e.target.value)}
-                    />
+
+                  <div className="frow">
+                    <div className="ffield">
+                      <label className="flabel">Rate (₱/hr)</label>
+                      <input
+                        type="number" min={0} placeholder="0"
+                        value={activeRoom.price} onChange={(e) => updateVariant(activeRoomIndex, 'price', e.target.value)}
+                      />
+                    </div>
+                    <div className="ffield">
+                      <label className="flabel">Max Pax</label>
+                      <input
+                        type="text" placeholder="e.g. 6 pax"
+                        value={activeRoom.pax} onChange={(e) => updateVariant(activeRoomIndex, 'pax', e.target.value)}
+                      />
+                    </div>
                   </div>
                 </div>
 
-                <div className="ffield">
-                  <label className="flabel">Room No.</label>
-                  <span className="flabel-hint">Must match the Room No. used in Room Monitoring for "Start Now" on due bookings to work.</span>
-                  <input
-                    type="text" placeholder="e.g. 101"
-                    value={activeRoom.roomNumber} onChange={(e) => updateVariant(activeRoomIndex, 'roomNumber', e.target.value)}
-                  />
-                </div>
+                <div className="fm-section">
+                  <div className="fm-section-title"><i className="ti ti-door"></i> Availability &amp; Status</div>
+                  <div className="ffield">
+                    <label className="flabel">Starting Room No.</label>
+                    <span className="flabel-hint">Combined with Available Units, defines the range of table/room numbers used in Room Monitoring (e.g. start 101 + 3 units = 101, 102, 103).</span>
+                    <input
+                      type="number" min="1" placeholder="e.g. 101"
+                      value={activeRoom.startingRoomNumber} onChange={(e) => updateVariant(activeRoomIndex, 'startingRoomNumber', e.target.value)}
+                    />
+                  </div>
 
-                <div className="frow">
                   <div className="ffield">
                     <label className="flabel">Available Units</label>
-                    <span className="flabel-hint">How many identical rooms of this type exist, for booking availability.</span>
+                    <span className="flabel-hint">How many identical rooms of this type exist, for reservation availability.</span>
                     <input
                       type="number" min="1"
                       value={activeRoom.roomCount ?? 1}
                       onChange={(e) => updateVariant(activeRoomIndex, 'roomCount', Math.max(1, Number(e.target.value) || 1))}
                     />
                   </div>
+
+                  <div className="fm-room-number-preview">
+                    <i className="ti ti-hash"></i> Generates: {roomNumberRangeLabel(activeRoom)}
+                  </div>
+
                   <div className="ffield">
                     <label className="flabel">Status</label>
-                    <select
-                      value={activeRoom.status || 'Available'}
-                      onChange={(e) => updateVariant(activeRoomIndex, 'status', e.target.value)}
-                    >
-                      <option value="Available">Available</option>
-                      <option value="Maintenance">Maintenance</option>
-                      <option value="Unavailable">Unavailable</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="ffield">
-                  <label className="flabel">Room Image</label>
-                  <ImageUploadPreview
-                    icon="ti-photo"
-                    title={variantThumbSrc(activeRoomIndex, activeRoom) ? 'Click to change image' : 'Click to upload image'}
-                    subtitle="PNG, JPG up to 10MB"
-                    accept="image/png,image/jpeg"
-                    maxSizeMB={10}
-                    maxHeight={110}
-                    value={variantThumbSrc(activeRoomIndex, activeRoom) || ''}
-                    onFileSelect={(file) => handleVariantImageSelect(activeRoomIndex, file)}
-                  />
-                </div>
-
-                <div className="ffield" style={{ marginBottom: 22 }}>
-                  <label className="flabel">Amenities</label>
-                  <div className="chip-list">
-                    {(activeRoom.features || []).map((f, fi) => (
-                      <span className="chip" key={fi}>
-                        {f}
-                        <button type="button" title="Remove" onClick={() => removeVariantFeature(activeRoomIndex, fi)}>
-                          <i className="ti ti-x" style={{ fontSize: 11 }}></i>
+                    <div className="fm-status-toggle">
+                      {['Available', 'Maintenance', 'Unavailable'].map((s) => (
+                        <button
+                          type="button"
+                          key={s}
+                          className={`fm-status-btn${(activeRoom.status || 'Available') === s ? ` fm-status-btn--active-${s}` : ''}`}
+                          onClick={() => updateVariant(activeRoomIndex, 'status', s)}
+                        >
+                          {s}
                         </button>
-                      </span>
-                    ))}
+                      ))}
+                    </div>
                   </div>
-                  <div className="chip-input-row">
-                    <input
-                      type="text"
-                      placeholder="e.g. Air-conditioned, Free WiFi — press Enter to add"
-                      value={featureInput}
-                      onChange={(e) => setFeatureInput(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          addVariantFeature(activeRoomIndex);
-                        }
-                      }}
+                </div>
+
+                <div className="fm-section">
+                  <div className="fm-section-title"><i className="ti ti-photo"></i> Room Image</div>
+                  <div className="ffield">
+                    <div className="fm-upload-zone">
+                    <ImageUploadPreview
+                      icon="ti-photo"
+                      title={variantThumbSrc(activeRoomIndex, activeRoom) ? 'Click to change image' : 'Click to upload image'}
+                      subtitle="PNG, JPG up to 10MB"
+                      accept="image/png,image/jpeg"
+                      maxSizeMB={10}
+                      maxHeight={130}
+                      value={variantThumbSrc(activeRoomIndex, activeRoom) || ''}
+                      onFileSelect={(file) => handleVariantImageSelect(activeRoomIndex, file)}
                     />
-                    <button type="button" className="chip-add-btn" onClick={() => addVariantFeature(activeRoomIndex)}>
-                      <i className="ti ti-plus"></i>
-                    </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="fm-section">
+                  <div className="fm-section-title"><i className="ti ti-sparkles"></i> Amenities</div>
+                  <div className="ffield">
+                    <div className="chip-list">
+                      {(activeRoom.features || []).map((f, fi) => (
+                        <span className="chip" key={fi}>
+                          {f}
+                          <button type="button" title="Remove" onClick={() => removeVariantFeature(activeRoomIndex, fi)}>
+                            <i className="ti ti-x" style={{ fontSize: 11 }}></i>
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                    <div className="chip-input-row">
+                      <input
+                        type="text"
+                        placeholder="e.g. Air-conditioned, Free WiFi — press Enter to add"
+                        value={featureInput}
+                        onChange={(e) => setFeatureInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            addVariantFeature(activeRoomIndex);
+                          }
+                        }}
+                      />
+                      <button type="button" className="chip-add-btn" onClick={() => addVariantFeature(activeRoomIndex)}>
+                        <i className="ti ti-plus"></i>
+                      </button>
+                    </div>
                   </div>
                 </div>
 
@@ -864,7 +944,7 @@ function RoomManagement() {
           <div className="fm-preview-col">
             {formStep === 'rooms' && activeRoomIndex !== null ? (
               <>
-                <div className="fm-preview-label">Live Preview — what guests see when picking a room</div>
+                <div className="fm-preview-label"><i className="ti ti-eye"></i>Live Preview — what guests see when picking a room</div>
                 <div className="fm-preview-cards">
                   <RoomOptionCard
                     option={{ ...previewFacility.variants[activeRoomIndex] }}
@@ -874,7 +954,7 @@ function RoomManagement() {
               </>
             ) : formStep === 'rooms' ? (
               <>
-                <div className="fm-preview-label">Live Preview — the rooms guests will choose from</div>
+                <div className="fm-preview-label"><i className="ti ti-eye"></i>Live Preview — the rooms guests will choose from</div>
                 <div className="fm-preview-cards">
                   {previewFacility.variants.filter((v) => v.label?.trim()).length === 0 ? (
                     <div className="fm-preview-empty">Add a room to see how it looks to guests.</div>
@@ -887,7 +967,7 @@ function RoomManagement() {
               </>
             ) : (
               <>
-                <div className="fm-preview-label">Live Preview — what guests see before Book Now</div>
+                <div className="fm-preview-label"><i className="ti ti-eye"></i>Live Preview — what guests see before Reserve Now</div>
                 <div className="fm-preview-cards">
                   <FacilityBookingCard room={previewFacility} />
                 </div>

@@ -76,7 +76,7 @@ function Analytics() {
       cell.className = 'hm-cell';
       const alpha = (0.08 + (v / max) * 0.82).toFixed(2);
       cell.style.background = `rgba(239,62,109,${alpha})`;
-      cell.title = `${7 + i}:00 — ${v} bookings`;
+      cell.title = `${7 + i}:00 — ${v} reservations`;
       hm.appendChild(cell);
     });
   }, []);
@@ -92,12 +92,12 @@ function Analytics() {
         <div className="mc">
           <div className="mc-label"><i className="ti ti-clock-hour-4"></i> Avg Session</div>
           <div className="mc-val">1.8 hrs</div>
-          <div className="mc-sub">per booking</div>
+          <div className="mc-sub">per reservation</div>
         </div>
         <div className="mc">
           <div className="mc-label"><i className="ti ti-trophy"></i> Top Room</div>
           <div className="mc-val">Billiards</div>
-          <div className="mc-sub">58% of bookings</div>
+          <div className="mc-sub">58% of reservations</div>
         </div>
         <div className="mc">
           <div className="mc-label"><i className="ti ti-flame"></i> Peak Hour</div>
@@ -111,7 +111,7 @@ function Analytics() {
           <div className="card-head">
             <div>
               <span className="card-title"><i className="ti ti-chart-bar"></i> Daily revenue this week</span>
-              <p className="card-subtitle">Total booking revenue collected per day (₱)</p>
+              <p className="card-subtitle">Total reservation revenue collected per day (₱)</p>
             </div>
           </div>
           <div className="legend">
@@ -129,8 +129,8 @@ function Analytics() {
         <div className="card">
           <div className="card-head">
             <div>
-              <span className="card-title"><i className="ti ti-chart-donut"></i> Bookings by room type</span>
-              <p className="card-subtitle">Share of total bookings this week</p>
+              <span className="card-title"><i className="ti ti-chart-donut"></i> Reservations by room type</span>
+              <p className="card-subtitle">Share of total reservations this week</p>
             </div>
           </div>
           <div className="legend">
@@ -152,12 +152,12 @@ function Analytics() {
             </div>
           </div>
           <div className="chart-wrap chart-wrap-donut">
-            <canvas ref={roomsCanvasRef} aria-label="Donut chart of bookings by room type">
+            <canvas ref={roomsCanvasRef} aria-label="Donut chart of reservations by room type">
               Billiards 58%, KTV 22%, Basketball Court 12%, VIP 8%.
             </canvas>
             <div className="donut-center">
               <span className="donut-center-val">142</span>
-              <span className="donut-center-label">Bookings</span>
+              <span className="donut-center-label">Reservations</span>
             </div>
           </div>
         </div>
@@ -167,7 +167,7 @@ function Analytics() {
         <div className="card-head">
           <div>
             <span className="card-title"><i className="ti ti-clock"></i> Hourly traffic</span>
-            <p className="card-subtitle">Bookings started per hour, 7AM–12AM</p>
+            <p className="card-subtitle">Reservations started per hour, 7AM–12AM</p>
           </div>
         </div>
         <div id="heatmap" ref={heatmapRef} />
@@ -181,9 +181,9 @@ function Analytics() {
           <span>12AM</span>
         </div>
         <div className="hm-scale">
-          <span>Fewer bookings</span>
+          <span>Fewer reservations</span>
           <div className="hm-scale-bar" />
-          <span>More bookings</span>
+          <span>More reservations</span>
         </div>
       </div>
     </div>

@@ -9,9 +9,7 @@ const { logAudit } = require("../utils/auditLog");
 
 router.get("/", async (req, res) => {
   try {
-    const filter = {};
-    if (req.query.status) filter.status = req.query.status;
-    const rooms = await Room.find(filter).sort({ name: 1 });
+    const rooms = await Room.find().sort({ name: 1 });
     res.json(rooms);
   } catch (err) {
     console.error(err);
@@ -36,7 +34,6 @@ router.post("/", requirePermission(PERMISSIONS.ROOM_MANAGE), upload.fields([{ na
       name,
       description,
       price,
-      status,
       features,
       variants,
       capacity,
@@ -80,8 +77,6 @@ router.post("/", requirePermission(PERMISSIONS.ROOM_MANAGE), upload.fields([{ na
 
       price: Number(price) || 0,
 
-      status: status || "Available",
-
       capacity: Number(capacity) || 0,
 
       features: parsedFeatures,
@@ -105,7 +100,6 @@ router.put("/:id", requirePermission(PERMISSIONS.ROOM_MANAGE), upload.fields([{ 
       name,
       description,
       price,
-      status,
       features,
       variants,
       capacity,
@@ -116,7 +110,6 @@ router.put("/:id", requirePermission(PERMISSIONS.ROOM_MANAGE), upload.fields([{ 
     if (name !== undefined) update.name = name;
     if (description !== undefined) update.description = description;
     if (price !== undefined) update.price = Number(price) || 0;
-    if (status !== undefined) update.status = status;
     if (capacity !== undefined) update.capacity = Number(capacity) || 0;
     if (req.files?.image?.[0]) update.image = req.files.image[0].path;
 

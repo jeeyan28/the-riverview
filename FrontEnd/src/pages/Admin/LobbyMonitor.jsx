@@ -15,7 +15,7 @@ const FACILITY_ICONS = { Billiards: 'bi-disc', Karaoke: 'bi-mic', 'Private Rooms
 const FACILITY_ICON_DEFAULT = 'bi-building';
 
 const STATUS_META = {
-  available: { label: 'Available', hint: 'Ready to book' },
+  available: { label: 'Available', hint: 'Ready to reserve' },
   occupied: { label: 'Occupied', hint: 'Currently in use' },
   'ending-soon': { label: 'Ending Soon', hint: 'Wrapping up' },
   expired: { label: 'Overdue', hint: 'Past reserved time' },

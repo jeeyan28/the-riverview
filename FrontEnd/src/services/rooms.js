@@ -1,13 +1,9 @@
-
 import { apiRequest } from './api';
 
 const BASE = '/api/rooms';
 
 export const roomsService = {
   list: () => apiRequest(BASE, { fallbackMessage: 'Failed to load rooms' }),
-
-  /** @param {string} id @param {'Available'|'Occupied'|'Under Maintenance'|'Inactive'} status */
-  updateStatus: (id, status) => apiRequest(`${BASE}/${id}`, { method: 'PUT', body: { status }, fallbackMessage: 'Failed to reset room status.' }),
 
   /** @param {FormData|object} payload */
   create: (payload) => apiRequest(BASE, { method: 'POST', body: payload, fallbackMessage: 'Failed to save facility.' }),
