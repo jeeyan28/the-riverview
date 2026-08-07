@@ -17,6 +17,13 @@ import {
   isHolidayDate,
   isOperatingDay,
   priceOptionsFor,
+  isHourBooked,
+  canBookDuration,
+  getSlotState,
+  getLatestStartTime,
+  buildHourCounts,
+  getFreeHourCount,
+  getTimePeriod,
 } from '../utils/rooms';
 import { API_BASE_URL } from '../services/api';
 
@@ -27,57 +34,6 @@ const MONTHS = [
   'July', 'August', 'September', 'October', 'November', 'December',
 ];
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-
-function canBookDuration(startHour, duration, closeHour, reserved, totalRooms) {
-  if (startHour + duration > closeHour) return false;
-  for (let hour = startHour; hour < startHour + duration; hour++) {
-    const bookedRooms = Number(reserved?.[hour] || 0);
-    if (bookedRooms >= totalRooms) return false;
-  }
-  return true;
-}
-
-function isHourBooked(hour, reserved, totalRooms) {
-  return Number(reserved?.[hour] || 0) >= totalRooms;
-}
-
-function getSlotState(startHour, duration, closeHour, reserved, totalRooms) {
-  if (isHourBooked(startHour, reserved, totalRooms)) return 'booked';
-  if (startHour + duration > closeHour) return 'insufficient';
-  if (!canBookDuration(startHour, duration, closeHour, reserved, totalRooms)) return 'booked';
-  return 'available';
-}
-
-function getLatestStartTime(openHour, closeHour, duration) {
-  const latest = closeHour - duration;
-  return latest >= openHour ? latest : null;
-}
-
-function buildHourCounts(dayBookings) {
-  const counts = {};
-  (dayBookings || []).forEach((b) => {
-    const start = parseInt(String(b.timeIn).split(':')[0], 10);
-    for (let h = start; h < start + Number(b.duration); h++) {
-      counts[h] = (counts[h] || 0) + 1;
-    }
-  });
-  return counts;
-}
-
-function getFreeHourCount(dayBookings, openHour, closeHour, totalRooms) {
-  const reserved = buildHourCounts(dayBookings);
-  let count = 0;
-  for (let h = openHour; h < closeHour; h++) {
-    if (!isHourBooked(h, reserved, totalRooms)) count++;
-  }
-  return count;
-}
-
-function getTimePeriod(hour) {
-  if (hour < 12) return 'Morning';
-  if (hour < 17) return 'Afternoon';
-  return 'Evening';
-}
 
 const STEPS = [
   { key: 'price', label: 'Room' },

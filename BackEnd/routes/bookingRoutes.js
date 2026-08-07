@@ -7,7 +7,7 @@ const { LOCK_DURATION_MINUTES } = BookingLock;
 const { requirePermission, ensureAuthenticated } = require("../middleware/adminAuth");
 const { paymentProofUpload } = require("../middleware/upload");
 const { PERMISSIONS, isAdminRole } = require("../utils/permissions");
-const { validateAndPriceBooking, computeDownPayment, saveWithReservationCode, runInTransaction, voidExpiredBookings } = require("../utils/bookingHelper");
+const { validateAndPriceBooking, computeDownPayment, saveWithReservationCode, runInTransaction, voidExpiredBookings, bookingStartMs } = require("../utils/bookingHelper");
 
 
 router.get("/", requirePermission(PERMISSIONS.BOOKING_VIEW), async (req, res) => {
@@ -249,6 +249,60 @@ router.get("/:id", ensureAuthenticated, async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(400).json({ message: "Invalid booking id." });
+  }
+});
+
+router.put("/:id/reschedule", ensureAuthenticated, async (req, res) => {
+  try {
+    const { date, timeIn } = req.body;
+    if (!date || !timeIn) {
+      return res.status(400).json({ message: "date and timeIn are required." });
+    }
+
+    let booking;
+    try {
+      booking = await runInTransaction(async (session) => {
+        const existing = await Booking.findById(req.params.id).session(session);
+        if (!existing) throw { status: 404, message: "Booking not found." };
+        if (String(existing.bookedBy) !== String(req.user._id)) {
+          throw { status: 403, message: "Not allowed." };
+        }
+        if (existing.status !== Booking.BOOKING_STATUS.CONFIRMED) {
+          throw { status: 409, message: "Only confirmed bookings can be rescheduled." };
+        }
+        if (existing.rescheduleCount >= Booking.MAX_RESCHEDULES) {
+          throw { status: 409, message: "This booking has already been rescheduled the maximum number of times." };
+        }
+        if (bookingStartMs(existing.date, existing.timeIn) - Date.now() < Booking.RESCHEDULE_CUTOFF_HOURS * 3600000) {
+          throw { status: 409, message: `Reschedule is no longer available within ${Booking.RESCHEDULE_CUTOFF_HOURS} hour of your reservation.` };
+        }
+
+        await validateAndPriceBooking({
+          roomId: existing.room,
+          variantLabel: existing.variantLabel || undefined,
+          date,
+          timeIn,
+          duration: existing.duration,
+          isAdminBooking: false,
+          guestCount: existing.guestCount,
+          excludeBookingId: existing._id,
+          session,
+        });
+
+        return Booking.findByIdAndUpdate(
+          req.params.id,
+          { date, timeIn, $inc: { rescheduleCount: 1 } },
+          { returnDocument: "after", runValidators: true, session }
+        );
+      });
+    } catch (e) {
+      return res.status(e.status || 500).json({ message: e.message || "Server error." });
+    }
+
+    res.json(booking);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error." });
   }
 });
 

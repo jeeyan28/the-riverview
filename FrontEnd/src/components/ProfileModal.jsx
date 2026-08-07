@@ -6,6 +6,7 @@ import { API_BASE_URL } from '../services/api';
 import { openBookingReceipt } from '../utils/receipt';
 import PasswordInput from './PasswordInput';
 import { PASSWORD_REQUIREMENTS } from '../utils/password';
+import RescheduleModal, { canRescheduleBooking } from './RescheduleModal';
 
 const EMPTY_DETAILS = { firstName: '', lastName: '', phone: '', email: '' };
 const EMPTY_PASSWORD = { currentPassword: '', newPassword: '', confirmPassword: '' };
@@ -34,6 +35,7 @@ function ProfileModal({ open, onClose }) {
   const [loadingBookings, setLoadingBookings] = useState(false);
   const [bookingsError, setBookingsError] = useState('');
   const [viewingBooking, setViewingBooking] = useState(null);
+  const [reschedulingBooking, setReschedulingBooking] = useState(null);
 
   const [toast, setToast] = useState({ visible: false, message: '', type: 'success' });
   const toastTimer = useRef(null);
@@ -520,12 +522,33 @@ function ProfileModal({ open, onClose }) {
               <button type="button" className="pf-btn pf-btn-ghost" onClick={() => setViewingBooking(null)}>
                 Close
               </button>
+              {canRescheduleBooking(viewingBooking) && (
+                <button
+                  type="button"
+                  className="pf-btn pf-btn-ghost"
+                  onClick={() => setReschedulingBooking(viewingBooking)}
+                >
+                  <i className="fa-solid fa-calendar-clock"></i> Reschedule
+                </button>
+              )}
               <button type="button" className="pf-btn pf-btn-solid" onClick={() => openBookingReceipt(viewingBooking)}>
                 <i className="fa-solid fa-download"></i> Download Receipt
               </button>
             </div>
           </div>
         </div>
+      )}
+
+      {reschedulingBooking && (
+        <RescheduleModal
+          booking={reschedulingBooking}
+          onClose={() => setReschedulingBooking(null)}
+          onRescheduled={(updated) => {
+            setBookings((prev) => prev.map((b) => (b._id === updated._id ? { ...b, ...updated } : b)));
+            setViewingBooking((v) => (v && v._id === updated._id ? { ...v, ...updated } : v));
+            setReschedulingBooking(null);
+          }}
+        />
       )}
 
       <div className={`pf-toast${toast.visible ? ' show' : ''}${toast.type === 'error' ? ' error' : ''}`} id="pfToast">
