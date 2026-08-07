@@ -54,12 +54,12 @@ const ROOMS_BY_FACILITY = {
   karaoke: [
     { id: 'K1', name: 'Room K1', type: 'Solo Room', capacity: '1–2 People', price: 250, available: true, description: 'A cozy pod built for solo singers or duets who want their own space. Compact but comes with the same premium mic setup as the bigger rooms.' },
     { id: 'K2', name: 'Room K2', type: 'Big Room', capacity: '1–10 People', price: 450, available: true, description: 'Our party-sized room with a premium sound system and plenty of room to move. Fits the whole barkada comfortably with couch seating around the screen.' },
-    { id: 'K3', name: 'Room K3', type: 'Shared Room', capacity: '1–6 People', price: 300, available: false, description: "A mid-sized room that's great for small groups looking for a laid-back sing-along. Currently fully booked — check back later or pick another room." },
+    { id: 'K3', name: 'Room K3', type: 'Shared Room', capacity: '1–6 People', price: 300, available: false, description: "A mid-sized room that's great for small groups looking for a laid-back sing-along. Currently fully reserved — check back later or pick another room." },
     { id: 'K4', name: 'Room K4', type: 'Big Room', capacity: '1–8 People', price: 400, available: true, description: 'Spacious room with mood lighting and a song library spanning every genre. Great for birthdays or just a fun night out with friends.' },
   ],
   'drinking-rooms': [
     { id: 'P1', name: 'Room P1', type: 'Shared Room', capacity: '1–8 People', price: 500, available: true, description: 'A private lounge with premium service, low lighting, and comfortable seating. Ideal for intimate get-togethers or a relaxed night with close friends.' },
-    { id: 'P2', name: 'Room P2', type: 'Big Room', capacity: '1–12 People', price: 700, available: false, description: 'Our largest private room, built for celebrations and bigger gatherings. Currently fully booked — popular for birthdays and reunions, so reserve early next time.' },
+    { id: 'P2', name: 'Room P2', type: 'Big Room', capacity: '1–12 People', price: 700, available: false, description: 'Our largest private room, built for celebrations and bigger gatherings. Currently fully reserved — popular for birthdays and reunions, so reserve early next time.' },
   ],
   'rental-court': [
     { id: 'R1', name: 'Court R1', type: 'Big Room', capacity: '1–10 People', price: 600, available: true, description: 'A full-size court with proper flooring, a working scoreboard, and a sound system for official games. Great for pickup games, practice, or a real tournament match.' },
@@ -136,7 +136,7 @@ function RoomCard({ room, onView }) {
     >
       <div className="room-card-img">
         <span className={`room-card-status ${room.available ? 'room-status-available' : 'room-status-fullybooked'}`}>
-          {room.available ? 'Available' : 'Fully Booked'}
+          {room.available ? 'Available' : 'Fully Reserved'}
         </span>
         <img src={room.facilityImage} alt={room.name} />
       </div>
@@ -178,7 +178,7 @@ function RoomDetailsModal({ room, onClose }) {
         <div className="rp-modal-body">
           <div className="rp-modal-img">
             <span className={`room-card-status ${room.available ? 'room-status-available' : 'room-status-fullybooked'}`}>
-              {room.available ? 'Available' : 'Fully Booked'}
+              {room.available ? 'Available' : 'Fully Reserved'}
             </span>
             <img src={room.facilityImage} alt={room.name} />
           </div>
@@ -253,8 +253,8 @@ function Rooms() {
               {isAll ? ' All Rooms' : ` ${selectedFacility.name} Rooms`}
             </h2>
             {!isAll && (
-              <button type="button" className="btn-select rp-book-facility" disabled title="Booking coming soon">
-                <i className="fa-solid fa-calendar-check"></i> Book Facility
+              <button type="button" className="btn-select rp-book-facility" disabled title="Reservation coming soon">
+                <i className="fa-solid fa-calendar-check"></i> Reserve Facility
               </button>
             )}
           </div>

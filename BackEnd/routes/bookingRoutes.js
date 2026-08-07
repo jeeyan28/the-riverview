@@ -209,7 +209,7 @@ router.post("/", ensureAuthenticated, paymentProofUpload.single("paymentScreensh
           ...(paymentMethod ? { paymentMethod } : {}),
           bookedBy: req.session.userId,
           source: "walk-in",
-          status: req.body.status || "Active",
+          status: req.body.status || Booking.BOOKING_STATUS.ONGOING,
           paymentStatus: "Paid",
         });
 
@@ -284,17 +284,73 @@ router.put("/:id/reject", requirePermission(PERMISSIONS.BOOKING_MANAGE), async (
 
 router.put("/:id", requirePermission(PERMISSIONS.BOOKING_MANAGE), async (req, res) => {
   try {
-    const { status, duration, paymentMethod, timeIn, date, guestName } = req.body;
-    const update = {};
-    if (status !== undefined) update.status = status;
-    if (duration !== undefined) update.duration = duration;
-    if (paymentMethod !== undefined) update.paymentMethod = paymentMethod;
-    if (timeIn !== undefined) update.timeIn = timeIn;
-    if (date !== undefined) update.date = date;
-    if (guestName !== undefined) update.guestName = guestName;
+    const {
+      status, duration, paymentMethod, timeIn, date, guestName,
+      guestEmail, guestContact, guestCount, amount, downPayment,
+      paymentStatus, specialRequests, room, variantLabel,
+    } = req.body;
 
-    const booking = await Booking.findByIdAndUpdate(req.params.id, update, { returnDocument: "after", runValidators: true });
-    if (!booking) return res.status(404).json({ message: "Booking not found." });
+    let booking;
+    try {
+      booking = await runInTransaction(async (session) => {
+        const existing = await Booking.findById(req.params.id).session(session);
+        if (!existing) {
+          throw { status: 404, message: "Booking not found." };
+        }
+
+        const update = {};
+        if (status !== undefined) update.status = status;
+        if (paymentMethod !== undefined) update.paymentMethod = paymentMethod;
+        if (guestName !== undefined) update.guestName = guestName;
+        if (guestEmail !== undefined) update.guestEmail = guestEmail;
+        if (guestContact !== undefined) update.guestContact = guestContact;
+        if (guestCount !== undefined) update.guestCount = guestCount;
+        if (amount !== undefined) update.amount = amount;
+        if (downPayment !== undefined) update.downPayment = downPayment;
+        if (paymentStatus !== undefined) update.paymentStatus = paymentStatus;
+        if (specialRequests !== undefined) update.specialRequests = specialRequests;
+
+        const roomChanging = room !== undefined && String(room) !== String(existing.room);
+        const variantChanging = variantLabel !== undefined && (variantLabel || null) !== (existing.variantLabel || null);
+        const dateChanging = date !== undefined && date !== existing.date;
+        const timeChanging = timeIn !== undefined && timeIn !== existing.timeIn;
+        const durationChanging = duration !== undefined && Number(duration) !== existing.duration;
+
+        if (roomChanging || variantChanging || dateChanging || timeChanging || durationChanging) {
+          const effectiveRoomId = room !== undefined ? room : existing.room;
+          const effectiveVariantLabel = variantLabel !== undefined ? variantLabel : existing.variantLabel;
+          const effectiveDate = date !== undefined ? date : existing.date;
+          const effectiveTimeIn = timeIn !== undefined ? timeIn : existing.timeIn;
+          const effectiveDuration = duration !== undefined ? Number(duration) : existing.duration;
+
+          const { room: validatedRoom } = await validateAndPriceBooking({
+            roomId: effectiveRoomId,
+            variantLabel: effectiveVariantLabel || undefined,
+            date: effectiveDate,
+            timeIn: effectiveTimeIn,
+            duration: effectiveDuration,
+            isAdminBooking: true,
+            guestCount: undefined,
+            excludeBookingId: existing._id,
+            session,
+          });
+
+          update.room = validatedRoom._id;
+          update.roomLabel = validatedRoom.name;
+          update.variantLabel = effectiveVariantLabel || null;
+          update.date = effectiveDate;
+          update.timeIn = effectiveTimeIn;
+          update.duration = effectiveDuration;
+        }
+
+        return Booking.findByIdAndUpdate(req.params.id, update, {
+          returnDocument: "after", runValidators: true, session,
+        });
+      });
+    } catch (e) {
+      return res.status(e.status || 500).json({ message: e.message || "Server error." });
+    }
+
     res.json(booking);
   } catch (err) {
     console.error(err);

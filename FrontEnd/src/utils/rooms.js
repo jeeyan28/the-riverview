@@ -4,10 +4,6 @@ export function dateKey(y, m, d) {
   return `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 }
 
-// Extracts a numeric guest cap from a room's free-text Max Pax value
-// (e.g. "6 pax" -> 6, "1–4 People" -> 4 — the highest number found, since
-// a range expresses a maximum). Returns null (no cap enforced) if the
-// text has no number in it.
 export function getPaxCapacity(paxText) {
   if (!paxText) return null;
   const matches = String(paxText).match(/\d+/g);
@@ -90,12 +86,6 @@ export function clearMonthAvailability(roomId, year, month /* 1-12 */) {
   });
 }
 
-// Per-hour booked COUNT (not just a boolean) — an hour is only "covered"
-// once `totalRooms` existing bookings already occupy it, matching the
-// backend's capacity-aware availability check (see bookingHelper.js's
-// getSlotCapacity). Defaults to 1 unit for callers that don't pass
-// totalRooms, so a room/variant with no known capacity still behaves like
-// the old single-unit assumption.
 function coveredHours(dayBookings, openHour, closeHour, totalRooms = 1) {
   const counts = new Array(Math.max(0, closeHour - openHour)).fill(0);
   (dayBookings || []).forEach((b) => {
@@ -162,11 +152,6 @@ export function computeDownPayment(unitPrice) {
   return Math.max(0, Math.round(Number(unitPrice) || 0));
 }
 
-// The list of bookable options for a room: its pricing tiers (variants) if
-// any exist, or a single synthesized "Standard" option built from the
-// room's own base fields. Used by both BookingModal (customer booking) and
-// Room Management's live preview, so admins see exactly what guests see —
-// one implementation, not two hand-maintained copies.
 export function priceOptionsFor(room) {
   return room.variants && room.variants.length
     ? room.variants
@@ -178,6 +163,6 @@ export function priceOptionsFor(room) {
         description: room.description || '',
         features: room.features || [],
         roomCount: 1,
-        status: room.status,
+        status: 'Available',
       }];
 }

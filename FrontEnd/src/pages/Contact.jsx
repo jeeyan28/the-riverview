@@ -8,7 +8,7 @@ function Contact() {
         <div className="contact-header">
           <span className="section-label">Get In Touch</span>
           <h2>Contact Us</h2>
-          <p>Have a question about a booking or an event? Reach out and we'll get back to you.</p>
+          <p>Have a question about a reservation or an event? Reach out and we'll get back to you.</p>
         </div>
 
         <div className="contact-grid">

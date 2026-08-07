@@ -150,7 +150,7 @@ function BookingSummaryContents({
     <>
       <div className="bk-summary-panel-title-row">
         <span className="bk-summary-panel-title-icon"><i className="fa-solid fa-calendar-days"></i></span>
-        <span className="bk-summary-panel-title">Booking Summary</span>
+        <span className="bk-summary-panel-title">Reservation Summary</span>
       </div>
 
       <div className="bk-summary-panel-section">
@@ -184,7 +184,7 @@ function BookingSummaryContents({
 
           <div className="bk-summary-panel-section">
             <div className="bk-summary-panel-stat">
-              <span className="bk-summary-panel-stat-head"><i className="fa-solid fa-calendar-days"></i> Selected Booking Date &amp; Time</span>
+              <span className="bk-summary-panel-stat-head"><i className="fa-solid fa-calendar-days"></i> Selected Reservation Date &amp; Time</span>
               <span className={'bk-summary-panel-stat-value' + (dateLabel ? '' : ' bk-summary-panel-stat-value--empty')}>
                 {dateLabel ? `${dateLabel}${timeLabel ? `, ${timeLabel}` : ''}` : 'Not selected yet'}
               </span>
@@ -214,7 +214,7 @@ function BookingSummaryContents({
           <div className="bk-summary-panel-section">
             <span className="bk-summary-panel-section-label">Schedule</span>
             {!dateLabel && (
-              <p className="bk-summary-panel-empty"><i className="fa-solid fa-calendar"></i> Select a booking date.</p>
+              <p className="bk-summary-panel-empty"><i className="fa-solid fa-calendar"></i> Select a reservation date.</p>
             )}
             {dateLabel && !timeLabel && (
               <p className="bk-summary-panel-empty"><i className="fa-solid fa-clock"></i> Choose an available time slot.</p>
@@ -222,7 +222,7 @@ function BookingSummaryContents({
             {dateLabel && (
               <div className="bk-summary-panel-list">
                 <div className="bk-summary-panel-row">
-                  <span className="bk-summary-panel-row-label"><i className="fa-solid fa-calendar-days"></i> Booking Date</span>
+                  <span className="bk-summary-panel-row-label"><i className="fa-solid fa-calendar-days"></i> Reservation Date</span>
                   <span className="bk-summary-panel-row-value">{dateLabel}</span>
                 </div>
                 {timeLabel && (
@@ -340,7 +340,7 @@ function BookingSuccess({ booking, room, selectedVariant, onDone, onViewBooking 
   return (
     <>
       <div className="bk-confirm-icon"><i className="fa-solid fa-check"></i></div>
-      <h3>Booking Confirmed!</h3>
+      <h3>Reservation Confirmed!</h3>
       <p>Your reservation has been successfully created. We can't wait to host you.</p>
 
       <div className="bk-success-card">
@@ -350,7 +350,7 @@ function BookingSuccess({ booking, room, selectedVariant, onDone, onViewBooking 
             <span className="bk-success-code">{booking.reservationCode || '—'}</span>
           </div>
           <div className="bk-success-item">
-            <span className="bk-summary-label">Booked By</span>
+            <span className="bk-summary-label">Reserved By</span>
             <span className="bk-summary-value">{booking.guestName || '—'}</span>
           </div>
           <div className="bk-success-item">
@@ -370,7 +370,7 @@ function BookingSuccess({ booking, room, selectedVariant, onDone, onViewBooking 
             <span className="bk-summary-value">{facility}</span>
           </div>
           <div className="bk-success-item">
-            <span className="bk-summary-label">Booking Date</span>
+            <span className="bk-summary-label">Reservation Date</span>
             <span className="bk-summary-value">{dateLabel}</span>
           </div>
           <div className="bk-success-item">
@@ -382,7 +382,7 @@ function BookingSuccess({ booking, room, selectedVariant, onDone, onViewBooking 
             <span className="bk-summary-value">{booking.guestCount || 1}</span>
           </div>
           <div className="bk-success-item">
-            <span className="bk-summary-label">Booked On</span>
+            <span className="bk-summary-label">Reserved On</span>
             <span className="bk-summary-value">{bookedOnLabel}</span>
           </div>
         </div>
@@ -695,7 +695,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
         if (!res.ok) {
           if (res.status === 401) {
             await logout();
-            alert('Your session has expired. Please log in again to complete your booking.');
+            alert('Your session has expired. Please log in again to complete your reservation.');
             window.location.href = '/login';
             return;
           }
@@ -827,7 +827,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
     setConfirming(false);
 
     if (!user) {
-      alert('Your session has expired. Please log in again to complete your booking.');
+      alert('Your session has expired. Please log in again to complete your reservation.');
       window.location.href = '/login';
       return;
     }
@@ -948,7 +948,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
       if (!res.ok && res.status !== 402 && res.status !== 409) {
         if (res.status === 401) {
           await logout();
-          alert('Your session has expired. Please log in again to complete your booking.');
+          alert('Your session has expired. Please log in again to complete your reservation.');
           window.location.href = '/login';
           return;
         }
@@ -1093,7 +1093,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
           title = holiday ? 'Closed for a holiday/closure' : 'Closed on this day of the week';
         } else if (fullyBooked) {
           variant = 'full';
-          title = 'Fully booked for this room';
+          title = 'Fully reserved for this room';
         } else if (nearlyFull) {
           variant = 'few';
           title = `Only ${freeHours} open hour${freeHours === 1 ? '' : 's'} left today`;
@@ -1150,7 +1150,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
             )}
           </div>
           <div>
-            <p className="bk-eyebrow">Book a space</p>
+            <p className="bk-eyebrow">Reserve a space</p>
             <h2>{step === 'paymongoReturn' ? 'Online Payment' : room?.name}</h2>
           </div>
         </div>
@@ -1164,7 +1164,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
           return (
             <div className="bk-lock-banner">
               <i className="fa-solid fa-lock"></i>
-              We're holding this time slot for you — complete your booking within {mm}:{ss} or it will be released.
+              We're holding this time slot for you — complete your reservation within {mm}:{ss} or it will be released.
             </div>
           );
         })()}
@@ -1177,7 +1177,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
             aria-expanded={mobileSummaryOpen}
           >
             <span>
-              Booking Summary
+              Reservation Summary
               {selectedVariant && (
                 <span className="bk-summary-toggle-price"> · ₱{subtotalAmount.toLocaleString()}</span>
               )}
@@ -1214,7 +1214,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
             {step === 'price' && room && (
               <div className="bk-step" id="bkStepPrice">
                 <p className="bk-choose-label bk-choose-label--heading bk-choose-label--tight">Choose a room</p>
-                <p className="bk-choose-label bk-choose-label--sub">Select the room you want to book.</p>
+                <p className="bk-choose-label bk-choose-label--sub">Select the room you want to reserve.</p>
                 <div className={'bk-room-list' + (selectedVariant ? ' bk-room-list--has-selection' : '')} id="bkPriceList">
                   {priceItems.map((opt, i) => {
                     const isSelected =
@@ -1234,7 +1234,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
 
                 <p className="bk-info-bar">
                   <i className="fa-solid fa-circle-info"></i>
-                  You can review your booking details before completing the payment.
+                  You can review your reservation details before completing the payment.
                 </p>
               </div>
             )}
@@ -1249,7 +1249,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
 
                 {!selectedDate && (
                   <>
-                    <p className="bk-choose-label bk-choose-label--heading">When would you like to book?</p>
+                    <p className="bk-choose-label bk-choose-label--heading">When would you like to reserve?</p>
                     <div className="bk-calendar-block">
                       <div className="bk-cal-head">
                         <button
@@ -1315,7 +1315,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
                     <div className="bk-legend">
                       <span><i className="bk-dot bk-dot--available"></i> Available</span>
                       <span><i className="bk-dot bk-dot--few"></i> Few slots</span>
-                      <span><i className="bk-dot bk-dot--full"></i> Fully booked</span>
+                      <span><i className="bk-dot bk-dot--full"></i> Fully reserved</span>
                       <span><i className="bk-dot bk-dot--unavailable"></i> Unavailable</span>
                     </div>
                   </>
@@ -1325,7 +1325,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
                   <>
                     <div className="bk-selected-date-recap">
                       <div>
-                        <p className="bk-selected-date-recap-label">Selected Booking Date</p>
+                        <p className="bk-selected-date-recap-label">Selected Reservation Date</p>
                         <p className="bk-selected-date-recap-value">{selectedDateLabel}</p>
                       </div>
                       <button className="bk-change-date-btn" onClick={handleChangeDate}>
@@ -1348,7 +1348,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
                       </div>
                     </div>
 
-                    <p className="bk-choose-label">Available Time — only open, unbooked times are shown.</p>
+                    <p className="bk-choose-label">Available Time — only open, unreserved times are shown.</p>
 
                     {lockError && (
                       <p className="bk-lock-error">
@@ -1359,8 +1359,8 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
                     {(() => {
                       const latestStart = getLatestStartTime(openHour, closeHour, selectedDuration);
                       const helperText = latestStart !== null
-                        ? `For a ${selectedDuration}-hour booking, the latest available start time is ${formatHour(latestStart)}. Later start times would extend beyond our ${formatHour(closeHour)} closing time.`
-                        : `A ${selectedDuration}-hour booking doesn't fit within today's operating hours (closes at ${formatHour(closeHour)}).`;
+                        ? `For a ${selectedDuration}-hour reservation, the latest available start time is ${formatHour(latestStart)}. Later start times would extend beyond our ${formatHour(closeHour)} closing time.`
+                        : `A ${selectedDuration}-hour reservation doesn't fit within today's operating hours (closes at ${formatHour(closeHour)}).`;
                       return <p className="bk-slot-helper-msg">{helperText}</p>;
                     })()}
 
@@ -1391,7 +1391,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
                           let slotStatusLabel;
                           let slotStatusColor;
                           if (state === 'booked') {
-                            slotStatusLabel = 'Booked';
+                            slotStatusLabel = 'Reserved';
                           } else if (state === 'insufficient') {
                             const remaining = closeHour - h;
                             slotStatusLabel = `Only ${remaining} Hour${remaining === 1 ? '' : 's'} Remaining`;
@@ -1591,10 +1591,10 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
                 </div>
 
                 <div className="bk-review-section">
-                  <p className="bk-review-section-title">Booking Schedule</p>
+                  <p className="bk-review-section-title">Reservation Schedule</p>
                   <div className="bk-review-card">
                     <div className="bk-summary-row">
-                      <span className="bk-sr-label"><i className="fa-solid fa-calendar-days"></i> Booking Date</span>
+                      <span className="bk-sr-label"><i className="fa-solid fa-calendar-days"></i> Reservation Date</span>
                       <span className="bk-sr-value">{reviewDateLabel}</span>
                     </div>
                     <div className="bk-summary-row">
@@ -1655,7 +1655,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
                 </div>
 
                 <div className="bk-review-section">
-                  <p className="bk-review-section-title">Booking Policies</p>
+                  <p className="bk-review-section-title">Reservation Policies</p>
                   <div className="bk-review-card">
                     <p className="bk-review-note" style={{ marginTop: 0 }}>
                       Only available times are shown above. Need assistance? We're happy to help before you pay.
@@ -1667,7 +1667,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
                   <p className="bk-review-section-title">Cancellation Reminder</p>
                   <div className="bk-review-card bk-review-card--warning">
                     <p className="bk-review-note" style={{ marginTop: 0 }}>
-                      Please review your details carefully. Cancellations and rescheduling are subject to our booking policy — reach out to us before paying if anything above needs to change.
+                      Please review your details carefully. Cancellations and rescheduling are subject to our reservation policy — reach out to us before paying if anything above needs to change.
                     </p>
                   </div>
                 </div>
@@ -1926,11 +1926,11 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
                     <p>
                       {pmReturn.phase === 'loading' && 'Please wait a moment.'}
                       {pmReturn.phase === 'cancelled' &&
-                        "No worries — your slot wasn't charged and hasn't been held. Feel free to book again whenever you're ready."}
+                        "No worries — your slot wasn't charged and hasn't been held. Feel free to reserve again whenever you're ready."}
                       {pmReturn.phase === 'needLogin' &&
-                        'Log in with the same account you booked with to see your payment status.'}
+                        'Log in with the same account you reserved with to see your payment status.'}
                       {pmReturn.phase === 'pending' &&
-                        'This can take a little longer than usual. You\'ll see your booking move to "Confirmed" in your profile shortly — no need to pay again.'}
+                        'This can take a little longer than usual. You\'ll see your reservation move to "Confirmed" in your profile shortly — no need to pay again.'}
                     </p>
 
                     {pmReturn.phase !== 'loading' && (

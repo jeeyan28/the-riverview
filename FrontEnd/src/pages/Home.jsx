@@ -46,14 +46,14 @@ const WHY_BOOK_CARDS = [
   { icon: CalendarCheck, title: 'Reserve in Advance', desc: "Lock in your preferred room before it's gone." },
   { icon: Zap, title: 'Faster Check-In', desc: 'Skip the wait — your room is ready when you arrive.' },
   { icon: LayoutGrid, title: 'See What\u2019s Available', desc: 'Browse room types and real-time availability first.' },
-  { icon: ShieldCheck, title: 'Secure Booking', desc: 'Your reservation and payment details stay protected.' },
+  { icon: ShieldCheck, title: 'Secure Reservation', desc: 'Your reservation and payment details stay protected.' },
 ];
 
 const BOOKING_STEPS = [
   {
     icon: CalendarDays,
     title: 'Choose Your Slot',
-    desc: 'Pick your preferred date, time, and reserve right on our booking page.',
+    desc: 'Pick your preferred date, time, and reserve right on our reservation page.',
   },
   {
     icon: Wallet,
@@ -68,10 +68,10 @@ const BOOKING_STEPS = [
 ];
 
 const HELPFUL_INFO_CARDS = [
-  { icon: Wallet, title: 'Down Payment Required', desc: "All bookings require a down payment equal to your first hour's rate to be approved." },
+  { icon: Wallet, title: 'Down Payment Required', desc: "All reservations require a down payment equal to your first hour's rate to be approved." },
   { icon: Timer, title: '20-Minute Payment Window', desc: 'Complete your online payment within 20 minutes, or the slot is released to other customers.' },
-  { icon: Hourglass, title: '5-Hour Maximum Rental', desc: 'You can book up to 5 hours per transaction.' },
-  { icon: DoorOpen, title: 'Arrive On Time', desc: 'Since your first hour is prepaid, you must arrive at least 20 minutes before your first booked hour ends, or the system will automatically cancel your booking.' },
+  { icon: Hourglass, title: '5-Hour Maximum Rental', desc: 'You can reserve up to 5 hours per transaction.' },
+  { icon: DoorOpen, title: 'Arrive On Time', desc: 'Since your first hour is prepaid, you must arrive at least 20 minutes before your first reserved hour ends, or the system will automatically cancel your reservation.' },
   { icon: FileText, title: 'Non-Refundable', desc: 'All down payments are strictly non-refundable, especially for no-shows.' },
   { icon: Clock3, title: 'Open Daily', desc: '7AM to midnight, every day of the week.' },
   { icon: MessageCircle, title: 'Need Help?', desc: 'Questions or issues? Message our official Facebook page "The Riverview" we\u2019re happy to help.' },
@@ -191,7 +191,7 @@ function Home() {
       try {
         const res = await fetch(`${API_BASE_URL}/api/rooms`, { credentials: 'include' });
         if (!res.ok) throw new Error('Failed to load rooms');
-        const data = (await res.json()).filter((r) => r.status !== 'Inactive');
+        const data = await res.json();
         if (!cancelled) setRooms(data);
       } catch (err) {
         console.error(err);
@@ -217,7 +217,6 @@ function Home() {
       const updates = {};
       await Promise.all(
         rooms
-          .filter((r) => r.status === 'Available')
           .map(async (room) => {
             try {
               const totalUnits = room.variants && room.variants.length
@@ -228,7 +227,7 @@ function Home() {
               for (let h = currentHour; h < closeHour && fullyBooked; h++) {
                 if (Number(reserved?.[h] || 0) < totalUnits) fullyBooked = false;
               }
-              if (fullyBooked) updates[room._id] = 'Fully Booked';
+              if (fullyBooked) updates[room._id] = 'Fully Reserved';
             } catch (err) {
               console.error(err);
             }
@@ -297,10 +296,10 @@ function Home() {
             <p className="hero-eyebrow">San Rafael Caingin · Open Daily 7AM–12AM</p>
             <h1>Where Family<br />Fun <em>Begins.</em></h1>
             <p className="hero-sub">
-              Billiards, basketball, KTV, and more — all under one roof. Book a room in minutes, have fun all night.
+              Billiards, basketball, KTV, and more — all under one roof. Reserve a room in minutes, have fun all night.
             </p>
             <div className="hero-actions">
-              <a href="#" className="btn-primary-hero" onClick={(e) => e.preventDefault()}>Book a Space</a>
+              <a href="#" className="btn-primary-hero" onClick={(e) => e.preventDefault()}>Reserve a Space</a>
               <a href="#rooms" className="btn-ghost-hero">See Rooms</a>
             </div>
           </div>
@@ -312,7 +311,7 @@ function Home() {
       <section className="how-it-works">
         <div className="how-it-works-inner reveal">
           <div className="section-label">3 Easy Steps</div>
-          <h2>Booking takes less than a minute.</h2>
+          <h2>Reservation takes less than a minute.</h2>
         </div>
         <div className="steps-grid reveal-stagger">
           {BOOKING_STEPS.map((s, i) => (
@@ -329,7 +328,7 @@ function Home() {
       <section id="rooms">
         <div className="rooms-header reveal">
           <div>
-            <div className="section-label">Book Your Space</div>
+            <div className="section-label">Reserve Your Space</div>
             <h2>Choose Your Room</h2>
           </div>
           <div className="rooms-header-right">
@@ -372,7 +371,7 @@ function Home() {
 
       <section className="why-book">
         <div className="why-book-inner reveal">
-          <div className="section-label">Why Book Online?</div>
+          <div className="section-label">Why Reserve Online?</div>
           <h2>A few reasons to reserve ahead.</h2>
         </div>
         <div className="why-book-grid reveal-stagger">
@@ -444,7 +443,7 @@ function Home() {
             </div>
             <div className="about-card">
               <div className="about-card-icon"><CalendarCheck size={20} color="var(--teal)" /></div>
-              <h4>Easy Booking</h4>
+              <h4>Easy Reservation</h4>
               <p>Reserve your room online in seconds. Walk-ins always welcome, reservations always smoother.</p>
             </div>
             <div className="about-card">

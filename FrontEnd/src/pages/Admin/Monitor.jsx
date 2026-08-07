@@ -31,7 +31,42 @@ function getBookingRoomTarget(booking) {
   const variant = booking.variantLabel ? variants.find((v) => v.label === booking.variantLabel) : null;
   const roomName = variant?.label || booking.variantLabel || booking.roomLabel;
   if (!roomName) return null;
-  return { facilityName, roomName, roomNumber: variant?.roomNumber || '' };
+  return {
+    facilityName,
+    roomName,
+    startingRoomNumber: variant?.startingRoomNumber != null ? Number(variant.startingRoomNumber) : null,
+    roomCount: variant?.roomCount != null ? Number(variant.roomCount) : null,
+  };
+}
+
+function matchRoomForTarget(rooms, roomTarget) {
+  if (!roomTarget) return { matchedRoom: null, previewNumber: null };
+  const { facilityName, roomName, startingRoomNumber, roomCount } = roomTarget;
+  const facilityRooms = rooms.filter((r) => r.facilityName === facilityName);
+
+  if (!Number.isFinite(startingRoomNumber) || startingRoomNumber < 1 || !Number.isFinite(roomCount) || roomCount < 1) {
+    const matchedRoom = facilityRooms.find((r) => r.roomName === roomName && r.status === 'Available') || null;
+    return { matchedRoom, previewNumber: null };
+  }
+
+  const rangeEnd = startingRoomNumber + roomCount - 1;
+  const inRange = facilityRooms
+    .map((r) => ({ room: r, num: Number(r.roomNumber) }))
+    .filter((r) => Number.isFinite(r.num) && r.num >= startingRoomNumber && r.num <= rangeEnd)
+    .sort((a, b) => a.num - b.num);
+
+  const availableInRange = inRange.find((r) => r.room.status === 'Available');
+  if (availableInRange) return { matchedRoom: availableInRange.room, previewNumber: null };
+
+  const usedInRange = new Set(inRange.map((r) => r.num));
+  let nextInRange = startingRoomNumber;
+  while (nextInRange <= rangeEnd && usedInRange.has(nextInRange)) nextInRange++;
+  if (nextInRange <= rangeEnd) return { matchedRoom: null, previewNumber: nextInRange };
+
+  const usedAll = new Set(facilityRooms.map((r) => Number(r.roomNumber)).filter((n) => Number.isFinite(n) && n > 0));
+  let overflow = rangeEnd + 1;
+  while (usedAll.has(overflow)) overflow++;
+  return { matchedRoom: null, previewNumber: overflow };
 }
 
 function Monitor() {
@@ -119,12 +154,13 @@ function Monitor() {
     if (!guardPermission('room:manage')) return;
     setModal({ mode: 'extend', fixedRoom: room, session });
   }
-  function openStartFromBooking(booking, matchedRoom, roomTarget) {
+  function openStartFromBooking(booking, matchedRoom, roomTarget, previewNumber) {
     if (!canStartFromBooking) return;
     setModal({
       mode: 'start',
       fixedRoom: matchedRoom,
       roomTarget: matchedRoom ? null : roomTarget,
+      previewNumber: matchedRoom ? null : previewNumber,
       session: null,
       bookingId: booking._id,
       initialGuestName: booking.guestName,
@@ -133,7 +169,7 @@ function Monitor() {
     });
   }
 
-  async function handleModalSubmit({ mode, roomId, roomTarget, sessionId, totalHours, paymentMethod, paymentStatus, guestName, bookingId }) {
+  async function handleModalSubmit({ mode, roomId, roomTarget, sessionId, totalHours, paymentMethod, paymentStatus, paymentTiming, guestName, bookingId }) {
     if (mode !== 'extend' && bookingId) {
       if (!canStartFromBooking) return;
     } else if (!guardPermission('room:manage')) {
@@ -143,7 +179,7 @@ function Monitor() {
     if (mode === 'extend') {
       await roomSessionsService.extend(sessionId, { addedHours: totalHours, paymentStatus });
     } else {
-      const created = await roomSessionsService.create({ roomId, roomTarget, duration: totalHours, paymentMethod, paymentStatus, guestName, bookingId });
+      const created = await roomSessionsService.create({ roomId, roomTarget, duration: totalHours, paymentMethod, paymentStatus, paymentTiming, guestName, bookingId });
 
       try {
         const updatedRoom = await monitorRoomsService.updateStatus(created.room, 'Occupied');
@@ -298,7 +334,10 @@ function Monitor() {
       render: (r) => {
         const { occupancy } = buildRoomView(r, sessions);
         return occupancy ? (
-          <span className={`pay-pill pay-${(occupancy.paymentStatus || 'Unpaid').toLowerCase()}`}>{occupancy.paymentStatus || 'Unpaid'}</span>
+          <>
+            <span className={`pay-pill pay-${(occupancy.paymentStatus || 'Unpaid').toLowerCase()}`}>{occupancy.paymentStatus || 'Unpaid'}</span>
+            <span className="pay-timing-tag">{occupancy.paymentTiming === 'After' ? 'Pay After' : 'Pay Before'}</span>
+          </>
         ) : '—';
       },
     },
@@ -375,7 +414,7 @@ function Monitor() {
 
       {canStartFromBooking && dueBookings.length > 0 && (
         <div className="card card-flush rm-table-wrap rm-due-wrap">
-          <div className="rm-group-head">Bookings Due</div>
+          <div className="rm-group-head">Reservations Due</div>
           <table className="rm-table">
             <thead>
               <tr>
@@ -393,11 +432,7 @@ function Monitor() {
                 .sort((a, b) => a.timeIn.localeCompare(b.timeIn))
                 .map((b) => {
                   const roomTarget = getBookingRoomTarget(b);
-                  const matchedRoom = roomTarget
-                    ? rooms.find((r) => r.facilityName === roomTarget.facilityName && r.roomNumber === roomTarget.roomNumber)
-                      || (!roomTarget.roomNumber ? rooms.find((r) => r.facilityName === roomTarget.facilityName && r.roomName === roomTarget.roomName && r.status === 'Available') : null)
-                      || null
-                    : null;
+                  const { matchedRoom, previewNumber } = matchRoomForTarget(rooms, roomTarget);
                   const scheduledStart = new Date(`${b.date}T${String(b.timeIn).padStart(5, '0')}:00`);
                   const isDue = scheduledStart.getTime() <= Date.now();
                   const occupancy = matchedRoom ? findRoomOccupancy(matchedRoom._id, sessions) : null;
@@ -411,8 +446,8 @@ function Monitor() {
                           {matchedRoom
                             ? `Room No.${matchedRoom.roomNumber}`
                             : roomTarget
-                              ? roomTarget.roomNumber
-                                ? `Room No.${roomTarget.roomNumber} (will be created)`
+                              ? previewNumber
+                                ? `Room No.${previewNumber} (will be created)`
                                 : 'Room No. will be auto-assigned'
                               : 'No matching Room Monitor room'}
                         </div>
@@ -433,8 +468,8 @@ function Monitor() {
                         <button
                           className="rm-btn"
                           disabled={!roomTarget || hasConflict}
-                          title={!roomTarget ? 'Could not determine this booking\'s room.' : hasConflict ? 'End the current session on this room first.' : ''}
-                          onClick={() => openStartFromBooking(b, matchedRoom, roomTarget)}
+                          title={!roomTarget ? 'Could not determine this reservation\'s room.' : hasConflict ? 'End the current session on this room first.' : ''}
+                          onClick={() => openStartFromBooking(b, matchedRoom, roomTarget, previewNumber)}
                         >
                           <i className="bi bi-play-circle"></i>Start Now
                         </button>
@@ -580,7 +615,7 @@ function Monitor() {
                     </div>
                     <div className="rm-foot">
                       <div className={`rm-foot-info rm-foot-info--${(occupancy.paymentStatus || 'Unpaid').toLowerCase()}`}>
-                        <i className="bi bi-person"></i>{occupancy.paymentStatus || 'Unpaid'}
+                        <i className="bi bi-person"></i>{occupancy.paymentStatus || 'Unpaid'} · {occupancy.paymentTiming === 'After' ? 'Pay After' : 'Pay Before'}
                       </div>
                       <div className="rm-foot-price">₱{r.price}/hr</div>
                     </div>
@@ -701,6 +736,7 @@ function RoomDetailModal({ room, view, onClose, canManage, onExtend, onEndSessio
                   <span className="lbl">Payment Status</span>
                   <span className={`pay-pill pay-${(view.occupancy.paymentStatus || 'Unpaid').toLowerCase()}`}>{view.occupancy.paymentStatus || 'Unpaid'}</span>
                 </div>
+                <div className="rm-row"><span className="lbl">Payment Timing</span><span className="val">{view.occupancy.paymentTiming === 'After' ? 'Pay After' : 'Pay Before'}</span></div>
                 <div className="rm-row"><span className="lbl">Amount</span><span className="val">₱{(view.occupancy.amount || 0).toFixed(2)}</span></div>
                 <div className="rm-row"><span className="lbl">Start Time</span><span className="val">{formatStartTime(view.occupancy)}</span></div>
                 <div className="rm-row"><span className="lbl">End Time</span><span className="val">{formatEndTime(view.occupancy)}</span></div>
@@ -974,6 +1010,7 @@ function SessionModal({ modal, onClose, onSubmit }) {
   const [seconds, setSeconds] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('Cash');
   const [paymentStatus, setPaymentStatus] = useState('Unpaid');
+  const [paymentTiming, setPaymentTiming] = useState('Before');
   const [guestName, setGuestName] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -992,6 +1029,7 @@ function SessionModal({ modal, onClose, onSubmit }) {
       setDurationFromHours(modal.initialDurationHours || 0);
       setPaymentMethod('Cash');
       setPaymentStatus('Unpaid');
+      setPaymentTiming('Before');
       setGuestName(modal.initialGuestName || '');
     } else {
       setHours('');
@@ -999,6 +1037,7 @@ function SessionModal({ modal, onClose, onSubmit }) {
       setSeconds('');
       setPaymentMethod('Cash');
       setPaymentStatus('Unpaid');
+      setPaymentTiming('Before');
       setGuestName('');
     }
   }, [modal]);
@@ -1047,6 +1086,7 @@ function SessionModal({ modal, onClose, onSubmit }) {
         totalHours,
         paymentMethod,
         paymentStatus,
+        paymentTiming,
         guestName,
         bookingId: modal.bookingId,
       });
@@ -1061,10 +1101,10 @@ function SessionModal({ modal, onClose, onSubmit }) {
   const fixedRoomLabel = modal?.fixedRoom
     ? `${modal.fixedRoom.roomName} — Room No. ${modal.fixedRoom.roomNumber} (${modal.fixedRoom.facilityName})`
     : modal?.roomTarget
-      ? `${modal.roomTarget.roomName} — ${modal.roomTarget.roomNumber ? `Room No. ${modal.roomTarget.roomNumber} ` : ''}(${modal.roomTarget.facilityName}) — will be created`
+      ? `${modal.roomTarget.roomName} — ${modal.previewNumber ? `Room No. ${modal.previewNumber} ` : ''}(${modal.roomTarget.facilityName}) — will be created`
       : '';
   const fixedRoomRate = modal?.fixedRoom ? `₱${modal.fixedRoom.price}/hr` : modal?.roomTarget ? '—' : '';
-  const title = isExtend ? `Extend Session — ${modal?.fixedRoom?.roomName || ''}` : fromBooking ? 'Start Session from Booking' : 'Start Session';
+  const title = isExtend ? `Extend Session — ${modal?.fixedRoom?.roomName || ''}` : fromBooking ? 'Start Session from Reservation' : 'Start Session';
 
   return (
     <Modal open={!!modal} onClose={onClose} title={title}>
@@ -1103,7 +1143,7 @@ function SessionModal({ modal, onClose, onSubmit }) {
               </div>
             </div>
             {fromBooking && (
-              <p style={{ margin: '6px 0 0', fontSize: '.72rem', color: 'var(--muted)' }}>Duration is fixed to what the guest booked.</p>
+              <p style={{ margin: '6px 0 0', fontSize: '.72rem', color: 'var(--muted)' }}>Duration is fixed to what the guest reserved.</p>
             )}
 
             {!isExtend && !fromBooking && (
@@ -1130,6 +1170,28 @@ function SessionModal({ modal, onClose, onSubmit }) {
                 <option value="GCash">GCash</option>
                 <option value="Maya">Maya</option>
               </select>
+            </div>
+          )}
+
+          {!isExtend && (
+            <div className="mfield">
+              <label>Payment Timing</label>
+              <div className="pay-toggle" role="group" aria-label="Payment timing">
+                <button
+                  type="button"
+                  className={`pay-toggle-btn pay-toggle-btn--paid${paymentTiming === 'Before' ? ' active' : ''}`}
+                  onClick={() => setPaymentTiming('Before')}
+                >
+                  Pay Before
+                </button>
+                <button
+                  type="button"
+                  className={`pay-toggle-btn pay-toggle-btn--unpaid${paymentTiming === 'After' ? ' active' : ''}`}
+                  onClick={() => setPaymentTiming('After')}
+                >
+                  Pay After
+                </button>
+              </div>
             </div>
           )}
 

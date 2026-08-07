@@ -52,7 +52,7 @@ async function runInTransaction(fn) {
   }
 }
 
-async function validateAndPriceBooking({ roomId, variantLabel, date, timeIn, duration, isAdminBooking, guestCount, excludeLockUserId, session }) {
+async function validateAndPriceBooking({ roomId, variantLabel, date, timeIn, duration, isAdminBooking, guestCount, excludeLockUserId, excludeBookingId, session }) {
   if (!roomId || !date || !timeIn || !duration) {
     throw { status: 400, message: "roomId, date, timeIn and duration are required." };
   }
@@ -77,15 +77,14 @@ async function validateAndPriceBooking({ roomId, variantLabel, date, timeIn, dur
   const room = await (session ? roomQuery.session(session) : roomQuery);
   if (!room) throw { status: 404, message: "Selected room does not exist." };
 
-  if (!isAdminBooking && room.status && room.status !== "Available") {
-    throw { status: 409, message: `This facility is currently ${room.status.toLowerCase()} and cannot be booked.` };
-  }
-
   let unitPrice = room.price;
   if (room.variants && room.variants.length) {
     if (variantLabel) {
       const variant = room.variants.find(v => v.label === variantLabel);
       if (!variant) throw { status: 400, message: "Selected pricing option not found." };
+      if (!isAdminBooking && variant.status && variant.status !== "Available") {
+        throw { status: 409, message: `This room is currently ${variant.status.toLowerCase()} and cannot be booked.` };
+      }
       unitPrice = variant.price;
     } else {
       unitPrice = Math.min(...room.variants.map(v => Number(v.price) || 0));
@@ -112,6 +111,7 @@ async function validateAndPriceBooking({ roomId, variantLabel, date, timeIn, dur
     variantLabel: variantLabel || null,
     date,
     status: { $nin: ["Cancelled", "Rejected"] },
+    ...(excludeBookingId ? { _id: { $ne: excludeBookingId } } : {}),
   }).select("timeIn duration");
   const existing = await (session ? query.session(session) : query);
 

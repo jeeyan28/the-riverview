@@ -28,7 +28,7 @@ function Footer() {
             <a href="/#rooms" onClick={(e) => handleSectionLink(e, 'rooms')}>Rooms</a>
             <a href="/#about" onClick={(e) => handleSectionLink(e, 'about')}>About</a>
             <Link to="/contact">Contact</Link>
-            <a href="#">Book Now</a>
+            <a href="#">Reserve Now</a>
           </div>
           <div className="footer-col footer-map-col">
             <h4>Find Us</h4>

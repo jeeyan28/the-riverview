@@ -37,6 +37,7 @@ function Reports() {
 
   const [search, setSearch] = useState('');
   const [paymentFilter, setPaymentFilter] = useState('');
+  const [timingFilter, setTimingFilter] = useState('');
 
   async function fetchFinishedSessions() {
     setSessionsLoading(true);
@@ -66,7 +67,7 @@ function Reports() {
   }
 
   async function handleExport(source) {
-    const label = source === 'booking' ? 'Bookings Report' : 'Room Monitoring Report';
+    const label = source === 'booking' ? 'Reservations Report' : 'Room Monitoring Report';
     if (!(await confirm(`Export the ${label} for ${from} to ${to}? This will download an Excel file.`, { confirmText: 'Export' }))) return;
     setLoadingSource(source);
     setExportError(null);
@@ -116,11 +117,12 @@ function Reports() {
     const term = search.trim().toLowerCase();
     return recentlyFinished.filter((s) => {
       if (paymentFilter && (s.paymentStatus || 'Unpaid') !== paymentFilter) return false;
+      if (timingFilter && (s.paymentTiming || 'Before') !== timingFilter) return false;
       if (!term) return true;
       const haystack = `${s.guestName || ''} ${s.room?.facilityName || s.facilityName || ''} ${s.room?.roomNumber ?? s.roomNumber ?? ''}`.toLowerCase();
       return haystack.includes(term);
     });
-  }, [recentlyFinished, search, paymentFilter]);
+  }, [recentlyFinished, search, paymentFilter, timingFilter]);
 
   const columns = [
     {
@@ -146,6 +148,11 @@ function Reports() {
       render: (s) => <span className={`pay-pill pay-${(s.paymentStatus || 'Unpaid').toLowerCase()}`}>{s.paymentStatus || 'Unpaid'}</span>,
     },
     {
+      key: 'timing',
+      label: 'Timing',
+      render: (s) => <span className="pay-timing-tag">{s.paymentTiming === 'After' ? 'Pay After' : 'Pay Before'}</span>,
+    },
+    {
       key: 'actions',
       label: 'Action',
       render: (s) => (
@@ -163,7 +170,7 @@ function Reports() {
         <div className="card-head">
           <span className="card-title">Export Sales Report</span>
         </div>
-        <p className="rep-card-desc">Download an itemized Excel report for a chosen date range, split by booking or walk-in sales.</p>
+        <p className="rep-card-desc">Download an itemized Excel report for a chosen date range, split by reservation or walk-in sales.</p>
         <div className="rep-daterange-row">
           <div className="field-stack">
             <label className="field-label">Date range</label>
@@ -171,7 +178,7 @@ function Reports() {
           </div>
           <button className="save-btn" onClick={() => handleExport('booking')} disabled={loadingSource !== null}>
             <i className="ti ti-calendar-check"></i>
-            {loadingSource === 'booking' ? 'Generating…' : 'Export Bookings Report'}
+            {loadingSource === 'booking' ? 'Generating…' : 'Export Reservations Report'}
           </button>
           <button className="save-btn" onClick={() => handleExport('walkin')} disabled={loadingSource !== null}>
             <i className="ti ti-door-enter"></i>
@@ -232,6 +239,15 @@ function Reports() {
                   <option value="">All payment status</option>
                   <option value="Paid">Paid</option>
                   <option value="Unpaid">Unpaid</option>
+                </select>
+                <select
+                  className="users-filter-input"
+                  value={timingFilter}
+                  onChange={(e) => setTimingFilter(e.target.value)}
+                >
+                  <option value="">All payment timing</option>
+                  <option value="Before">Pay Before</option>
+                  <option value="After">Pay After</option>
                 </select>
               </div>
             </div>

@@ -187,7 +187,7 @@ function Navbar({
           id="mobile-book-btn"
           style={{ fontSize: '1rem', padding: '.75rem 2rem', borderRadius: '8px', marginTop: '1rem' }}
         >
-          Book Now
+          Reserve Now
         </button>
         <button
           className="btn-book"
