@@ -18,7 +18,7 @@ router.get("/", async (req, res) => {
       })),
       announcements: settings.announcements
         .filter(a => a.isActive && (!a.expiresAt || a.expiresAt > now))
-        .map(a => ({ _id: a._id, title: a.title, message: a.message, emoji: a.emoji })),
+        .map(a => ({ _id: a._id, title: a.title, message: a.message, emoji: a.emoji, createdAt: a.createdAt })),
       paymentMethods: settings.paymentMethods
         .filter(pm => pm.isActive)
         .map(pm => ({ _id: pm._id, name: pm.name, qrImage: pm.qrImage })),

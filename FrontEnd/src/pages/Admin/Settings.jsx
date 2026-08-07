@@ -261,6 +261,10 @@ function AnnouncementsTab() {
   const [announcements, setAnnouncements] = useState([]);
   const [posting, setPosting] = useState(false);
   const [busyId, setBusyId] = useState(null);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [formTitle, setFormTitle] = useState('');
+  const [formMessage, setFormMessage] = useState('');
+  const [formEmoji, setFormEmoji] = useState('');
 
   const fetchAnnouncements = useCallback(async () => {
     try {
@@ -277,15 +281,30 @@ function AnnouncementsTab() {
     fetchAnnouncements();
   }, [fetchAnnouncements]);
 
-  async function handleAddAnnouncement() {
+  function openAddModal() {
     if (!guardPermission('settings:manage', "You don't have permission to post announcements.")) return;
-    const title = window.prompt('Announcement title (e.g. "Weekend Promo"):');
-    if (!title) return;
-    const message = window.prompt('Announcement message (shown to every visitor):');
-    if (!message) return;
+    setFormTitle('');
+    setFormMessage('');
+    setFormEmoji('');
+    setShowAddModal(true);
+  }
+
+  function closeAddModal() {
+    if (posting) return;
+    setShowAddModal(false);
+  }
+
+  async function handleSubmitAnnouncement(e) {
+    e.preventDefault();
+    if (!formTitle.trim() || !formMessage.trim()) return;
     setPosting(true);
     try {
-      await settingsService.addAnnouncement({ title, message });
+      await settingsService.addAnnouncement({
+        title: formTitle.trim(),
+        message: formMessage.trim(),
+        emoji: formEmoji.trim() || undefined,
+      });
+      setShowAddModal(false);
       await fetchAnnouncements();
     } catch (err) {
       alert(err.message);
@@ -328,7 +347,7 @@ function AnnouncementsTab() {
           <i className="ti ti-speakerphone"></i>
           <span className="fac-head-title">Homepage Announcements</span>
         </div>
-        <button className="btn-teal" type="button" disabled={posting} onClick={handleAddAnnouncement}>
+        <button className="btn-teal" type="button" disabled={posting} onClick={openAddModal}>
           <i className="ti ti-plus"></i>New Announcement
         </button>
       </div>
@@ -336,6 +355,58 @@ function AnnouncementsTab() {
         Active announcements appear as the dismissible banner at the top of the public homepage. Inactive or expired
         ones stay here but won't show to guests.
       </p>
+      <Modal
+        open={showAddModal}
+        onClose={closeAddModal}
+        title="New Announcement"
+        actions={
+          <>
+            <button type="button" className="announcement-btn" disabled={posting} onClick={closeAddModal}>
+              Cancel
+            </button>
+            <button
+              type="submit"
+              form="announcement-form"
+              className="save-btn"
+              disabled={posting || !formTitle.trim() || !formMessage.trim()}
+            >
+              {posting ? 'Posting…' : 'Post announcement'}
+            </button>
+          </>
+        }
+      >
+        <form id="announcement-form" onSubmit={handleSubmitAnnouncement}>
+          <div className="pfield">
+            <label>Title</label>
+            <input
+              type="text"
+              value={formTitle}
+              onChange={(e) => setFormTitle(e.target.value)}
+              placeholder='e.g. "Weekend Promo"'
+              autoFocus
+            />
+          </div>
+          <div className="pfield">
+            <label>Message</label>
+            <textarea
+              value={formMessage}
+              onChange={(e) => setFormMessage(e.target.value)}
+              placeholder="Shown to every visitor on the homepage banner"
+              rows={3}
+            />
+          </div>
+          <div className="pfield">
+            <label>Icon (optional emoji)</label>
+            <input
+              type="text"
+              value={formEmoji}
+              onChange={(e) => setFormEmoji(e.target.value)}
+              placeholder="📣"
+              maxLength={2}
+            />
+          </div>
+        </form>
+      </Modal>
       <div className="announcement-list">
         {loading ? (
           <div className="announcement-empty">Loading…</div>

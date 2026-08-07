@@ -3,7 +3,7 @@ export const LAST_UPDATED = 'August 6, 2026';
 export const TERMS_CONTENT = {
   en: {
     intro:
-      'These Terms of Service govern your use of The Riverview\'s online booking system for court and billiard table reservations. By creating an account or making a booking, you agree to these Terms.',
+      'These Terms of Service govern your use of The Riverview\'s online reservations. By creating an account or making a booking, you agree to these Terms.',
     sections: [
       {
         heading: '1. Eligibility',

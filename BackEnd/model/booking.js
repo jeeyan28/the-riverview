@@ -19,7 +19,6 @@ const BOOKING_STATUS = {
 
 const PAYMENT_STATUS = {
   UNPAID: "Unpaid",
-  PENDING_VERIFICATION: "Pending Verification",
   PAID: "Paid",
   REJECTED: "Rejected",
 };

@@ -12,36 +12,16 @@ import PageTransition from '../components/PageTransition';
 import { useTheme } from '../hooks/useTheme';
 import { useAuth } from '../context/AuthContext';
 import { useSiteSettings } from '../hooks/useSiteSettings';
-
-const PROMO_DISMISS_KEY = 'riverview-promo-dismissed';
+import { useAnnouncements } from '../hooks/useAnnouncements';
 
 function MainLayout() {
   const { initializing } = useAuth();
   const { settings } = useSiteSettings();
-  const announcement = settings.announcements?.[0] || null;
+  const announcements = useAnnouncements(settings.announcements);
   const [theme, toggleTheme] = useTheme();
-  const [promoVisible, setPromoVisible] = useState(
-    () => sessionStorage.getItem(PROMO_DISMISS_KEY) !== '1'
-  );
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
-
-  useEffect(() => {
-    function setBannerHeightVar() {
-      const banner = document.getElementById('promo-banner');
-      const h = promoVisible && banner ? banner.offsetHeight : 0;
-      document.documentElement.style.setProperty('--banner-h', `${h}px`);
-    }
-    setBannerHeightVar();
-    window.addEventListener('resize', setBannerHeightVar);
-    return () => window.removeEventListener('resize', setBannerHeightVar);
-  }, [promoVisible, announcement]);
-
-  function dismissPromo() {
-    setPromoVisible(false);
-    sessionStorage.setItem(PROMO_DISMISS_KEY, '1');
-  }
 
   useEffect(() => {
     function onScroll() {
@@ -62,9 +42,7 @@ function MainLayout() {
   return (
     <>
       <Navbar
-        announcement={announcement}
-        promoVisible={promoVisible}
-        onDismissPromo={dismissPromo}
+        announcements={announcements}
         mobileNavOpen={mobileNavOpen}
         onOpenMobileNav={() => setMobileNavOpen(true)}
         onCloseMobileNav={() => setMobileNavOpen(false)}

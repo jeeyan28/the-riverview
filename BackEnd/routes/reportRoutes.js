@@ -9,7 +9,7 @@ const router = express.Router();
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const MAX_RANGE_DAYS = 92;
-const BLOCK_COLS = 7;
+const BLOCK_COLS = 5;
 const BLOCK_GAP_COLS = 1;
 const BLOCKS_PER_ROW = 3;
 const SOURCE_LABELS = { booking: "Bookings (Online)", walkin: "Room Monitoring (Walk-in)", all: "All Sales" };
@@ -76,7 +76,7 @@ function writeBlock(sheet, group, startRow, startCol) {
   totalCell.numFmt = "#,##0.00";
 
   const subHeaderRow = sheet.getRow(startRow + 1);
-  const columnTitles = ["Time In", "Time Out", "No. of Hrs", "Guest Name", "Source", "Payment Status", "Balance"];
+  const columnTitles = ["Time In", "Time Out", "No. of Hrs", "Guest Name", "Source"];
   columnTitles.forEach((title, i) => {
     const cell = subHeaderRow.getCell(startCol + i);
     cell.value = title;
@@ -85,16 +85,11 @@ function writeBlock(sheet, group, startRow, startCol) {
 
   group.sessions.forEach((session, i) => {
     const row = sheet.getRow(startRow + 2 + i);
-    const balance = (Number(session.amount) || 0) - (Number(session.paidAmount) || 0);
     row.getCell(startCol).value = formatTime(session.startTime);
     row.getCell(startCol + 1).value = formatTime(session.endedAt);
     row.getCell(startCol + 2).value = formatDuration(session.duration);
     row.getCell(startCol + 3).value = session.guestName || "";
     row.getCell(startCol + 4).value = session.booking ? "Booking" : "Walk-in";
-    row.getCell(startCol + 5).value = session.paymentStatus;
-    const balanceCell = row.getCell(startCol + 6);
-    balanceCell.value = balance > 0 ? balance : 0;
-    balanceCell.numFmt = "#,##0.00";
   });
 
   for (let c = 0; c < BLOCK_COLS; c++) {

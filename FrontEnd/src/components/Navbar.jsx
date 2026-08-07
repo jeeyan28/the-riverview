@@ -3,11 +3,10 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import logo from '../assets/logo/logoo.png';
 import { useAuth } from '../context/AuthContext';
 import ThemeToggle from './ThemeToggle';
+import AnnouncementsBell from './AnnouncementsBell';
 
 function Navbar({
-  announcement,
-  promoVisible,
-  onDismissPromo,
+  announcements,
   mobileNavOpen,
   onOpenMobileNav,
   onCloseMobileNav,
@@ -73,26 +72,6 @@ function Navbar({
   }, [chipMenuOpen]);
   return (
     <>
-      {announcement && (
-        <div
-          id="promo-banner"
-          className={`promo-banner${promoVisible ? '' : ' is-hidden'}`}
-        >
-          <p className="promo-text" id="promo-text-line">
-            <span className="promo-emoji">{announcement.emoji}</span>
-            {announcement.message}
-          </p>
-          <button
-            className="promo-close"
-            id="promoClose"
-            aria-label="Dismiss announcement"
-            onClick={onDismissPromo}
-          >
-            ✕
-          </button>
-        </div>
-      )}
-
       <header id="site-header" className={scrolled ? 'scrolled' : ''}>
         <div className="logo">
           <img src={logo} alt="Riverview Logo" />
@@ -107,6 +86,8 @@ function Navbar({
         </nav>
 
         <div className="nav-buttons">
+          <AnnouncementsBell variant="desktop" {...announcements} />
+
           {(isHome || isRooms || isContact) && <ThemeToggle id="nav-theme-toggle" theme={theme} onToggle={onToggleTheme} />}
 
           <Link
@@ -165,13 +146,17 @@ function Navbar({
           </div>
         </div>
 
-        <div
-          className={`hamburger${mobileNavOpen ? ' active' : ''}`}
-          id="hamburger"
-          aria-label="Open menu"
-          onClick={onOpenMobileNav}
-        >
-          <span></span><span></span><span></span>
+        <div className="mobile-header-actions">
+          <AnnouncementsBell variant="mobile" {...announcements} />
+
+          <div
+            className={`hamburger${mobileNavOpen ? ' active' : ''}`}
+            id="hamburger"
+            aria-label="Open menu"
+            onClick={onOpenMobileNav}
+          >
+            <span></span><span></span><span></span>
+          </div>
         </div>
       </header>
 

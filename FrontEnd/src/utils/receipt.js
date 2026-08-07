@@ -6,6 +6,11 @@ export function formatHour(h) {
   return `${display}:00 ${period}`;
 }
 
+export function guestPhoneDisplay(guestContact) {
+  if (!guestContact) return 'N/A';
+  return String(guestContact).includes('@') ? 'N/A' : guestContact;
+}
+
 function esc(value) {
   return String(value ?? '').replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
 }
@@ -208,7 +213,7 @@ export function openBookingReceipt(booking, overrides = {}) {
     reservationCode: booking.reservationCode || '—',
     facility,
     guestName: booking.guestName || '—',
-    guestContact: booking.guestContact || '—',
+    guestContact: guestPhoneDisplay(booking.guestContact),
     guestEmail: booking.guestEmail || '—',
     roomName,
     guestCount: String(booking.guestCount || 1),

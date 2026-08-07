@@ -5,7 +5,7 @@ import fallbackRoomImg from '../assets/pictures/Billiard.jpg';
 import RoomOptionCard from './RoomOptionCard';
 import { bookingsService } from '../services/bookings';
 import { useCountdownClock } from '../hooks/useCountdownClock';
-import { formatHour, openBookingReceipt } from '../utils/receipt';
+import { formatHour, openBookingReceipt, guestPhoneDisplay } from '../utils/receipt';
 import {
   dateKey,
   getPaxCapacity,
@@ -311,7 +311,7 @@ function BookingSuccess({ booking, room, selectedVariant, onDone, onViewBooking 
           </div>
           <div className="bk-success-item">
             <span className="bk-summary-label">Contact No.</span>
-            <span className="bk-summary-value">{booking.guestContact || '—'}</span>
+            <span className="bk-summary-value">{guestPhoneDisplay(booking.guestContact)}</span>
           </div>
           <div className="bk-success-item">
             <span className="bk-summary-label">Email</span>

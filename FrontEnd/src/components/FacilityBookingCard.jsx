@@ -35,7 +35,7 @@ function FacilityBookingCard({ room, liveStatus, onSelect }) {
       </div>
       <div className="room-card-body">
         <h3>{room.name || 'Untitled Facility'}</h3>
-        <span className="price-amt">Starting at ₱{startingPrice}/hr</span>
+        <span className="price-amt">Start at ₱{startingPrice}/hr</span>
 
         {(roomTypeCount > 0 || (room.features && room.features.length > 0)) && (
           <div className="room-card-tags">
