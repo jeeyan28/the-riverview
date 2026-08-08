@@ -24,14 +24,14 @@ router.get("/", requirePermission(PERMISSIONS.BOOKING_VIEW), async (req, res) =>
     }
 
     const filter = {};
-    if (req.query.status) filter.status = req.query.status;
-    if (req.query.paymentStatus) filter.paymentStatus = req.query.paymentStatus;
-    if (req.query.room) filter.room = req.query.room;
-    if (req.query.date) filter.date = req.query.date;
-    if (req.query.guestContact) filter.guestContact = req.query.guestContact;
-    else if (req.query.guestName) filter.guestName = req.query.guestName;
+    if (req.query.status) filter.status = String(req.query.status);
+    if (req.query.paymentStatus) filter.paymentStatus = String(req.query.paymentStatus);
+    if (req.query.room) filter.room = String(req.query.room);
+    if (req.query.date) filter.date = String(req.query.date);
+    if (req.query.guestContact) filter.guestContact = String(req.query.guestContact);
+    else if (req.query.guestName) filter.guestName = String(req.query.guestName);
     if (req.query.search) {
-      const safe = req.query.search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const safe = String(req.query.search).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       const re = new RegExp(safe, "i");
       filter.$or = [{ guestName: re }, { guestContact: re }, { reservationCode: re }];
     }

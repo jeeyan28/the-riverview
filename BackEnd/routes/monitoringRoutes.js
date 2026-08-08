@@ -9,7 +9,7 @@ const roomsRouter = express.Router();
 roomsRouter.get("/", ensureAdmin, async (req, res) => {
   try {
     const filter = {};
-    if (req.query.status) filter.status = req.query.status;
+    if (req.query.status) filter.status = String(req.query.status);
     const rooms = await MonitorRoom.find(filter).sort({ facilityName: 1, roomNumber: 1 });
     res.json(rooms);
   } catch (err) {
