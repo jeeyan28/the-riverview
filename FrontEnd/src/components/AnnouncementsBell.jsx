@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { timeAgo } from '../utils/time';
 
 function AnnouncementsBell({ items, unreadCount, markRead, variant = 'desktop' }) {
   const [open, setOpen] = useState(false);
@@ -69,7 +70,10 @@ function AnnouncementsBell({ items, unreadCount, markRead, variant = 'desktop' }
                   <span className="announcement-item-emoji">{a.emoji}</span>
                 </span>
                 <div className="announcement-item-body">
-                  <p className="announcement-item-title">{a.title}</p>
+                  <div className="announcement-item-top">
+                    <p className="announcement-item-title">{a.title}</p>
+                    <span className="announcement-item-time">{timeAgo(a.createdAt)}</span>
+                  </div>
                   <p className="announcement-item-message">{a.message}</p>
                 </div>
                 {!a.isRead && (

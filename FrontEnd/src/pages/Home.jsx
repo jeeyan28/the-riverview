@@ -300,7 +300,7 @@ function Home() {
             </p>
             <div className="hero-actions">
               <a href="#" className="btn-primary-hero" onClick={(e) => e.preventDefault()}>Reserve a Space</a>
-              <a href="#rooms" className="btn-ghost-hero">See Rooms</a>
+              <a href="Rooms" className="btn-ghost-hero">See Rooms</a>
             </div>
           </div>
 

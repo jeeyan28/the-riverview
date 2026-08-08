@@ -29,6 +29,7 @@ const BOOKING_STATUSES = ['Pending Payment Verification', 'Confirmed', 'Rejected
 const EDITABLE_BOOKING_STATUSES = BOOKING_STATUSES.filter((s) => s !== 'Done');
 const PAYMENT_METHODS = ['Cash', 'GCash', 'Maya'];
 const SEARCH_DEBOUNCE_MS = 350;
+const BOOKINGS_POLL_MS = 15000;
 const MAX_GUEST_HISTORY_ROWS = 5;
 const SHORT_STATUS = { 'Pending Payment Verification': 'Pending' };
 const WEEKDAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -126,8 +127,8 @@ function Bookings() {
     };
   }, []);
 
-  const fetchBookings = useCallback(async () => {
-    setLoading(true);
+  const fetchBookings = useCallback(async ({ silent = false } = {}) => {
+    if (!silent) setLoading(true);
     setLoadError(false);
     try {
       const data = await bookingsService.list({
@@ -139,9 +140,9 @@ function Bookings() {
       setBookings(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error(err);
-      setLoadError(true);
+      if (!silent) setLoadError(true);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [search, statusFilter, roomFilter, dateFilter]);
 
@@ -154,6 +155,11 @@ function Bookings() {
     searchDebounce.current = setTimeout(fetchBookings, SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(searchDebounce.current);
   }, [search]);
+
+  useEffect(() => {
+    const handle = setInterval(() => fetchBookings({ silent: true }), BOOKINGS_POLL_MS);
+    return () => clearInterval(handle);
+  }, [fetchBookings]);
 
   function openEditBooking(id) {
     if (!guardPermission('booking:manage')) return;
