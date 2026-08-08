@@ -1,11 +1,24 @@
+# Dependencies
 node_modules/
+
+# Environment
 .env
 .env .example
+
+# Build output
 dist/
 build/
+
+# Vercel
+.vercel
+
+# OS / editor junk
+.DS_Store
+*.log
+
+# Local-only project docs (not tracked in repo)
 PROJECT_PROGRESS.md
 FEATURE_REQUESTS.md
 NOTES.md
 Security plan.md
 structure.txt
-.md

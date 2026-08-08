@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "audit": "npm audit --omit=dev"
   },
   "dependencies": {
     "@tanstack/react-table": "^8.21.3",

@@ -39,7 +39,7 @@ router.get("/", requireRole("manager", "super_admin"), async (req, res) => {
       filter.status = req.query.status;
     }
     if (req.query.search) {
-      const rx = new RegExp(req.query.search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+      const rx = new RegExp(String(req.query.search).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
       filter.$or = [{ name: rx }, { email: rx }];
     }
 

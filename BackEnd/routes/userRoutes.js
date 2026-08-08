@@ -41,9 +41,9 @@ function shapeUser(u) {
 router.get("/", requirePermission(PERMISSIONS.ADMIN_MANAGE), async (req, res) => {
   try {
     const filter = {};
-    if (req.query.role) filter.role = req.query.role;
+    if (req.query.role) filter.role = String(req.query.role);
     if (req.query.search) {
-      const rx = new RegExp(req.query.search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+      const rx = new RegExp(String(req.query.search).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
       filter.$or = [{ firstName: rx }, { lastName: rx }, { email: rx }];
     }
 

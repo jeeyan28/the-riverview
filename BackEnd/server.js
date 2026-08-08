@@ -3,6 +3,7 @@ dns.setServers(['1.1.1.1', '8.8.8.8']);
 
 const express = require("express");
 const mongoose = require("mongoose");
+mongoose.set("sanitizeFilter", true);
 const cors = require("cors");
 const path = require("path");
 const helmet = require("helmet");
