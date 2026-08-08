@@ -225,7 +225,7 @@ function LobbyMonitor() {
               <i className="bi bi-sort-down"></i>
               <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
                 <option value="default">Sort: Default</option>
-                <option value="roomNumber">Sort: Room Number</option>
+                <option value="roomNumber">Sort: Table Number</option>
                 <option value="timeRemaining">Sort: Time Remaining</option>
                 <option value="status">Sort: Status</option>
                 <option value="price">Sort: Price</option>
@@ -277,7 +277,7 @@ function LobbyMonitor() {
                           return (
                             <div className={`lobby-card lobby-card--${status.key}${status.critical ? ' lobby-card--critical' : ''}`} key={r._id}>
                               <div className="lobby-card-top">
-                                <span className="lobby-room-num">Room No.{r.roomNumber}</span>
+                                <span className="lobby-room-num">Table No.{r.roomNumber}</span>
                                 <span className={`lobby-badge lobby-badge--${status.key}${status.critical ? ' lobby-badge--critical' : ''}`}><span className="dot"></span>{status.label}</span>
                               </div>
                               <div className="lobby-timer">

@@ -467,7 +467,10 @@ function Monitor() {
 
       {canStartFromBooking && dueBookings.length > 0 && (
         <div className="card card-flush rm-table-wrap rm-due-wrap">
-          <div className="rm-group-head">Reservations Due</div>
+          <div className="rm-due-head">
+            <span className="card-title"><i className="bi bi-alarm"></i>Reservations Due</span>
+            <span className="rm-group-count">{dueBookings.length}</span>
+          </div>
           <table className="rm-table">
             <thead>
               <tr>
@@ -490,9 +493,12 @@ function Monitor() {
                   const isDue = scheduledStart.getTime() <= Date.now();
                   const occupancy = matchedRoom ? findRoomOccupancy(matchedRoom._id, sessions) : null;
                   const hasConflict = matchedRoom && occupancy;
+                  const downPayment = b.downPayment || 0;
+                  const totalAmount = b.amount || 0;
+                  const isFullyPaid = downPayment >= totalAmount && totalAmount > 0;
                   return (
                     <tr key={b._id} className={isDue ? 'blink-expired' : ''}>
-                      <td>{b.guestName}</td>
+                      <td><span className="rm-guest-name">{b.guestName}</span></td>
                       <td>
                         <div className="rm-name">{b.roomLabel}</div>
                         <div className="rm-type">
@@ -506,20 +512,25 @@ function Monitor() {
                         </div>
                       </td>
                       <td>{scheduledStart.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</td>
-                      <td>₱{(b.downPayment || 0).toFixed(2)} / ₱{(b.amount || 0).toFixed(2)}</td>
+                      <td>
+                        <div className="rm-amount">₱{downPayment.toFixed(2)}</div>
+                        <div className={`rm-amount-sub${isFullyPaid ? ' paid' : ''}`}>
+                          {isFullyPaid ? 'Fully paid' : `of ₱${totalAmount.toFixed(2)} total`}
+                        </div>
+                      </td>
                       <td>
                         <span className={`rm-status-pill ${isDue ? 'status-expired' : 'status-warning'}`}>
                           <span className="dot"></span>{isDue ? 'Due Now' : 'Upcoming'}
                         </span>
                         {hasConflict && (
-                          <div style={{ fontSize: '.72rem', color: 'var(--red)', marginTop: '4px' }}>
-                            Table occupied — end that session first
+                          <div className="rm-conflict-note">
+                            <i className="bi bi-exclamation-triangle"></i>Table occupied — end that session first
                           </div>
                         )}
                       </td>
                       <td>
                         <button
-                          className="rm-btn"
+                          className="rm-btn primary"
                           disabled={!roomTarget || hasConflict}
                           title={!roomTarget ? 'Could not determine this reservation\'s room.' : hasConflict ? 'End the current session on this room first.' : ''}
                           onClick={() => openStartFromBooking(b, matchedRoom, roomTarget, previewNumber)}
@@ -1221,13 +1232,13 @@ function SessionModal({ modal, onClose, onSubmit }) {
   const title = isExtend ? `Extend Session — ${modal?.fixedRoom?.roomName || ''}` : fromBooking ? 'Start Session from Reservation' : 'Start Session';
 
   return (
-    <Modal open={!!modal} onClose={onClose} title={title}>
+    <Modal open={!!modal} onClose={onClose} title={title} size="lg">
       {modal && (
         <>
           {!isExtend && (
-            <div className="rmd-stat-box" style={{ marginBottom: '16px' }}>
+            <div className="rmd-stat-box">
               <div className="val">{fixedRoomLabel}</div>
-              <div className="lbl" style={{ marginTop: '4px' }}>Rate: {fixedRoomRate}</div>
+              <div className="lbl lbl--sub">Rate: {fixedRoomRate}</div>
             </div>
           )}
 
@@ -1258,11 +1269,11 @@ function SessionModal({ modal, onClose, onSubmit }) {
               </div>
             </div>
             {fromBooking && (
-              <p style={{ margin: '6px 0 0', fontSize: '.72rem', color: 'var(--muted)' }}>Duration is fixed to what the guest reserved.</p>
+              <p className="mfield-note">Duration is fixed to what the guest reserved.</p>
             )}
 
             {!isExtend && !fromBooking && (
-              <div className="aw-preset-row" style={{ marginTop: '9px' }}>
+              <div className="aw-preset-row aw-preset-row--gap-top">
                 {DURATION_PRESETS.map((p) => (
                   <button key={p.label} type="button" className="aw-preset-btn" onClick={() => setDurationFromHours(p.mins / 60)}>{p.label}</button>
                 ))}
@@ -1278,6 +1289,13 @@ function SessionModal({ modal, onClose, onSubmit }) {
           )}
 
           <div className="mfield-section-label">Payment</div>
+
+          {fromBooking && (
+            <div className="mfield-paid-note">
+              <i className="bi bi-check-circle-fill"></i>
+              <span>₱{(modal.downPaymentInfo?.paid || 0).toFixed(2)} of ₱{(modal.downPaymentInfo?.total || 0).toFixed(2)} down payment already paid online — applied automatically.</span>
+            </div>
+          )}
 
           {!isExtend && !fromBooking && (
             <div className="mfield">
@@ -1309,15 +1327,6 @@ function SessionModal({ modal, onClose, onSubmit }) {
                   Pay After
                 </button>
               </div>
-            </div>
-          )}
-
-          {fromBooking && (
-            <div className="mfield">
-              <label>Payment</label>
-              <p style={{ margin: 0, fontSize: '.82rem', color: 'var(--muted)' }}>
-                Downpayment already paid online: ₱{(modal.downPaymentInfo?.paid || 0).toFixed(2)} of ₱{(modal.downPaymentInfo?.total || 0).toFixed(2)}. Applied automatically.
-              </p>
             </div>
           )}
 

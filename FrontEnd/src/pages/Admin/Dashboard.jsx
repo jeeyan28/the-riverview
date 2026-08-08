@@ -1,11 +1,13 @@
 import '../../styles/admin/dashboard.css';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import DataTable from '../../components/DataTable';
 import { dashboardService } from '../../services/dashboard';
-import { monitorRoomsService } from '../../services/monitoring';
+import { monitorRoomsService, roomSessionsService } from '../../services/monitoring';
 import { bookingsService } from '../../services/bookings';
 import { formatPeso } from '../../utils/currency';
+import { dateKey } from '../../utils/rooms';
+import { buildRoomView, formatTimeRemaining } from '../../hooks/useRoomMonitorData';
 
 const STATUS_PILL_CLASS = {
   Ongoing: 'pill-active',
@@ -31,6 +33,8 @@ const ROOM_STATUS_DOT_CLASS = {
   Inactive: 'dash-dot-vacant',
 };
 
+const DASHBOARD_POLL_MS = 15000;
+
 function initialsOf(name) {
   return (
     (name || '?')
@@ -53,8 +57,10 @@ function Dashboard() {
   const navigate = useNavigate();
 
   const [rooms, setRooms] = useState([]);
+  const [sessions, setSessions] = useState([]);
   const [roomsLoading, setRoomsLoading] = useState(true);
   const [roomsError, setRoomsError] = useState(false);
+  const [, forceTick] = useState(0);
 
   const [recentBookings, setRecentBookings] = useState([]);
   const [bookingsLoading, setBookingsLoading] = useState(true);
@@ -64,58 +70,77 @@ function Dashboard() {
   const [summaryLoading, setSummaryLoading] = useState(true);
   const [summaryError, setSummaryError] = useState(false);
 
+  const unmountedRef = useRef(false);
   useEffect(() => {
-    let cancelled = false;
+    unmountedRef.current = false;
+    return () => {
+      unmountedRef.current = true;
+    };
+  }, []);
 
-    async function loadRooms() {
-      setRoomsLoading(true);
-      setRoomsError(false);
-      try {
-        const data = await monitorRoomsService.list();
-        if (!cancelled) setRooms(Array.isArray(data) ? data : []);
-      } catch (err) {
-        console.error(err);
-        if (!cancelled) setRoomsError(true);
-      } finally {
-        if (!cancelled) setRoomsLoading(false);
-      }
+  const loadRooms = useCallback(async ({ silent = false } = {}) => {
+    if (!silent) setRoomsLoading(true);
+    if (!silent) setRoomsError(false);
+    try {
+      const [roomsData, sessionsData] = await Promise.all([monitorRoomsService.list(), roomSessionsService.list()]);
+      if (unmountedRef.current) return;
+      setRooms(Array.isArray(roomsData) ? roomsData : []);
+      setSessions(Array.isArray(sessionsData) ? sessionsData : []);
+    } catch (err) {
+      console.error(err);
+      if (!unmountedRef.current && !silent) setRoomsError(true);
+    } finally {
+      if (!unmountedRef.current && !silent) setRoomsLoading(false);
     }
+  }, []);
 
-    async function loadRecentBookings() {
-      setBookingsLoading(true);
-      setBookingsError(false);
-      try {
-        const data = await bookingsService.list();
-        if (!cancelled) setRecentBookings((Array.isArray(data) ? data : []).slice(0, 5));
-      } catch (err) {
-        console.error(err);
-        if (!cancelled) setBookingsError(true);
-      } finally {
-        if (!cancelled) setBookingsLoading(false);
-      }
+  const loadRecentBookings = useCallback(async ({ silent = false } = {}) => {
+    if (!silent) setBookingsLoading(true);
+    if (!silent) setBookingsError(false);
+    try {
+      const today = dateKey(new Date().getFullYear(), new Date().getMonth(), new Date().getDate());
+      const data = await bookingsService.list({ date: today });
+      if (unmountedRef.current) return;
+      setRecentBookings(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error(err);
+      if (!unmountedRef.current && !silent) setBookingsError(true);
+    } finally {
+      if (!unmountedRef.current && !silent) setBookingsLoading(false);
     }
+  }, []);
 
-    async function loadSummary() {
-      setSummaryLoading(true);
-      setSummaryError(false);
-      try {
-        const data = await dashboardService.getSummary();
-        if (!cancelled) setSummary(data);
-      } catch (err) {
-        console.error(err);
-        if (!cancelled) setSummaryError(true);
-      } finally {
-        if (!cancelled) setSummaryLoading(false);
-      }
+  const loadSummary = useCallback(async ({ silent = false } = {}) => {
+    if (!silent) setSummaryLoading(true);
+    if (!silent) setSummaryError(false);
+    try {
+      const data = await dashboardService.getSummary();
+      if (unmountedRef.current) return;
+      setSummary(data);
+    } catch (err) {
+      console.error(err);
+      if (!unmountedRef.current && !silent) setSummaryError(true);
+    } finally {
+      if (!unmountedRef.current && !silent) setSummaryLoading(false);
     }
+  }, []);
 
+  useEffect(() => {
     loadRooms();
     loadRecentBookings();
     loadSummary();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    const tickHandle = setInterval(() => forceTick((n) => n + 1), 1000);
+    return () => clearInterval(tickHandle);
+  }, [loadRooms, loadRecentBookings, loadSummary]);
+
+  useEffect(() => {
+    const pollHandle = setInterval(() => {
+      loadRooms({ silent: true });
+      loadRecentBookings({ silent: true });
+      loadSummary({ silent: true });
+    }, DASHBOARD_POLL_MS);
+    return () => clearInterval(pollHandle);
+  }, [loadRooms, loadRecentBookings, loadSummary]);
 
   const recentColumns = [
     {
@@ -140,6 +165,16 @@ function Dashboard() {
   const bookingsDelta = summary?.todayBookings?.deltaVsYesterday ?? 0;
   const revenuePercent = summary?.todayRevenue?.percentVsAvg ?? 0;
   const overdueCount = summary?.overdueRooms?.count ?? 0;
+
+  const roomViews = rooms
+    .map((r) => ({ room: r, view: buildRoomView(r, sessions) }))
+    .sort((a, b) => {
+      if (a.view.occupancy && b.view.occupancy) return a.view.remaining - b.view.remaining;
+      if (a.view.occupancy) return -1;
+      if (b.view.occupancy) return 1;
+      return 0;
+    })
+    .slice(0, 10);
 
   return (
     <div className="panel active" id="panel-dashboard">
@@ -210,10 +245,15 @@ function Dashboard() {
             ) : rooms.length === 0 ? (
               <div className="dash-empty-state">No rooms yet.</div>
             ) : (
-              rooms.map((r) => (
+              roomViews.map(({ room: r, view }) => (
                 <div className="dash-room-row" key={r._id}>
                   <span className={`dash-room-dot ${ROOM_STATUS_DOT_CLASS[r.status] || 'dash-dot-vacant'}`}></span>
                   <span className="dash-room-num">{r.roomNumber}</span>
+                  {view.occupancy && (
+                    <span className={`dash-room-time${view.isCritical || view.isPastEnd ? ' critical' : view.isWarning ? ' warning' : ''}`}>
+                      {formatTimeRemaining(view.remaining, view.isPastEnd)}
+                    </span>
+                  )}
                   <span className={`pill ${ROOM_STATUS_PILL_CLASS[r.status] || 'pill-vacant'}`}>{r.status}</span>
                 </div>
               ))

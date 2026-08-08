@@ -79,6 +79,9 @@
 #panel-dashboard .dash-room-row:hover{background:var(--navy4);transform:translateX(2px);}
 #panel-dashboard .dash-room-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
 #panel-dashboard .dash-room-num{flex:1;font-size:.8rem;color:var(--text);}
+#panel-dashboard .dash-room-time{font-size:.76rem;color:var(--muted);font-variant-numeric:tabular-nums;}
+#panel-dashboard .dash-room-time.warning{color:var(--amber);}
+#panel-dashboard .dash-room-time.critical{color:var(--red);}
 #panel-dashboard .dash-dot-active{background:var(--teal);box-shadow:0 0 0 3px rgba(0,201,167,.18);}
 #panel-dashboard .dash-dot-vacant{background:var(--blue);}
 #panel-dashboard .dash-dot-overdue{background:var(--amber);box-shadow:0 0 0 3px rgba(239,159,39,.16);}
