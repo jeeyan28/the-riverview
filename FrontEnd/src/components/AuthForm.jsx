@@ -4,6 +4,7 @@ import PasswordInput from './PasswordInput';
 import PasswordRequirementsList from './PasswordRequirementsList';
 import Toast from './Toast';
 import OtpInput from './OtpInput';
+import Modal from './Modal';
 import { useToast } from '../hooks/useToast';
 import { useGoogleAuth } from '../hooks/useGoogleAuth';
 import { useCountdownClock } from '../hooks/useCountdownClock';
@@ -29,12 +30,48 @@ function AuthForm({ mode, onSwitchMode, onForgotPassword }) {
     login,
     register,
     loginWithGoogle,
+    continueAsGuest,
     resendAccountVerification,
     verifyAccountOtp,
     verifyRegistrationOtp,
     resendRegistrationOtp,
   } = useAuth();
   const { toast, showToast } = useToast();
+  const [guestLoading, setGuestLoading] = useState(false);
+  const [guestModalOpen, setGuestModalOpen] = useState(false);
+  const [guestFirstName, setGuestFirstName] = useState('');
+  const [guestLastName, setGuestLastName] = useState('');
+  const [guestErrors, setGuestErrors] = useState({ firstName: '', lastName: '' });
+
+  function openGuestModal() {
+    setGuestFirstName('');
+    setGuestLastName('');
+    setGuestErrors({ firstName: '', lastName: '' });
+    setGuestModalOpen(true);
+  }
+
+  async function handleGuestSubmit() {
+    if (guestLoading) return;
+    const firstNameError = validateName(guestFirstName, 'First name');
+    const lastNameError = validateName(guestLastName, 'Last name');
+    setGuestErrors({ firstName: firstNameError, lastName: lastNameError });
+    if (firstNameError || lastNameError) return;
+
+    setGuestLoading(true);
+    try {
+      const user = await continueAsGuest({
+        firstName: normalizeName(guestFirstName),
+        lastName: normalizeName(guestLastName),
+      });
+      setGuestModalOpen(false);
+      showToast('Continuing as guest…', 'success');
+      setTimeout(() => redirectAfterLogin(user), 1200);
+    } catch (err) {
+      showToast(err.message || 'Could not start a guest session.', 'error');
+    } finally {
+      setGuestLoading(false);
+    }
+  }
 
   async function handleGoogleCredential(response) {
     if (!response.code) {
@@ -555,6 +592,14 @@ function AuthForm({ mode, onSwitchMode, onForgotPassword }) {
             </span>
             <ArrowRight size={16} className="btn-social-arrow" />
           </button>
+          <button
+            type="button"
+            className="btn-guest"
+            onClick={openGuestModal}
+            disabled={guestLoading}
+          >
+            Continue as Guest
+          </button>
           <div className="signup-row">
             New here?{' '}
             <button type="button" className="link-button" onClick={onSwitchMode}>
@@ -563,6 +608,68 @@ function AuthForm({ mode, onSwitchMode, onForgotPassword }) {
           </div>
 
         </form>
+
+        <Modal
+          open={guestModalOpen}
+          onClose={() => !guestLoading && setGuestModalOpen(false)}
+          title="Continue as Guest"
+          actions={
+            <>
+              <button type="button" className="cancel-btn" onClick={() => setGuestModalOpen(false)} disabled={guestLoading}>
+                Cancel
+              </button>
+              <button type="button" className="save-btn" onClick={handleGuestSubmit} disabled={guestLoading}>
+                {guestLoading ? 'Starting…' : 'Continue'}
+              </button>
+            </>
+          }
+        >
+          <div className="rf-scope">
+            <div className={`field${guestErrors.firstName ? ' has-error' : ''}`} id="field-guest-firstname">
+              <label htmlFor="guest-firstname">First name</label>
+              <div className="input-wrap">
+                <input
+                  type="text"
+                  id="guest-firstname"
+                  name="firstname"
+                  placeholder="Juan"
+                  autoComplete="given-name"
+                  value={guestFirstName}
+                  onChange={(e) => {
+                    setGuestFirstName(e.target.value);
+                    setGuestErrors((prev) => (prev.firstName ? { ...prev, firstName: '' } : prev));
+                  }}
+                />
+                <User size={18} className="input-icon" />
+              </div>
+              <span className="field-error" style={{ display: guestErrors.firstName ? 'block' : 'none' }}>
+                {guestErrors.firstName}
+              </span>
+            </div>
+
+            <div className={`field${guestErrors.lastName ? ' has-error' : ''}`} id="field-guest-lastname">
+              <label htmlFor="guest-lastname">Last name</label>
+              <div className="input-wrap">
+                <input
+                  type="text"
+                  id="guest-lastname"
+                  name="lastname"
+                  placeholder="dela Cruz"
+                  autoComplete="family-name"
+                  value={guestLastName}
+                  onChange={(e) => {
+                    setGuestLastName(e.target.value);
+                    setGuestErrors((prev) => (prev.lastName ? { ...prev, lastName: '' } : prev));
+                  }}
+                />
+                <User size={18} className="input-icon" />
+              </div>
+              <span className="field-error" style={{ display: guestErrors.lastName ? 'block' : 'none' }}>
+                {guestErrors.lastName}
+              </span>
+            </div>
+          </div>
+        </Modal>
 
         <Toast {...toast} />
       </>

@@ -8,6 +8,10 @@ const { requirePermission, ensureAuthenticated } = require("../middleware/adminA
 const { paymentProofUpload } = require("../middleware/upload");
 const { PERMISSIONS, isAdminRole } = require("../utils/permissions");
 const { validateAndPriceBooking, computeDownPayment, saveWithReservationCode, runInTransaction, voidExpiredBookings, updateBookingLifecycleStatuses, bookingStartMs } = require("../utils/bookingHelper");
+const { validate } = require("../middleware/validate");
+const { lockSchema, createBookingSchema, rescheduleSchema, updateBookingSchema } = require("../validation/bookingSchemas");
+const { logAudit } = require("../utils/auditLog");
+const { bookingActionLimiter } = require("../middleware/rateLimiter");
 
 
 router.get("/", requirePermission(PERMISSIONS.BOOKING_VIEW), async (req, res) => {
@@ -121,14 +125,9 @@ router.get("/availability-month", async (req, res) => {
   }
 });
 
-router.post("/lock", ensureAuthenticated, async (req, res) => {
+router.post("/lock", ensureAuthenticated, bookingActionLimiter, validate(lockSchema), async (req, res) => {
   try {
-    const { roomId, variantLabel, date, timeIn, duration: durationRaw } = req.body;
-    const duration = Number(durationRaw);
-
-    if (!roomId || !date || !timeIn || !duration) {
-      return res.status(400).json({ message: "roomId, date, timeIn and duration are required." });
-    }
+    const { roomId, variantLabel, date, timeIn, duration } = req.body;
 
     let lock;
     try {
@@ -176,7 +175,7 @@ router.delete("/lock/:id", ensureAuthenticated, async (req, res) => {
   }
 });
 
-router.post("/", ensureAuthenticated, paymentProofUpload.single("paymentScreenshot"), async (req, res) => {
+router.post("/", ensureAuthenticated, paymentProofUpload.single("paymentScreenshot"), validate(createBookingSchema), async (req, res) => {
   try {
     const isAdminBooking = isAdminRole(req.user.role);
     if (!isAdminBooking) {
@@ -185,13 +184,7 @@ router.post("/", ensureAuthenticated, paymentProofUpload.single("paymentScreensh
       });
     }
 
-    const { guestName, guestContact, guestEmail, guestCount: guestCountRaw, specialRequests, roomId, variantLabel, date, timeIn, duration: durationRaw, paymentMethod } = req.body;
-    const duration = Number(durationRaw);
-    const guestCount = guestCountRaw !== undefined && guestCountRaw !== "" ? Number(guestCountRaw) : 1;
-
-    if (!guestName) {
-      return res.status(400).json({ message: "guestName, roomId, date, timeIn and duration are required." });
-    }
+    const { guestName, guestContact, guestEmail, guestCount, specialRequests, roomId, variantLabel, date, timeIn, duration, paymentMethod } = req.body;
 
     let booking;
     try {
@@ -202,7 +195,7 @@ router.post("/", ensureAuthenticated, paymentProofUpload.single("paymentScreensh
           guestName,
           guestContact: guestContact || "",
           guestEmail: guestEmail || "",
-          guestCount: Number.isFinite(guestCount) && guestCount > 0 ? guestCount : 1,
+          guestCount: guestCount || 1,
           specialRequests: specialRequests || "",
           room: room._id,
           roomLabel: room.name,
@@ -225,6 +218,7 @@ router.post("/", ensureAuthenticated, paymentProofUpload.single("paymentScreensh
       return res.status(e.status || 500).json({ message: e.message || "Server error." });
     }
 
+    await logAudit({ category: "Booking", action: "created", description: `created walk-in booking ${booking.reservationCode} for ${booking.guestName}`, user: req.user });
     res.status(201).json(booking);
   } catch (err) {
     console.error(err);
@@ -257,12 +251,9 @@ router.get("/:id", ensureAuthenticated, async (req, res) => {
   }
 });
 
-router.put("/:id/reschedule", ensureAuthenticated, async (req, res) => {
+router.put("/:id/reschedule", ensureAuthenticated, bookingActionLimiter, validate(rescheduleSchema), async (req, res) => {
   try {
     const { date, timeIn } = req.body;
-    if (!date || !timeIn) {
-      return res.status(400).json({ message: "date and timeIn are required." });
-    }
 
     let booking;
     try {
@@ -319,6 +310,7 @@ router.put("/:id/approve", requirePermission(PERMISSIONS.BOOKING_MANAGE), async 
       { returnDocument: "after", runValidators: true }
     );
     if (!booking) return res.status(404).json({ message: "Booking not found." });
+    await logAudit({ category: "Booking", action: "updated", description: `approved booking ${booking.reservationCode} for ${booking.guestName}`, user: req.user });
     res.json(booking);
   } catch (err) {
     console.error(err);
@@ -334,6 +326,7 @@ router.put("/:id/reject", requirePermission(PERMISSIONS.BOOKING_MANAGE), async (
       { returnDocument: "after", runValidators: true }
     );
     if (!booking) return res.status(404).json({ message: "Booking not found." });
+    await logAudit({ category: "Booking", action: "updated", description: `rejected booking ${booking.reservationCode} for ${booking.guestName}`, user: req.user });
     res.json(booking);
   } catch (err) {
     console.error(err);
@@ -341,7 +334,7 @@ router.put("/:id/reject", requirePermission(PERMISSIONS.BOOKING_MANAGE), async (
   }
 });
 
-router.put("/:id", requirePermission(PERMISSIONS.BOOKING_MANAGE), async (req, res) => {
+router.put("/:id", requirePermission(PERMISSIONS.BOOKING_MANAGE), validate(updateBookingSchema), async (req, res) => {
   try {
     const {
       status, duration, paymentMethod, timeIn, date, guestName,
@@ -410,6 +403,7 @@ router.put("/:id", requirePermission(PERMISSIONS.BOOKING_MANAGE), async (req, re
       return res.status(e.status || 500).json({ message: e.message || "Server error." });
     }
 
+    await logAudit({ category: "Booking", action: "updated", description: `updated booking ${booking.reservationCode} for ${booking.guestName}`, user: req.user });
     res.json(booking);
   } catch (err) {
     console.error(err);
@@ -421,6 +415,7 @@ router.delete("/:id", requirePermission(PERMISSIONS.BOOKING_MANAGE), async (req,
   try {
     const booking = await Booking.findByIdAndDelete(req.params.id);
     if (!booking) return res.status(404).json({ message: "Booking not found." });
+    await logAudit({ category: "Booking", action: "deleted", description: `deleted booking ${booking.reservationCode} for ${booking.guestName}`, user: req.user });
     res.json({ message: "Booking deleted." });
   } catch (err) {
     console.error(err);

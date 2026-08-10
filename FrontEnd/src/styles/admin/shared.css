@@ -328,8 +328,8 @@ body{
 #app .password-requirements .requirement-icon{font-size:.66rem;line-height:1;min-width:1em;}
 
 .modal-bg{
-  display:none;position:fixed;inset:0;background:rgba(6,10,18,.7);
-  backdrop-filter:blur(3px);z-index:50;align-items:center;justify-content:center;padding:20px;
+  display:none;position:fixed;inset:0;background:rgba(6,10,18,.82);
+  backdrop-filter:blur(14px);z-index:50;align-items:center;justify-content:center;padding:20px;
 }
 .modal-bg.open{display:flex;}
 .modal-box{

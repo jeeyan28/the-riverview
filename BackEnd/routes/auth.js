@@ -1,12 +1,12 @@
 const express = require("express");
 const crypto = require("crypto");
-const bcrypt = require("bcryptjs"); // matches the package used in model/user.js
+const bcrypt = require("bcryptjs");
 const router = express.Router();
 
 const User = require("../model/user");
 const LoginHistory = require("../model/loginHistory");
 const PendingRegistration = require("../model/pendingRegistration");
-const { loginLimiter, forgotPasswordLimiter, registerOtpLimiter } = require("../middleware/rateLimiter");
+const { loginLimiter, forgotPasswordLimiter, registerOtpLimiter, guestCreationLimiter, guestRecoveryLoginLimiter } = require("../middleware/rateLimiter");
 const { ensureAuthenticated } = require("../middleware/adminAuth");
 const { sendOtpEmail } = require("../utils/mailer");
 const {
@@ -22,11 +22,8 @@ const { exchangeGoogleAuthCode } = require("../utils/googleVerify");
 const { normalizeName, validateName } = require("../utils/nameValidation");
 const { isAdminRole, getEffectivePermissions, roleLabel } = require("../utils/permissions");
 const { isPasswordStrongEnough, PASSWORD_POLICY_MESSAGE } = require("../utils/passwordPolicy");
+const { GUEST_EMAIL_DOMAIN } = require("../utils/constants");
 
-// Fixed bcrypt hash of a random value, used only to burn CPU time when a user
-// doesn't exist, so login response time doesn't reveal whether the email is
-// registered. Generate your own once with `bcrypt.hashSync(crypto.randomBytes(16).toString("hex"), 10)`
-// and hardcode the result here (do NOT regenerate it per-process).
 const DUMMY_HASH = "$2b$10$CwTycUXWue0Thq9StjUM0uJ8i8U6vJXd8yGdIeYbFqOZ2P0zqhkbG";
 
 function sanitizeUser(user) {
@@ -39,17 +36,12 @@ function sanitizeUser(user) {
     role: user.role,
     roleLabel: roleLabel(user.role),
     permissions: isAdminRole(user.role) ? getEffectivePermissions(user) : undefined,
-    // Lets the client gate profile-detail editing: Google-linked accounts
-    // source their name from Google, not a manual edit form (see
-    // FEATURE_REQUESTS.md). Boolean only — never send the raw googleId.
     isGoogleAccount: !!user.googleId,
-    // Google's photo, shown instead of the letter-avatar for Google
-    // accounts. Only ever populated when isGoogleAccount is true.
+    isGuest: !!user.isGuest,
     profilePicture: user.googleId ? user.googleProfilePicture || "" : "",
   };
 }
 
-// Promise wrapper so we can `await` session regeneration/save cleanly below.
 function regenerateSession(req) {
   return new Promise((resolve, reject) => {
     req.session.regenerate((err) => (err ? reject(err) : resolve()));
@@ -61,9 +53,6 @@ function saveSession(req) {
   });
 }
 
-// Records a single login attempt (success or failure) for the admin panel's
-// Login History page. Never throws into the caller — a logging failure
-// must not block or fail a real login.
 async function logLoginAttempt(req, { user, email, status, reason = "", method = "password" }) {
   try {
     await LoginHistory.create({
@@ -82,9 +71,6 @@ async function logLoginAttempt(req, { user, email, status, reason = "", method =
   }
 }
 
-// ── Register a new (customer) user — Part 3: stages the signup as a
-// PendingRegistration and emails an OTP; the User document itself isn't
-// created until that OTP is verified (Part 5/7).
 router.post("/register", registerOtpLimiter, async (req, res) => {
   try {
     const { password } = req.body;
@@ -96,13 +82,6 @@ router.post("/register", registerOtpLimiter, async (req, res) => {
     const firstNameError = validateName(req.body.firstName, "First name");
     const lastNameError = validateName(req.body.lastName, "Last name");
 
-    // Field-specific checks, in form order. Each missing/invalid field gets
-    // its own message (mirroring firstName/lastName's existing pattern)
-    // instead of a blanket "All fields are required." — that message was
-    // misleading whenever only one field was actually missing, or the
-    // problem wasn't a missing field at all (e.g. a malformed email). The
-    // generic message is now reserved for a payload with no email and no
-    // password at all (a genuinely empty/malformed request).
     if (firstNameError) {
       return res.status(400).json({ message: firstNameError, field: "firstName" });
     }
@@ -135,8 +114,6 @@ router.post("/register", registerOtpLimiter, async (req, res) => {
 
     const passwordHash = await bcrypt.hash(password, User.SALT_ROUNDS);
 
-    // Reuse an existing pending signup for this email instead of creating a
-    // second one — just refresh its data and OTP, per FEATURE_REQUESTS.md.
     let pending = await PendingRegistration.findOne({ email: emailLower });
     if (pending) {
       pending.firstName = firstNameNormalized;
@@ -148,15 +125,11 @@ router.post("/register", registerOtpLimiter, async (req, res) => {
         lastName: lastNameNormalized,
         email: emailLower,
         passwordHash,
-        otpHash: "",       // set below, before save
-        otpExpires: new Date(0), // set below, before save
+        otpHash: "",
+        otpExpires: new Date(0),
       });
     }
 
-    // Both a brand-new signup and a resubmission for an existing pending
-    // record count against the same per-email hourly cap — otherwise
-    // someone could bypass /register/resend-otp's limit just by resubmitting
-    // the registration form instead.
     const windowCheck = checkAndBumpOtpRequestWindow(pending);
     if (!windowCheck.allowed) {
       return res.status(429).json({
@@ -187,9 +160,6 @@ router.post("/register", registerOtpLimiter, async (req, res) => {
   }
 });
 
-// ── Resend registration OTP — Part 6. Shares the same per-email hourly cap
-// as /register (checkAndBumpOtpRequestWindow) plus a 60s cooldown, and
-// resets otpAttempts the same way a fresh OTP always does.
 router.post("/register/resend-otp", registerOtpLimiter, async (req, res) => {
   try {
     const { email } = req.body;
@@ -240,11 +210,6 @@ router.post("/register/resend-otp", registerOtpLimiter, async (req, res) => {
   }
 });
 
-// ── Verify registration OTP — Part 5 + Part 7 combined: consumes the
-// PendingRegistration and creates the real, verified User in one step
-// (there's no valid intermediate state between "OTP confirmed" and
-// "account exists" to split these into two requests). Also enforces
-// Part 6's max-verification-attempts cap.
 router.post("/register/verify-otp", registerOtpLimiter, async (req, res) => {
   try {
     const { email, otp } = req.body;
@@ -259,8 +224,6 @@ router.post("/register/verify-otp", registerOtpLimiter, async (req, res) => {
     const expired = { message: "That code has expired. Request a new one." };
     const tooManyAttempts = { message: "Too many incorrect attempts. Please request a new code." };
 
-    // Covers both "never registered" and "already verified" (the pending
-    // record is deleted on success, so a replayed/reused code lands here).
     if (!pending) {
       return res.status(400).json(incorrect);
     }
@@ -281,8 +244,6 @@ router.post("/register/verify-otp", registerOtpLimiter, async (req, res) => {
       return res.status(400).json(incorrect);
     }
 
-    // Guard a race where a second signup/verification for this email
-    // completed between /register and now.
     const existingUser = await User.findOne({ email: emailLower });
     if (existingUser) {
       await PendingRegistration.deleteOne({ _id: pending._id });
@@ -293,7 +254,7 @@ router.post("/register/verify-otp", registerOtpLimiter, async (req, res) => {
       firstName: pending.firstName,
       lastName: pending.lastName,
       email: pending.email,
-      password: pending.passwordHash, // already bcrypt-hashed — see model/user.js's skipPasswordHash guard
+      password: pending.passwordHash,
       role: "user",
       isVerified: true,
     });
@@ -309,11 +270,6 @@ router.post("/register/verify-otp", registerOtpLimiter, async (req, res) => {
   }
 });
 
-// ── Resend verification code — Part 8. For an existing User whose account
-// isn't verified (e.g. created outside the registration OTP flow, so
-// there's no PendingRegistration left to resend from). Reuses the same OTP
-// primitives/email purpose as registration; stores the OTP on the User
-// document itself, mirroring resetOtpHash/resetOtpExpires's pattern above.
 router.post("/resend-verification", registerOtpLimiter, async (req, res) => {
   try {
     const { email } = req.body;
@@ -324,7 +280,6 @@ router.post("/resend-verification", registerOtpLimiter, async (req, res) => {
       "+verifyOtpExpires +otpWindowStart +otpResendCount"
     );
 
-    // Generic response either way — don't reveal whether the account exists.
     const generic = { message: "If that account needs verification, a code has been sent." };
     if (!user || user.isVerified) return res.json(generic);
 
@@ -339,9 +294,6 @@ router.post("/resend-verification", registerOtpLimiter, async (req, res) => {
       }
     }
 
-    // Same per-email hourly cap PendingRegistration enforces on registration
-    // resends, reused unmodified — User has the same otpWindowStart/
-    // otpResendCount fields checkAndBumpOtpRequestWindow expects.
     const windowCheck = checkAndBumpOtpRequestWindow(user);
     if (!windowCheck.allowed) {
       return res.status(429).json({
@@ -369,9 +321,6 @@ router.post("/resend-verification", registerOtpLimiter, async (req, res) => {
   }
 });
 
-// ── Verify an existing account's OTP — Part 8's counterpart to
-// /register/verify-otp, for accounts that already exist but aren't
-// verified yet. Does not log the user in; they sign in normally afterward.
 router.post("/verify-account-otp", registerOtpLimiter, async (req, res) => {
   try {
     const { email, otp } = req.body;
@@ -421,7 +370,304 @@ router.post("/verify-account-otp", registerOtpLimiter, async (req, res) => {
   }
 });
 
-// ── Login (customers AND staff/manager/super_admin all use this same endpoint)
+router.post("/guest", guestCreationLimiter, async (req, res) => {
+  try {
+    const firstNameError = validateName(req.body.firstName, "First name");
+    const lastNameError = validateName(req.body.lastName, "Last name");
+    if (firstNameError || lastNameError) {
+      return res.status(400).json({ message: firstNameError || lastNameError, field: firstNameError ? "firstName" : "lastName" });
+    }
+
+    const user = await User.create({
+      firstName: normalizeName(req.body.firstName),
+      lastName: normalizeName(req.body.lastName),
+      phone: "",
+      email: `guest_${crypto.randomUUID()}@${GUEST_EMAIL_DOMAIN}`,
+      role: "user",
+      isGuest: true,
+      isVerified: true,
+      isActive: true,
+    });
+
+    await logLoginAttempt(req, { user, status: "success", method: "guest" });
+
+    await regenerateSession(req);
+
+    req.session.userId = user._id.toString();
+    req.session.role = user.role;
+    await saveSession(req);
+
+    res.status(201).json({ message: "Guest session started.", user: sanitizeUser(user) });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error." });
+  }
+});
+
+// GUEST_ACCOUNT_PLAN.md Section 2: the customer-facing counterpart to
+// POST /api/users/:id/recover (routes/userRoutes.js). Verifies the one-time
+// temp email/password an admin relayed to the customer. This is the only
+// place a soft-deleted guest is considered restored — issuing the temp
+// credentials (the admin side) does not clear guestDeletedAt on its own.
+router.post("/guest-recovery-login", guestRecoveryLoginLimiter, async (req, res) => {
+  try {
+    const { tempEmail, tempPassword } = req.body;
+    if (!tempEmail || !tempPassword) {
+      return res.status(400).json({ message: "Temporary email and password are required." });
+    }
+
+    const invalid = { message: "Invalid or expired recovery credentials." };
+
+    const user = await User.findOne({
+      guestRecoveryEmailHash: hashOtp(String(tempEmail).trim()),
+      isGuest: true,
+    }).select("+guestRecoveryPasswordHash +guestRecoveryExpiresAt");
+
+    if (!user || !user.guestRecoveryExpiresAt || user.guestRecoveryExpiresAt.getTime() < Date.now()) {
+      await logLoginAttempt(req, { email: tempEmail, status: "failed", reason: "Invalid or expired guest recovery credentials", method: "guest-recovery" });
+      return res.status(400).json(invalid);
+    }
+
+    if (!hashesMatch(hashOtp(String(tempPassword)), user.guestRecoveryPasswordHash)) {
+      await logLoginAttempt(req, { user, status: "failed", reason: "Wrong recovery password", method: "guest-recovery" });
+      return res.status(400).json(invalid);
+    }
+
+    user.guestDeletedAt = null;
+    user.isActive = true;
+    user.guestRecoveryEmailHash = undefined;
+    user.guestRecoveryPasswordHash = undefined;
+    user.guestRecoveryExpiresAt = undefined;
+    await user.save();
+
+    await logLoginAttempt(req, { user, status: "success", method: "guest-recovery" });
+
+    await regenerateSession(req);
+
+    req.session.userId = user._id.toString();
+    req.session.role = user.role;
+    await saveSession(req);
+
+    res.json({ message: "Welcome back! Your account has been restored.", user: sanitizeUser(user) });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error." });
+  }
+});
+
+function requireGuest(req, res, next) {
+  if (!req.user.isGuest) {
+    return res.status(403).json({ message: "Only guest accounts can be claimed." });
+  }
+  next();
+}
+
+router.post("/guest/claim/email/start", registerOtpLimiter, ensureAuthenticated, requireGuest, async (req, res) => {
+  try {
+    const { password } = req.body;
+    const emailRaw = String(req.body.email || "").trim();
+    const emailLower = emailRaw.toLowerCase();
+
+    if (!emailRaw) {
+      return res.status(400).json({ message: "Email is required.", field: "email" });
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailRaw)) {
+      return res.status(400).json({ message: "Enter a valid email address.", field: "email" });
+    }
+    if (!password) {
+      return res.status(400).json({ message: "Password is required.", field: "password" });
+    }
+    if (!isPasswordStrongEnough(password)) {
+      return res.status(400).json({ message: PASSWORD_POLICY_MESSAGE, field: "password" });
+    }
+
+    const existingUser = await User.findOne({ email: emailLower, _id: { $ne: req.user._id } });
+    if (existingUser) {
+      return res.status(409).json({ message: "An account with this email already exists.", field: "email" });
+    }
+
+    const passwordHash = await bcrypt.hash(password, User.SALT_ROUNDS);
+
+    const user = await User.findById(req.user._id).select(
+      "+verifyOtpHash +verifyOtpExpires +verifyOtpAttempts +otpWindowStart +otpResendCount"
+    );
+
+    const windowCheck = checkAndBumpOtpRequestWindow(user);
+    if (!windowCheck.allowed) {
+      return res.status(429).json({
+        message: "Too many verification codes requested. Please try again later.",
+        retryAfterSeconds: windowCheck.retryAfterSeconds,
+      });
+    }
+
+    const otp = generateOtp();
+    user.pendingClaimEmail = emailLower;
+    user.pendingClaimPasswordHash = passwordHash;
+    user.verifyOtpHash = hashOtp(otp);
+    user.verifyOtpExpires = new Date(Date.now() + OTP_TTL_MS);
+    user.verifyOtpAttempts = 0;
+    await user.save();
+
+    try {
+      await sendOtpEmail({ email: emailLower, firstName: user.firstName, lastName: user.lastName }, otp, "verify");
+    } catch (err) {
+      console.error("Failed to send claim OTP email:", err);
+    }
+
+    res.json({ message: "Verification code sent.", email: emailLower });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error." });
+  }
+});
+
+router.post("/guest/claim/email/resend-otp", registerOtpLimiter, ensureAuthenticated, requireGuest, async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id).select(
+      "+pendingClaimEmail +verifyOtpExpires +otpWindowStart +otpResendCount"
+    );
+
+    if (!user.pendingClaimEmail) {
+      return res.status(400).json({ message: "No pending claim request. Start again." });
+    }
+
+    if (user.verifyOtpExpires) {
+      const lastIssuedAt = user.verifyOtpExpires.getTime() - OTP_TTL_MS;
+      const msSinceIssued = Date.now() - lastIssuedAt;
+      if (msSinceIssued < RESEND_COOLDOWN_MS) {
+        return res.status(429).json({
+          message: "Please wait before requesting another code.",
+          retryAfterSeconds: Math.ceil((RESEND_COOLDOWN_MS - msSinceIssued) / 1000),
+        });
+      }
+    }
+
+    const windowCheck = checkAndBumpOtpRequestWindow(user);
+    if (!windowCheck.allowed) {
+      return res.status(429).json({
+        message: "Too many verification codes requested. Please try again later.",
+        retryAfterSeconds: windowCheck.retryAfterSeconds,
+      });
+    }
+
+    const otp = generateOtp();
+    user.verifyOtpHash = hashOtp(otp);
+    user.verifyOtpExpires = new Date(Date.now() + OTP_TTL_MS);
+    user.verifyOtpAttempts = 0;
+    await user.save();
+
+    try {
+      await sendOtpEmail({ email: user.pendingClaimEmail, firstName: user.firstName, lastName: user.lastName }, otp, "verify");
+    } catch (err) {
+      console.error("Failed to send claim OTP email:", err);
+    }
+
+    res.json({ message: "A new verification code has been sent." });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error." });
+  }
+});
+
+router.post("/guest/claim/email/verify-otp", registerOtpLimiter, ensureAuthenticated, requireGuest, async (req, res) => {
+  try {
+    const { otp } = req.body;
+    if (!otp) {
+      return res.status(400).json({ message: "Code is required." });
+    }
+
+    const user = await User.findById(req.user._id).select(
+      "+pendingClaimEmail +pendingClaimPasswordHash +verifyOtpHash +verifyOtpExpires +verifyOtpAttempts"
+    );
+
+    const incorrect = { message: "Incorrect verification code." };
+    const expired = { message: "That code has expired. Request a new one." };
+    const tooManyAttempts = { message: "Too many incorrect attempts. Please request a new code." };
+
+    if (!user.pendingClaimEmail || !user.verifyOtpHash || !user.verifyOtpExpires) {
+      return res.status(400).json(incorrect);
+    }
+    if (user.verifyOtpExpires.getTime() < Date.now()) {
+      return res.status(400).json(expired);
+    }
+    if (user.verifyOtpAttempts >= MAX_OTP_VERIFY_ATTEMPTS) {
+      return res.status(429).json(tooManyAttempts);
+    }
+
+    const candidateHash = hashOtp(otp);
+    if (!hashesMatch(candidateHash, user.verifyOtpHash)) {
+      user.verifyOtpAttempts += 1;
+      await user.save();
+      if (user.verifyOtpAttempts >= MAX_OTP_VERIFY_ATTEMPTS) {
+        return res.status(429).json(tooManyAttempts);
+      }
+      return res.status(400).json(incorrect);
+    }
+
+    const existingUser = await User.findOne({ email: user.pendingClaimEmail, _id: { $ne: user._id } });
+    if (existingUser) {
+      user.pendingClaimEmail = undefined;
+      user.pendingClaimPasswordHash = undefined;
+      user.verifyOtpHash = undefined;
+      user.verifyOtpExpires = undefined;
+      user.verifyOtpAttempts = 0;
+      await user.save();
+      return res.status(409).json({ message: "An account with this email already exists." });
+    }
+
+    user.email = user.pendingClaimEmail;
+    user.password = user.pendingClaimPasswordHash;
+    user.isGuest = false;
+    user.pendingClaimEmail = undefined;
+    user.pendingClaimPasswordHash = undefined;
+    user.verifyOtpHash = undefined;
+    user.verifyOtpExpires = undefined;
+    user.verifyOtpAttempts = 0;
+    user.$locals.skipPasswordHash = true;
+    await user.save();
+
+    res.json({ message: "Your account has been saved.", user: sanitizeUser(user) });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error." });
+  }
+});
+
+router.post("/guest/claim/google", ensureAuthenticated, requireGuest, async (req, res) => {
+  try {
+    const { code } = req.body;
+    if (!code) return res.status(400).json({ message: "Missing Google credential." });
+
+    const profile = await exchangeGoogleAuthCode(code);
+    if (!profile.email || !profile.emailVerified) {
+      return res.status(401).json({ message: "Google account email is not verified." });
+    }
+
+    const existingUser = await User.findOne({
+      $or: [{ googleId: profile.googleId }, { email: profile.email }],
+      _id: { $ne: req.user._id },
+    });
+    if (existingUser) {
+      return res.status(409).json({ message: "That Google account is already linked to another user." });
+    }
+
+    const user = await User.findById(req.user._id);
+    user.email = profile.email;
+    user.googleId = profile.googleId;
+    user.googleProfilePicture = profile.picture || "";
+    if (profile.firstname) user.firstName = profile.firstname;
+    if (profile.lastname) user.lastName = profile.lastname;
+    user.isGuest = false;
+    user.isVerified = true;
+    await user.save();
+
+    res.json({ message: "Your account has been saved.", user: sanitizeUser(user) });
+  } catch (err) {
+    console.error(err);
+    res.status(401).json({ message: "Google sign-in failed." });
+  }
+});
+
 router.post("/login", loginLimiter, async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -433,8 +679,6 @@ router.post("/login", loginLimiter, async (req, res) => {
     const user = await User.findOne({ email: String(email).toLowerCase() }).select("+password");
 
     if (!user) {
-      // Burn roughly the same amount of time as a real bcrypt compare would,
-      // so "no such user" and "wrong password" aren't distinguishable by timing.
       await bcrypt.compare(password, DUMMY_HASH);
       await logLoginAttempt(req, { email, status: "failed", reason: "No account found" });
       return res.status(401).json({ message: "Invalid email or password." });
@@ -452,9 +696,6 @@ router.post("/login", loginLimiter, async (req, res) => {
       return res.status(403).json({ message: "This account has been deactivated." });
     }
 
-    // Part 8: unverified accounts can't sign in. Checked before the password
-    // compare (same as isActive above) so the frontend can offer a resend
-    // button without first requiring a correct password.
     if (!user.isVerified) {
       await logLoginAttempt(req, { user, status: "failed", reason: "Email not verified" });
       return res.status(403).json({
@@ -473,9 +714,6 @@ router.post("/login", loginLimiter, async (req, res) => {
     await user.registerSuccessfulLogin();
     await logLoginAttempt(req, { user, status: "success" });
 
-    // Regenerate the session on privilege change (anonymous -> authenticated) to
-    // prevent session fixation: an attacker who set a session ID before login
-    // must not be able to ride the victim's post-login session.
     await regenerateSession(req);
 
     req.session.userId = user._id.toString();
@@ -540,24 +778,17 @@ router.post("/google", async (req, res) => {
   }
 });
 
-// ── Forgot password — sends a 6-digit OTP instead of a reset link.
 router.post("/forgot-password", forgotPasswordLimiter, async (req, res) => {
   const { email } = req.body;
   if (!email) return res.status(400).json({ message: "Email is required." });
 
   const user = await User.findOne({ email: String(email).toLowerCase() });
 
-  // Always the same response, so this can't be used to find out which emails exist.
   const generic = { message: "If an account exists for that email, a verification code has been sent." };
-  // Part 8: unverified accounts can't use Forgot Password either — folded
-  // into the same generic non-response as inactive/nonexistent accounts.
   if (!user || !user.isActive || !user.isVerified) return res.json(generic);
 
-  // 6-digit OTP, uniformly distributed (avoids the modulo bias of % 1000000).
   const otp = generateOtp();
 
-  // Overwriting the previous hash/expiry is what invalidates any prior OTP —
-  // only the most recently issued code can ever verify.
   user.resetOtpHash = hashOtp(otp);
   user.resetOtpExpires = Date.now() + OTP_TTL_MS;
   user.resetOtpAttempts = 0;
@@ -572,8 +803,6 @@ router.post("/forgot-password", forgotPasswordLimiter, async (req, res) => {
   res.json(generic);
 });
 
-// ── Verify OTP — consumes the OTP and issues a short-lived reset-session
-// token that Part 5's password-reset step will require.
 router.post("/verify-otp", forgotPasswordLimiter, async (req, res) => {
   const { email, otp } = req.body;
   if (!email || !otp) {
@@ -614,14 +843,12 @@ router.post("/verify-otp", forgotPasswordLimiter, async (req, res) => {
   user.resetOtpExpires = undefined;
   user.resetOtpAttempts = 0;
   user.resetSessionTokenHash = crypto.createHash("sha256").update(rawSessionToken).digest("hex");
-  user.resetSessionTokenExpires = Date.now() + 10 * 60 * 1000; // window to complete the password reset
+  user.resetSessionTokenExpires = Date.now() + 10 * 60 * 1000;
   await user.save();
 
   res.json({ message: "Code verified.", resetSessionToken: rawSessionToken });
 });
 
-
-// ── Reset password (uses the resetSessionToken issued by /verify-otp)
 router.post("/reset-password", forgotPasswordLimiter, async (req, res) => {
   const { resetSessionToken, password } = req.body;
 
@@ -639,14 +866,14 @@ router.post("/reset-password", forgotPasswordLimiter, async (req, res) => {
   const user = await User.findOne({
     resetSessionTokenHash: hashedToken,
     resetSessionTokenExpires: { $gt: Date.now() },
-    isActive: true, // don't let a reset go through for an account deactivated after verification
+    isActive: true,
   }).select("+resetSessionTokenHash +resetSessionTokenExpires");
 
   if (!user) {
     return res.status(400).json({ message: "Reset session has expired. Please verify your email again." });
   }
 
-  user.password = password; // re-hashed by the pre-save hook in model/user.js
+  user.password = password;
   user.resetSessionTokenHash = undefined;
   user.resetSessionTokenExpires = undefined;
   user.lockUntil = undefined;
@@ -656,14 +883,22 @@ router.post("/reset-password", forgotPasswordLimiter, async (req, res) => {
   res.json({ message: "Password updated. You can now log in." });
 });
 
-// ── Current session user (used on page load to confirm still logged in + get role)
 router.get("/me", ensureAuthenticated, async (req, res) => {
-  // req.user was already loaded and confirmed active by ensureAuthenticated —
-  // no need to hit the database again for the same document.
   res.json({ user: sanitizeUser(req.user) });
 });
-// ── Logout
-router.post("/logout", (req, res) => {
+router.post("/logout", async (req, res) => {
+  try {
+    if (req.session && req.session.userId) {
+      const user = await User.findById(req.session.userId);
+      if (user && user.isGuest) {
+        user.isActive = false;
+        user.guestDeletedAt = new Date();
+        await user.save();
+      }
+    }
+  } catch (err) {
+    console.error(err);
+  }
   req.session.destroy(() => {
     res.clearCookie("connect.sid");
     res.json({ message: "Logged out." });

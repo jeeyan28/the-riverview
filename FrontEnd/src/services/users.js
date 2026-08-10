@@ -1,16 +1,14 @@
-// services/users.js — wraps /api/users/* endpoints, used by Users.jsx and
-// Settings.jsx's ProfileTab. ProfileModal.jsx still has its own raw fetch()
-// calls to the same profile/password endpoints — not yet migrated.
 import { apiRequest } from './api';
 
 const BASE = '/api/users';
 
 export const usersService = {
-  /** @param {{search?: string, role?: string}} [params] */
   list: (params = {}) => {
     const qs = new URLSearchParams();
     if (params.search) qs.set('search', params.search);
     if (params.role) qs.set('role', params.role);
+    if (params.isGuest !== undefined) qs.set('isGuest', String(params.isGuest));
+    if (params.deleted !== undefined) qs.set('deleted', String(params.deleted));
     const s = qs.toString();
     return apiRequest(`${BASE}${s ? `?${s}` : ''}`, { fallbackMessage: 'Failed to load users.' });
   },
@@ -22,6 +20,10 @@ export const usersService = {
   updateStatus: (id, isActive) => apiRequest(`${BASE}/${id}/status`, { method: 'PUT', body: { isActive }, fallbackMessage: 'Failed to update status.' }),
 
   remove: (id) => apiRequest(`${BASE}/${id}`, { method: 'DELETE', fallbackMessage: 'Failed to delete user.' }),
+
+  recover: (id) => apiRequest(`${BASE}/${id}/recover`, { method: 'POST', fallbackMessage: 'Failed to generate recovery credentials.' }),
+
+  cleanupGuestsNow: () => apiRequest(`${BASE}/guests/cleanup-now`, { method: 'POST', fallbackMessage: 'Failed to run guest cleanup.' }),
 
   updateProfile: (id, payload) => apiRequest(`${BASE}/${id}`, { method: 'PUT', body: payload, fallbackMessage: 'Could not update your profile.' }),
 

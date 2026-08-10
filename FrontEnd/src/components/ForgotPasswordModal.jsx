@@ -61,8 +61,6 @@ function ForgotPasswordModal({ open, onClose, onReturnToLogin }) {
   const [resetSessionToken, setResetSessionToken] = useState('');
   const [resendAvailableAt, setResendAvailableAt] = useState(0);
   const [otpExpiresAt, setOtpExpiresAt] = useState(0);
-  // Remounts <OtpInput> (via its `key`) so its auto-focus-first-box effect
-  // fires again after a resend, without exposing an imperative focus API.
   const [otpBoxKey, setOtpBoxKey] = useState(0);
   const now = useCountdownClock(sent);
 
@@ -73,8 +71,6 @@ function ForgotPasswordModal({ open, onClose, onReturnToLogin }) {
   const [resetting, setResetting] = useState(false);
   const [resetDone, setResetDone] = useState(false);
 
-  // Reset to a clean request view each time the modal opens, and auto-focus
-  // the email input.
   useEffect(() => {
     if (!open) return;
     setEmail('');
@@ -98,7 +94,6 @@ function ForgotPasswordModal({ open, onClose, onReturnToLogin }) {
     return () => cancelAnimationFrame(raf);
   }, [open]);
 
-  // Escape closes; Tab is trapped inside the modal while it's open.
   useEffect(() => {
     if (!open) return;
 
@@ -162,7 +157,7 @@ function ForgotPasswordModal({ open, onClose, onReturnToLogin }) {
       setOtpError('');
       setResendAvailableAt(Date.now() + RESEND_COOLDOWN_SECONDS * 1000);
       setOtpExpiresAt(Date.now() + OTP_EXPIRY_SECONDS * 1000);
-      setOtpBoxKey((k) => k + 1); // remounts OtpInput so it auto-focuses box 0 again
+      setOtpBoxKey((k) => k + 1);
       showToast(message, 'success');
     } catch (err) {
       showToast('Could not reach the server. Is it running?', 'error');
@@ -236,12 +231,7 @@ function ForgotPasswordModal({ open, onClose, onReturnToLogin }) {
   }
 
   return (
-    <div
-      className="forgot-modal-backdrop"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose?.();
-      }}
-    >
+    <div className="forgot-modal-backdrop">
       <div
         className="forgot-modal login-card"
         ref={modalRef}

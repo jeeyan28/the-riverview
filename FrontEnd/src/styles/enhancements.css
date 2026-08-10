@@ -8,6 +8,8 @@
     --shadow-soft: 0 1px 2px rgba(10,22,40,.04), 0 8px 24px rgba(10,22,40,.06);
     --shadow-lift: 0 10px 30px rgba(10,22,40,.12), 0 2px 8px rgba(10,22,40,.08);
     --shadow-deep: 0 24px 60px rgba(0,0,0,.35), 0 4px 16px rgba(0,0,0,.2);
+    --warning-bg: #fff3cd;
+    --warning-text: #664d03;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -21,7 +23,7 @@
     .hero-bg, .hero-carousel, .hero-intro-avatar { transform: none !important; }
 }
 
-html { scroll-behavior: smooth; scroll-padding-top: calc(var(--header-h, 68px) + 16px); }
+html { scroll-behavior: smooth; scroll-padding-top: calc(var(--header-h, 68px) + var(--guest-banner-h, 0px) + 16px); }
 
 a:focus-visible,
 button:focus-visible,
@@ -340,4 +342,35 @@ nav a:hover::after, nav a.active::after { width: 20px; }
 @media (max-width: 768px) {
     .reveal, .reveal-stagger > * { transform: translateY(18px); }
     .hero-content > * { animation-duration: .5s; }
+}
+.guest-banner {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 210;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    flex-wrap: wrap;
+    padding: 6px 16px;
+    background: var(--warning-bg);
+    color: var(--warning-text);
+    font-size: .86rem;
+    text-align: center;
+}
+.guest-banner-save {
+    border: 1px solid var(--warning-text);
+    background: transparent;
+    color: var(--warning-text);
+    font-weight: 600;
+    font-size: .82rem;
+    padding: 6px 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background var(--dur-fast) var(--ease-out);
+    white-space: nowrap;
+}
+.guest-banner-save:hover {
+    background: rgba(102, 77, 3, .12);
 }

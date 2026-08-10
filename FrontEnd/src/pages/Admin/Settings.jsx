@@ -16,6 +16,11 @@ const SETTINGS_TABS = [
   { key: 'audit', label: 'Audit Log' },
 ];
 
+const SETTINGS_MANAGE_PERMISSION = 'settings:manage';
+const DEFAULT_OPEN_TIME = '06:00';
+const DEFAULT_CLOSE_TIME = '22:00';
+const DEFAULT_ANNOUNCEMENT_EMOJI = '📣';
+
 function Settings() {
   const [activeTab, setActiveTab] = useState('announcements');
 
@@ -82,8 +87,8 @@ function OperatingScheduleAndHolidays() {
   const { guardPermission } = useAuth();
 
   const [loading, setLoading] = useState(true);
-  const [openTime, setOpenTime] = useState('06:00');
-  const [closeTime, setCloseTime] = useState('22:00');
+  const [openTime, setOpenTime] = useState(DEFAULT_OPEN_TIME);
+  const [closeTime, setCloseTime] = useState(DEFAULT_CLOSE_TIME);
   const [openDays, setOpenDays] = useState(DEFAULT_OPEN_DAYS_BEFORE_LOAD);
   const [holidays, setHolidays] = useState([]);
 
@@ -94,8 +99,8 @@ function OperatingScheduleAndHolidays() {
     try {
       const settings = await settingsService.getAdmin();
       const oh = settings.operatingHours || {};
-      setOpenTime(oh.openTime || '06:00');
-      setCloseTime(oh.closeTime || '22:00');
+      setOpenTime(oh.openTime || DEFAULT_OPEN_TIME);
+      setCloseTime(oh.closeTime || DEFAULT_CLOSE_TIME);
       setOpenDays(Array.isArray(oh.openDays) ? oh.openDays : [0, 1, 2, 3, 4, 5, 6]);
       setHolidays(settings.holidays || []);
     } catch (err) {
@@ -114,7 +119,7 @@ function OperatingScheduleAndHolidays() {
   }
 
   async function handleSaveSchedule() {
-    if (!guardPermission('settings:manage', "You don't have permission to change operating hours.")) return;
+    if (!guardPermission(SETTINGS_MANAGE_PERMISSION, "You don't have permission to change operating hours.")) return;
     setSaveState('saving');
     try {
       await settingsService.updateOperatingHours({ openTime, closeTime, openDays });
@@ -127,7 +132,7 @@ function OperatingScheduleAndHolidays() {
   }
 
   async function handleAddHoliday() {
-    if (!guardPermission('settings:manage', "You don't have permission to add holidays.")) return;
+    if (!guardPermission(SETTINGS_MANAGE_PERMISSION, "You don't have permission to add holidays.")) return;
     const name = window.prompt('Holiday / closure name (e.g. "Christmas Day"):');
     if (!name) return;
     const date = window.prompt('Date (YYYY-MM-DD):');
@@ -147,7 +152,7 @@ function OperatingScheduleAndHolidays() {
   }
 
   async function handleDeleteHoliday(id) {
-    if (!guardPermission('settings:manage', "You don't have permission to remove holidays.")) return;
+    if (!guardPermission(SETTINGS_MANAGE_PERMISSION, "You don't have permission to remove holidays.")) return;
     if (!window.confirm('Remove this holiday/closure date?')) return;
     try {
       await settingsService.removeHoliday(id);
@@ -282,7 +287,7 @@ function AnnouncementsTab() {
   }, [fetchAnnouncements]);
 
   function openAddModal() {
-    if (!guardPermission('settings:manage', "You don't have permission to post announcements.")) return;
+    if (!guardPermission(SETTINGS_MANAGE_PERMISSION, "You don't have permission to post announcements.")) return;
     setFormTitle('');
     setFormMessage('');
     setFormEmoji('');
@@ -314,7 +319,7 @@ function AnnouncementsTab() {
   }
 
   async function handleToggle(id, nextIsActive) {
-    if (!guardPermission('settings:manage', "You don't have permission to change announcements.")) return;
+    if (!guardPermission(SETTINGS_MANAGE_PERMISSION, "You don't have permission to change announcements.")) return;
     setBusyId(id);
     try {
       await settingsService.updateAnnouncement(id, { isActive: nextIsActive });
@@ -327,7 +332,7 @@ function AnnouncementsTab() {
   }
 
   async function handleDelete(id) {
-    if (!guardPermission('settings:manage', "You don't have permission to delete announcements.")) return;
+    if (!guardPermission(SETTINGS_MANAGE_PERMISSION, "You don't have permission to delete announcements.")) return;
     if (!window.confirm('Delete this announcement?')) return;
     setBusyId(id);
     try {
@@ -401,7 +406,7 @@ function AnnouncementsTab() {
               type="text"
               value={formEmoji}
               onChange={(e) => setFormEmoji(e.target.value)}
-              placeholder="📣"
+              placeholder={DEFAULT_ANNOUNCEMENT_EMOJI}
               maxLength={2}
             />
           </div>
@@ -415,7 +420,7 @@ function AnnouncementsTab() {
         ) : (
           announcements.map((a) => (
             <div className="announcement-row" key={a._id}>
-              <span className="announcement-icon">{a.emoji || '📣'}</span>
+              <span className="announcement-icon">{a.emoji || DEFAULT_ANNOUNCEMENT_EMOJI}</span>
               <div className="announcement-body">
                 <div className="announcement-title">{a.title}</div>
                 <div className="announcement-message">{a.message}</div>
@@ -457,7 +462,7 @@ function formatAuditTime(dateStr) {
 
 function auditDotClass(action) {
   if (action === 'deleted') return 'del';
-  if (action === 'updated') return 'warn';
+  if (action === 'updated' || action === 'recovered') return 'warn';
   return '';
 }
 

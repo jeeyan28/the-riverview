@@ -40,6 +40,21 @@ app.use(async (req, res, next) => {
 const { webhookHandler } = require("./routes/paymongoRoutes");
 app.post("/api/payments/paymongo/webhook", express.raw({ type: "application/json" }), webhookHandler);
 
+app.get("/api/cron/purge-expired-guests", async (req, res) => {
+  if (req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`) {
+    return res.status(401).json({ message: "Unauthorized." });
+  }
+  try {
+    await connectDB();
+    const { purgeExpiredGuests } = require("./scripts/purgeExpiredGuests");
+    const result = await purgeExpiredGuests({ dryRun: false });
+    res.json({ deletedCount: result.deletedCount });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Cleanup failed." });
+  }
+});
+
 app.use(express.json({ limit: "100kb" }));
 
 const allowedOrigins = (process.env.APP_BASE_URL || "http://localhost:5500")
@@ -54,6 +69,9 @@ app.use(cors({
   },
   credentials: true,
 }));
+
+const { verifyOrigin } = require("./middleware/csrf");
+app.use(verifyOrigin(allowedOrigins));
 
 app.get("/", (req, res) => {
   res.json({

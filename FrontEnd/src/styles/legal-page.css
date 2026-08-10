@@ -1,7 +1,7 @@
 .legal-page{
     background:var(--surface);
     min-height:100vh;
-    padding:calc(var(--header-h) + 3rem) 1.5rem 5rem;
+    padding:calc(var(--header-h) + var(--guest-banner-h, 0px) + 3rem) 1.5rem 5rem;
 }
 
 .legal-inner{
