@@ -4,6 +4,7 @@ import logo from '../assets/logo/logoo.png';
 import { useAuth } from '../context/AuthContext';
 import ThemeToggle from './ThemeToggle';
 import AnnouncementsBell from './AnnouncementsBell';
+import LogoutConfirmDialog from './LogoutConfirmDialog';
 
 function Navbar({
   announcements,
@@ -16,6 +17,7 @@ function Navbar({
   onToggleTheme,
 }) {
   const [chipMenuOpen, setChipMenuOpen] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const chipRef = useRef(null);
   const { user, isAdmin, logout } = useAuth();
   const navigate = useNavigate();
@@ -56,6 +58,11 @@ function Navbar({
 
   async function handleLogout() {
     setChipMenuOpen(false);
+    setShowLogoutConfirm(true);
+  }
+
+  async function confirmLogout() {
+    setShowLogoutConfirm(false);
     await logout();
     navigate('/');
   }
@@ -192,6 +199,13 @@ function Navbar({
           Log out
         </button>
       </div>
+
+      <LogoutConfirmDialog
+        open={showLogoutConfirm}
+        isGuest={!!user?.isGuest}
+        onConfirm={confirmLogout}
+        onCancel={() => setShowLogoutConfirm(false)}
+      />
     </>
   );
 }

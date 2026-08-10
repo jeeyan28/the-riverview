@@ -19,8 +19,10 @@ button { cursor: pointer; border: none; font-family: 'Inter', sans-serif; }
     --card:   #E8E2D4;
     --teal:   #00C9A7;
     --muted:  #8A9BB0;
+    --warning: #e0a13a;
     --header-h: 68px;
     --holiday-h: 0px;
+    --guest-banner-h: 0px;
 
     
     --surface:            #101d33;
@@ -119,9 +121,13 @@ button { cursor: pointer; border: none; font-family: 'Inter', sans-serif; }
 #site-header .theme-toggle:hover { background: var(--nav-bg-scroll); }
 #site-header .theme-toggle-icon { color: var(--nav-muted); }
 
+body.has-guest-banner {
+    --guest-banner-h: 44px;
+}
+
 #site-header {
     position: fixed;
-    top: 0;
+    top: var(--guest-banner-h);
     left: 0; right: 0;
     z-index: 200;
     background: var(--nav-bg);
@@ -1225,6 +1231,10 @@ button { cursor: pointer; border: none; font-family: 'Inter', sans-serif; }
 .bk-field-textarea { resize: vertical; min-height: 44px; }
 .bk-field-error {
     font-size: .74rem; color: #e2554b; margin: 0;
+    display: flex; align-items: center; gap: 6px;
+}
+.bk-field-warning {
+    font-size: .74rem; color: var(--warning); margin: 0;
     display: flex; align-items: center; gap: 6px;
 }
 

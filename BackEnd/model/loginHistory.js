@@ -8,7 +8,7 @@ const loginHistorySchema = new mongoose.Schema({
   name: { type: String, default: "" },
   email: { type: String, required: true, lowercase: true },
   role: { type: String, default: "user" }, // snapshot; drives the Users/Admin tab split
-  method: { type: String, enum: ["password", "google"], default: "password" },
+  method: { type: String, enum: ["password", "google", "guest", "guest-recovery"], default: "password" },
   status: { type: String, enum: ["success", "failed"], required: true },
   // Short reason shown in the Admin tab for failed attempts, e.g. "Wrong password", "Account locked".
   reason: { type: String, default: "" },

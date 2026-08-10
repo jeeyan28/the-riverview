@@ -1,32 +1,5 @@
-    import { useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import '../styles/confirm-dialog.css';
-
-// ─────────────────────────────────────────────────────────────────────────
-// ConfirmDialog — React port of the legacy js/ui-modal.js's UIModal.confirm().
-//
-// Built to close the project-wide gap flagged across Bookings.jsx,
-// Monitor.jsx, and Users.jsx: those three still used the browser's native
-// window.confirm()/confirm(), which the original app never actually showed
-// (admin.js always routed through the themed UIModal.confirm() instead).
-// This is a styling/consistency fix only — no confirm-site's underlying
-// logic (what happens on yes/no) is changed, only how the yes/no question
-// itself is presented.
-//
-// Usage (via the paired useConfirm() hook in hooks/useConfirm.js):
-//   const { confirm, confirmProps } = useConfirm();
-//   ...
-//   if (!(await confirm('Delete this?', { danger: true, confirmText: 'Delete' }))) return;
-//   ...
-//   return (<> ... <ConfirmDialog {...confirmProps} /> </>);
-//
-// Behavior preserved 1:1 from UIModal.confirm():
-//   - Escape key -> cancel (false)
-//   - Enter key -> confirm (true)
-//   - Click on the overlay backdrop (outside the box) -> cancel (false)
-//   - Confirm button auto-focused when the dialog opens
-//   - `danger` option swaps the icon (question -> triangle) and the confirm
-//     button's color (teal -> red), same as the original's `opts.danger`
-// ─────────────────────────────────────────────────────────────────────────
 
 const ICONS = {
   question: (
@@ -52,6 +25,7 @@ function ConfirmDialog({
   danger = false,
   confirmText,
   cancelText,
+  confirmDisabled = false,
   onConfirm,
   onCancel,
 }) {
@@ -64,21 +38,18 @@ function ConfirmDialog({
 
     function onKey(e) {
       if (e.key === 'Escape') onCancel();
-      if (e.key === 'Enter') onConfirm();
+      if (e.key === 'Enter' && !confirmDisabled) onConfirm();
     }
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [open, onConfirm, onCancel]);
+  }, [open, onConfirm, onCancel, confirmDisabled]);
 
   if (!open) return null;
 
   const resolvedTitle = title || (danger ? 'Please confirm' : 'Confirm');
 
   return (
-    <div
-      className="uimodal-overlay uimodal-show"
-      onClick={(e) => { if (e.target === e.currentTarget) onCancel(); }}
-    >
+    <div className="uimodal-overlay uimodal-show">
       <div className="uimodal-box">
         <div className={`uimodal-icon${danger ? ' uimodal-danger' : ''}`}>
           {danger ? ICONS.danger : ICONS.question}
@@ -93,6 +64,7 @@ function ConfirmDialog({
             ref={confirmBtnRef}
             className={`uimodal-btn ${danger ? 'uimodal-btn-danger' : 'uimodal-btn-primary'}`}
             onClick={onConfirm}
+            disabled={confirmDisabled}
           >
             {confirmText || (danger ? 'Delete' : 'Confirm')}
           </button>

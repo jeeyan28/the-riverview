@@ -4,9 +4,12 @@ import '../styles/style.css';
 import '../styles/enhancements.css';
 import '../styles/auth-ui.css';
 import '../styles/skeleton.css';
+import '../styles/login.css';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import ProfileModal from '../components/ProfileModal';
+import GuestBanner from '../components/GuestBanner';
+import ClaimAccountModal from '../components/ClaimAccountModal';
 import PageSkeleton from '../components/PageSkeleton';
 import PageTransition from '../components/PageTransition';
 import { useTheme } from '../hooks/useTheme';
@@ -15,13 +18,14 @@ import { useSiteSettings } from '../hooks/useSiteSettings';
 import { useAnnouncements } from '../hooks/useAnnouncements';
 
 function MainLayout() {
-  const { initializing } = useAuth();
+  const { initializing, user } = useAuth();
   const { settings } = useSiteSettings();
   const announcements = useAnnouncements(settings.announcements);
   const [theme, toggleTheme] = useTheme();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [claimAccountOpen, setClaimAccountOpen] = useState(false);
 
   useEffect(() => {
     function onScroll() {
@@ -35,12 +39,19 @@ function MainLayout() {
     document.body.style.overflow = mobileNavOpen ? 'hidden' : '';
   }, [mobileNavOpen]);
 
+  useEffect(() => {
+    document.body.classList.toggle('has-guest-banner', !!user?.isGuest);
+    return () => document.body.classList.remove('has-guest-banner');
+  }, [user?.isGuest]);
+
   if (initializing) {
     return <PageSkeleton />;
   }
 
   return (
     <>
+      <GuestBanner onSave={() => setClaimAccountOpen(true)} />
+
       <Navbar
         announcements={announcements}
         mobileNavOpen={mobileNavOpen}
@@ -59,6 +70,8 @@ function MainLayout() {
       <Footer />
 
       <ProfileModal open={profileOpen} onClose={() => setProfileOpen(false)} />
+
+      <ClaimAccountModal open={claimAccountOpen} onClose={() => setClaimAccountOpen(false)} />
     </>
   );
 }

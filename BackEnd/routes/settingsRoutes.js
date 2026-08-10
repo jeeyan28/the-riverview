@@ -5,6 +5,15 @@ const { requirePermission } = require("../middleware/adminAuth");
 const { PERMISSIONS } = require("../utils/permissions");
 const { paymentMethodQrUpload } = require("../middleware/upload");
 const { logAudit } = require("../utils/auditLog");
+const { validate } = require("../middleware/validate");
+const {
+  operatingHoursSchema,
+  createHolidaySchema,
+  createAnnouncementSchema,
+  updateAnnouncementSchema,
+  createPaymentMethodSchema,
+  updatePaymentMethodSchema,
+} = require("../validation/settingsSchemas");
 
 router.get("/", async (req, res) => {
   try {
@@ -39,25 +48,22 @@ router.get("/admin", requirePermission(PERMISSIONS.SETTINGS_VIEW), async (req, r
   }
 });
 
-router.put("/operating-hours", requirePermission(PERMISSIONS.SETTINGS_MANAGE), async (req, res) => {
+router.put("/operating-hours", requirePermission(PERMISSIONS.SETTINGS_MANAGE), validate(operatingHoursSchema), async (req, res) => {
   try {
     const { openTime, closeTime, openDays, minOnlineDurationHours, maxOnlineDurationHours } = req.body;
     const settings = await Settings.getSingleton();
 
     if (openTime !== undefined) settings.operatingHours.openTime = openTime;
     if (closeTime !== undefined) settings.operatingHours.closeTime = closeTime;
-    if (Array.isArray(openDays)) {
-      settings.operatingHours.openDays = openDays
-        .map(Number)
-        .filter(d => Number.isInteger(d) && d >= 0 && d <= 6);
-    }
-    if (minOnlineDurationHours !== undefined) settings.operatingHours.minOnlineDurationHours = Math.max(1 / 3600, Number(minOnlineDurationHours) || 1);
-    if (maxOnlineDurationHours !== undefined) settings.operatingHours.maxOnlineDurationHours = Math.max(1, Number(maxOnlineDurationHours) || 5);
+    if (openDays !== undefined) settings.operatingHours.openDays = openDays;
+    if (minOnlineDurationHours !== undefined) settings.operatingHours.minOnlineDurationHours = minOnlineDurationHours;
+    if (maxOnlineDurationHours !== undefined) settings.operatingHours.maxOnlineDurationHours = maxOnlineDurationHours;
 
     settings.updatedBy = req.user._id;
     settings.updatedAt = new Date();
     await settings.save();
 
+    await logAudit({ category: "Settings", action: "updated", description: "updated operating hours", user: req.user });
     res.json(settings.operatingHours);
   } catch (err) {
     console.error(err);
@@ -65,18 +71,17 @@ router.put("/operating-hours", requirePermission(PERMISSIONS.SETTINGS_MANAGE), a
   }
 });
 
-router.post("/holidays", requirePermission(PERMISSIONS.SETTINGS_MANAGE), async (req, res) => {
+router.post("/holidays", requirePermission(PERMISSIONS.SETTINGS_MANAGE), validate(createHolidaySchema), async (req, res) => {
   try {
     const { name, date, fullDay, note } = req.body;
-    if (!name || !date) {
-      return res.status(400).json({ message: "name and date are required." });
-    }
     const settings = await Settings.getSingleton();
     settings.holidays.push({ name, date, fullDay: fullDay !== false, note: note || "" });
     settings.updatedBy = req.user._id;
     settings.updatedAt = new Date();
     await settings.save();
-    res.status(201).json(settings.holidays[settings.holidays.length - 1]);
+    const created = settings.holidays[settings.holidays.length - 1];
+    await logAudit({ category: "Settings", action: "created", description: `added holiday "${created.name}" (${created.date})`, user: req.user });
+    res.status(201).json(created);
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Server error." });
@@ -86,14 +91,15 @@ router.post("/holidays", requirePermission(PERMISSIONS.SETTINGS_MANAGE), async (
 router.delete("/holidays/:id", requirePermission(PERMISSIONS.SETTINGS_MANAGE), async (req, res) => {
   try {
     const settings = await Settings.getSingleton();
-    const before = settings.holidays.length;
-    settings.holidays = settings.holidays.filter(h => String(h._id) !== req.params.id);
-    if (settings.holidays.length === before) {
+    const target = settings.holidays.find(h => String(h._id) === req.params.id);
+    if (!target) {
       return res.status(404).json({ message: "Holiday not found." });
     }
+    settings.holidays = settings.holidays.filter(h => String(h._id) !== req.params.id);
     settings.updatedBy = req.user._id;
     settings.updatedAt = new Date();
     await settings.save();
+    await logAudit({ category: "Settings", action: "deleted", description: `removed holiday "${target.name}" (${target.date})`, user: req.user });
     res.json({ message: "Holiday removed." });
   } catch (err) {
     console.error(err);
@@ -101,12 +107,9 @@ router.delete("/holidays/:id", requirePermission(PERMISSIONS.SETTINGS_MANAGE), a
   }
 });
 
-router.post("/announcements", requirePermission(PERMISSIONS.SETTINGS_MANAGE), async (req, res) => {
+router.post("/announcements", requirePermission(PERMISSIONS.SETTINGS_MANAGE), validate(createAnnouncementSchema), async (req, res) => {
   try {
     const { title, message, emoji, isActive, expiresAt } = req.body;
-    if (!title || !message) {
-      return res.status(400).json({ message: "title and message are required." });
-    }
     const settings = await Settings.getSingleton();
     settings.announcements.push({
       title, message,
@@ -126,7 +129,7 @@ router.post("/announcements", requirePermission(PERMISSIONS.SETTINGS_MANAGE), as
   }
 });
 
-router.put("/announcements/:id", requirePermission(PERMISSIONS.SETTINGS_MANAGE), async (req, res) => {
+router.put("/announcements/:id", requirePermission(PERMISSIONS.SETTINGS_MANAGE), validate(updateAnnouncementSchema), async (req, res) => {
   try {
     const settings = await Settings.getSingleton();
     const ann = settings.announcements.id(req.params.id);
@@ -168,29 +171,28 @@ router.delete("/announcements/:id", requirePermission(PERMISSIONS.SETTINGS_MANAG
   }
 });
 
-router.post("/payment-methods", requirePermission(PERMISSIONS.SETTINGS_MANAGE), paymentMethodQrUpload.single("qrImage"), async (req, res) => {
+router.post("/payment-methods", requirePermission(PERMISSIONS.SETTINGS_MANAGE), paymentMethodQrUpload.single("qrImage"), validate(createPaymentMethodSchema), async (req, res) => {
   try {
     const { name, isActive } = req.body;
-    if (!name) {
-      return res.status(400).json({ message: "name is required." });
-    }
     const settings = await Settings.getSingleton();
     settings.paymentMethods.push({
       name,
       qrImage: req.file ? req.file.path : "",
-      isActive: isActive !== undefined ? isActive === "true" || isActive === true : true,
+      isActive: isActive !== undefined ? isActive : true,
     });
     settings.updatedBy = req.user._id;
     settings.updatedAt = new Date();
     await settings.save();
-    res.status(201).json(settings.paymentMethods[settings.paymentMethods.length - 1]);
+    const created = settings.paymentMethods[settings.paymentMethods.length - 1];
+    await logAudit({ category: "Settings", action: "created", description: `added payment method "${created.name}"`, user: req.user });
+    res.status(201).json(created);
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Server error." });
   }
 });
 
-router.put("/payment-methods/:id", requirePermission(PERMISSIONS.SETTINGS_MANAGE), paymentMethodQrUpload.single("qrImage"), async (req, res) => {
+router.put("/payment-methods/:id", requirePermission(PERMISSIONS.SETTINGS_MANAGE), paymentMethodQrUpload.single("qrImage"), validate(updatePaymentMethodSchema), async (req, res) => {
   try {
     const settings = await Settings.getSingleton();
     const pm = settings.paymentMethods.id(req.params.id);
@@ -198,12 +200,13 @@ router.put("/payment-methods/:id", requirePermission(PERMISSIONS.SETTINGS_MANAGE
 
     const { name, isActive } = req.body;
     if (name !== undefined) pm.name = name;
-    if (isActive !== undefined) pm.isActive = isActive === "true" || isActive === true;
+    if (isActive !== undefined) pm.isActive = isActive;
     if (req.file) pm.qrImage = req.file.path;
 
     settings.updatedBy = req.user._id;
     settings.updatedAt = new Date();
     await settings.save();
+    await logAudit({ category: "Settings", action: "updated", description: `updated payment method "${pm.name}"`, user: req.user });
     res.json(pm);
   } catch (err) {
     console.error(err);
@@ -214,14 +217,15 @@ router.put("/payment-methods/:id", requirePermission(PERMISSIONS.SETTINGS_MANAGE
 router.delete("/payment-methods/:id", requirePermission(PERMISSIONS.SETTINGS_MANAGE), async (req, res) => {
   try {
     const settings = await Settings.getSingleton();
-    const before = settings.paymentMethods.length;
-    settings.paymentMethods = settings.paymentMethods.filter(pm => String(pm._id) !== req.params.id);
-    if (settings.paymentMethods.length === before) {
+    const target = settings.paymentMethods.find(pm => String(pm._id) === req.params.id);
+    if (!target) {
       return res.status(404).json({ message: "Payment method not found." });
     }
+    settings.paymentMethods = settings.paymentMethods.filter(pm => String(pm._id) !== req.params.id);
     settings.updatedBy = req.user._id;
     settings.updatedAt = new Date();
     await settings.save();
+    await logAudit({ category: "Settings", action: "deleted", description: `removed payment method "${target.name}"`, user: req.user });
     res.json({ message: "Payment method removed." });
   } catch (err) {
     console.error(err);

@@ -22,10 +22,11 @@ const STATUS_PILL_CLASS = {
   Overdue: 'pill-overdue',
   Cancelled: 'pill-done',
   'Pending Payment Verification': 'pill-pending',
+  'Awaiting Online Payment': 'pill-pending',
   Confirmed: 'pill-active',
   Rejected: 'pill-overdue',
 };
-const BOOKING_STATUSES = ['Pending Payment Verification', 'Confirmed', 'Rejected', 'Ongoing', 'Pending', 'Done', 'Overdue', 'Cancelled'];
+const BOOKING_STATUSES = ['Pending Payment Verification', 'Awaiting Online Payment', 'Confirmed', 'Rejected', 'Ongoing', 'Pending', 'Done', 'Overdue', 'Cancelled'];
 const EDITABLE_BOOKING_STATUSES = BOOKING_STATUSES.filter((s) => s !== 'Done');
 const PAYMENT_METHODS = ['Cash', 'GCash', 'Maya'];
 const SEARCH_DEBOUNCE_MS = 350;

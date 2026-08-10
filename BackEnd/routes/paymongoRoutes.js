@@ -14,6 +14,10 @@ const {
   verifyWebhookSignature,
 } = require("../utils/paymongo");
 const { isAdminRole } = require("../utils/permissions");
+const { GUEST_EMAIL_DOMAIN } = require("../utils/constants");
+const { validate } = require("../middleware/validate");
+const { createIntentSchema, attachIntentSchema } = require("../validation/paymentSchemas");
+const { paymentIntentLimiter, paymentAttachLimiter } = require("../middleware/rateLimiter");
 
 function getReturnBaseUrl() {
   return (
@@ -30,9 +34,10 @@ function isPaidPaymentIntent(intentAttrs) {
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-function resolveGuestEmail({ guestEmail, guestContact, accountEmail }) {
+function resolveGuestEmail({ guestEmail, guestContact, accountEmail, isGuest }) {
   if (guestEmail && EMAIL_RE.test(guestEmail)) return guestEmail;
   if (guestContact && EMAIL_RE.test(guestContact)) return guestContact;
+  if (isGuest) return "";
   return accountEmail || "";
 }
 
@@ -53,19 +58,21 @@ router.get("/config", (req, res) => {
   }
 });
 
-router.post("/intent", ensureAuthenticated, async (req, res) => {
+router.post("/intent", ensureAuthenticated, paymentIntentLimiter, validate(createIntentSchema), async (req, res) => {
   try {
-    const { guestName, guestContact, guestEmail, guestCount: guestCountRaw, specialRequests, roomId, variantLabel, date, timeIn, duration: durationRaw, downPaymentHours: downPaymentHoursRaw } = req.body;
-    const duration = Number(durationRaw);
-    const guestCount = guestCountRaw !== undefined && guestCountRaw !== "" ? Number(guestCountRaw) : 1;
+    const { guestName, guestContact, guestEmail, guestCount: guestCountRaw, specialRequests, roomId, variantLabel, date, timeIn, duration, downPaymentHours: downPaymentHoursRaw } = req.body;
+    const guestCount = guestCountRaw || 1;
 
-    if (!guestName) {
-      return res.status(400).json({ message: "guestName, roomId, date, timeIn and duration are required." });
+    const downPaymentHours = downPaymentHoursRaw !== undefined ? downPaymentHoursRaw : 1;
+    if (downPaymentHours > duration) {
+      return res.status(400).json({ message: `Downpayment hours must be a whole number between 1 and ${duration}.` });
     }
 
-    const downPaymentHours = downPaymentHoursRaw !== undefined && downPaymentHoursRaw !== "" ? Number(downPaymentHoursRaw) : 1;
-    if (!Number.isInteger(downPaymentHours) || downPaymentHours < 1 || downPaymentHours > duration) {
-      return res.status(400).json({ message: `Downpayment hours must be a whole number between 1 and ${duration}.` });
+    if (req.user.isGuest) {
+      const candidateEmail = (guestEmail || guestContact || "").trim().toLowerCase();
+      if (candidateEmail && (!EMAIL_RE.test(candidateEmail) || candidateEmail.endsWith(`@${GUEST_EMAIL_DOMAIN}`))) {
+        return res.status(400).json({ message: "Please provide a valid email address, or leave it blank.", field: "guestEmail" });
+      }
     }
 
     const activeLock = await BookingLock.findOne({
@@ -99,7 +106,7 @@ router.post("/intent", ensureAuthenticated, async (req, res) => {
         metadata: toBookingMetadata({
           guestName: guestName.trim(),
           guestContact: (guestContact || "").trim(),
-          guestEmail: resolveGuestEmail({ guestEmail, guestContact, accountEmail: req.user.email }),
+          guestEmail: resolveGuestEmail({ guestEmail, guestContact, accountEmail: req.user.email, isGuest: req.user.isGuest }),
           guestCount,
           specialRequests: (specialRequests || "").trim(),
           roomId: room._id,
@@ -129,7 +136,7 @@ router.post("/intent", ensureAuthenticated, async (req, res) => {
   }
 });
 
-router.post("/intent/:paymentIntentId/attach", ensureAuthenticated, async (req, res) => {
+router.post("/intent/:paymentIntentId/attach", ensureAuthenticated, paymentAttachLimiter, validate(attachIntentSchema), async (req, res) => {
   try {
     const { paymentIntentId } = req.params;
     const { paymentMethodId, paymentMethodType } = req.body;
@@ -152,9 +159,6 @@ router.post("/intent/:paymentIntentId/attach", ensureAuthenticated, async (req, 
     if (String(metadata.bookedBy) !== String(req.user._id)) {
       return res.status(403).json({ message: "Not allowed." });
     }
-    if (!paymentMethodId && !paymentMethodType) {
-      return res.status(400).json({ message: "paymentMethodId or paymentMethodType is required." });
-    }
 
     let methodId = paymentMethodId;
     if (!methodId) {
@@ -162,7 +166,7 @@ router.post("/intent/:paymentIntentId/attach", ensureAuthenticated, async (req, 
       try {
         walletMethod = await createWalletPaymentMethod({
           type: paymentMethodType,
-          billing: { name: metadata.guestName, email: metadata.guestEmail || req.user.email },
+          billing: { name: metadata.guestName, email: metadata.guestEmail || (req.user.isGuest ? undefined : req.user.email) },
         });
       } catch (e) {
         return res.status(e.status || 502).json({ message: e.message || "Could not start that payment method. Please try again." });

@@ -18,9 +18,6 @@ function readStoredUser() {
   }
 }
 
-// Writes back to whichever storage already held the value (localStorage if
-// "remember me" was checked at login, sessionStorage otherwise) — same
-// convention Profile.jsx's saveStoredAdmin() used pre-context.
 function writeStoredUser(user) {
   const area = localStorage.getItem(STORAGE_KEY) ? localStorage : sessionStorage;
   if (user) area.setItem(STORAGE_KEY, JSON.stringify(user));
@@ -35,10 +32,6 @@ const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(() => readStoredUser());
-  // True only until the first /api/auth/me revalidation resolves (success
-  // or failure). AdminLayout's route guard waits on this before deciding
-  // to redirect, so a logged-in admin doing a hard refresh never gets
-  // bounced to /login just because the network call hasn't returned yet.
   const [initializing, setInitializing] = useState(true);
 
   const revalidate = useCallback(async () => {
@@ -50,9 +43,6 @@ export function AuthProvider({ children }) {
       writeStoredUser(freshUser);
       return freshUser;
     } catch {
-      // Matches guardAdminPage()'s behavior: any failure means "treat as
-      // logged out." Clear the stale cache too, so a future fast-paint
-      // read doesn't resurrect a dead session.
       setUser(null);
       clearStoredUser();
       return null;
@@ -63,9 +53,6 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     revalidate();
-    // Intentionally run once on mount only — this matches guardAdminPage(),
-    // which ran once per admin page load. Login()/logout() below update
-    // `user` directly instead of re-triggering this effect.
   }, [revalidate]);
 
   const login = useCallback(async (email, password, rememberMe) => {
@@ -78,9 +65,7 @@ export function AuthProvider({ children }) {
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       const err = new Error(data.message || 'Login failed.');
-      err.status = res.status; // preserves the 423 account-locked check Login.jsx makes
-      // Part 8: lets LoginForm branch to its "resend verification" state
-      // instead of just showing the message as a dead-end toast.
+      err.status = res.status;
       err.unverified = !!data.unverified;
       throw err;
     }
@@ -105,6 +90,24 @@ export function AuthProvider({ children }) {
     return data.user;
   }, []);
 
+  const continueAsGuest = useCallback(async ({ firstName, lastName }) => {
+    const res = await fetch(`${API_BASE_URL}/api/auth/guest`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ firstName, lastName }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const err = new Error(data.message || 'Could not start a guest session.');
+      err.status = res.status;
+      throw err;
+    }
+    setUser(data.user);
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(data.user));
+    return data.user;
+  }, []);
+
   const register = useCallback(async (formData) => {
     const res = await fetch(`${API_BASE_URL}/api/auth/register`, {
       method: 'POST',
@@ -114,11 +117,6 @@ export function AuthProvider({ children }) {
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      // Mirrors login()'s err.status attachment (Phase 13) — lets a caller
-      // reliably tell "server responded with an error" (has a numeric
-      // status) apart from a genuine network failure (fetch itself threw,
-      // so this line never runs), rather than duck-typing on
-      // `instanceof TypeError`.
       const err = new Error(data.message || 'Registration failed.');
       err.status = res.status;
       throw err;
@@ -126,9 +124,6 @@ export function AuthProvider({ children }) {
     return data;
   }, []);
 
-  // Part 5: confirms a PendingRegistration's OTP and (per routes/auth.js)
-  // creates the real, verified User in the same call. Mirrors register()'s
-  // err.status attachment so RegisterForm.jsx can branch on it the same way.
   const verifyRegistrationOtp = useCallback(async (email, otp) => {
     const res = await fetch(`${API_BASE_URL}/api/auth/register/verify-otp`, {
       method: 'POST',
@@ -145,9 +140,6 @@ export function AuthProvider({ children }) {
     return data;
   }, []);
 
-  // Part 6: requests a fresh OTP for a PendingRegistration (server enforces
-  // the 60s cooldown and the 5/hour per-email cap either way — this is just
-  // the call, not the throttling itself).
   const resendRegistrationOtp = useCallback(async (email) => {
     const res = await fetch(`${API_BASE_URL}/api/auth/register/resend-otp`, {
       method: 'POST',
@@ -164,10 +156,6 @@ export function AuthProvider({ children }) {
     return data;
   }, []);
 
-  // Part 8: resend a verification code for an existing-but-unverified
-  // account (shown from LoginForm's "Please verify your email" state).
-  // Distinct from resendRegistrationOtp above, which targets a
-  // PendingRegistration that no longer exists once an account is created.
   const resendAccountVerification = useCallback(async (email) => {
     const res = await fetch(`${API_BASE_URL}/api/auth/resend-verification`, {
       method: 'POST',
@@ -184,9 +172,6 @@ export function AuthProvider({ children }) {
     return data;
   }, []);
 
-  // Part 8 counterpart to verifyRegistrationOtp: confirms the code sent by
-  // resendAccountVerification and flips the account to isVerified. Does
-  // not log the user in — LoginForm re-submits the login form afterward.
   const verifyAccountOtp = useCallback(async (email, otp) => {
     const res = await fetch(`${API_BASE_URL}/api/auth/verify-account-otp`, {
       method: 'POST',
@@ -203,21 +188,82 @@ export function AuthProvider({ children }) {
     return data;
   }, []);
 
+  const claimGuestByEmailStart = useCallback(async (email, password) => {
+    const res = await fetch(`${API_BASE_URL}/api/auth/guest/claim/email/start`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const err = new Error(data.message || 'Could not send a verification code.');
+      err.status = res.status;
+      err.field = data.field;
+      throw err;
+    }
+    return data;
+  }, []);
+
+  const claimGuestByEmailResendOtp = useCallback(async () => {
+    const res = await fetch(`${API_BASE_URL}/api/auth/guest/claim/email/resend-otp`, {
+      method: 'POST',
+      credentials: 'include',
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const err = new Error(data.message || 'Could not resend the code.');
+      err.status = res.status;
+      throw err;
+    }
+    return data;
+  }, []);
+
+  const claimGuestByEmailVerifyOtp = useCallback(async (otp) => {
+    const res = await fetch(`${API_BASE_URL}/api/auth/guest/claim/email/verify-otp`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ otp }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const err = new Error(data.message || 'Verification failed.');
+      err.status = res.status;
+      throw err;
+    }
+    setUser(data.user);
+    writeStoredUser(data.user);
+    return data.user;
+  }, []);
+
+  const claimGuestByGoogle = useCallback(async (code) => {
+    const res = await fetch(`${API_BASE_URL}/api/auth/guest/claim/google`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const err = new Error(data.message || 'Google sign-in failed.');
+      err.status = res.status;
+      throw err;
+    }
+    setUser(data.user);
+    writeStoredUser(data.user);
+    return data.user;
+  }, []);
+
   const logout = useCallback(async () => {
     try {
       await fetch(`${API_BASE_URL}/api/auth/logout`, { method: 'POST', credentials: 'include' });
     } finally {
-      // Same order as admin.js's #admin-logout-btn handler: clear storage
-      // even if the network call fails, so the UI doesn't strand someone
-      // in a "looks logged in" state.
       clearStoredUser();
       setUser(null);
     }
   }, []);
 
-  // Lets a page (Profile.jsx, after a successful save) update the shared
-  // user object without a full /api/auth/me round-trip, while keeping
-  // storage in sync. Does NOT hit the network itself.
   const updateUser = useCallback((patch) => {
     setUser((prev) => {
       if (!prev) return prev;
@@ -229,18 +275,11 @@ export function AuthProvider({ children }) {
 
   const isAdmin = !!user && ADMIN_ROLES.includes(user.role);
 
-  // Direct port of admin.js's hasAdminPermission(), reading the real
-  // server-provided permissions array instead of a re-mirrored table —
-  // see the file-header note on ROLE_LABELS/ROLE_LEVEL above for why.
   const hasPermission = useCallback(
     (permission) => !!user && Array.isArray(user.permissions) && user.permissions.includes(permission),
     [user]
   );
 
-  // Direct port of admin.js's guardPermission(): same "show an alert and
-  // return false" UX for click-handlers that need to bail out early,
-  // preserved so every DEFERRED call site ported in Phase 12 can drop in
-  // unchanged.
   const guardPermission = useCallback(
     (permission, message) => {
       if (hasPermission(permission)) return true;
@@ -261,11 +300,16 @@ export function AuthProvider({ children }) {
       guardPermission,
       login,
       loginWithGoogle,
+      continueAsGuest,
       register,
       verifyRegistrationOtp,
       resendRegistrationOtp,
       resendAccountVerification,
       verifyAccountOtp,
+      claimGuestByEmailStart,
+      claimGuestByEmailResendOtp,
+      claimGuestByEmailVerifyOtp,
+      claimGuestByGoogle,
       logout,
       updateUser,
       revalidate,
@@ -278,11 +322,16 @@ export function AuthProvider({ children }) {
       guardPermission,
       login,
       loginWithGoogle,
+      continueAsGuest,
       register,
       verifyRegistrationOtp,
       resendRegistrationOtp,
       resendAccountVerification,
       verifyAccountOtp,
+      claimGuestByEmailStart,
+      claimGuestByEmailResendOtp,
+      claimGuestByEmailVerifyOtp,
+      claimGuestByGoogle,
       logout,
       updateUser,
       revalidate,

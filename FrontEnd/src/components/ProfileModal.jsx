@@ -7,6 +7,7 @@ import { openBookingReceipt } from '../utils/receipt';
 import PasswordInput from './PasswordInput';
 import { PASSWORD_REQUIREMENTS } from '../utils/password';
 import RescheduleModal, { canRescheduleBooking } from './RescheduleModal';
+import LogoutConfirmDialog from './LogoutConfirmDialog';
 
 const EMPTY_DETAILS = { firstName: '', lastName: '', phone: '', email: '' };
 const EMPTY_PASSWORD = { currentPassword: '', newPassword: '', confirmPassword: '' };
@@ -39,6 +40,7 @@ function ProfileModal({ open, onClose }) {
 
   const [toast, setToast] = useState({ visible: false, message: '', type: 'success' });
   const toastTimer = useRef(null);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   function pfShowToast(message, type = 'success') {
     setToast({ visible: true, message, type });
@@ -51,7 +53,7 @@ function ProfileModal({ open, onClose }) {
       firstName: u.firstName || '',
       lastName: u.lastName || '',
       phone: u.phone || '',
-      email: u.email || '',
+      email: u.isGuest ? '' : (u.email || ''),
     });
   }
 
@@ -99,6 +101,11 @@ function ProfileModal({ open, onClose }) {
   }
 
   async function handleLogout() {
+    setShowLogoutConfirm(true);
+  }
+
+  async function confirmLogout() {
+    setShowLogoutConfirm(false);
     await logout();
     window.location.href = '/';
   }
@@ -188,9 +195,6 @@ function ProfileModal({ open, onClose }) {
       <div
         className={`pf-overlay${open ? ' open' : ''}`}
         id="profileModal"
-        onClick={(e) => {
-          if (e.target === e.currentTarget) handleClose();
-        }}
       >
         <div className="pf-modal">
           <div className="pf-modal-head">
@@ -264,7 +268,14 @@ function ProfileModal({ open, onClose }) {
                 </div>
                 <div className="pf-field">
                   <label htmlFor="pfEmailReadonly">Email</label>
-                  <input type="email" id="pfEmailReadonly" value={details.email} disabled readOnly />
+                  <input
+                    type="email"
+                    id="pfEmailReadonly"
+                    value={details.email}
+                    placeholder={authUser?.isGuest ? 'Not set — claim your account to add one' : ''}
+                    disabled
+                    readOnly
+                  />
                 </div>
                 <div className="pf-field">
                   <label htmlFor="pfPhone">Phone number</label>
@@ -427,12 +438,7 @@ function ProfileModal({ open, onClose }) {
       </div>
 
       {viewingBooking && (
-        <div
-          className="pf-overlay open"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setViewingBooking(null);
-          }}
-        >
+        <div className="pf-overlay open">
           <div className="pf-modal">
             <div className="pf-modal-head">
               <h2 className="pf-modal-title">Reservation details</h2>
@@ -555,6 +561,13 @@ function ProfileModal({ open, onClose }) {
         <span id="pfToastIcon">{toast.type === 'error' ? '⚠️' : '✅'}</span>
         <span id="pfToastMsg">{toast.message}</span>
       </div>
+
+      <LogoutConfirmDialog
+        open={showLogoutConfirm}
+        isGuest={!!authUser?.isGuest}
+        onConfirm={confirmLogout}
+        onCancel={() => setShowLogoutConfirm(false)}
+      />
     </>
   );
 }

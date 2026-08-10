@@ -1,4 +1,5 @@
 const express = require("express");
+const crypto = require("crypto");
 const router = express.Router();
 
 const User = require("../model/user");
@@ -16,11 +17,29 @@ const {
 const { normalizeName, validateName } = require("../utils/nameValidation");
 const { isPasswordStrongEnough, PASSWORD_POLICY_MESSAGE } = require("../utils/passwordPolicy");
 const { logAudit } = require("../utils/auditLog");
+const { hashOtp } = require("../utils/otp");
+const { GUEST_RECOVERY_WINDOW_DAYS, GUEST_RECOVERY_CREDENTIAL_TTL_MS, GUEST_EMAIL_DOMAIN } = require("../utils/constants");
+const { purgeExpiredGuests } = require("../scripts/purgeExpiredGuests");
+
+const GUEST_RECOVERY_WINDOW_MS = GUEST_RECOVERY_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+
+function generateRecoveryCredentials() {
+  const tempEmail = `guest-recover-${crypto.randomBytes(6).toString("hex")}@${GUEST_EMAIL_DOMAIN}`;
+  const tempPassword = crypto.randomBytes(9).toString("base64url");
+  return { tempEmail, tempPassword };
+}
 
 function canEditTarget(req, target) {
   if (req.session.userId === String(target._id)) return true;
   if (!isAdminRole(req.user.role) || !hasPermission(req.user, PERMISSIONS.ADMIN_MANAGE)) return false;
   return canManageTarget({ actor: req.user, target }).ok;
+}
+
+function guestStatus(u) {
+  if (!u.isGuest) return null;
+  if (!u.guestDeletedAt) return "active";
+  if (u.guestRecoveryExpiresAt && u.guestRecoveryExpiresAt.getTime() > Date.now()) return "recovery_pending";
+  return "deleted";
 }
 
 function shapeUser(u) {
@@ -35,6 +54,10 @@ function shapeUser(u) {
     isActive: u.isActive,
     lastLoginAt: u.lastLoginAt,
     createdAt: u.createdAt,
+    isGuest: !!u.isGuest,
+    guestDeletedAt: u.guestDeletedAt || null,
+    guestStatus: guestStatus(u),
+    guestRecoverableUntil: u.guestDeletedAt ? new Date(u.guestDeletedAt.getTime() + GUEST_RECOVERY_WINDOW_MS) : null,
   };
 }
 
@@ -46,8 +69,12 @@ router.get("/", requirePermission(PERMISSIONS.ADMIN_MANAGE), async (req, res) =>
       const rx = new RegExp(String(req.query.search).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
       filter.$or = [{ firstName: rx }, { lastName: rx }, { email: rx }];
     }
+    if (req.query.isGuest !== undefined) filter.isGuest = req.query.isGuest === "true";
+    if (req.query.deleted !== undefined) {
+      filter.guestDeletedAt = req.query.deleted === "true" ? { $ne: null } : null;
+    }
 
-    const users = await User.find(filter).sort({ createdAt: -1 }).limit(500);
+    const users = await User.find(filter).select("+guestRecoveryExpiresAt").sort({ createdAt: -1 }).limit(500);
     const shaped = users.map((u) => ({
       ...shapeUser(u),
       canManage: canManageTarget({ actor: req.user, target: u }).ok,
@@ -122,6 +149,61 @@ router.put("/:id/role", requirePermission(PERMISSIONS.ADMIN_MANAGE), async (req,
     await target.save();
     await logAudit({ category: "Manage Users", action: "updated", description: `changed ${target.firstName} ${target.lastName}'s role to ${roleLabel(role)}`, user: req.user });
     res.json({ user: shapeUser(target) });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error." });
+  }
+});
+
+router.post("/:id/recover", requirePermission(PERMISSIONS.ADMIN_MANAGE), async (req, res) => {
+  try {
+    const target = await User.findById(req.params.id);
+    if (!target) return res.status(404).json({ message: "User not found." });
+
+    if (!target.isGuest) {
+      return res.status(400).json({ message: "This account isn't a guest account." });
+    }
+    if (!target.guestDeletedAt) {
+      return res.status(400).json({ message: "This guest account hasn't been deleted, so there's nothing to recover." });
+    }
+    if (Date.now() - target.guestDeletedAt.getTime() > GUEST_RECOVERY_WINDOW_MS) {
+      return res.status(400).json({ message: "This guest account is past its 60-day recovery window and can no longer be recovered." });
+    }
+
+    const { tempEmail, tempPassword } = generateRecoveryCredentials();
+    const expiresAt = new Date(Date.now() + GUEST_RECOVERY_CREDENTIAL_TTL_MS);
+
+    target.guestRecoveryEmailHash = hashOtp(tempEmail);
+    target.guestRecoveryPasswordHash = hashOtp(tempPassword);
+    target.guestRecoveryExpiresAt = expiresAt;
+    await target.save();
+
+    await logAudit({
+      category: "Manage Users",
+      action: "recovered",
+      description: `issued recovery credentials for a deleted guest account (deleted ${target.guestDeletedAt.toLocaleDateString()})`,
+      user: req.user,
+    });
+
+    res.json({ tempEmail, tempPassword, expiresAt });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error." });
+  }
+});
+
+router.post("/guests/cleanup-now", requirePermission(PERMISSIONS.ADMIN_MANAGE), async (req, res) => {
+  try {
+    const result = await purgeExpiredGuests({ dryRun: false });
+
+    await logAudit({
+      category: "Manage Users",
+      action: "deleted",
+      description: `ran guest cleanup: hard-deleted ${result.deletedCount} expired guest account(s)`,
+      user: req.user,
+    });
+
+    res.json({ deletedCount: result.deletedCount });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Server error." });
@@ -233,4 +315,4 @@ router.put("/:id/password", ensureAuthenticated, async (req, res) => {
   }
 });
 
-module.exports = router;
+module.exports = router;  

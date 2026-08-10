@@ -476,7 +476,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
 
     const user = authUser;
     setGuestName(user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : '');
-    setGuestContact(user ? user.phone || user.email || '' : '');
+    setGuestContact(user ? user.phone || (user.isGuest ? '' : user.email) || '' : '');
   }, [room]);
 
   useEffect(() => {
@@ -773,7 +773,12 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
     const trimmedContact = guestContact.trim();
 
     const nErr = trimmedName ? '' : 'Please enter your full name.';
-    const cErr = trimmedContact ? '' : 'Please enter a phone number or email.';
+    let cErr = '';
+    if (!trimmedContact) {
+      cErr = authUser?.isGuest ? '' : 'Please enter a phone number or email.';
+    } else if (authUser?.isGuest && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedContact)) {
+      cErr = 'Please enter a valid email address.';
+    }
     setNameError(nErr);
     setContactError(cErr);
     if (nErr || cErr || paxError) return;
@@ -1451,17 +1456,23 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
                     )}
                   </div>
                   <div className="bk-field">
-                    <label className="bk-field-label" htmlFor="bkGuestContact">Phone Number or Email</label>
+                    <label className="bk-field-label" htmlFor="bkGuestContact">
+                      {authUser?.isGuest ? 'Email Address' : 'Phone Number or Email'}
+                      {authUser?.isGuest && <span className="bk-field-optional">Optional</span>}
+                    </label>
                     <input
                       type="text"
                       id="bkGuestContact"
                       className={`bk-field-input${contactError ? ' bk-field-input--error' : ''}`}
-                      placeholder="09xx xxx xxxx or you@email.com"
+                      placeholder={authUser?.isGuest ? 'you@email.com' : '09xx xxx xxxx or you@email.com'}
                       value={guestContact}
                       onChange={(e) => { setGuestContact(e.target.value); if (contactError) setContactError(''); }}
                     />
                     {contactError && (
                       <p className="bk-field-error"><i className="fa-solid fa-circle-exclamation"></i> {contactError}</p>
+                    )}
+                    {authUser?.isGuest && !contactError && !guestContact.trim() && (
+                      <p className="bk-field-warning"><i className="fa-solid fa-triangle-exclamation"></i> Without an email, you won't receive a booking receipt.</p>
                     )}
                   </div>
                   <div className="bk-field">
