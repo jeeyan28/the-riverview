@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import '../styles/style.css';
 import '../styles/enhancements.css';
@@ -26,6 +26,8 @@ function MainLayout() {
   const [scrolled, setScrolled] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [claimAccountOpen, setClaimAccountOpen] = useState(false);
+  const siteRef = useRef(null);
+  const closeMobileNav = useCallback(() => setMobileNavOpen(false), []);
 
   useEffect(() => {
     function onScroll() {
@@ -36,7 +38,15 @@ function MainLayout() {
   }, []);
 
   useEffect(() => {
-    document.body.style.overflow = mobileNavOpen ? 'hidden' : '';
+    if (!mobileNavOpen) return;
+    const previousBodyOverflow = document.body.style.overflow;
+    const previousRootOverflow = document.documentElement.style.overflow;
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previousBodyOverflow;
+      document.documentElement.style.overflow = previousRootOverflow;
+    };
   }, [mobileNavOpen]);
 
   useEffect(() => {
@@ -44,19 +54,34 @@ function MainLayout() {
     return () => document.body.classList.remove('has-guest-banner');
   }, [user?.isGuest]);
 
+  useEffect(() => {
+    const site = siteRef.current;
+    if (!site) return;
+    const banner = site.querySelector('.guest-banner');
+    if (!banner) {
+      site.style.setProperty('--guest-banner-h', '0px');
+      return;
+    }
+    const updateBannerHeight = () => site.style.setProperty('--guest-banner-h', `${banner.getBoundingClientRect().height}px`);
+    updateBannerHeight();
+    const observer = new ResizeObserver(updateBannerHeight);
+    observer.observe(banner);
+    return () => observer.disconnect();
+  }, [initializing, user?.isGuest]);
+
   if (initializing) {
     return <PageSkeleton />;
   }
 
   return (
-    <>
+    <div className="public-site" ref={siteRef}>
       <GuestBanner onSave={() => setClaimAccountOpen(true)} />
 
       <Navbar
         announcements={announcements}
         mobileNavOpen={mobileNavOpen}
         onOpenMobileNav={() => setMobileNavOpen(true)}
-        onCloseMobileNav={() => setMobileNavOpen(false)}
+        onCloseMobileNav={closeMobileNav}
         scrolled={scrolled}
         onOpenProfile={() => setProfileOpen(true)}
         theme={theme}
@@ -72,7 +97,7 @@ function MainLayout() {
       <ProfileModal open={profileOpen} onClose={() => setProfileOpen(false)} />
 
       <ClaimAccountModal open={claimAccountOpen} onClose={() => setClaimAccountOpen(false)} />
-    </>
+    </div>
   );
 }
 

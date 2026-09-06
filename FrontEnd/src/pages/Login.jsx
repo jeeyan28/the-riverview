@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import { User } from 'lucide-react';
 import AuthForm from '../components/AuthForm';
 import ForgotPasswordModal from '../components/ForgotPasswordModal';
+import AuthMorphOverlay from '../components/AuthMorphOverlay';
+import { useAuthMorph } from '../hooks/useAuthMorph';
 import logo from "../assets/logo/logoo.png";
 import loginIllustration from "../assets/images/login-illustration.jpg";
 
@@ -11,6 +13,8 @@ function Login() {
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const cardRef = useRef(null);
   const [cardHeight, setCardHeight] = useState(null);
+  const { stage, rect, progress, beginMorph, retry } = useAuthMorph();
+  const isMorphing = stage !== 'idle';
 
   useLayoutEffect(() => {
     if (isLogin && cardHeight === null && cardRef.current) {
@@ -18,10 +22,14 @@ function Login() {
     }
   }, [isLogin, cardHeight]);
 
+  function handleAuthSuccess(user) {
+    beginMorph(user, cardRef.current?.getBoundingClientRect());
+  }
+
   return (
     <main className="login-page">
 
-      <div className="login-background">
+      <div className={`login-background${isMorphing ? ' is-dimmed' : ''}`}>
         <div
           className="login-background-image"
           style={{ backgroundImage: `url(${loginIllustration})` }}
@@ -39,14 +47,12 @@ function Login() {
 
       <section className="login-layout">
 
-        <div className="login-copy">
+        <div className={`login-copy${isMorphing ? ' is-exiting' : ''}`}>
           <span className="login-badge">PREMIUM RECREATION</span>
           <h1>
-            Reserve.
-            <br />
-            Play.
-            <br />
-            Unwind.
+            <span>Reserve.</span>
+            <span>Play.</span>
+            <span>Unwind.</span>
           </h1>
           <p>
             Reserve billiards and recreation spaces with
@@ -55,7 +61,7 @@ function Login() {
         </div>
 
         <aside
-          className="login-card"
+          className={`login-card${isMorphing ? ' is-morph-source' : ''}`}
           ref={cardRef}
           style={cardHeight ? { height: cardHeight } : undefined}
         >
@@ -83,12 +89,15 @@ function Login() {
                 mode={isLogin ? 'login' : 'register'}
                 onSwitchMode={() => setIsLogin((v) => !v)}
                 onForgotPassword={() => setShowForgotPassword(true)}
+                onAuthSuccess={handleAuthSuccess}
               />
             </div>
           </div>
         </aside>
 
       </section>
+
+      <AuthMorphOverlay stage={stage} rect={rect} progress={progress} onRetry={retry} />
 
       <ForgotPasswordModal
         open={showForgotPassword}

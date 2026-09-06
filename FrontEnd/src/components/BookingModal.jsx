@@ -1197,6 +1197,16 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
                   <i className="fa-solid fa-circle-info"></i>
                   You can review your reservation details before completing the payment.
                 </p>
+                <div className="bk-mobile-room-actions">
+                  <button
+                    type="button"
+                    className="bk-confirm bk-continue"
+                    disabled={!selectedVariant}
+                    onClick={handleContinueFromPrice}
+                  >
+                    Continue to date &amp; time <i className="fa-solid fa-arrow-right" aria-hidden="true"></i>
+                  </button>
+                </div>
               </div>
             )}
 

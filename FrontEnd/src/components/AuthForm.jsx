@@ -13,18 +13,13 @@ import { OTP_LENGTH, OTP_EXPIRY_SECONDS, RESEND_COOLDOWN_SECONDS, formatCountdow
 import { isPasswordStrongEnough } from '../utils/password';
 import { validateName, normalizeName } from '../utils/name';
 
-function redirectAfterLogin(user) {
-  const isAdmin = ['staff', 'manager', 'super_admin'].includes(user.role);
-  window.location.href = isAdmin ? '/admin/dashboard' : '/';
-}
-
 function maskEmail(email) {
   const [local, domain] = String(email || '').split('@');
   if (!local || !domain) return email || '';
   return `${local[0]}***@${domain}`;
 }
 
-function AuthForm({ mode, onSwitchMode, onForgotPassword }) {
+function AuthForm({ mode, onSwitchMode, onForgotPassword, onAuthSuccess }) {
   const isLogin = mode === 'login';
   const {
     login,
@@ -64,8 +59,7 @@ function AuthForm({ mode, onSwitchMode, onForgotPassword }) {
         lastName: normalizeName(guestLastName),
       });
       setGuestModalOpen(false);
-      showToast('Continuing as guest…', 'success');
-      setTimeout(() => redirectAfterLogin(user), 1200);
+      onAuthSuccess?.(user);
     } catch (err) {
       showToast(err.message || 'Could not start a guest session.', 'error');
     } finally {
@@ -82,8 +76,7 @@ function AuthForm({ mode, onSwitchMode, onForgotPassword }) {
     }
     try {
       const user = await loginWithGoogle(response.code, true);
-      showToast('Welcome! Redirecting…', 'success');
-      setTimeout(() => redirectAfterLogin(user), 1200);
+      onAuthSuccess?.(user);
     } catch (err) {
       showToast(err.message || 'Google sign-in failed.', 'error');
     }
@@ -130,12 +123,7 @@ function AuthForm({ mode, onSwitchMode, onForgotPassword }) {
     setLoading(true);
     try {
       const user = await login(trimmedEmail, password, remember);
-      const isAdmin = ['staff', 'manager', 'super_admin'].includes(user.role);
-      showToast(
-        isAdmin ? 'Welcome, Admin! Redirecting…' : `Welcome back, ${user.firstName}!`,
-        'success'
-      );
-      setTimeout(() => redirectAfterLogin(user), 1200);
+      onAuthSuccess?.(user);
     } catch (err) {
       if (typeof err.status === 'number') {
         if (err.unverified) {

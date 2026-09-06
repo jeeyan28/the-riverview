@@ -1,0 +1,20 @@
+/* Loaded after page styles. Keep responsive rules in their UI area. */
+@import './auth-responsive.css';
+@import './public-responsive.css';
+@import './forms-responsive.css';
+@import './admin/responsive.css';
+
+html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+}
+
+button, a, input, select, textarea {
+    touch-action: manipulation;
+}
+
+.toast {
+    max-width: calc(100vw - 32px);
+    bottom: calc(20px + env(safe-area-inset-bottom));
+    overflow-wrap: anywhere;
+}

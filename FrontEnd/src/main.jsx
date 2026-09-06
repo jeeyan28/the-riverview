@@ -5,6 +5,7 @@ import App from './App.jsx'
 import { AuthProvider } from './context/AuthContext.jsx'
 
 import './styles/root.css'
+import './styles/responsive.css'
 
 
 ReactDOM.createRoot(document.getElementById('root')).render(

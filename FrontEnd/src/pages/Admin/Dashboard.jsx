@@ -248,7 +248,7 @@ function Dashboard() {
               roomViews.map(({ room: r, view }) => (
                 <div className="dash-room-row" key={r._id}>
                   <span className={`dash-room-dot ${ROOM_STATUS_DOT_CLASS[r.status] || 'dash-dot-vacant'}`}></span>
-                  <span className="dash-room-num">{r.roomNumber}</span>
+                  <span className="dash-room-num">Table {r.roomNumber} </span>
                   {view.occupancy && (
                     <span className={`dash-room-time${view.isCritical || view.isPastEnd ? ' critical' : view.isWarning ? ' warning' : ''}`}>
                       {formatTimeRemaining(view.remaining, view.isPastEnd)}

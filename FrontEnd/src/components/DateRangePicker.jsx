@@ -95,13 +95,19 @@ function DateRangePicker({ from, to, onChange }) {
 
   return (
     <div className="drp-root" ref={rootRef}>
-      <button type="button" className="drp-trigger" onClick={() => (open ? setOpen(false) : openPicker())}>
+      <button type="button" className="drp-trigger" aria-expanded={open} aria-haspopup="dialog" onClick={() => (open ? setOpen(false) : openPicker())}>
         <i className="ti ti-calendar" />
         <span>{formatLabel(from)} – {formatLabel(to)}</span>
       </button>
 
       {open && (
-        <div className="drp-popover">
+        <div className="drp-popover" role="dialog" aria-label="Choose report dates">
+          <div className="drp-popover-header">
+            <span>Choose report dates</span>
+            <button type="button" className="drp-close" aria-label="Close date picker" onClick={() => { setOpen(false); setPendingStart(null); }}>
+              <i className="ti ti-x" aria-hidden="true" />
+            </button>
+          </div>
           <div className="drp-presets">
             {PRESETS.map((preset) => (
               <button key={preset.label} type="button" className="drp-preset-btn" onClick={() => handlePreset(preset)}>
@@ -112,11 +118,11 @@ function DateRangePicker({ from, to, onChange }) {
 
           <div className="drp-calendar">
             <div className="drp-nav">
-              <button type="button" className="drp-nav-btn" onClick={() => shiftMonth(-1)}>
+              <button type="button" className="drp-nav-btn" aria-label="Previous month" onClick={() => shiftMonth(-1)}>
                 <i className="ti ti-chevron-left" />
               </button>
               <span className="drp-nav-label">{MONTH_LABELS[viewMonth]} {viewYear}</span>
-              <button type="button" className="drp-nav-btn" onClick={() => shiftMonth(1)}>
+              <button type="button" className="drp-nav-btn" aria-label="Next month" onClick={() => shiftMonth(1)}>
                 <i className="ti ti-chevron-right" />
               </button>
             </div>
@@ -139,14 +145,14 @@ function DateRangePicker({ from, to, onChange }) {
                 if (isStart || isEnd) classes.push('drp-day-selected');
                 if (inRange) classes.push('drp-day-in-range');
                 return (
-                  <button key={key} type="button" className={classes.join(' ')} onClick={() => handleDayClick(date)}>
+                  <button key={key} type="button" className={classes.join(' ')} aria-label={formatLabel(key)} aria-pressed={isStart || isEnd || Boolean(inRange)} onClick={() => handleDayClick(date)}>
                     {date.getDate()}
                   </button>
                 );
               })}
             </div>
 
-            {pendingStart && <div className="drp-hint">Pick the end date</div>}
+            <div className="drp-hint" aria-live="polite">{pendingStart ? 'Now choose the end date' : 'Choose a start date, then an end date'}</div>
           </div>
         </div>
       )}

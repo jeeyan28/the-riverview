@@ -1,0 +1,675 @@
+/* Shared guest forms and report dates. Keep viewport rules together so the
+   desktop, tablet and phone layouts are easy to maintain. */
+.bk-overlay,
+.pf-overlay,
+.uimodal-overlay,
+:is(.login-page, .claim-modal-scope) .forgot-modal-backdrop {
+  padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  overscroll-behavior: contain;
+}
+
+.bk-modal {
+  height: min(850px, calc(100dvh - 48px));
+  max-height: calc(100dvh - 48px);
+  overflow: hidden;
+}
+
+.bk-modal.bk-modal--compact {
+  max-height: calc(100dvh - 48px);
+}
+
+.bk-header {
+  padding-right: 76px;
+}
+
+.bk-header > div,
+.bk-room-option-body,
+.bk-room-option-top,
+.bk-summary-panel-room > div,
+.bk-field,
+.pf-field,
+.pf-phone-field input,
+.pf-summary-card {
+  min-width: 0;
+}
+
+.bk-header h2,
+.bk-summary-panel-row-value,
+.bk-summary-value,
+.bk-sr-value,
+.bk-success-note,
+.pf-detail-value,
+.pf-summary-num,
+.uimodal-message {
+  overflow-wrap: anywhere;
+}
+
+.bk-close,
+.pf-close,
+.bk-nav-btn,
+.bk-pax-btn,
+.drp-nav-btn,
+.drp-close,
+:is(.login-page, .claim-modal-scope) .forgot-modal-close {
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+}
+
+.bk-confirm,
+.bk-back,
+.bk-back-btn,
+.bk-done,
+.bk-duration-btn,
+.bk-room-option-details-btn,
+.bk-payment-method-tile,
+.bk-payment-fallback-btn,
+.pf-btn,
+.pf-tab,
+.pf-edit-btn,
+.pf-view-btn,
+.pf-logout,
+.uimodal-btn,
+.drp-trigger,
+.drp-preset-btn,
+:is(.login-page, .claim-modal-scope) .forgot-modal-actions button {
+  min-height: 44px;
+  touch-action: manipulation;
+}
+
+.bk-field-input,
+.pf-field input {
+  min-height: 46px;
+  max-width: 100%;
+  scroll-margin-block: 24px;
+}
+
+.bk-field-textarea {
+  min-height: 88px;
+}
+
+.bk-detail-actions {
+  margin: 20px 0 0;
+  padding: 12px 0 max(12px, env(safe-area-inset-bottom));
+  bottom: 0;
+  gap: 12px;
+}
+
+.bk-mobile-room-actions {
+  display: none;
+}
+
+.pf-modal {
+  height: auto;
+  max-height: min(820px, calc(100dvh - 48px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+
+.pf-panel.active {
+  flex: 0 0 auto;
+  overflow: visible;
+}
+
+.pf-history {
+  max-height: none;
+  overflow: visible;
+}
+
+.pf-detail-list,
+.pf-modal-actions {
+  flex-shrink: 0;
+}
+
+.pf-modal-actions {
+  flex-wrap: wrap;
+}
+
+.pf-booking-row {
+  flex-wrap: wrap;
+}
+
+.pf-booking-main {
+  flex-basis: 140px;
+}
+
+.pf-booking-title {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.pf-toast {
+  width: max-content;
+  max-width: calc(100vw - 32px);
+  bottom: max(20px, env(safe-area-inset-bottom));
+}
+
+.uimodal-box {
+  max-height: calc(100dvh - 48px);
+  overflow-y: auto;
+}
+
+.uimodal-actions {
+  flex-wrap: wrap;
+}
+
+.uimodal-btn-primary:not(:disabled) {
+  color: #06251f;
+}
+
+.uimodal-btn-primary:not(:disabled):hover {
+  background: var(--teal, #00c9a7);
+  filter: brightness(1.06);
+}
+
+:is(.login-page, .claim-modal-scope) .forgot-modal.login-card {
+  max-height: calc(100dvh - 48px);
+  overscroll-behavior: contain;
+}
+
+:is(.login-page, .claim-modal-scope) .forgot-modal .login-card-header {
+  padding-right: 36px;
+}
+
+:is(.login-page, .claim-modal-scope) .forgot-modal-close {
+  top: 12px;
+  right: 12px;
+}
+
+:is(.login-page, .claim-modal-scope) .forgot-modal .otp-input-group {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: clamp(4px, 1.5vw, 10px);
+}
+
+:is(.login-page, .claim-modal-scope) .forgot-modal .otp-input-group .otp-input {
+  width: 100%;
+  min-width: 0;
+  height: 48px;
+  padding: 0;
+  border-radius: 10px;
+}
+
+:is(.login-page, .claim-modal-scope) .forgot-modal .signup-row {
+  flex-wrap: wrap;
+  line-height: 1.6;
+}
+
+.claim-modal-scope .profile-tabs {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+}
+
+.claim-modal-scope .profile-tab {
+  min-width: 0;
+  min-height: 44px;
+  padding-inline: 8px;
+}
+
+.drp-root {
+  max-width: 100%;
+}
+
+.drp-trigger {
+  max-width: 100%;
+  text-align: left;
+  line-height: 1.4;
+}
+
+.drp-trigger span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.drp-popover {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 308px);
+  gap: 12px;
+  width: 468px;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-radius: 16px;
+}
+
+.drp-popover-header {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--text);
+  font-size: .9rem;
+  font-weight: 600;
+}
+
+.drp-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text);
+  border: 1px solid var(--border);
+  background: var(--navy3);
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.drp-calendar {
+  width: 100%;
+  min-width: 0;
+}
+
+.drp-day {
+  min-width: 0;
+  min-height: 42px;
+  font-size: .82rem;
+}
+
+.drp-day-selected {
+  color: #06251f;
+  font-weight: 700;
+}
+
+.drp-hint {
+  margin-top: 12px;
+  line-height: 1.5;
+}
+
+.drp-root button:focus-visible,
+.pf-modal button:focus-visible,
+.uimodal-btn:focus-visible {
+  outline: 2px solid var(--teal, #00c9a7);
+  outline-offset: 3px;
+}
+
+@media (min-width: 900px) {
+  .bk-summary-panel-mobile {
+    display: none;
+  }
+}
+
+@media (max-width: 1024px), (pointer: coarse) {
+  .bk-modal input,
+  .bk-modal select,
+  .bk-modal textarea,
+  .pf-modal input,
+  .pf-modal select,
+  .pf-modal textarea,
+  :is(.login-page, .claim-modal-scope) .forgot-modal .field input {
+    font-size: 16px;
+  }
+
+  .pf-field .input-wrap .toggle-pw {
+    width: 44px;
+    min-height: 44px;
+  }
+
+  .pf-field .input-wrap input {
+    padding-right: 50px;
+  }
+
+  .bk-day {
+    min-height: 44px;
+  }
+}
+
+@media (max-width: 899px) {
+  .bk-modal,
+  .bk-modal.bk-modal--compact {
+    height: auto;
+    max-height: calc(100dvh - 32px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .bk-content {
+    display: block;
+    flex: 0 0 auto;
+  }
+
+  .bk-body {
+    overflow: visible;
+    padding-bottom: 20px;
+  }
+
+  .bk-step {
+    max-width: none;
+  }
+
+  .bk-summary-toggle {
+    width: auto;
+    min-height: 48px;
+    text-align: left;
+  }
+
+  .bk-summary-panel-mobile {
+    flex-shrink: 0;
+  }
+
+  .bk-mobile-room-actions {
+    display: block;
+    position: sticky;
+    bottom: 0;
+    margin-top: 16px;
+    padding: 12px 0 max(12px, env(safe-area-inset-bottom));
+    background: var(--surface-alt);
+    border-top: 1px solid var(--border);
+    z-index: 4;
+  }
+
+  .bk-mobile-room-actions .bk-confirm {
+    width: 100%;
+  }
+}
+
+@media (max-width: 640px) {
+  .drp-popover {
+    position: fixed;
+    inset: auto 12px max(12px, env(safe-area-inset-bottom));
+    z-index: 1100;
+    width: auto;
+    max-width: 440px;
+    max-height: calc(100dvh - 32px);
+    margin-inline: auto;
+    grid-template-columns: minmax(0, 1fr);
+    padding: 16px;
+    box-shadow: 0 0 0 100vmax rgba(6, 10, 18, .45), 0 16px 48px rgba(6, 10, 18, .2);
+  }
+
+  .drp-presets {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    min-width: 0;
+    padding: 0 0 12px;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+    gap: 6px;
+  }
+
+  .drp-preset-btn {
+    background: var(--navy3);
+    padding: 8px 6px;
+    text-align: center;
+  }
+
+  .drp-day {
+    aspect-ratio: auto;
+    min-height: 44px;
+  }
+}
+
+@media (max-width: 599px) {
+  .bk-overlay,
+  .pf-overlay {
+    padding: 0;
+  }
+
+  .bk-modal,
+  .bk-modal.bk-modal--compact,
+  .pf-modal {
+    width: 100%;
+    max-width: none;
+    height: 100dvh;
+    max-height: 100dvh;
+    border: 0;
+    border-radius: 0;
+  }
+
+  .bk-modal {
+    padding-top: env(safe-area-inset-top);
+  }
+
+  .bk-header {
+    padding: 18px 68px 14px max(16px, env(safe-area-inset-left));
+    gap: 12px;
+  }
+
+  .bk-header h2 {
+    font-size: 1.2rem;
+    line-height: 1.3;
+  }
+
+  .bk-room-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+  }
+
+  .bk-close {
+    top: calc(14px + env(safe-area-inset-top));
+    right: max(12px, env(safe-area-inset-right));
+  }
+
+  .bk-stepper {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    padding: 0 12px 14px;
+    gap: 4px;
+  }
+
+  .bk-step-chevron {
+    display: none;
+  }
+
+  .bk-step-dot {
+    flex-direction: column;
+    gap: 6px;
+    min-height: 56px;
+    text-align: center;
+  }
+
+  .bk-step-dot-num {
+    width: 30px;
+    height: 30px;
+  }
+
+  .bk-step-dot-label {
+    font-size: .68rem;
+    line-height: 1.3;
+    white-space: normal;
+  }
+
+  .bk-body {
+    padding: 0 max(16px, env(safe-area-inset-right)) max(20px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  }
+
+  .bk-summary-toggle,
+  .bk-summary-panel-mobile,
+  .bk-lock-banner {
+    margin: 0 16px 14px;
+    padding: 12px;
+  }
+
+  .bk-lock-banner,
+  .bk-info-bar {
+    align-items: flex-start;
+    line-height: 1.5;
+  }
+
+  .bk-calendar-block {
+    max-width: 400px;
+  }
+
+  .bk-grid {
+    gap: 2px;
+  }
+
+  .bk-day {
+    aspect-ratio: auto;
+    min-height: 44px;
+    border-radius: 9px;
+  }
+
+  .bk-room-option-collapsed {
+    gap: 10px;
+    padding: 12px;
+  }
+
+  .bk-room-option-img {
+    width: 76px;
+    height: 84px;
+    flex-basis: 76px;
+  }
+
+  .bk-room-option-top {
+    flex-wrap: wrap;
+  }
+
+  .bk-room-option-name {
+    font-size: .9rem;
+    overflow-wrap: anywhere;
+  }
+
+  .bk-room-option-details-btn {
+    white-space: normal;
+  }
+
+  .bk-room-option-amenity {
+    white-space: normal;
+  }
+
+  .bk-slots-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .bk-detail-actions,
+  .bk-success-actions-row {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .bk-detail-actions > button,
+  .bk-success-actions-row > button {
+    width: 100%;
+    flex: 0 0 auto;
+    min-height: 46px;
+  }
+
+  .bk-summary-row,
+  .bk-summary-panel-row {
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .bk-summary-row .bk-sr-value,
+  .bk-summary-panel-row-value {
+    max-width: 60%;
+  }
+
+  .pf-modal {
+    padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  }
+
+  .pf-modal-head {
+    align-items: center;
+    margin-bottom: 16px;
+  }
+
+  .pf-tabs {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin-bottom: 20px;
+  }
+
+  .pf-tab {
+    padding: 10px 8px;
+    white-space: normal;
+  }
+
+  .pf-profile-body {
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .pf-avatar-col {
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: 16px;
+  }
+
+  .pf-avatar {
+    width: 72px;
+    height: 72px;
+  }
+
+  .pf-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+
+  .pf-modal-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .pf-btn {
+    width: 100%;
+    min-height: 46px;
+  }
+
+  .pf-history-summary {
+    gap: 6px;
+  }
+
+  .pf-summary-num {
+    font-size: 1.1rem;
+  }
+
+  .pf-summary-label {
+    font-size: .7rem;
+    line-height: 1.4;
+  }
+
+  .pf-booking-row {
+    gap: 10px;
+    padding: 12px;
+  }
+
+  .pf-view-btn {
+    flex: 1 1 40%;
+  }
+
+  .pf-detail-row {
+    align-items: flex-start;
+  }
+
+  .pf-detail-value {
+    max-width: 62%;
+  }
+
+  .pf-detail-row--block .pf-detail-value {
+    max-width: 100%;
+  }
+
+  :is(.login-page, .claim-modal-scope) .forgot-modal.login-card {
+    padding: 28px 20px;
+    border-radius: 20px;
+    min-width: 0;
+  }
+
+  :is(.login-page, .claim-modal-scope) .forgot-modal-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  :is(.login-page, .claim-modal-scope) .forgot-modal-actions button {
+    width: 100%;
+    margin: 0;
+    white-space: normal;
+  }
+
+  .uimodal-box {
+    padding: 24px 20px;
+    border-radius: 20px;
+  }
+
+  .uimodal-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+}

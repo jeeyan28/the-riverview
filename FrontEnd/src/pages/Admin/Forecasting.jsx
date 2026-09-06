@@ -401,30 +401,32 @@ function Forecasting() {
               <div className="card-head">
                 <span className="card-title">Top room demand (last 60 days)</span>
               </div>
-              <table className="tbl">
-                <thead>
-                  <tr>
-                    <th>Room</th>
-                    <th>Reservations</th>
-                  </tr>
-                </thead>
-                <tbody id="fc-top-rooms">
-                  {data.topRooms.length ? (
-                    data.topRooms.map((r) => (
-                      <tr key={r.roomLabel}>
-                        <td>{r.roomLabel}</td>
-                        <td>{r.count}</td>
-                      </tr>
-                    ))
-                  ) : (
+              <div className="admin-table-scroll admin-table-scroll-compact" tabIndex={0} role="region" aria-label="Top room demand table">
+                <table className="tbl">
+                  <thead>
                     <tr>
-                      <td colSpan={2} style={{ textAlign: 'center', color: 'var(--muted)', padding: '16px 0' }}>
-                        No reservation data yet.
-                      </td>
+                      <th>Room</th>
+                      <th>Reservations</th>
                     </tr>
-                  )}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody id="fc-top-rooms">
+                    {data.topRooms.length ? (
+                      data.topRooms.map((r) => (
+                        <tr key={r.roomLabel}>
+                          <td>{r.roomLabel}</td>
+                          <td>{r.count}</td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={2} style={{ textAlign: 'center', color: 'var(--muted)', padding: '16px 0' }}>
+                          No reservation data yet.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
 

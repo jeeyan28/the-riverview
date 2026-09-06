@@ -50,6 +50,7 @@ function DataTable({
 
   return (
     <>
+      <div className="admin-table-scroll" role="region" aria-label={`${itemLabel} table — scroll horizontally for more columns`} tabIndex={0}>
       <table className={tableClassName}>
         <thead>
           <tr>
@@ -101,6 +102,7 @@ function DataTable({
           )}
         </tbody>
       </table>
+      </div>
 
       {paginate && !loading && totalRows > 0 && (
         <Pagination
