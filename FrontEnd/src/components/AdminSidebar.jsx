@@ -64,11 +64,13 @@ function initialsOf(user) {
   return (initials || 'A').toUpperCase();
 }
 
-function AdminSidebar() {
+function AdminSidebar({ compact = false, mobileOpen = false, onClose, triggerRef }) {
   const { user, roleLabel, hasPermission, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const navRef = useRef(null);
+  const sidebarRef = useRef(null);
+  const closeButtonRef = useRef(null);
 
   const [collapsed, setCollapsed] = useState(() => {
     try {
@@ -77,6 +79,7 @@ function AdminSidebar() {
       return false;
     }
   });
+  const isCollapsed = collapsed && !compact;
 
   useEffect(() => {
     try {
@@ -86,9 +89,43 @@ function AdminSidebar() {
   }, [collapsed]);
 
   useEffect(() => {
+    if (compact && !mobileOpen) return;
     const activeItem = navRef.current?.querySelector('.sb-item.active');
-    activeItem?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-  }, [location.pathname]);
+    activeItem?.scrollIntoView({ block: 'nearest' });
+  }, [location.pathname, compact, mobileOpen]);
+
+  useEffect(() => {
+    if (!compact || !mobileOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    closeButtonRef.current?.focus();
+
+    function handleKeyDown(event) {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        onClose();
+      }
+      if (event.key !== 'Tab') return;
+      const controls = [...sidebarRef.current.querySelectorAll('a[href], button:not([disabled])')]
+        .filter((element) => element.offsetParent !== null);
+      const first = controls[0];
+      const last = controls[controls.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last?.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first?.focus();
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener('keydown', handleKeyDown);
+      triggerRef?.current?.focus();
+    };
+  }, [compact, mobileOpen, onClose, triggerRef]);
 
   async function handleLogout() {
     await logout();
@@ -96,20 +133,41 @@ function AdminSidebar() {
   }
 
   return (
-    <div id="sidebar" className={collapsed ? 'collapsed' : ''}>
+    <aside
+      id="sidebar"
+      ref={sidebarRef}
+      className={`${isCollapsed ? 'collapsed' : ''}${mobileOpen ? ' mobile-open' : ''}`}
+      role={compact ? 'dialog' : undefined}
+      aria-label="Admin navigation"
+      aria-modal={compact && mobileOpen ? true : undefined}
+      aria-hidden={compact && !mobileOpen ? true : undefined}
+      inert={compact && !mobileOpen ? '' : undefined}
+    >
       <button
         type="button"
         className="sb-toggle-btn"
         onClick={() => setCollapsed((c) => !c)}
         title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        aria-expanded={!collapsed}
+        aria-controls="admin-sidebar-navigation"
       >
         <i className={`ti ${collapsed ? 'ti-chevron-right' : 'ti-chevron-left'}`}></i>
       </button>
 
+      <button
+        ref={closeButtonRef}
+        type="button"
+        className="admin-drawer-close"
+        onClick={onClose}
+        aria-label="Close navigation menu"
+      >
+        <i className="ti ti-x" aria-hidden="true"></i>
+      </button>
+
       <div className="sb-brand">
         <img className="sb-logo" src={logo} alt="Riverview Logo" />
-        {!collapsed && (
+        {!isCollapsed && (
           <div>
             <div className="sb-title">Riverview</div>
             <div className="sb-sub">Admin Panel</div>
@@ -117,7 +175,7 @@ function AdminSidebar() {
         )}
       </div>
 
-      <div className="sb-nav" ref={navRef}>
+      <nav className="sb-nav" id="admin-sidebar-navigation" ref={navRef} aria-label="Administration">
         {NAV_SECTIONS.map((section) => {
           const visibleItems = section.items.filter(
             (item) =>
@@ -125,7 +183,7 @@ function AdminSidebar() {
               (!item.roles || item.roles.includes(user?.role))
           );
           if (visibleItems.length === 0 && section.items.length > 0) {
-            return collapsed ? null : (
+            return isCollapsed ? null : (
               <div key={section.label}>
                 <div className="sb-section">{section.label}</div>
               </div>
@@ -133,7 +191,7 @@ function AdminSidebar() {
           }
           return (
             <div key={section.label}>
-              {!collapsed && <div className="sb-section">{section.label}</div>}
+              {!isCollapsed && <div className="sb-section">{section.label}</div>}
               {visibleItems.map((item) => (
                 <NavLink
                   key={item.to}
@@ -141,37 +199,42 @@ function AdminSidebar() {
                   className={({ isActive }) => `sb-item${isActive ? ' active' : ''}`}
                   title={item.label}
                   data-tooltip={item.label}
+                  aria-label={item.label}
+                  onClick={compact ? onClose : undefined}
                 >
-                  <i className={`ti ${item.icon}`}></i>
-                  {!collapsed && item.label}
+                  <i className={`ti ${item.icon}`} aria-hidden="true"></i>
+                  {!isCollapsed && item.label}
                 </NavLink>
               ))}
             </div>
           );
         })}
-      </div>
+      </nav>
 
       <div className="sb-bottom">
         <div className="admin-info-row">
           <div className="admin-av" id="sb-admin-av" title={fullName(user)} data-tooltip={fullName(user)}>
             {initialsOf(user)}
           </div>
-          {!collapsed && (
-            <div>
+          {!isCollapsed && (
+            <div className="admin-user-details">
               <div className="admin-name" id="sb-admin-name">{fullName(user)}</div>
               <div className="admin-role" id="sb-admin-role">{roleLabel || 'Admin'}</div>
             </div>
           )}
-          <i
-            className="ti ti-logout sb-logout-icon"
+          <button
+            type="button"
+            className="sb-logout-button"
             id="admin-logout-btn"
             onClick={handleLogout}
             title="Logout"
-            style={{ fontSize: 14, marginLeft: collapsed ? 0 : 'auto' }}
-          ></i>
+            aria-label="Log out"
+          >
+            <i className="ti ti-logout" aria-hidden="true"></i>
+          </button>
         </div>
       </div>
-    </div>
+    </aside>
   );
 }
 

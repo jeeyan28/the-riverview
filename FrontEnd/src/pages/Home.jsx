@@ -21,8 +21,9 @@ import heroImg5 from '../assets/pictures/RiverView_5.jpg';
 import heroImg6 from '../assets/pictures/RiverView_6.jpg';
 import heroImg7 from '../assets/pictures/RiverView_7.jpg';
 import heroImg8 from '../assets/pictures/RiverView_8.jpg';
-import billiardsImg from '../assets/images/billiards.png';
-import courtImg from '../assets/images/court.png';
+import billiardsImg from '../assets/images/about-billiards.png';
+import courtImg from '../assets/images/about-court.png';
+import ktvImg from '../assets/images/about-ktv.png';
 import heroBgImg from '../assets/images/main.png';
 
 const HERO_CAROUSEL_INTERVAL_MS = 4000;
@@ -420,7 +421,7 @@ function Home() {
                 <p>Private rooms with updated song libraries. Bring your barkada, bring your voice. No judgment here.</p>
               </div>
               <div className="space-img">
-                <img src={billiardsImg} alt="KTV Room" />
+                <img src={ktvImg} alt="KTV Room" />
               </div>
             </div>
           </div>

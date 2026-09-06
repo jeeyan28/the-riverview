@@ -1,0 +1,129 @@
+/* Login keeps the existing desktop card and uses a single page scroll on touch screens. */
+.login-page {
+    min-height: 100svh;
+}
+
+.login-page .login-copy h1 > span {
+    display: block;
+}
+
+.login-page .login-layout,
+.login-page .login-card,
+.login-page .auth-card-inner,
+.login-page .field {
+    min-width: 0;
+}
+
+.login-page .login-layout {
+    min-height: 100svh;
+}
+
+.login-page .login-header {
+    padding-left: max(clamp(20px, 4.4vw, 64px), env(safe-area-inset-left));
+    padding-right: max(clamp(20px, 4.4vw, 64px), env(safe-area-inset-right));
+    top: env(safe-area-inset-top, 0px);
+}
+
+.login-page :is(button, a):focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+}
+
+@media (max-width: 1080px) {
+    .login-page .login-layout {
+        align-content: center;
+        gap: 24px;
+        padding: calc(100px + env(safe-area-inset-top)) max(24px, env(safe-area-inset-right)) calc(40px + env(safe-area-inset-bottom)) max(24px, env(safe-area-inset-left));
+    }
+
+    .login-page .login-copy .login-badge {
+        margin-bottom: 12px;
+    }
+
+    .login-page .login-copy h1 {
+        display: flex;
+        justify-content: center;
+        flex-wrap: wrap;
+        gap: 0 .22em;
+        font-size: clamp(1.75rem, 4.5vw, 2.6rem);
+        margin-bottom: 12px;
+    }
+
+    .login-page .login-copy p {
+        max-width: 440px;
+        font-size: .95rem;
+        line-height: 1.5;
+    }
+
+    .login-page .login-card {
+        /* Override the measured desktop height so registration grows with its fields. */
+        height: auto !important;
+        max-width: 480px;
+        text-align: left;
+    }
+
+    .login-page .auth-card-body {
+        overflow: visible;
+        padding-right: 0;
+        margin-right: 0;
+    }
+
+    .login-page .field input:not(.otp-input),
+    .login-page .rf-scope .field input:not(.otp-input) {
+        font-size: 16px;
+    }
+
+    .login-page :is(.toggle-pw, .forgot-link, .signup-row .link-button, .login-row .link-button) {
+        min-height: 44px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .login-page .input-wrap .toggle-pw {
+        min-width: 44px;
+        right: 4px;
+    }
+}
+
+@media (max-width: 600px) {
+    .login-page .login-layout {
+        align-content: start;
+        gap: 20px;
+        padding: calc(88px + env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) calc(24px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+    }
+
+    .login-page .login-copy p,
+    .login-page .login-copy .login-badge {
+        display: none;
+    }
+
+    .login-page .login-copy h1 {
+        font-size: clamp(1.4rem, 6.4vw, 2rem);
+        margin: 0;
+    }
+
+    .login-page .login-card {
+        padding: 24px 20px;
+        border-radius: 20px;
+    }
+
+    .login-page .login-card-header {
+        margin-bottom: 20px;
+    }
+
+    .login-page .login-card-header h2 {
+        font-size: 1.5rem;
+    }
+
+    .login-page .otp-input-group {
+        gap: 6px;
+    }
+
+    .login-page input.otp-input {
+        width: min(42px, 12vw);
+        min-width: 0;
+        height: 48px;
+        font-size: 20px;
+    }
+}

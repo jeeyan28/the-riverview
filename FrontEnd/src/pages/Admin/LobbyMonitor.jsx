@@ -200,7 +200,7 @@ function LobbyMonitor() {
         <>
           <p className="lobby-setup-note">
             <i className="bi bi-info-circle"></i>
-            This is a setup preview. Pick what this screen should show below, then select <strong>Display on TV</strong> — filters and sorting hide automatically for guests, and the list will gently auto-scroll if it doesn't fit the screen.
+            <span>This is a setup preview. Pick what this screen should show below, then select <strong>Display on TV</strong> — filters and sorting hide automatically for guests, and the list will gently auto-scroll if it doesn't fit the screen.</span>
           </p>
           <div className="lobby-filters">
             <div className="lobby-filter-row">
@@ -297,7 +297,7 @@ function LobbyMonitor() {
             </div>
           ))
         ) : (
-          <div className="lobby-table-wrap">
+          <div className="lobby-table-wrap" tabIndex={0} role="region" aria-label="Room availability table">
             <table className="lobby-table">
               <thead>
                 <tr>
