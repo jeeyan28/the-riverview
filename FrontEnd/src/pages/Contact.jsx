@@ -1,74 +1,82 @@
+import { ArrowUpRight, CalendarCheck, Clock3, MapPin, MessageCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { useSiteSettings } from '../hooks/useSiteSettings';
+import { operatingHoursSummary } from '../utils/operatingHours';
 import '../styles/contact-page.css';
 
-function Contact() {
+const FACEBOOK_URL = 'https://www.facebook.com/profile.php?id=61550783505442';
+const MAPS_URL = 'https://maps.app.goo.gl/2VqEJXFJifUz2KF76';
+
+function ContactCard({ icon: Icon, title, children, action }) {
   return (
-    <section id="contact" className="contact-page">
+    <article className="contact-card">
+      <div className="contact-card-head">
+        <div className="contact-card-icon"><Icon size={18} aria-hidden="true" /></div>
+        <h4>{title}</h4>
+      </div>
+      <p>{children}</p>
+      <div className="contact-card-actions">{action}</div>
+    </article>
+  );
+}
+
+function Contact() {
+  const { settings } = useSiteSettings();
+  const hoursLabel = operatingHoursSummary(settings);
+
+  return (
+    <section id="contact" className="contact-page" aria-labelledby="contact-title">
       <div className="contact-inner">
         <div className="contact-header">
-          <span className="section-label">Get In Touch</span>
-          <h2>Contact Us</h2>
-          <p>Have a question about a reservation or an event? Reach out and we'll get back to you.</p>
+          <span className="section-label">Visit The Riverview</span>
+          <h2 id="contact-title">Plan your visit or ask us directly.</h2>
+          <p>
+            Reserve online for a confirmed time slot. For event questions or help with an
+            existing reservation, message the official Facebook page.
+          </p>
         </div>
 
         <div className="contact-grid">
           <div className="contact-cards">
-            <div className="contact-card">
-              <div className="contact-card-head">
-                <div className="contact-card-icon"><i className="fa-solid fa-location-dot"></i></div>
-                <h4>Address</h4>
-              </div>
-              <p>0355 Caingin, San Rafael, Philippines, 3008</p>
-              <div className="contact-card-actions">
-                <a
-                  className="contact-card-btn"
-                  href="https://maps.app.goo.gl/2VqEJXFJifUz2KF76"
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  Open in Maps <i className="fa-solid fa-arrow-up-right-from-square"></i>
+            <ContactCard
+              icon={MapPin}
+              title="Location"
+              action={(
+                <a className="contact-card-btn" href={MAPS_URL} target="_blank" rel="noreferrer">
+                  Open in Google Maps <ArrowUpRight size={14} aria-hidden="true" />
                 </a>
-              </div>
-            </div>
+              )}
+            >
+              0355 Caingin, San Rafael, Bulacan, Philippines 3008
+            </ContactCard>
 
-            <div className="contact-card">
-              <div className="contact-card-head">
-                <div className="contact-card-icon"><i className="fa-solid fa-envelope"></i></div>
-                <h4>Email</h4>
-              </div>
-              <p>Add your contact email here. We'll get back to you via email.</p>
-              <div className="contact-card-actions">
-                <a className="contact-card-btn" href="mailto:">
-                  Send an Email <i className="fa-solid fa-paper-plane"></i>
+            <ContactCard
+              icon={Clock3}
+              title="Operating hours"
+              action={<Link className="contact-card-btn" to="/rooms">Check facilities</Link>}
+            >
+              {hoursLabel}. Admin-posted closures appear in the reservation calendar.
+            </ContactCard>
+
+            <ContactCard
+              icon={MessageCircle}
+              title="Reservation support"
+              action={(
+                <a className="contact-card-btn" href={FACEBOOK_URL} target="_blank" rel="noreferrer">
+                  Message on Facebook <ArrowUpRight size={14} aria-hidden="true" />
                 </a>
-              </div>
-            </div>
+              )}
+            >
+              Send the team your reservation code when asking about a booking, cancellation request, or event.
+            </ContactCard>
 
-            <div className="contact-card">
-              <div className="contact-card-head">
-                <div className="contact-card-icon"><i className="fa-solid fa-phone"></i></div>
-                <h4>Phone</h4>
-              </div>
-              <p>Add your contact number here.</p>
-              <div className="contact-card-actions">
-                <a className="contact-card-btn" href="tel:">
-                  Call Now <i className="fa-solid fa-phone"></i>
-                </a>
-              </div>
-            </div>
-
-            <div className="contact-card">
-              <div className="contact-card-head">
-                <div className="contact-card-icon"><i className="fa-solid fa-clock"></i></div>
-                <h4>Hours</h4>
-              </div>
-              <p>Add your operating hours here.</p>
-              <div className="contact-card-actions">
-                <Link className="contact-card-btn" to="/rooms">
-                  View Schedule <i className="fa-solid fa-calendar-days"></i>
-                </Link>
-              </div>
-            </div>
+            <ContactCard
+              icon={CalendarCheck}
+              title="Ready to reserve?"
+              action={<Link className="contact-card-btn" to="/rooms">Browse available spaces</Link>}
+            >
+              Select a room, date, and whole-hour time slot. Online reservations are confirmed after the required down payment succeeds.
+            </ContactCard>
           </div>
 
           <div className="map-embed">
@@ -78,31 +86,8 @@ function Contact() {
               loading="lazy"
               referrerPolicy="strict-origin-when-cross-origin"
               allowFullScreen
-            ></iframe>
+            />
           </div>
-        </div>
-
-        <div className="social-icons contact-socials">
-          <a href="#" aria-label="Instagram"><i className="fa-brands fa-instagram"></i></a>
-          <a
-            href="https://www.facebook.com/profile.php?id=61550783505442"
-            target="_blank"
-            rel="noreferrer"
-            aria-label="Facebook"
-          >
-            <i className="fa-brands fa-facebook-f"></i>
-          </a>
-          <a
-                href="https://www.tiktok.com/@the.riverview?is_from_webapp=1&sender_device=pc"
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="Visit The Riverview on TikTok"
-                title="Follow us on TikTok"
-                class="social-link"
-              >
-                <i class="bi bi-tiktok"></i>
-                <span class="visually-hidden">TikTok</span>
-              </a>
         </div>
       </div>
     </section>

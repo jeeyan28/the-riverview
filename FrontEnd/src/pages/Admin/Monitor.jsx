@@ -1,17 +1,21 @@
 import '../../styles/admin/monitor.css';
+import '../../styles/admin/finance.css';
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import Modal from '../../components/Modal';
 import DataTable from '../../components/DataTable';
 import Pagination from '../../components/Pagination';
 import ConfirmDialog from '../../components/ConfirmDialog';
+import DateRangePicker from '../../components/DateRangePicker';
 import { useConfirm } from '../../hooks/useConfirm';
 import { useAuth } from '../../context/AuthContext';
 import { monitorRoomsService, roomSessionsService } from '../../services/monitoring';
 import { bookingsService } from '../../services/bookings';
-import { dateKey } from '../../utils/rooms';
+import { businessDate } from '../../utils/businessDate';
+import { CORKAGE_FEE, calculateBookingPrice, variantRateLabel } from '../../utils/roomPricing';
+import { BarChart3, Download, Radio } from 'lucide-react';
 import {
   useRoomMonitorData,
-  normalizeRoom,
   sessionEnd,
   formatStartTime,
   formatEndTime,
@@ -20,9 +24,35 @@ import {
   buildRoomView,
 } from '../../hooks/useRoomMonitorData';
 
-const FACILITY_ICONS = { Billiards: 'bi-disc', Karaoke: 'bi-mic', 'Private Rooms': 'bi-door-open', 'Rental Court': 'bi-trophy' };
+const FACILITY_ICONS = { Billiards: 'bi-disc', KTV: 'bi-mic', Court: 'bi-trophy' };
 const FACILITY_ICON_DEFAULT = 'bi-building';
 const DUE_BOOKINGS_POLL_MS = 20 * 1000;
+
+function paymentSummary(record, isBooking = false) {
+  const total = Math.max(0, Number(record?.amount) || 0);
+  const paid = Math.max(
+    0,
+    Number(record?.paidAmount) || 0,
+    isBooking ? Number(record?.downPayment) || 0 : record?.paymentStatus === 'Paid' ? total : 0,
+  );
+  const refunded = Math.max(0, Number(record?.refundedAmount) || 0);
+  const collected = Math.max(0, paid - refunded);
+  const balance = Math.max(0, Math.round((total - collected) * 100) / 100);
+  return { total, collected, balance, status: balance === 0 ? 'Paid' : collected > 0 ? 'Partially paid' : 'Unpaid' };
+}
+
+const money = (value) => `₱${Number(value || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+function SessionPayment({ session }) {
+  const payment = paymentSummary(session);
+  const state = payment.balance === 0 ? 'paid' : payment.collected > 0 ? 'partial' : 'unpaid';
+  return (
+    <div className="rm-payment-summary">
+      <span className={`pay-timing-tag ${state}`}>{payment.status}</span>
+      <span>{money(payment.balance)} balance</span>
+    </div>
+  );
+}
 
 function getBookingRoomTarget(booking) {
   const facilityName = booking.room?.name;
@@ -42,7 +72,7 @@ function getBookingRoomTarget(booking) {
 function matchRoomForTarget(rooms, roomTarget) {
   if (!roomTarget) return { matchedRoom: null, previewNumber: null };
   const { facilityName, roomName, startingRoomNumber, roomCount } = roomTarget;
-  const facilityRooms = rooms.filter((r) => r.facilityName === facilityName);
+  const facilityRooms = rooms.filter((r) => r.facilityName === facilityName && r.roomName === roomName);
 
   if (!Number.isFinite(startingRoomNumber) || startingRoomNumber < 1 || !Number.isFinite(roomCount) || roomCount < 1) {
     const matchedRoom = facilityRooms.find((r) => r.roomName === roomName && r.status === 'Available') || null;
@@ -72,18 +102,20 @@ function matchRoomForTarget(rooms, roomTarget) {
 function Monitor() {
   const { hasPermission, guardPermission } = useAuth();
   const canManage = hasPermission('room:manage');
+  const canOperate = hasPermission('room:operate');
   const canManageBookings = hasPermission('booking:manage');
-  const canStartFromBooking = canManage || canManageBookings;
+  const canStartFromBooking = canOperate || canManageBookings;
   const { confirm, confirmProps } = useConfirm();
 
   const {
-    rooms, setRooms, sessions, loading,
+    rooms, setRooms, sessions, loading, refreshError, lastUpdatedAt,
     fetchRooms, fetchMonitorSessions,
     viewMode, changeViewMode,
     soundMuted, toggleSoundMuted,
   } = useRoomMonitorData('admin');
 
   const [modal, setModal] = useState(null);
+  const [finishingSession, setFinishingSession] = useState(null);
   const [showAddRoom, setShowAddRoom] = useState(false);
   const [editRoomId, setEditRoomId] = useState(null);
   const [facilityFilter, setFacilityFilter] = useState('All');
@@ -94,11 +126,46 @@ function Monitor() {
   const [dueBookings, setDueBookings] = useState([]);
   const [gridPage, setGridPage] = useState(1);
   const [gridPageSize, setGridPageSize] = useState(10);
+  const [workspaceTab, setWorkspaceTab] = useState('live');
+  const [reportFrom, setReportFrom] = useState(() => businessDate());
+  const [reportTo, setReportTo] = useState(() => businessDate());
+  const [monitorReport, setMonitorReport] = useState(null);
+  const [reportLoading, setReportLoading] = useState(false);
+  const [reportError, setReportError] = useState('');
+  const [reportExporting, setReportExporting] = useState(false);
+
+  async function loadMonitorReport() {
+    setReportLoading(true);
+    setReportError('');
+    try {
+      setMonitorReport(await roomSessionsService.report(reportFrom, reportTo));
+    } catch (err) {
+      setReportError(err.message || 'Could not load the session report.');
+    } finally {
+      setReportLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (workspaceTab === 'report') loadMonitorReport();
+  }, [workspaceTab, reportFrom, reportTo]);
+
+  async function exportMonitorReport() {
+    setReportExporting(true);
+    setReportError('');
+    try {
+      await roomSessionsService.exportReport(reportFrom, reportTo);
+    } catch (err) {
+      setReportError(err.message || 'Could not export the session report.');
+    } finally {
+      setReportExporting(false);
+    }
+  }
 
   async function fetchDueBookings() {
     if (!canStartFromBooking) return;
     try {
-      const today = dateKey(new Date().getFullYear(), new Date().getMonth(), new Date().getDate());
+      const today = businessDate();
       const data = await bookingsService.list({ status: 'Confirmed' });
       const list = Array.isArray(data) ? data : [];
       setDueBookings(list.filter((b) => b.date <= today));
@@ -122,54 +189,42 @@ function Monitor() {
     setRoomNameFilter('All');
   }
 
-  async function endSession(sessionId, roomId) {
-    if (!guardPermission('room:manage')) return;
-    if (!(await confirm('End this session and mark it Paid? The table will be marked Available.', { confirmText: 'End & Mark Paid' }))) return;
-    try {
-      const result = await roomSessionsService.end(sessionId, true);
-
-      if (result?.roomDeleted) {
-        setRooms((prev) => prev.filter((r) => r._id !== roomId));
-      } else {
-        try {
-          const updatedRoom = await monitorRoomsService.updateStatus(roomId, 'Available');
-          setRooms((prev) => prev.map((r) => (r._id === roomId ? normalizeRoom({ ...r, ...updatedRoom }) : r)));
-        } catch {}
-      }
-
-      await fetchMonitorSessions();
-    } catch (err) {
-      console.error(err);
-      alert('Could not end this session.');
-    }
+  function endSession(session) {
+    if (refreshError || !guardPermission('room:operate')) return;
+    setFinishingSession(session);
   }
 
-  async function cancelSession(sessionId, roomId) {
-    if (!guardPermission('room:manage')) return;
-    if (!(await confirm('Cancel this session? This removes it entirely and frees up the table — use this only if it was started by accident.', { confirmText: 'Cancel Session' }))) return;
+  async function finishSession(payment) {
+    if (refreshError || !guardPermission('room:operate')) return;
+    await roomSessionsService.end(finishingSession._id, payment);
+    setFinishingSession(null);
+    await fetchMonitorSessions();
+    await fetchDueBookings();
+  }
+
+  async function cancelSession(sessionId) {
+    if (refreshError || !guardPermission('room:operate')) return;
+    if (!(await confirm('Cancel this accidental session and release the table? Its payment and session history will be kept. A linked reservation will be restored for a new start.', { confirmText: 'Cancel Session' }))) return;
     try {
       await roomSessionsService.remove(sessionId);
-      try {
-        const updatedRoom = await monitorRoomsService.updateStatus(roomId, 'Available');
-        setRooms((prev) => prev.map((r) => (r._id === roomId ? normalizeRoom({ ...r, ...updatedRoom }) : r)));
-      } catch {}
       await fetchMonitorSessions();
+      await fetchDueBookings();
     } catch (err) {
       console.error(err);
-      alert('Could not cancel this session.');
+      alert(err.message || 'Could not cancel this session.');
     }
   }
 
   function openStartSessionModal(room) {
-    if (!guardPermission('room:manage')) return;
+    if (refreshError || !guardPermission('room:operate')) return;
     setModal({ mode: 'start', fixedRoom: room, session: null });
   }
   function openExtendModal(session, room) {
-    if (!guardPermission('room:manage')) return;
+    if (refreshError || !guardPermission('room:operate')) return;
     setModal({ mode: 'extend', fixedRoom: room, session });
   }
   function openStartFromBooking(booking, matchedRoom, roomTarget, previewNumber) {
-    if (!canStartFromBooking) return;
+    if (refreshError || !canStartFromBooking) return;
     setModal({
       mode: 'start',
       fixedRoom: matchedRoom,
@@ -179,30 +234,22 @@ function Monitor() {
       bookingId: booking._id,
       initialGuestName: booking.guestName,
       initialDurationHours: booking.duration,
-      downPaymentInfo: { paid: booking.downPayment || 0, total: booking.amount || 0 },
+      downPaymentInfo: paymentSummary(booking, true),
     });
   }
 
-  async function handleModalSubmit({ mode, roomId, roomTarget, sessionId, totalHours, paymentMethod, paymentTiming, guestName, bookingId }) {
+  async function handleModalSubmit({ mode, roomId, roomTarget, sessionId, totalHours, paymentMethod, paymentTiming, paidAmount, guestName, guestCount, hasCorkage, bookingId }) {
+    if (refreshError) throw new Error('Wait for the table status to refresh before changing this session.');
     if (mode !== 'extend' && bookingId) {
       if (!canStartFromBooking) return;
-    } else if (!guardPermission('room:manage')) {
+    } else if (!guardPermission('room:operate')) {
       return;
     }
 
     if (mode === 'extend') {
       await roomSessionsService.extend(sessionId, { addedHours: totalHours });
     } else {
-      const created = await roomSessionsService.create({ roomId, roomTarget, duration: totalHours, paymentMethod, paymentTiming, guestName, bookingId });
-
-      try {
-        const updatedRoom = await monitorRoomsService.updateStatus(created.room, 'Occupied');
-        setRooms((prev) => {
-          const exists = prev.some((r) => r._id === created.room);
-          if (exists) return prev.map((r) => (r._id === created.room ? normalizeRoom({ ...r, ...updatedRoom }) : r));
-          return [...prev, normalizeRoom(updatedRoom)];
-        });
-      } catch {}
+      await roomSessionsService.create({ roomId, roomTarget, duration: totalHours, paymentMethod, paymentTiming, paidAmount, guestName, guestCount, hasCorkage, bookingId });
     }
 
     setModal(null);
@@ -365,12 +412,10 @@ function Monitor() {
       key: 'payment',
       label: 'Payment',
       sortable: true,
-      sortValue: (r) => buildRoomView(r, sessions).occupancy?.paymentTiming || '',
+      sortValue: (r) => paymentSummary(buildRoomView(r, sessions).occupancy).balance,
       render: (r) => {
         const { occupancy } = buildRoomView(r, sessions);
-        return occupancy ? (
-          <span className="pay-timing-tag">{occupancy.paymentTiming === 'After' ? 'Pay After' : 'Pay Before'}</span>
-        ) : '—';
+        return occupancy ? <SessionPayment session={occupancy} /> : '—';
       },
     },
     {
@@ -381,22 +426,18 @@ function Monitor() {
         return (
           <div className="rm-actions rm-actions--table">
             {occupancy ? (
-              canManage ? (
+              canOperate && !refreshError ? (
                 <>
                   <button className="rm-btn" onClick={() => openExtendModal(occupancy, r)}><i className="bi bi-clock-history"></i>Extend</button>
-                  <button className="rm-btn rm-btn--success" onClick={() => endSession(occupancy._id, r._id)}><i className="bi bi-check2-circle"></i>End & Mark Paid</button>
+                  <button className="rm-btn rm-btn--success" onClick={() => endSession(occupancy)}><i className="bi bi-check2-circle"></i>Finish</button>
                   <button className="rm-btn danger" onClick={() => cancelSession(occupancy._id, r._id)}><i className="bi bi-x-circle"></i>Cancel</button>
                 </>
               ) : (
                 <span className="rm-note">In use</span>
               )
             ) : r.status === 'Available' ? (
-              canManage ? (
-                <>
-                  <button className="rm-btn primary" onClick={() => openStartSessionModal(r)}><i className="bi bi-play-fill"></i>Start Session</button>
-                  <button className="rm-btn" onClick={() => setEditRoomId(r._id)}><i className="bi bi-pencil-square"></i>Edit</button>
-                  <button className="rm-btn danger" onClick={() => deleteRoom(r._id)}><i className="bi bi-trash"></i>Delete</button>
-                </>
+              canOperate ? (
+                <button className="rm-btn primary" onClick={() => openStartSessionModal(r)}><i className="bi bi-play-fill"></i>Start Session</button>
               ) : (
                 <span className="rm-note">No permission</span>
               )
@@ -411,9 +452,29 @@ function Monitor() {
 
   return (
     <div className="panel active" id="panel-monitor">
+      <div className="monitor-section-tabs" role="tablist" aria-label="Live monitor sections">
+        <button type="button" role="tab" aria-selected={workspaceTab === 'live'} className={workspaceTab === 'live' ? 'active' : ''} onClick={() => setWorkspaceTab('live')}><Radio size={17} aria-hidden="true" /><span>Live floor</span><small>Rooms and active guests</small></button>
+        <button type="button" role="tab" aria-selected={workspaceTab === 'report'} className={workspaceTab === 'report' ? 'active' : ''} onClick={() => setWorkspaceTab('report')}><BarChart3 size={17} aria-hidden="true" /><span>Session report</span><small>Played hours and payments</small></button>
+      </div>
+
+      {workspaceTab === 'report' && (
+        <MonitorReportPanel
+          report={monitorReport}
+          from={reportFrom}
+          to={reportTo}
+          loading={reportLoading}
+          error={reportError}
+          exporting={reportExporting}
+          onRangeChange={(nextFrom, nextTo) => { setReportFrom(nextFrom); setReportTo(nextTo); }}
+          onReload={loadMonitorReport}
+          onExport={exportMonitorReport}
+        />
+      )}
+
+      <div className="monitor-live-workspace" hidden={workspaceTab !== 'live'}>
       <div className="rm-toolbar-head">
         <div className="rm-page-head">
-          <span className="live-badge"><span className="dot"></span>Live</span>
+          <span className="live-badge"><span className="dot"></span>{refreshError ? 'Reconnecting' : loading ? 'Connecting' : 'Live'}</span>
           <span className="rm-page-sub">Real-time table status and session monitoring</span>
         </div>
         <div className="rm-toolbar-actions">
@@ -437,12 +498,19 @@ function Monitor() {
             <i className="bi bi-tv"></i>View Lobby Display
           </a>
           {canManage && (
-            <button className="btn-teal" onClick={() => setShowAddRoom(true)}>
-              <i className="bi bi-building-add"></i>New Table
-            </button>
+            <Link className="btn-teal" to="/admin/room-management">
+              <i className="bi bi-building-gear"></i>Manage Inventory
+            </Link>
           )}
         </div>
       </div>
+
+      {refreshError && (
+        <div className="rm-refresh-error" role="status">
+          <span>Table status could not refresh. {lastUpdatedAt ? `Showing occupancy last checked at ${new Date(lastUpdatedAt).toLocaleTimeString([], { timeZone: 'Asia/Manila', hour: '2-digit', minute: '2-digit', second: '2-digit' })}.` : 'Availability is not yet known.'} Session controls resume after a successful refresh.</span>
+          <button type="button" className="rm-btn" onClick={fetchMonitorSessions}>Retry</button>
+        </div>
+      )}
 
       {!loading && rooms.length > 0 && (
         <div className="rm-stats-bar">
@@ -477,7 +545,7 @@ function Monitor() {
                 <th>Guest</th>
                 <th>Facility / Table</th>
                 <th>Scheduled</th>
-                <th>Downpayment</th>
+                <th>Payment collected</th>
                 <th>Status</th>
                 <th>Action</th>
               </tr>
@@ -485,17 +553,15 @@ function Monitor() {
             <tbody>
               {dueBookings
                 .slice()
-                .sort((a, b) => a.timeIn.localeCompare(b.timeIn))
+                .sort((a, b) => String(a.timeIn || '').localeCompare(String(b.timeIn || '')))
                 .map((b) => {
                   const roomTarget = getBookingRoomTarget(b);
                   const { matchedRoom, previewNumber } = matchRoomForTarget(rooms, roomTarget);
-                  const scheduledStart = new Date(`${b.date}T${String(b.timeIn).padStart(5, '0')}:00`);
+                  const scheduledStart = new Date(`${b.date}T${String(b.timeIn).padStart(5, '0')}:00+08:00`);
                   const isDue = scheduledStart.getTime() <= Date.now();
                   const occupancy = matchedRoom ? findRoomOccupancy(matchedRoom._id, sessions) : null;
                   const hasConflict = matchedRoom && occupancy;
-                  const downPayment = b.downPayment || 0;
-                  const totalAmount = b.amount || 0;
-                  const isFullyPaid = downPayment >= totalAmount && totalAmount > 0;
+                  const payment = paymentSummary(b, true);
                   return (
                     <tr key={b._id} className={isDue ? 'blink-expired' : ''}>
                       <td><span className="rm-guest-name">{b.guestName}</span></td>
@@ -511,11 +577,11 @@ function Monitor() {
                               : 'No matching Table Monitor table'}
                         </div>
                       </td>
-                      <td>{scheduledStart.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</td>
+                      <td>{scheduledStart.toLocaleString([], { timeZone: 'Asia/Manila', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</td>
                       <td>
-                        <div className="rm-amount">₱{downPayment.toFixed(2)}</div>
-                        <div className={`rm-amount-sub${isFullyPaid ? ' paid' : ''}`}>
-                          {isFullyPaid ? 'Fully paid' : `of ₱${totalAmount.toFixed(2)} total`}
+                        <div className="rm-amount">{money(payment.collected)}</div>
+                        <div className={`rm-amount-sub${payment.balance === 0 ? ' paid' : ''}`}>
+                          {payment.balance === 0 ? 'Fully paid' : `${money(payment.balance)} balance`}
                         </div>
                       </td>
                       <td>
@@ -531,7 +597,7 @@ function Monitor() {
                       <td>
                         <button
                           className="rm-btn primary"
-                          disabled={!roomTarget || hasConflict}
+                          disabled={!!refreshError || !roomTarget || hasConflict}
                           title={!roomTarget ? 'Could not determine this reservation\'s room.' : hasConflict ? 'End the current session on this room first.' : ''}
                           onClick={() => openStartFromBooking(b, matchedRoom, roomTarget, previewNumber)}
                         >
@@ -549,7 +615,7 @@ function Monitor() {
       {loading ? (
         <div className="room-grid"><div className="room-grid-empty">Loading tables…</div></div>
       ) : rooms.length === 0 ? (
-        <div className="room-grid"><div className="room-grid-empty">No tables yet — click New Table above to add one.</div></div>
+        <div className="room-grid"><div className="room-grid-empty">{refreshError ? 'Waiting for table status…' : 'No tables configured yet.'}</div></div>
       ) : (
         <>
           <div className="rm-search-row">
@@ -663,6 +729,12 @@ function Monitor() {
                 onClick={() => setDetailRoomId(r._id)}
                 role="button"
                 tabIndex={0}
+                onKeyDown={(event) => {
+                  if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) {
+                    event.preventDefault();
+                    setDetailRoomId(r._id);
+                  }
+                }}
               >
                 {occupancy && (isCritical || isPastEnd) && (
                   <span className="rm-warning-pop"><i className="bi bi-exclamation-triangle-fill"></i></span>
@@ -694,11 +766,12 @@ function Monitor() {
                     </div>
                     <div className="rm-foot">
                       <div className="rm-foot-info">
-                        <i className="bi bi-person"></i>{occupancy.paymentTiming === 'After' ? 'Pay After' : 'Pay Before'}
+                        <i className="bi bi-person"></i>{occupancy.guestName || 'Walk-in guest'}
                       </div>
                       <div className="rm-foot-price">₱{r.price}/hr</div>
                     </div>
-                    {canManage && (
+                    <SessionPayment session={occupancy} />
+                    {canOperate && !refreshError && (
                       <div className="rm-quick-actions">
                         <button
                           type="button"
@@ -710,9 +783,9 @@ function Monitor() {
                         <button
                           type="button"
                           className="rm-btn rm-btn--success"
-                          onClick={(e) => { e.stopPropagation(); endSession(occupancy._id, r._id); }}
+                          onClick={(e) => { e.stopPropagation(); endSession(occupancy); }}
                         >
-                          <i className="bi bi-check2-circle"></i>End & Mark Paid
+                          <i className="bi bi-check2-circle"></i>Finish
                         </button>
                         <button
                           type="button"
@@ -732,7 +805,7 @@ function Monitor() {
                     <span>{r.status === 'Available' ? 'Available' : r.status}</span>
                   </div>
                 )}
-                {!occupancy && r.status === 'Available' && canManage && (
+                {!occupancy && r.status === 'Available' && canOperate && (
                   <div className="rm-foot">
                     <button
                       type="button"
@@ -778,28 +851,23 @@ function Monitor() {
         </>
       )}
 
+      </div>
+
       <SessionModal modal={modal} onClose={() => setModal(null)} onSubmit={handleModalSubmit} />
-      <RoomFormModal open={showAddRoom} onClose={() => setShowAddRoom(false)} onSubmit={handleAddRoom} existingFacilities={facilities} rooms={rooms} />
-      <RoomFormModal
-        open={!!editRoomId}
-        onClose={() => setEditRoomId(null)}
-        onSubmit={handleEditRoom}
-        existingFacilities={facilities}
-        rooms={rooms}
-        initialRoom={rooms.find((r) => r._id === editRoomId) || null}
-      />
+      <FinishSessionModal session={finishingSession ? sessions.find((session) => session._id === finishingSession._id) || finishingSession : null} disabled={!!refreshError} onClose={() => setFinishingSession(null)} onSubmit={finishSession} />
       <RoomDetailModal
         room={detailRoom}
         view={detailView}
         onClose={() => setDetailRoomId(null)}
         canManage={canManage}
+        canOperate={canOperate && !refreshError}
         onExtend={() => {
           setDetailRoomId(null);
           openExtendModal(detailView.occupancy, detailRoom);
         }}
         onEndSessionPaid={() => {
           setDetailRoomId(null);
-          endSession(detailView.occupancy._id, detailRoom._id);
+          endSession(detailView.occupancy);
         }}
         onCancelSession={() => {
           setDetailRoomId(null);
@@ -820,13 +888,124 @@ function Monitor() {
   );
 }
 
+function MonitorReportPanel({ report, from, to, loading, error, exporting, onRangeChange, onReload, onExport }) {
+  return (
+    <section className="monitor-report" aria-labelledby="monitor-report-title">
+      <div className="monitor-report-head">
+        <div>
+          <h2 id="monitor-report-title">Played session report</h2>
+          <p>One row per live-monitor session, grouped by its start date and exact room type.</p>
+        </div>
+        <button type="button" className="save-btn" onClick={onExport} disabled={loading || exporting}>
+          <Download size={16} aria-hidden="true" />{exporting ? 'Generating…' : 'Export Excel'}
+        </button>
+      </div>
+
+      <div className="monitor-report-filters">
+        <DateRangePicker from={from} to={to} onChange={onRangeChange} />
+        <button type="button" className="btn-cancel" onClick={onReload} disabled={loading}>{loading ? 'Loading…' : 'Refresh'}</button>
+      </div>
+
+      {error && <div className="finance-error" role="alert">{error}</div>}
+
+      <div className="monitor-report-summary" aria-label="Session totals">
+        <div><span>Played sessions</span><strong>{loading && !report ? '—' : report?.summary?.sessions ?? 0}</strong><small>{report?.summary?.hours ?? 0} occupied hours</small></div>
+        <div><span>Hourly charges</span><strong>{money(report?.summary?.charged)}</strong><small>Room and facility time</small></div>
+        <div><span>Collected</span><strong>{money(report?.summary?.collected)}</strong><small>{report?.summary?.paid ?? 0} fully paid</small></div>
+        <div className={(report?.summary?.outstanding || 0) > 0 ? 'has-balance' : ''}><span>Outstanding</span><strong>{money(report?.summary?.outstanding)}</strong><small>{report?.summary?.partial ?? 0} partial · {report?.summary?.unpaid ?? 0} unpaid</small></div>
+      </div>
+
+      <div className="monitor-report-layout">
+        <div className="card card-flush monitor-report-table-card">
+          <div className="monitor-report-card-head"><div><h3>Session activity</h3><p>Time in, scheduled time out, rate, charge, and payment balance.</p></div><span>{report?.rows?.length ?? 0} rows</span></div>
+          <div className="admin-table-scroll" tabIndex={0} role="region" aria-label="Live monitor session report">
+            <table className="tbl monitor-report-table">
+              <thead><tr><th>Date / time</th><th>Facility / room</th><th>Guest</th><th>Source</th><th>Hours</th><th>Rate</th><th>Charge</th><th>Paid</th><th>Balance</th><th>Payment</th></tr></thead>
+              <tbody>
+                {loading && !report ? <tr><td colSpan="10" className="finance-empty">Loading played sessions…</td></tr> : report?.rows?.length ? report.rows.map((row) => (
+                  <tr key={row.id}>
+                    <td><strong>{row.date}</strong><div className="finance-meta">{row.timeIn} – {row.timeOut}</div></td>
+                    <td>{row.facilityName}<div className="finance-meta">{row.roomType}{row.unitNumber ? ` · Unit ${row.unitNumber}` : ''}</div></td>
+                    <td>{row.guestName}</td>
+                    <td>{row.source === 'booking' ? 'Reservation' : 'Walk-in'}</td>
+                    <td className="finance-value">{row.duration}h</td>
+                    <td>{row.rateLabel}</td>
+                    <td className="finance-value">{money(row.amount)}</td>
+                    <td className="finance-value">{money(row.collected)}</td>
+                    <td className="finance-value">{money(row.balance)}</td>
+                    <td><span className={`monitor-payment-pill ${String(row.paymentStatus).toLowerCase()}`}>{row.paymentStatus}</span><div className="finance-meta">{row.paymentTiming === 'After' ? 'Pay after play' : 'Collected before play'}</div></td>
+                  </tr>
+                )) : <tr><td colSpan="10" className="finance-empty">No played sessions for these service dates.</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <aside className="card monitor-room-totals">
+          <div className="monitor-report-card-head"><div><h3>By room type</h3><p>Revenue stays tied to its hourly room rate.</p></div></div>
+          <div className="monitor-room-total-list">
+            {report?.byRoomType?.length ? report.byRoomType.map((group) => (
+              <div key={`${group.facilityName}-${group.roomType}`}>
+                <span><strong>{group.roomType}</strong><small>{group.facilityName} · {group.sessions} session{group.sessions === 1 ? '' : 's'} · {group.hours}h</small></span>
+                <span><strong>{money(group.collected)}</strong><small>{money(group.outstanding)} due</small></span>
+              </div>
+            )) : <p className="finance-empty">Room totals appear after a session is recorded.</p>}
+          </div>
+        </aside>
+      </div>
+    </section>
+  );
+}
+
 function guestInitials(name) {
   if (!name) return '?';
   const parts = name.trim().split(/\s+/).filter(Boolean);
   return parts.slice(0, 2).map((p) => p[0].toUpperCase()).join('') || '?';
 }
 
-function RoomDetailModal({ room, view, onClose, canManage, onExtend, onEndSessionPaid, onCancelSession, onEdit, onDelete }) {
+function FinishSessionModal({ session, disabled, onClose, onSubmit }) {
+  const [paidAmount, setPaidAmount] = useState('0');
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (session) setPaidAmount(String(session.paidAmount ?? 0));
+  }, [session]);
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    const received = Number(paidAmount);
+    if (!Number.isFinite(received) || received < 0) {
+      alert('Amount collected must be a valid non-negative number.');
+      return;
+    }
+    if (received > Number(session?.amount || 0)) {
+      alert('Amount collected cannot exceed the session charge.');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await onSubmit({ paid: received >= Number(session?.amount || 0), paidAmount: received });
+    } catch (err) {
+      alert(err.message || 'Could not finish this session.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <Modal open={!!session} onClose={onClose} title="Finish session">
+      {session && (
+        <form onSubmit={handleSubmit}>
+          <p className="mfield-note">{session.guestName || 'Walk-in guest'} · {session.roomName || `Table ${session.roomNumber}`} · charge {money(session.amount)}</p>
+          <div className="mfield"><label htmlFor="finish-paid-amount">Amount collected (₱)</label><input id="finish-paid-amount" type="number" min="0" max={session.amount || 0} step="0.01" value={paidAmount} onChange={(event) => setPaidAmount(event.target.value)} disabled={disabled} autoFocus /><p className="mfield-note">Enter the money actually received. A partial or zero amount keeps the balance outstanding while preserving the session history.</p></div>
+          <div className="modal-actions"><button type="button" className="btn-cancel" onClick={onClose}>Keep active</button><button type="submit" className="btn-confirm" disabled={disabled || submitting}>{submitting ? 'Saving…' : 'Finish session'}</button></div>
+        </form>
+      )}
+    </Modal>
+  );
+}
+
+function RoomDetailModal({ room, view, onClose, canManage, canOperate, onExtend, onEndSessionPaid, onCancelSession, onEdit, onDelete }) {
   const title = room ? `Table ${room.roomNumber} — ${room.facilityName}` : 'Table details';
 
   return (
@@ -876,21 +1055,14 @@ function RoomDetailModal({ room, view, onClose, canManage, onExtend, onEndSessio
 
           <div className="rmd-actions">
             {view.occupancy ? (
-              canManage && (
+              canOperate && (
                 <>
-                  <button className="rm-btn rm-btn--success rm-btn--block" onClick={onEndSessionPaid}><i className="bi bi-check2-circle"></i>End & Mark Paid</button>
+                  <button className="rm-btn rm-btn--success rm-btn--block" onClick={onEndSessionPaid}><i className="bi bi-check2-circle"></i>Finish Session</button>
                   <div className="rmd-actions-row">
                     <button className="rm-btn" onClick={onExtend}><i className="bi bi-clock-history"></i>Extend</button>
                     <button className="rm-btn danger" onClick={onCancelSession}><i className="bi bi-x-circle"></i>Cancel Session</button>
                   </div>
                 </>
-              )
-            ) : room.status === 'Available' ? (
-              canManage && (
-                <div className="rmd-actions-row">
-                  <button className="rm-btn" onClick={onEdit}><i className="bi bi-pencil-square"></i>Edit</button>
-                  <button className="rm-btn danger" onClick={onDelete}><i className="bi bi-trash"></i>Delete Table</button>
-                </div>
               )
             ) : null}
             <button className="btn-cancel" onClick={onClose}>Close</button>
@@ -1120,28 +1292,22 @@ function RoomFormModal({ open, onClose, onSubmit, existingFacilities, rooms, ini
 }
 
 
-const DURATION_PRESETS = [
-  { label: '15m', mins: 15 },
-  { label: '30m', mins: 30 },
-  { label: '1h', mins: 60 },
-  { label: '2h', mins: 120 },
-  { label: '3h', mins: 180 },
-];
+const HOUR_PRESETS = [1, 2, 3, 4, 5];
 
-const EXTEND_PRESETS = [
-  { label: '1hr', mins: 60 },
-  { label: '2hr', mins: 120 },
-  { label: '3hr', mins: 180 },
-];
+function manilaHour() {
+  return Number(new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Manila', hour: '2-digit', hourCycle: 'h23' }).format(new Date()));
+}
 
 function SessionModal({ modal, onClose, onSubmit }) {
-  const [hours, setHours] = useState('');
-  const [minutes, setMinutes] = useState('');
-  const [seconds, setSeconds] = useState('');
+  const [hours, setHours] = useState(1);
   const [paymentMethod, setPaymentMethod] = useState('Cash');
-  const [paymentTiming, setPaymentTiming] = useState('Before');
+  const [collectionMode, setCollectionMode] = useState('later');
+  const [partialAmount, setPartialAmount] = useState('');
   const [guestName, setGuestName] = useState('');
+  const [guestCount, setGuestCount] = useState('1');
+  const [hasCorkage, setHasCorkage] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [formError, setFormError] = useState('');
 
   const isExtend = modal?.mode === 'extend';
   const fromBooking = !isExtend && !!modal?.bookingId;
@@ -1150,55 +1316,51 @@ function SessionModal({ modal, onClose, onSubmit }) {
     if (!modal) return;
 
     if (modal.mode === 'extend' && modal.session) {
-      setHours('');
-      setMinutes('');
-      setSeconds('');
+      setHours(1);
     } else if (fromBooking) {
-      setDurationFromHours(modal.initialDurationHours || 0);
+      setHours(Math.max(1, Math.round(Number(modal.initialDurationHours) || 1)));
       setPaymentMethod('Cash');
-      setPaymentTiming('Before');
+      setCollectionMode((modal.downPaymentInfo?.balance || 0) > 0 ? 'later' : 'full');
       setGuestName(modal.initialGuestName || '');
+      setGuestCount('1');
+      setHasCorkage(false);
     } else {
-      setHours('');
-      setMinutes('');
-      setSeconds('');
+      setHours(1);
       setPaymentMethod('Cash');
-      setPaymentTiming('Before');
+      setCollectionMode('later');
+      setPartialAmount('');
       setGuestName('');
+      setGuestCount('1');
+      setHasCorkage(false);
     }
+    setFormError('');
   }, [modal]);
 
-  function setDurationFromHours(totalHours) {
-    const totalSeconds = Math.max(1, Math.min(24 * 3600, Math.round((totalHours || 0) * 3600)));
-    setHours(String(Math.floor(totalSeconds / 3600)));
-    setMinutes(String(Math.floor((totalSeconds % 3600) / 60)));
-    setSeconds(String(totalSeconds % 60));
-  }
-
-  function handleHmsChange(field, rawValue) {
-    const current = { hours: Number(hours) || 0, minutes: Number(minutes) || 0, seconds: Number(seconds) || 0 };
-    current[field] = Math.max(0, Number(rawValue) || 0);
-    const totalSeconds = Math.max(0, Math.min(24 * 3600, current.hours * 3600 + current.minutes * 60 + current.seconds));
-    setHours(String(Math.floor(totalSeconds / 3600)));
-    setMinutes(String(Math.floor((totalSeconds % 3600) / 60)));
-    setSeconds(String(totalSeconds % 60));
-  }
-
-  function collectDurationHours() {
-    const h = Math.max(0, Number(hours) || 0);
-    const m = Math.max(0, Number(minutes) || 0);
-    const s = Math.max(0, Number(seconds) || 0);
-    return h + m / 60 + s / 3600;
-  }
+  const duration = Math.max(1, Math.round(Number(hours) || 1));
+  const maxHours = isExtend ? Math.max(1, 24 - Math.ceil(Number(modal?.session?.duration) || 0)) : 24;
+  const walkInPricing = !isExtend && !fromBooking && modal?.fixedRoom
+    ? calculateBookingPrice({ variant: modal.fixedRoom, startHour: manilaHour(), duration, guestCount: Number(guestCount) || 1, hasCorkage })
+    : null;
+  const totalCharge = fromBooking ? Number(modal?.downPaymentInfo?.total) || 0 : Number(walkInPricing?.amount) || 0;
+  const alreadyCollected = fromBooking ? Number(modal?.downPaymentInfo?.collected) || 0 : 0;
+  const outstanding = Math.max(0, totalCharge - alreadyCollected);
+  const paidAmount = fromBooking
+    ? collectionMode === 'full' ? totalCharge : alreadyCollected
+    : collectionMode === 'full' ? totalCharge : collectionMode === 'partial' ? Math.max(0, Number(partialAmount) || 0) : 0;
 
   async function handleSubmit() {
-    const totalHours = collectDurationHours();
-    if (!totalHours || totalHours < 1 / 3600) {
-      alert(isExtend ? 'Hours to add must be at least 1 second.' : 'Duration must be at least 1 second.');
+    const totalHours = duration;
+    setFormError('');
+    if (!Number.isInteger(totalHours) || totalHours < 1) {
+      setFormError(isExtend ? 'Choose at least one whole hour to add.' : 'Choose a duration of at least one whole hour.');
       return;
     }
-    if (totalHours > 24) {
-      alert(isExtend ? 'Hours to add cannot exceed 24 hours.' : 'Duration cannot exceed 24 hours.');
+    if (totalHours > maxHours) {
+      setFormError(`Choose no more than ${maxHours} whole hour${maxHours === 1 ? '' : 's'}.`);
+      return;
+    }
+    if (!isExtend && paidAmount > totalCharge) {
+      setFormError('The amount collected cannot be higher than the session charge.');
       return;
     }
 
@@ -1211,13 +1373,16 @@ function SessionModal({ modal, onClose, onSubmit }) {
         sessionId: modal.session?._id,
         totalHours,
         paymentMethod,
-        paymentTiming,
+        paymentTiming: paidAmount >= totalCharge && totalCharge > 0 ? 'Before' : 'After',
+        paidAmount,
         guestName,
+        guestCount: Number(guestCount) || 1,
+        hasCorkage,
         bookingId: modal.bookingId,
       });
     } catch (err) {
       console.error(err);
-      alert(err.message || 'Could not save this table monitoring session.');
+      setFormError(err.message || 'Could not save this room session.');
     } finally {
       setSubmitting(false);
     }
@@ -1228,7 +1393,7 @@ function SessionModal({ modal, onClose, onSubmit }) {
     : modal?.roomTarget
       ? `${modal.roomTarget.roomName} — ${modal.previewNumber ? `Table No. ${modal.previewNumber} ` : ''}(${modal.roomTarget.facilityName}) — will be created`
       : '';
-  const fixedRoomRate = modal?.fixedRoom ? `₱${modal.fixedRoom.price}/hr` : modal?.roomTarget ? '—' : '';
+  const fixedRoomRate = modal?.fixedRoom ? variantRateLabel(modal.fixedRoom) : modal?.roomTarget ? 'From reservation' : '';
   const title = isExtend ? `Extend Session — ${modal?.fixedRoom?.roomName || ''}` : fromBooking ? 'Start Session from Reservation' : 'Start Session';
 
   return (
@@ -1244,41 +1409,17 @@ function SessionModal({ modal, onClose, onSubmit }) {
 
           <div className="mfield-section-label">Session details</div>
           <div className="mfield">
-            <label>{isExtend ? 'Hours to Add (Hours / Minutes / Seconds)' : 'Duration (Hours / Minutes / Seconds)'}</label>
-
-            {isExtend && (
-              <div className="aw-preset-row">
-                {EXTEND_PRESETS.map((p) => (
-                  <button key={p.label} type="button" className="aw-preset-btn" onClick={() => setDurationFromHours(p.mins / 60)}>{p.label}</button>
-                ))}
-              </div>
-            )}
-
-            <div className={`field-row${isExtend ? ' field-row--extend-gap' : ''}`}>
-              <div className="field-col">
-                <input type="number" min="0" step="1" value={hours} disabled={fromBooking} onChange={(e) => handleHmsChange('hours', e.target.value)} />
-                <div className="aw-unit-lbl">Hours</div>
-              </div>
-              <div className="field-col">
-                <input type="number" min="0" step="1" value={minutes} disabled={fromBooking} onChange={(e) => handleHmsChange('minutes', e.target.value)} />
-                <div className="aw-unit-lbl">Minutes</div>
-              </div>
-              <div className="field-col">
-                <input type="number" min="0" step="1" value={seconds} disabled={fromBooking} onChange={(e) => handleHmsChange('seconds', e.target.value)} />
-                <div className="aw-unit-lbl">Seconds</div>
-              </div>
+            <label>{isExtend ? 'Whole hours to add' : 'Session length'}</label>
+            <div className="session-hour-picker" role="group" aria-label={isExtend ? 'Hours to add' : 'Session length'}>
+              {HOUR_PRESETS.filter((value) => value <= maxHours).map((value) => (
+                <button key={value} type="button" className={`session-hour-option${duration === value ? ' active' : ''}`} aria-pressed={duration === value} disabled={fromBooking} onClick={() => setHours(value)}>{value}<small>hr</small></button>
+              ))}
+              {!fromBooking && <label className="session-hour-custom"><span>Other</span><input type="number" min="1" max={maxHours} step="1" value={hours} onChange={(event) => setHours(event.target.value)} aria-label="Custom whole hours" /></label>}
             </div>
             {fromBooking && (
-              <p className="mfield-note">Duration is fixed to what the guest reserved.</p>
+              <p className="mfield-note">This {duration}-hour length comes from the confirmed reservation.</p>
             )}
-
-            {!isExtend && !fromBooking && (
-              <div className="aw-preset-row aw-preset-row--gap-top">
-                {DURATION_PRESETS.map((p) => (
-                  <button key={p.label} type="button" className="aw-preset-btn" onClick={() => setDurationFromHours(p.mins / 60)}>{p.label}</button>
-                ))}
-              </div>
-            )}
+            {isExtend && <p className="mfield-note">The original start time stays unchanged. The full charge is recalculated from its hourly rates.</p>}
           </div>
 
           {!isExtend && (
@@ -1288,16 +1429,45 @@ function SessionModal({ modal, onClose, onSubmit }) {
             </div>
           )}
 
+          {!isExtend && !fromBooking && (
+            <>
+              <div className="mfield">
+                <label>Number of Guests</label>
+                <input type="number" min="1" value={guestCount} onChange={(event) => setGuestCount(event.target.value)} />
+              </div>
+              <label className="booking-addon-check">
+                <input type="checkbox" checked={hasCorkage} onChange={(event) => setHasCorkage(event.target.checked)} />
+                <span><strong>Outside food or drinks</strong><small>Add ₱{CORKAGE_FEE.toLocaleString()} corkage.</small></span>
+              </label>
+            </>
+          )}
+
           <div className="mfield-section-label">Payment</div>
 
           {fromBooking && (
-            <div className="mfield-paid-note">
-              <i className="bi bi-check-circle-fill"></i>
-              <span>₱{(modal.downPaymentInfo?.paid || 0).toFixed(2)} of ₱{(modal.downPaymentInfo?.total || 0).toFixed(2)} down payment already paid online — applied automatically.</span>
+            <div className="session-payment-ledger">
+              <div><span>Total charge</span><strong>{money(totalCharge)}</strong></div>
+              <div><span>Downpayment received</span><strong>{money(alreadyCollected)}</strong></div>
+              <div className={outstanding > 0 ? 'balance-due' : 'balance-paid'}><span>Balance due</span><strong>{money(outstanding)}</strong></div>
             </div>
           )}
 
-          {!isExtend && !fromBooking && (
+          {!isExtend && (
+            <div className="session-collection-options" role="group" aria-label="Payment collection">
+              <button type="button" className={collectionMode === 'later' ? 'active' : ''} aria-pressed={collectionMode === 'later'} onClick={() => setCollectionMode('later')}><strong>{fromBooking ? 'Keep balance due' : 'Pay after play'}</strong><small>{fromBooking ? `${money(outstanding)} stays visible to staff` : 'Start now with no payment collected'}</small></button>
+              <button type="button" className={collectionMode === 'full' ? 'active' : ''} aria-pressed={collectionMode === 'full'} onClick={() => setCollectionMode('full')}><strong>{fromBooking ? 'Collect balance now' : 'Collect full amount'}</strong><small>{fromBooking ? `Record ${money(outstanding)} more` : `Record ${money(totalCharge)} before play`}</small></button>
+              {!fromBooking && <button type="button" className={collectionMode === 'partial' ? 'active' : ''} aria-pressed={collectionMode === 'partial'} onClick={() => setCollectionMode('partial')}><strong>Collect part now</strong><small>Keep the rest as a visible balance</small></button>}
+            </div>
+          )}
+
+          {!isExtend && !fromBooking && collectionMode === 'partial' && (
+            <div className="mfield">
+              <label>Amount collected now</label>
+              <input type="number" min="0" max={totalCharge} step="0.01" value={partialAmount} onChange={(event) => setPartialAmount(event.target.value)} placeholder="0.00" />
+            </div>
+          )}
+
+          {!isExtend && collectionMode !== 'later' && (
             <div className="mfield">
               <label>Payment Method</label>
               <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)}>
@@ -1308,32 +1478,20 @@ function SessionModal({ modal, onClose, onSubmit }) {
             </div>
           )}
 
-          {!isExtend && (
-            <div className="mfield">
-              <label>Payment Timing</label>
-              <div className="pay-toggle" role="group" aria-label="Payment timing">
-                <button
-                  type="button"
-                  className={`pay-toggle-btn pay-toggle-btn--paid${paymentTiming === 'Before' ? ' active' : ''}`}
-                  onClick={() => setPaymentTiming('Before')}
-                >
-                  Pay Before
-                </button>
-                <button
-                  type="button"
-                  className={`pay-toggle-btn pay-toggle-btn--unpaid${paymentTiming === 'After' ? ' active' : ''}`}
-                  onClick={() => setPaymentTiming('After')}
-                >
-                  Pay After
-                </button>
-              </div>
+          {!isExtend && !fromBooking && walkInPricing && (
+            <div className="session-charge-preview">
+              <span>{modal.fixedRoom.roomName} · {duration} whole hour{duration === 1 ? '' : 's'}</span>
+              <strong>{money(totalCharge)}</strong>
+              <small>{variantRateLabel(modal.fixedRoom)}{hasCorkage ? ` · includes ${money(CORKAGE_FEE)} corkage` : ''}</small>
             </div>
           )}
 
+          {formError && <p className="session-form-error" role="alert">{formError}</p>}
+
           <div className="modal-actions">
-            <button className="btn-cancel" onClick={onClose}>Cancel</button>
-            <button className="btn-confirm" disabled={submitting} onClick={handleSubmit}>
-              {submitting ? (isExtend ? 'Saving…' : 'Starting…') : (isExtend ? 'Save Changes' : 'Start Session')}
+            <button type="button" className="btn-cancel" onClick={onClose}>Cancel</button>
+            <button type="button" className="btn-confirm" disabled={submitting} onClick={handleSubmit}>
+              {submitting ? (isExtend ? 'Extending…' : 'Starting…') : (isExtend ? `Add ${duration} hour${duration === 1 ? '' : 's'}` : 'Start session')}
             </button>
           </div>
         </>

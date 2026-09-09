@@ -1,15 +1,19 @@
 const { Joi } = require("../middleware/validate");
 
 const dateStr = Joi.string().pattern(/^\d{4}-\d{2}-\d{2}$/);
-const timeStr = Joi.string().pattern(/^\d{2}:\d{2}$/);
+const timeStr = Joi.string().pattern(/^(?:[01]\d|2[0-3]):[0-5]\d$/);
+const settingsItemIdParamsSchema = Joi.object({
+  id: Joi.string().trim().hex().length(24).required(),
+});
+const emptyBodySchema = Joi.object({}).default({});
 
 const operatingHoursSchema = Joi.object({
   openTime: timeStr,
   closeTime: timeStr,
-  openDays: Joi.array().items(Joi.number().integer().min(0).max(6)),
-  minOnlineDurationHours: Joi.number().positive(),
-  maxOnlineDurationHours: Joi.number().positive(),
-});
+  openDays: Joi.array().items(Joi.number().integer().min(0).max(6)).unique().min(1),
+  minOnlineDurationHours: Joi.number().integer().min(1).max(5),
+  maxOnlineDurationHours: Joi.number().integer().min(1).max(5),
+}).min(1);
 
 const createHolidaySchema = Joi.object({
   name: Joi.string().trim().min(1).max(120).required(),
@@ -45,6 +49,8 @@ const updatePaymentMethodSchema = Joi.object({
 });
 
 module.exports = {
+  settingsItemIdParamsSchema,
+  emptyBodySchema,
   operatingHoursSchema,
   createHolidaySchema,
   createAnnouncementSchema,

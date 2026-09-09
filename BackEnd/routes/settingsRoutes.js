@@ -7,6 +7,8 @@ const { paymentMethodQrUpload } = require("../middleware/upload");
 const { logAudit } = require("../utils/auditLog");
 const { validate } = require("../middleware/validate");
 const {
+  settingsItemIdParamsSchema,
+  emptyBodySchema,
   operatingHoursSchema,
   createHolidaySchema,
   createAnnouncementSchema,
@@ -88,7 +90,7 @@ router.post("/holidays", requirePermission(PERMISSIONS.SETTINGS_MANAGE), validat
   }
 });
 
-router.delete("/holidays/:id", requirePermission(PERMISSIONS.SETTINGS_MANAGE), async (req, res) => {
+router.delete("/holidays/:id", requirePermission(PERMISSIONS.SETTINGS_MANAGE), validate(settingsItemIdParamsSchema, "params"), validate(emptyBodySchema), async (req, res) => {
   try {
     const settings = await Settings.getSingleton();
     const target = settings.holidays.find(h => String(h._id) === req.params.id);
@@ -129,7 +131,7 @@ router.post("/announcements", requirePermission(PERMISSIONS.SETTINGS_MANAGE), va
   }
 });
 
-router.put("/announcements/:id", requirePermission(PERMISSIONS.SETTINGS_MANAGE), validate(updateAnnouncementSchema), async (req, res) => {
+router.put("/announcements/:id", requirePermission(PERMISSIONS.SETTINGS_MANAGE), validate(settingsItemIdParamsSchema, "params"), validate(updateAnnouncementSchema), async (req, res) => {
   try {
     const settings = await Settings.getSingleton();
     const ann = settings.announcements.id(req.params.id);
@@ -153,7 +155,7 @@ router.put("/announcements/:id", requirePermission(PERMISSIONS.SETTINGS_MANAGE),
   }
 });
 
-router.delete("/announcements/:id", requirePermission(PERMISSIONS.SETTINGS_MANAGE), async (req, res) => {
+router.delete("/announcements/:id", requirePermission(PERMISSIONS.SETTINGS_MANAGE), validate(settingsItemIdParamsSchema, "params"), validate(emptyBodySchema), async (req, res) => {
   try {
     const settings = await Settings.getSingleton();
     const target = settings.announcements.id(req.params.id);
@@ -192,7 +194,7 @@ router.post("/payment-methods", requirePermission(PERMISSIONS.SETTINGS_MANAGE), 
   }
 });
 
-router.put("/payment-methods/:id", requirePermission(PERMISSIONS.SETTINGS_MANAGE), paymentMethodQrUpload.single("qrImage"), validate(updatePaymentMethodSchema), async (req, res) => {
+router.put("/payment-methods/:id", requirePermission(PERMISSIONS.SETTINGS_MANAGE), paymentMethodQrUpload.single("qrImage"), validate(settingsItemIdParamsSchema, "params"), validate(updatePaymentMethodSchema), async (req, res) => {
   try {
     const settings = await Settings.getSingleton();
     const pm = settings.paymentMethods.id(req.params.id);
@@ -214,7 +216,7 @@ router.put("/payment-methods/:id", requirePermission(PERMISSIONS.SETTINGS_MANAGE
   }
 });
 
-router.delete("/payment-methods/:id", requirePermission(PERMISSIONS.SETTINGS_MANAGE), async (req, res) => {
+router.delete("/payment-methods/:id", requirePermission(PERMISSIONS.SETTINGS_MANAGE), validate(settingsItemIdParamsSchema, "params"), validate(emptyBodySchema), async (req, res) => {
   try {
     const settings = await Settings.getSingleton();
     const target = settings.paymentMethods.find(pm => String(pm._id) === req.params.id);

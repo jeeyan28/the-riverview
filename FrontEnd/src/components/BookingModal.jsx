@@ -25,7 +25,10 @@ import {
   getFreeHourCount,
   getTimePeriod,
 } from '../utils/rooms';
+import { CORKAGE_FEE, calculateBookingPrice, variantRateLabel } from '../utils/roomPricing';
 import { API_BASE_URL } from '../services/api';
+import { X } from 'lucide-react';
+import ModalPortal from './ModalPortal';
 
 const PAYMONGO_API_BASE = import.meta.env.VITE_PAYMONGO_API_BASE || 'https://api.paymongo.com/v1';
 
@@ -53,39 +56,49 @@ const PAYMENT_METHODS = [
 
 function BookingStepper({ step, onStepClick }) {
   const activeIndex = STEP_INDEX[step] || 1;
+  const activeLabel = STEPS[activeIndex - 1]?.label || STEPS[0].label;
   return (
     <div className="bk-stepper">
-      {STEPS.map((s, i) => {
-        const num = i + 1;
-        const state = num < activeIndex ? 'done' : num === activeIndex ? 'active' : 'upcoming';
-        const clickable = state === 'done' && typeof onStepClick === 'function';
-        return (
-          <Fragment key={s.key}>
-            {i > 0 && (
-              <i className="fa-solid fa-chevron-right bk-step-chevron" aria-hidden="true"></i>
-            )}
-            <div
-              className={`bk-step-dot bk-step-dot--${state}` + (clickable ? ' bk-step-dot--clickable' : '')}
-              onClick={clickable ? () => onStepClick(s.key) : undefined}
-              onKeyDown={clickable ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onStepClick(s.key); } } : undefined}
-              role={clickable ? 'button' : undefined}
-              tabIndex={clickable ? 0 : undefined}
-              aria-current={state === 'active' ? 'step' : undefined}
-              aria-label={`${s.label}${state === 'done' ? ', completed, activate to go back' : state === 'active' ? ', current step' : ', not yet available'}`}
-            >
-              <span className="bk-step-dot-num">{state === 'done' ? <i className="fa-solid fa-check"></i> : num}</span>
-              <span className="bk-step-dot-label">{s.label}</span>
-            </div>
-          </Fragment>
-        );
-      })}
+      <div className="bk-stepper-status" aria-live="polite">
+        <span>Step {activeIndex} of {STEPS.length}</span>
+        <strong>{activeLabel}</strong>
+      </div>
+      <div className="bk-stepper-progress" aria-hidden="true">
+        <span style={{ width: `${(activeIndex / STEPS.length) * 100}%` }} />
+      </div>
+      <div className="bk-stepper-steps">
+        {STEPS.map((s, i) => {
+          const num = i + 1;
+          const state = num < activeIndex ? 'done' : num === activeIndex ? 'active' : 'upcoming';
+          const clickable = state === 'done' && typeof onStepClick === 'function';
+          return (
+            <Fragment key={s.key}>
+              {i > 0 && (
+                <i className="fa-solid fa-chevron-right bk-step-chevron" aria-hidden="true"></i>
+              )}
+              <div
+                className={`bk-step-dot bk-step-dot--${state}` + (clickable ? ' bk-step-dot--clickable' : '')}
+                onClick={clickable ? () => onStepClick(s.key) : undefined}
+                onKeyDown={clickable ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onStepClick(s.key); } } : undefined}
+                role={clickable ? 'button' : undefined}
+                tabIndex={clickable ? 0 : undefined}
+                aria-current={state === 'active' ? 'step' : undefined}
+                aria-label={`${s.label}${state === 'done' ? ', completed, activate to go back' : state === 'active' ? ', current step' : ', not yet available'}`}
+              >
+                <span className="bk-step-dot-num">{state === 'done' ? <i className="fa-solid fa-check"></i> : num}</span>
+                <span className="bk-step-dot-label">{s.label}</span>
+              </div>
+            </Fragment>
+          );
+        })}
+      </div>
     </div>
   );
 }
 
 function BookingSummaryContents({
   room, selectedVariant, selectedDate, selectedHour, selectedDuration,
-  guestName, guestContact, guestCount, guestNote,
+  guestName, guestContact, guestCount, guestNote, hasCorkage,
   selectedMethod, subtotal, downPayment, remainingBalance,
   step, onContinue, continueDisabled,
 }) {
@@ -133,7 +146,7 @@ function BookingSummaryContents({
             <div className="bk-summary-panel-section">
               <div className="bk-summary-panel-row">
                 <span className="bk-summary-panel-row-label">Price</span>
-                <span className="bk-summary-panel-row-value">₱{selectedVariant.price}/hr</span>
+                <span className="bk-summary-panel-row-value">{variantRateLabel(selectedVariant)}</span>
               </div>
             </div>
           )}
@@ -218,6 +231,12 @@ function BookingSummaryContents({
                   <span className="bk-summary-panel-row-value">{guestNote}</span>
                 </div>
               )}
+              {hasCorkage && (
+                <div className="bk-summary-panel-row">
+                  <span className="bk-summary-panel-row-label"><i className="fa-solid fa-bag-shopping"></i> Add-on</span>
+                  <span className="bk-summary-panel-row-value">Outside food/drinks · ₱{CORKAGE_FEE}</span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -235,22 +254,28 @@ function BookingSummaryContents({
               <div className="bk-summary-panel-cost">
                 <div className="bk-summary-panel-cost-row">
                   <span>Rate</span>
-                  <span>₱{selectedVariant.price}/hr</span>
+                  <span>{variantRateLabel(selectedVariant)}</span>
                 </div>
+                {hasCorkage && (
+                  <div className="bk-summary-panel-cost-row">
+                    <span>Corkage</span>
+                    <span>₱{CORKAGE_FEE.toLocaleString()}</span>
+                  </div>
+                )}
                 <div className="bk-summary-panel-cost-row">
-                  <span>Subtotal ({durationLabel})</span>
+                  <span>Total charge ({durationLabel})</span>
                   <span>₱{subtotal.toLocaleString()}</span>
                 </div>
                 <div className="bk-summary-panel-cost-row bk-summary-panel-cost-row--accent">
-                  <span>Downpayment</span>
+                  <span>Pay online now</span>
                   <span>₱{downPayment.toLocaleString()}</span>
                 </div>
                 <div className="bk-summary-panel-cost-row bk-summary-panel-cost-row--total">
-                  <span>Remaining Balance</span>
+                  <span>Pay at the venue</span>
                   <span>₱{remainingBalance.toLocaleString()}</span>
                 </div>
               </div>
-              <p className="bk-summary-panel-note">Your downpayment secures this reservation. The remaining balance is paid upon arrival.</p>
+              <p className="bk-summary-panel-note">The online payment secures your time. Staff will see the remaining balance when your session starts.</p>
             </div>
           )}
         </>
@@ -337,6 +362,12 @@ function BookingSuccess({ booking, room, selectedVariant, onDone, onViewBooking 
             <span className="bk-summary-label">Guests</span>
             <span className="bk-summary-value">{booking.guestCount || 1}</span>
           </div>
+          {Number(booking.corkageFee) > 0 && (
+            <div className="bk-success-item">
+              <span className="bk-summary-label">Corkage</span>
+              <span className="bk-summary-value">₱{Number(booking.corkageFee).toLocaleString()}</span>
+            </div>
+          )}
           <div className="bk-success-item">
             <span className="bk-summary-label">Reserved On</span>
             <span className="bk-summary-value">{bookedOnLabel}</span>
@@ -345,11 +376,11 @@ function BookingSuccess({ booking, room, selectedVariant, onDone, onViewBooking 
 
         <div className="bk-success-cost">
           <div className="bk-success-item">
-            <span className="bk-summary-label">Downpayment Paid</span>
+            <span className="bk-summary-label">Paid online</span>
             <span className="bk-success-paid">₱{downPayment.toLocaleString()}</span>
           </div>
           <div className="bk-success-item">
-            <span className="bk-summary-label">Remaining Balance</span>
+            <span className="bk-summary-label">Pay at the venue</span>
             <span className="bk-success-balance">₱{remaining.toLocaleString()}</span>
           </div>
         </div>
@@ -401,6 +432,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
   const [guestContact, setGuestContact] = useState('');
   const [guestCount, setGuestCount] = useState(1);
   const [guestNote, setGuestNote] = useState('');
+  const [hasCorkage, setHasCorkage] = useState(false);
   const [paxError, setPaxError] = useState('');
   const [nameError, setNameError] = useState('');
   const [contactError, setContactError] = useState('');
@@ -459,6 +491,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
     setSelectedHour(null);
     setSelectedDuration(minDuration);
     setGuestNote('');
+    setHasCorkage(false);
     setGuestCount(1);
     setPaxError('');
     setNameError('');
@@ -517,7 +550,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
             }
             return;
           }
-          if (res.ok && data.paymentStatus === 'Paid' && data.bookingId) {
+          if (res.ok && ['Paid', 'Partial'].includes(data.paymentStatus) && data.bookingId) {
             const booking = await fetchPaidBooking(data.bookingId);
             if (!cancelled) setPmReturn({ phase: 'confirmed', booking });
             return;
@@ -638,6 +671,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
             guestName: guestName.trim(),
             guestContact: guestContact.trim(),
             guestCount: guestCount || 1,
+            hasCorkage,
             specialRequests: guestNote.trim(),
             roomId: room._id,
             variantLabel: selectedVariant.label,
@@ -677,7 +711,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
     return () => {
       cancelled = true;
     };
-  }, [step, room, selectedVariant, selectedDate, selectedHour, downPaymentHours]);
+  }, [step, room, selectedVariant, selectedDate, selectedHour, selectedDuration, downPaymentHours, hasCorkage]);
 
   function handleClose() {
     releaseCurrentLock();
@@ -840,7 +874,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
         if (res.status === 409 && data.status === 'paid_slot_unavailable') {
           slotUnavailableMsg = data.message || "Your payment succeeded, but this slot was just taken. Please contact support so we can help resolve it.";
         } else {
-          paid = res.ok && data.paymentStatus === 'Paid';
+          paid = res.ok && ['Paid', 'Partial'].includes(data.paymentStatus);
           paidBookingId = data.bookingId || null;
         }
       } catch (err) {
@@ -1075,7 +1109,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
   const selectedDateLabel = selectedDate
     ? `${WEEKDAYS[new Date(selectedDate.y, selectedDate.m, selectedDate.d).getDay()]}, ${MONTHS[selectedDate.m]} ${selectedDate.d}`
     : '';
-  const selectedOptionLabel = selectedVariant ? `${selectedVariant.label} · ₱${selectedVariant.price}/hr` : '';
+  const selectedOptionLabel = selectedVariant ? `${selectedVariant.label} · ${variantRateLabel(selectedVariant)}` : '';
   const startTimeLabel = selectedHour !== null ? formatHour(selectedHour) : '—';
   const endTimeLabel = selectedHour !== null ? formatHour(selectedHour + selectedDuration) : '—';
   const durationLabel = `${selectedDuration} hour${selectedDuration === 1 ? '' : 's'}`;
@@ -1083,8 +1117,19 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
   const reviewDateLabel = selectedDate
     ? `${MONTHS[selectedDate.m]} ${selectedDate.d}, ${selectedDate.y} (${WEEKDAYS[new Date(selectedDate.y, selectedDate.m, selectedDate.d).getDay()]})`
     : '—';
-  const subtotalAmount = selectedVariant ? selectedVariant.price * selectedDuration : 0;
-  const downPaymentAmount = selectedVariant ? Math.max(0, Math.round(selectedVariant.price * downPaymentHours)) : 0;
+  const priceBreakdown = selectedVariant
+    ? calculateBookingPrice({
+        variant: selectedVariant,
+        startHour: selectedHour ?? 0,
+        duration: selectedDuration,
+        guestCount,
+        hasCorkage,
+        downPaymentHours,
+      })
+    : { amount: 0, roomCharge: 0, corkageFee: 0, downPayment: 0, hourlyRates: [] };
+  const subtotalAmount = priceBreakdown.amount;
+  const roomChargeAmount = priceBreakdown.roomCharge;
+  const downPaymentAmount = priceBreakdown.downPayment;
   const remainingBalanceAmount = Math.max(0, subtotalAmount - downPaymentAmount);
   const downPaymentPresets = Array.from({ length: Math.max(1, selectedDuration || 1) }, (_, i) => i + 1);
   const visiblePaymentMethods = allowedPaymentMethodKeys
@@ -1098,9 +1143,10 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
   const contactPhone = settings?.contact?.phone;
 
   return (
-    <div className={`bk-overlay${open ? ' open' : ''}`} id="booking-modal">
-      <div className={'bk-modal' + (showSummaryPanel ? '' : ' bk-modal--compact')}>
-        <button className="bk-close" aria-label="Close" onClick={handleClose}>✕</button>
+    <ModalPortal>
+      <div className={`bk-overlay${open ? ' open' : ''}`} id="booking-modal" role="dialog" aria-modal="true" aria-labelledby="booking-modal-title">
+        <div className={'bk-modal' + (showSummaryPanel ? '' : ' bk-modal--compact')}>
+        <button type="button" className="bk-close" aria-label="Close reservation" onClick={handleClose}><X size={19} aria-hidden="true" /></button>
 
         <div className="bk-header">
           <div className="bk-room-icon">
@@ -1112,7 +1158,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
           </div>
           <div>
             <p className="bk-eyebrow">Reserve a space</p>
-            <h2>{step === 'paymongoReturn' ? 'Online Payment' : room?.name}</h2>
+            <h2 id="booking-modal-title">{step === 'paymongoReturn' ? 'Online payment' : room?.name}</h2>
           </div>
         </div>
 
@@ -1159,6 +1205,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
               guestContact={guestContact}
               guestCount={guestCount}
               guestNote={guestNote}
+              hasCorkage={hasCorkage}
               selectedMethod={selectedMethod}
               subtotal={subtotalAmount}
               downPayment={downPaymentAmount}
@@ -1256,7 +1303,8 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
                             <div className="bk-day bk-day--empty" key={`empty-${i}`}></div>
                           ))}
                           {calendarDays.map((day) => (
-                            <div
+                            <button
+                              type="button"
                               key={day.d}
                               className={
                                 'bk-day' +
@@ -1269,15 +1317,12 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
                                 (day.holiday ? ' bk-day--holiday' : '')
                               }
                               title={day.title || undefined}
-                              tabIndex={day.disabled ? undefined : 0}
-                              role="button"
-                              aria-disabled={day.disabled || undefined}
+                              disabled={day.disabled}
                               onClick={!day.disabled ? () => handleSelectDate(day.y, day.m, day.d) : undefined}
-                              onKeyDown={!day.disabled ? (e) => { if (e.key === 'Enter' || e.key === ' ') handleSelectDate(day.y, day.m, day.d); } : undefined}
                             >
                               <span className="bk-day-num">{day.d}</span>
                               {day.holiday && <span className="bk-day-holiday-badge">Holiday</span>}
-                            </div>
+                            </button>
                           ))}
                         </div>
                       )}
@@ -1308,13 +1353,15 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
                       <span>Duration (Maximum {maxDuration} hours)</span>
                       <div className="bk-duration-options" id="bkDurationOptions">
                         {Array.from({ length: maxDuration - minDuration + 1 }, (_, i) => i + minDuration).map((dur) => (
-                          <div
+                          <button
+                            type="button"
                             key={dur}
                             className={'bk-duration-btn' + (dur === selectedDuration ? ' bk-duration-btn--selected' : '')}
+                            aria-pressed={dur === selectedDuration}
                             onClick={() => handleSelectDuration(dur)}
                           >
                             {dur}h
-                          </div>
+                          </button>
                         ))}
                       </div>
                     </div>
@@ -1360,7 +1407,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
                           if (state === 'available') anyAvailable = true;
 
                           let slotStatusLabel;
-                          let slotStatusColor;
+                          let slotStatusTone = '';
                           if (state === 'booked') {
                             slotStatusLabel = 'Reserved';
                           } else if (state === 'insufficient') {
@@ -1372,11 +1419,12 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
                             slotStatusLabel = isFewLeft
                               ? `Only ${availableCount} of ${totalRooms} Left`
                               : `${availableCount} of ${totalRooms} Available`;
-                            slotStatusColor = isFewLeft ? '#d97706' : '#16a34a';
+                            slotStatusTone = isFewLeft ? ' is-limited' : ' is-open';
                           }
 
                           groups[getTimePeriod(h)].push(
-                            <div
+                            <button
+                              type="button"
                               key={h}
                               className={
                                 'bk-slot' +
@@ -1387,13 +1435,11 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
                                   : '')
                               }
                               onClick={fits ? () => handleSelectHour(h) : undefined}
-                              tabIndex={fits ? 0 : undefined}
-                              role="button"
-                              onKeyDown={fits ? (e) => { if (e.key === 'Enter' || e.key === ' ') handleSelectHour(h); } : undefined}
+                              disabled={!fits}
                             >
                               <span className="bk-slot-time">{formatHour(h)}</span>
-                              <span className="bk-slot-status" style={slotStatusColor ? { color: slotStatusColor } : undefined}>{slotStatusLabel}</span>
-                            </div>
+                              <span className={`bk-slot-status${slotStatusTone}`}>{slotStatusLabel}</span>
+                            </button>
                           );
                         }
 
@@ -1525,6 +1571,18 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
                       onChange={(e) => setGuestNote(e.target.value)}
                     />
                   </div>
+                  <label className={`bk-addon-option${hasCorkage ? ' bk-addon-option--selected' : ''}`}>
+                    <input
+                      type="checkbox"
+                      checked={hasCorkage}
+                      onChange={(event) => setHasCorkage(event.target.checked)}
+                    />
+                    <span className="bk-addon-option-icon"><i className="fa-solid fa-bag-shopping" aria-hidden="true"></i></span>
+                    <span>
+                      <strong>Bringing outside food or drinks</strong>
+                      <small>Includes the required ₱{CORKAGE_FEE.toLocaleString()} corkage fee.</small>
+                    </span>
+                  </label>
                 </div>
 
                 <div className="bk-detail-actions">
@@ -1546,108 +1604,122 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
 
                 <p className="bk-choose-label bk-choose-label--heading">Review your reservation</p>
 
-                <div className="bk-review-section">
-                  <p className="bk-review-section-title">Room Information</p>
-                  <div className="bk-review-card">
-                    <div className="bk-review-room">
-                      <div className="bk-review-room-img">
-                        <img
-                          src={selectedVariant.image ? resolveImageUrl(selectedVariant.image) : fallbackRoomImg}
-                          alt={selectedVariant.label}
-                        />
-                      </div>
-                      <div className="bk-review-room-body">
-                        <p className="bk-review-room-name">{selectedVariant.label}</p>
-                        <p className="bk-review-room-facility">{room.name}</p>
-                        {selectedVariant.pax && (
-                          <p className="bk-room-option-pax"><i className="fa-solid fa-users"></i> {selectedVariant.pax}</p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bk-review-section">
-                  <p className="bk-review-section-title">Reservation Schedule</p>
-                  <div className="bk-review-card">
-                    <div className="bk-summary-row">
-                      <span className="bk-sr-label"><i className="fa-solid fa-calendar-days"></i> Reservation Date</span>
-                      <span className="bk-sr-value">{reviewDateLabel}</span>
-                    </div>
-                    <div className="bk-summary-row">
-                      <span className="bk-sr-label"><i className="fa-solid fa-clock"></i> Time</span>
-                      <span className="bk-sr-value">{startTimeLabel}</span>
-                    </div>
-                    <div className="bk-summary-row">
-                      <span className="bk-sr-label"><i className="fa-solid fa-hourglass-half"></i> Duration</span>
-                      <span className="bk-sr-value">{durationLabel}</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bk-review-section">
-                  <p className="bk-review-section-title">Guest Information</p>
-                  <div className="bk-review-card">
-                    <div className="bk-summary-row">
-                      <span className="bk-sr-label"><i className="fa-solid fa-user"></i> Name</span>
-                      <span className="bk-sr-value">{guestName || '—'}</span>
-                    </div>
-                    <div className="bk-summary-row">
-                      <span className="bk-sr-label"><i className="fa-solid fa-phone"></i> Contact</span>
-                      <span className="bk-sr-value">{guestContact || '—'}</span>
-                    </div>
-                    <div className="bk-summary-row">
-                      <span className="bk-sr-label"><i className="fa-solid fa-users"></i> Guests (Pax)</span>
-                      <span className="bk-sr-value">{guestCount || 1}</span>
-                    </div>
-                  </div>
-                </div>
-
-                {guestNote && (
+                <div className="bk-review-overview">
                   <div className="bk-review-section">
-                    <p className="bk-review-section-title">Special Requests</p>
+                    <p className="bk-review-section-title">Room Information</p>
                     <div className="bk-review-card">
-                      <p className="bk-sr-value" style={{ textAlign: 'left' }}>{guestNote}</p>
+                      <div className="bk-review-room">
+                        <div className="bk-review-room-img">
+                          <img
+                            src={selectedVariant.image ? resolveImageUrl(selectedVariant.image) : fallbackRoomImg}
+                            alt={selectedVariant.label}
+                          />
+                        </div>
+                        <div className="bk-review-room-body">
+                          <p className="bk-review-room-name">{selectedVariant.label}</p>
+                          <p className="bk-review-room-facility">{room.name}</p>
+                          {selectedVariant.pax && (
+                            <p className="bk-room-option-pax"><i className="fa-solid fa-users"></i> {selectedVariant.pax}</p>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   </div>
-                )}
+
+                  <div className="bk-review-section">
+                    <p className="bk-review-section-title">Reservation Schedule</p>
+                    <div className="bk-review-card">
+                      <div className="bk-summary-row">
+                        <span className="bk-sr-label"><i className="fa-solid fa-calendar-days"></i> Reservation Date</span>
+                        <span className="bk-sr-value">{reviewDateLabel}</span>
+                      </div>
+                      <div className="bk-summary-row">
+                        <span className="bk-sr-label"><i className="fa-solid fa-clock"></i> Time</span>
+                        <span className="bk-sr-value">{startTimeLabel}</span>
+                      </div>
+                      <div className="bk-summary-row">
+                        <span className="bk-sr-label"><i className="fa-solid fa-hourglass-half"></i> Duration</span>
+                        <span className="bk-sr-value">{durationLabel}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bk-review-section">
+                    <p className="bk-review-section-title">Guest Information</p>
+                    <div className="bk-review-card">
+                      <div className="bk-summary-row">
+                        <span className="bk-sr-label"><i className="fa-solid fa-user"></i> Name</span>
+                        <span className="bk-sr-value">{guestName || '—'}</span>
+                      </div>
+                      <div className="bk-summary-row">
+                        <span className="bk-sr-label"><i className="fa-solid fa-phone"></i> Contact</span>
+                        <span className="bk-sr-value">{guestContact || '—'}</span>
+                      </div>
+                      <div className="bk-summary-row">
+                        <span className="bk-sr-label"><i className="fa-solid fa-users"></i> Guests (Pax)</span>
+                        <span className="bk-sr-value">{guestCount || 1}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {guestNote && (
+                    <div className="bk-review-section">
+                      <p className="bk-review-section-title">Special Requests</p>
+                      <div className="bk-review-card">
+                        <p className="bk-sr-value" style={{ textAlign: 'left' }}>{guestNote}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {hasCorkage && (
+                    <div className="bk-review-section">
+                      <p className="bk-review-section-title">Add-on</p>
+                      <div className="bk-review-card">
+                        <div className="bk-summary-row">
+                          <span className="bk-sr-label"><i className="fa-solid fa-bag-shopping"></i> Outside food or drinks</span>
+                          <span className="bk-sr-value">₱{CORKAGE_FEE.toLocaleString()}</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
 
                 <div className="bk-review-section">
                   <p className="bk-review-section-title">Payment Breakdown</p>
                   <div className="bk-review-cost">
                     <div className="bk-review-cost-row">
-                      <span>Subtotal ({durationLabel})</span>
+                      <span>Room charge ({durationLabel})</span>
+                      <span>₱{roomChargeAmount.toLocaleString()}</span>
+                    </div>
+                    {hasCorkage && (
+                      <div className="bk-review-cost-row">
+                        <span>Corkage fee</span>
+                        <span>₱{CORKAGE_FEE.toLocaleString()}</span>
+                      </div>
+                    )}
+                    <div className="bk-review-cost-row bk-review-cost-row--balance">
+                      <span>Total charge</span>
                       <span>₱{subtotalAmount.toLocaleString()}</span>
                     </div>
                     <div className="bk-review-cost-row bk-review-cost-row--accent">
-                      <span>Downpayment ({downPaymentHours} hour{downPaymentHours === 1 ? '' : 's'})</span>
+                      <span>Pay online now ({downPaymentHours} hour{downPaymentHours === 1 ? '' : 's'})</span>
                       <span>₱{downPaymentAmount.toLocaleString()}</span>
                     </div>
                     <div className="bk-review-cost-row bk-review-cost-row--balance">
-                      <span>Remaining Balance</span>
+                      <span>Pay at the venue</span>
                       <span>₱{remainingBalanceAmount.toLocaleString()}</span>
                     </div>
-                    <p className="bk-review-note">You'll choose your exact downpayment amount on the next step. The remaining balance is paid upon arrival.</p>
+                    <p className="bk-review-note">Choose how many hours to cover online on the next step. Staff will see the remaining balance when your session begins.</p>
                   </div>
                 </div>
 
-                <div className="bk-review-section">
-                  <p className="bk-review-section-title">Reservation Policies</p>
-                  <div className="bk-review-card">
-                    <p className="bk-review-note" style={{ marginTop: 0 }}>
-                      Only available times are shown above. Need assistance? We're happy to help before you pay.
-                    </p>
+                <details className="bk-review-disclosure">
+                  <summary>Policies and cancellation</summary>
+                  <div className="bk-review-disclosure-body">
+                    <p>Only available times are shown. Contact us before paying if you need help.</p>
+                    <p>Please review your details carefully. Cancellations and rescheduling follow the reservation policy.</p>
                   </div>
-                </div>
-
-                <div className="bk-review-section">
-                  <p className="bk-review-section-title">Cancellation Reminder</p>
-                  <div className="bk-review-card bk-review-card--warning">
-                    <p className="bk-review-note" style={{ marginTop: 0 }}>
-                      Please review your details carefully. Cancellations and rescheduling are subject to our reservation policy — reach out to us before paying if anything above needs to change.
-                    </p>
-                  </div>
-                </div>
+                </details>
 
                 <div className="bk-detail-actions">
                   <button className="bk-back-btn" onClick={() => setStep('details')}>
@@ -1668,15 +1740,15 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
 
                 <div className="bk-downpayment-card">
                   <span className="bk-downpayment-card-dot" aria-hidden="true"></span>
-                  <p className="bk-summary-label">Downpayment Amount</p>
+                  <p className="bk-summary-label">Pay online now</p>
                   <p className="bk-downpayment-amount">
                     ₱{downPaymentAmount.toLocaleString()}
                   </p>
-                  <p className="bk-downpayment-duration">({downPaymentHours} hour{downPaymentHours === 1 ? '' : 's'}) — this secures your reservation.</p>
+                  <p className="bk-downpayment-duration">Covers {downPaymentHours} hour{downPaymentHours === 1 ? '' : 's'} and confirms your reservation. ₱{remainingBalanceAmount.toLocaleString()} remains payable at the venue.</p>
                 </div>
 
                 <div className="bk-payment-methods">
-                  <span className="bk-payment-methods-label">Choose Downpayment</span>
+                  <span className="bk-payment-methods-label">Choose how many hours to pay now</span>
                   <div className="bk-payment-methods-grid">
                     {downPaymentPresets.map((h) => (
                       <button
@@ -1845,7 +1917,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
                     disabled={payLoading || !pmIntent || !selectedMethod || payErrorKind === 'paidSlotUnavailable'}
                     onClick={selectedMethod === 'card' ? undefined : handleConfirmWalletPay}
                   >
-                    {payLoading ? 'Processing…' : 'Pay Now'}
+                    {payLoading ? 'Processing…' : `Pay ₱${downPaymentAmount.toLocaleString()}`}
                   </button>
                 </div>
               </div>
@@ -1931,6 +2003,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
                 guestContact={guestContact}
                 guestCount={guestCount}
                 guestNote={guestNote}
+                hasCorkage={hasCorkage}
                 selectedMethod={selectedMethod}
                 subtotal={subtotalAmount}
                 downPayment={downPaymentAmount}
@@ -1942,8 +2015,9 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
             </div>
           )}
         </div>
+        </div>
       </div>
-    </div>
+    </ModalPortal>
   );
 }
 

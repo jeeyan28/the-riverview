@@ -1,8 +1,13 @@
-import { API_BASE_URL } from './api';
+import { API_BASE_URL, apiRequest } from './api';
 
 const BASE = '/api/reports';
 
 export const reportsService = {
+  getRange(from, to, source = 'all') {
+    const qs = new URLSearchParams({ from, to, source });
+    return apiRequest(`${BASE}?${qs}`, { fallbackMessage: 'Could not load sales for this date range.' });
+  },
+
   async exportRange(from, to, source = 'all') {
     const qs = new URLSearchParams({ from, to, source });
     const res = await fetch(`${API_BASE_URL}${BASE}/export?${qs.toString()}`, { credentials: 'include' });

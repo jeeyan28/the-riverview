@@ -3,11 +3,90 @@ const router = express.Router();
 const Room = require("../model/room");
 const upload = require("../middleware/upload");
 const { requirePermission } = require("../middleware/adminAuth");
+const { validate } = require("../middleware/validate");
 const { PERMISSIONS } = require("../utils/permissions");
+const { SERVICE_NAMES, canonicalServiceName, escapeRegExp } = require("../utils/roomCatalog");
+const { roomIdParamsSchema, emptyBodySchema, roomWriteSchema } = require("../validation/roomSchemas");
 const { logAudit } = require("../utils/auditLog");
+const { syncRoomInventory, deactivateRoomInventory } = require("../utils/syncRoomInventory");
 
+const roomUploads = upload.fields([
+  { name: "image", maxCount: 1 },
+  { name: "variantImages", maxCount: 20 },
+]);
+
+function parseJsonField(value, fallback, label) {
+  if (value === undefined || value === null || value === "") return fallback;
+  if (Array.isArray(value)) return value;
+  try {
+    const parsed = JSON.parse(value);
+    if (!Array.isArray(parsed)) throw new Error();
+    return parsed;
+  } catch {
+    throw { status: 400, message: `${label} must be a valid JSON array.` };
+  }
+}
+
+function parseRoomBody(req, res, next) {
+  try {
+    const canonicalName = canonicalServiceName(req.body.name);
+    req.body = {
+      ...req.body,
+      name: canonicalName || req.body.name,
+      features: parseJsonField(req.body.features, [], "features"),
+      variants: parseJsonField(req.body.variants, [], "variants"),
+      variantImageIndexes: parseJsonField(req.body.variantImageIndexes, [], "variantImageIndexes"),
+    };
+    next();
+  } catch (err) {
+    res.status(err.status || 400).json({ message: err.message || "Invalid room data." });
+  }
+}
+
+function attachUploadedImages(req) {
+  const variants = req.body.variants.map((variant) => ({ ...variant }));
+  const files = req.files?.variantImages || [];
+  const indexes = req.body.variantImageIndexes || [];
+
+  if (files.length !== indexes.length) {
+    throw { status: 400, message: "Each uploaded room image must have a matching room index." };
+  }
+  indexes.forEach((variantIndex, fileIndex) => {
+    if (!variants[variantIndex]) {
+      throw { status: 400, message: "A room image references a room that does not exist." };
+    }
+    variants[variantIndex].image = files[fileIndex].path;
+  });
+
+  return {
+    name: req.body.name,
+    description: req.body.description,
+    price: req.body.price,
+    capacity: req.body.capacity,
+    features: req.body.features,
+    variants,
+    ...(req.files?.image?.[0] ? { image: req.files.image[0].path } : {}),
+  };
+}
+
+async function findDuplicateService(name, excludingId) {
+  return Room.findOne({
+    name: new RegExp(`^${escapeRegExp(name)}$`, "i"),
+    ...(excludingId ? { _id: { $ne: excludingId } } : {}),
+  }).select("_id name");
+}
 
 router.get("/", async (req, res) => {
+  try {
+    const rooms = await Room.find({ name: { $in: SERVICE_NAMES } }).sort({ name: 1 });
+    res.json(rooms);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error." });
+  }
+});
+
+router.get("/admin", requirePermission(PERMISSIONS.ROOM_MANAGE), async (req, res) => {
   try {
     const rooms = await Room.find().sort({ name: 1 });
     res.json(rooms);
@@ -17,76 +96,26 @@ router.get("/", async (req, res) => {
   }
 });
 
-router.get("/:id", async (req, res) => {
+router.get("/:id", validate(roomIdParamsSchema, "params"), async (req, res) => {
   try {
-    const room = await Room.findById(req.params.id);
-    if (!room) return res.status(404).json({ message: "Room not found." });
+    const room = await Room.findOne({ _id: req.params.id, name: { $in: SERVICE_NAMES } });
+    if (!room) return res.status(404).json({ message: "Facility not found." });
     res.json(room);
   } catch (err) {
     console.error(err);
-    res.status(400).json({ message: "Invalid room id." });
+    res.status(400).json({ message: "Invalid facility id." });
   }
 });
 
-router.post("/", requirePermission(PERMISSIONS.ROOM_MANAGE), upload.fields([{ name: "image", maxCount: 1 }, { name: "variantImages", maxCount: 20 }]), async (req, res) => {
+router.post("/", requirePermission(PERMISSIONS.ROOM_MANAGE), roomUploads, parseRoomBody, validate(roomWriteSchema), async (req, res) => {
   try {
-    const {
-      name,
-      description,
-      price,
-      features,
-      variants,
-      capacity,
-      variantImageIndexes,
-    } = req.body;
+    const duplicate = await findDuplicateService(req.body.name);
+    if (duplicate) return res.status(409).json({ message: `${duplicate.name} already exists. Edit that facility instead.` });
 
-    if (!name) {
-      return res.status(400).json({
-        message: "name is required."
-      });
-    }
-
-    let parsedFeatures = [];
-    let parsedVariants = [];
-    try {
-      if (features) parsedFeatures = JSON.parse(features);
-      if (variants) parsedVariants = JSON.parse(variants);
-    } catch {
-      return res.status(400).json({ message: "features/variants must be valid JSON." });
-    }
-
-    const variantImageFiles = req.files?.variantImages || [];
-    if (variantImageFiles.length) {
-      let indexes = [];
-      try {
-        indexes = variantImageIndexes ? JSON.parse(variantImageIndexes) : [];
-      } catch {
-        return res.status(400).json({ message: "variantImageIndexes must be valid JSON." });
-      }
-      indexes.forEach((variantIndex, i) => {
-        if (parsedVariants[variantIndex] && variantImageFiles[i]) {
-          parsedVariants[variantIndex].image = variantImageFiles[i].path;
-        }
-      });
-    }
-
-    const room = new Room({
-      name,
-
-      description: description || "",
-
-      price: Number(price) || 0,
-
-      capacity: Number(capacity) || 0,
-
-      features: parsedFeatures,
-      variants: parsedVariants,
-
-      image: req.files?.image?.[0] ? req.files.image[0].path : (req.body.image || ""),
-    });
-
+    const room = new Room(attachUploadedImages(req));
     await room.save();
-    await logAudit({ category: "Room Management", action: "created", description: `added room "${room.name}"`, user: req.user });
+    await syncRoomInventory(room);
+    await logAudit({ category: "Room Management", action: "created", description: `added facility "${room.name}"`, user: req.user });
     res.status(201).json(room);
   } catch (err) {
     console.error(err);
@@ -94,51 +123,19 @@ router.post("/", requirePermission(PERMISSIONS.ROOM_MANAGE), upload.fields([{ na
   }
 });
 
-router.put("/:id", requirePermission(PERMISSIONS.ROOM_MANAGE), upload.fields([{ name: "image", maxCount: 1 }, { name: "variantImages", maxCount: 20 }]), async (req, res) => {
+router.put("/:id", requirePermission(PERMISSIONS.ROOM_MANAGE), roomUploads, parseRoomBody, validate(roomIdParamsSchema, "params"), validate(roomWriteSchema), async (req, res) => {
   try {
-    const {
-      name,
-      description,
-      price,
-      features,
-      variants,
-      capacity,
-      variantImageIndexes,
-    } = req.body;
+    const duplicate = await findDuplicateService(req.body.name, req.params.id);
+    if (duplicate) return res.status(409).json({ message: `${duplicate.name} already exists. Edit that facility instead.` });
 
-    const update = {};
-    if (name !== undefined) update.name = name;
-    if (description !== undefined) update.description = description;
-    if (price !== undefined) update.price = Number(price) || 0;
-    if (capacity !== undefined) update.capacity = Number(capacity) || 0;
-    if (req.files?.image?.[0]) update.image = req.files.image[0].path;
+    const existing = await Room.findById(req.params.id).select("image name");
+    if (!existing) return res.status(404).json({ message: "Facility not found." });
 
-    try {
-      if (features !== undefined) update.features = JSON.parse(features);
-      if (variants !== undefined) update.variants = JSON.parse(variants);
-    } catch {
-      return res.status(400).json({ message: "features/variants must be valid JSON." });
-    }
-
-    const variantImageFiles = req.files?.variantImages || [];
-    if (variantImageFiles.length && update.variants) {
-      let indexes = [];
-      try {
-        indexes = variantImageIndexes ? JSON.parse(variantImageIndexes) : [];
-      } catch {
-        return res.status(400).json({ message: "variantImageIndexes must be valid JSON." });
-      }
-      indexes.forEach((variantIndex, i) => {
-        if (update.variants[variantIndex] && variantImageFiles[i]) {
-          update.variants[variantIndex].image = variantImageFiles[i].path;
-        }
-      });
-    }
-
+    const update = attachUploadedImages(req);
+    if (!update.image) update.image = existing.image || "";
     const room = await Room.findByIdAndUpdate(req.params.id, update, { returnDocument: "after", runValidators: true });
-    if (!room) return res.status(404).json({ message: "Room not found." });
-
-    await logAudit({ category: "Room Management", action: "updated", description: `updated room "${room.name}"`, user: req.user });
+    await syncRoomInventory(room, existing.name);
+    await logAudit({ category: "Room Management", action: "updated", description: `updated facility "${room.name}"`, user: req.user });
     res.json(room);
   } catch (err) {
     console.error(err);
@@ -146,12 +143,13 @@ router.put("/:id", requirePermission(PERMISSIONS.ROOM_MANAGE), upload.fields([{ 
   }
 });
 
-router.delete("/:id", requirePermission(PERMISSIONS.ROOM_MANAGE), async (req, res) => {
+router.delete("/:id", requirePermission(PERMISSIONS.ROOM_MANAGE), validate(roomIdParamsSchema, "params"), validate(emptyBodySchema), async (req, res) => {
   try {
     const room = await Room.findByIdAndDelete(req.params.id);
-    if (!room) return res.status(404).json({ message: "Room not found." });
-    await logAudit({ category: "Room Management", action: "deleted", description: `deleted room "${room.name}"`, user: req.user });
-    res.json({ message: "Room deleted." });
+    if (!room) return res.status(404).json({ message: "Facility not found." });
+    await deactivateRoomInventory(room.name);
+    await logAudit({ category: "Room Management", action: "deleted", description: `deleted facility "${room.name}"`, user: req.user });
+    res.json({ message: "Facility deleted." });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Server error." });

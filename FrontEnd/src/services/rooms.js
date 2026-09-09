@@ -5,6 +5,8 @@ const BASE = '/api/rooms';
 export const roomsService = {
   list: () => apiRequest(BASE, { fallbackMessage: 'Failed to load rooms' }),
 
+  adminList: () => apiRequest(`${BASE}/admin`, { fallbackMessage: 'Failed to load facilities.' }),
+
   get: (id) => apiRequest(`${BASE}/${id}`, { fallbackMessage: 'Failed to load facility.' }),
 
   create: (payload) => apiRequest(BASE, { method: 'POST', body: payload, fallbackMessage: 'Failed to save facility.' }),

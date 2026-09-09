@@ -9,6 +9,7 @@ import PasswordRequirementsList from './PasswordRequirementsList';
 import { OTP_LENGTH, OTP_EXPIRY_SECONDS, RESEND_COOLDOWN_SECONDS, formatCountdown } from '../utils/otp';
 import { isPasswordStrongEnough } from '../utils/password';
 import { API_BASE_URL } from '../services/api';
+import ModalPortal from './ModalPortal';
 
 const DEFAULT_SENT_COPY =
   `If an account exists for that email, a verification code has been sent. It'll expire in ${Math.round(OTP_EXPIRY_SECONDS / 60)} minutes.`;
@@ -92,6 +93,15 @@ function ForgotPasswordModal({ open, onClose, onReturnToLogin }) {
     setResetDone(false);
     const raf = requestAnimationFrame(() => emailInputRef.current?.focus());
     return () => cancelAnimationFrame(raf);
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
   }, [open]);
 
   useEffect(() => {
@@ -231,17 +241,18 @@ function ForgotPasswordModal({ open, onClose, onReturnToLogin }) {
   }
 
   return (
-    <div className="forgot-modal-backdrop">
-      <div
-        className="forgot-modal login-card"
-        ref={modalRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="forgot-modal-title"
-      >
-        <button type="button" className="forgot-modal-close" onClick={onClose} aria-label="Close">
-          <X size={16} />
-        </button>
+    <ModalPortal>
+      <div className="forgot-modal-backdrop">
+        <div
+          className="forgot-modal login-card"
+          ref={modalRef}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="forgot-modal-title"
+        >
+          <button type="button" className="forgot-modal-close" onClick={onClose} aria-label="Close">
+            <X size={16} />
+          </button>
 
         {!sent ? (
           <>
@@ -420,10 +431,11 @@ function ForgotPasswordModal({ open, onClose, onReturnToLogin }) {
             </div>
           </>
         )}
-      </div>
+        </div>
 
-      <Toast {...toast} />
-    </div>
+        <Toast {...toast} />
+      </div>
+    </ModalPortal>
   );
 }
 

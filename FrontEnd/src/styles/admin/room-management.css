@@ -213,7 +213,7 @@
 .flabel-hint{font-size:.66rem;color:var(--muted);opacity:.8;}
 .fm-room-number-preview{display:flex;align-items:center;gap:6px;font-size:.74rem;color:var(--teal);background:rgba(0,201,167,.08);border:1px solid rgba(0,201,167,.2);border-radius:9px;padding:8px 12px;margin-bottom:12px;}
 .fm-room-number-preview i{font-size:12px;}
-.ffield input[type="text"],.ffield input[type="number"],.ffield select,.ffield textarea{
+.ffield input[type="text"],.ffield input[type="number"],.ffield input[type="time"],.ffield select,.ffield textarea{
   width:100%;background:var(--navy3);border:1px solid var(--border);border-radius:9px;
   padding:10px 12px;color:var(--text);font-family:var(--font-body);font-size:.84rem;outline:none;transition:.15s;
 }
@@ -347,5 +347,6 @@
 }
 .btn-save:hover:not(:disabled){background:#00b396;box-shadow:0 4px 14px rgba(0,201,167,.35);}
 .btn-save:disabled{opacity:.5;cursor:not-allowed;box-shadow:none;}
+.btn-teal:disabled{opacity:.5;cursor:not-allowed;transform:none;}
 .btn-save .spin{animation:btn-spin .8s linear infinite;}
 @keyframes btn-spin{to{transform:rotate(360deg);}}

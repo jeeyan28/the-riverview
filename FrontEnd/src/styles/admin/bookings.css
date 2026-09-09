@@ -9,6 +9,8 @@
   background:var(--navy3);color:var(--text);font-family:var(--font-body);outline:none;min-width:150px;
 }
 .bk-filter-input:focus{border-color:rgba(0,201,167,.5);}
+.bk-date-range{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:.76rem;}
+.bk-date-range .bk-filter-input{min-width:140px;}
 .bk-clear-btn{
   display:inline-flex;align-items:center;gap:4px;
   font-size:.78rem;padding:8px 12px;border-radius:9px;border:1px solid var(--border);
@@ -44,6 +46,8 @@
 .bk-facility-room{font-size:.72rem;color:var(--muted);}
 
 .bk-schedule{display:flex;flex-direction:column;gap:1px;}
+.bk-payment-pill{font:inherit;line-height:1.25;text-align:left;white-space:normal;}
+button.bk-payment-pill{cursor:pointer;}
 
 .bd-header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding-bottom:16px;border-bottom:1px solid var(--border);}
 .bd-body{display:flex;flex-direction:column;gap:14px;margin-top:16px;}
@@ -81,4 +85,10 @@
 
 @media (max-width:900px){
   .bk-search-wrap{max-width:none;width:100%;}
+}
+@media (max-width:640px){
+  .bk-filters{width:100%;}
+  .bk-filters>select,.bk-filters>.save-btn,.bk-filters>.bk-clear-btn{flex:1 1 100%;min-height:44px;font-size:16px;}
+  .bk-date-range{width:100%;display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);}
+  .bk-date-range .bk-filter-input{width:100%;min-width:0;min-height:44px;font-size:16px;padding-inline:8px;}
 }

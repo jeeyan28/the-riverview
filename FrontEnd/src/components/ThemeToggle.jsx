@@ -1,5 +1,5 @@
-// Light/dark switch — a sliding pill instead of a single icon button, so
-// both states are visible at once instead of just "the one you'd switch to".
+import { Moon, Sun } from 'lucide-react';
+
 function ThemeToggle({ id, theme, onToggle, style }) {
   const isDark = theme === 'dark';
 
@@ -14,11 +14,12 @@ function ThemeToggle({ id, theme, onToggle, style }) {
       onClick={onToggle}
       style={style}
     >
-      <i className="fa-solid fa-sun theme-toggle-icon"></i>
-      <i className="fa-solid fa-moon theme-toggle-icon"></i>
+      <Sun className="theme-toggle-icon theme-toggle-icon--sun" size={14} aria-hidden="true" />
+      <Moon className="theme-toggle-icon theme-toggle-icon--moon" size={14} aria-hidden="true" />
       <span className="theme-toggle-thumb">
-        <i className={`fa-solid ${isDark ? 'fa-moon' : 'fa-sun'}`}></i>
+        {isDark ? <Moon size={13} aria-hidden="true" /> : <Sun size={13} aria-hidden="true" />}
       </span>
+      <span className="visually-hidden">{isDark ? 'Dark appearance' : 'Light appearance'}</span>
     </button>
   );
 }

@@ -1,189 +1,159 @@
 import '../../styles/admin/analytics.css';
-import { useEffect, useRef } from 'react';
+import '../../styles/admin/finance.css';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Chart } from 'chart.js/auto';
+import RevenueFilters from '../../components/RevenueFilters';
+import RevenueSummary from '../../components/RevenueSummary';
+import { businessDate, daysBefore, useRevenueReport } from '../../hooks/useRevenueReport';
+import { formatPeso } from '../../utils/currency';
 
-
-
-const HOURLY_TRAFFIC = [0, 0, 1, 2, 3, 4, 6, 8, 7, 9, 8, 6, 5, 7, 9, 10, 5];
+function displayDate(value) {
+  if (!value) return '—';
+  const date = new Date(`${value}T12:00:00+08:00`);
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
 
 function Analytics() {
+  const today = useMemo(() => businessDate(), []);
+  const [from, setFrom] = useState(() => daysBefore(today, 6));
+  const [to, setTo] = useState(today);
+  const [source, setSource] = useState('all');
+  const [printRequested, setPrintRequested] = useState(false);
+  const { data, loading, error, reload } = useRevenueReport(from, to, source);
   const revenueCanvasRef = useRef(null);
-  const roomsCanvasRef = useRef(null);
-  const heatmapRef = useRef(null);
+  const facilityCanvasRef = useRef(null);
 
   useEffect(() => {
+    if (!printRequested) return undefined;
+    const frame = requestAnimationFrame(() => {
+      window.print();
+      setPrintRequested(false);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [printRequested]);
+
+  useEffect(() => {
+    if (!data || !revenueCanvasRef.current) return undefined;
+    const app = document.querySelector('#app');
+    const styles = app ? getComputedStyle(app) : null;
+    const textColor = styles?.getPropertyValue('--muted').trim() || '#6B7280';
+    const gridColor = styles?.getPropertyValue('--border').trim() || 'rgba(16,24,40,.08)';
+    const labels = (data.daily || []).map((day) => displayDate(day.date));
     const revenueChart = new Chart(revenueCanvasRef.current, {
-      type: 'bar',
+      type: 'line',
       data: {
-        labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+        labels,
         datasets: [
-          {
-            label: 'Revenue',
-            data: [4200, 5100, 4800, 6450, 7200, 6900, 3550],
-            backgroundColor: '#EF3E6D',
-            borderRadius: 5,
-            barPercentage: 0.6,
-          },
+          { label: 'Collected', data: (data.daily || []).map((day) => day.collected), borderColor: '#00C9A7', backgroundColor: 'rgba(0,201,167,.12)', fill: true, tension: .3, pointRadius: 2 },
+          { label: 'Charges', data: (data.daily || []).map((day) => day.charged), borderColor: '#EF3E6D', backgroundColor: 'transparent', fill: false, tension: .3, pointRadius: 2 },
         ],
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
-        scales: {
-          x: { grid: { display: false }, ticks: { color: '#6B7280', font: { size: 11 } } },
-          y: {
-            grid: { color: 'rgba(16,24,40,.06)' },
-            ticks: { color: '#6B7280', font: { size: 11 }, callback: (v) => '₱' + v.toLocaleString() },
-          },
-        },
+        interaction: { mode: 'index', intersect: false },
+        plugins: { legend: { labels: { color: textColor, usePointStyle: true } }, tooltip: { callbacks: { label: (item) => `${item.dataset.label}: ${formatPeso(item.raw)}` } } },
+        scales: { x: { grid: { display: false }, ticks: { color: textColor, maxTicksLimit: 8 } }, y: { grid: { color: gridColor }, ticks: { color: textColor, callback: (value) => formatPeso(value) } } },
       },
     });
-
-    const roomsChart = new Chart(roomsCanvasRef.current, {
+    const facilities = (data.byFacility || []).slice(0, 6);
+    const facilityChart = facilityCanvasRef.current && facilities.length ? new Chart(facilityCanvasRef.current, {
       type: 'doughnut',
-      data: {
-        labels: ['Billiards', 'KTV', 'Court', 'VIP'],
-        datasets: [
-          {
-            data: [58, 22, 12, 8],
-            backgroundColor: ['#EF3E6D', '#378ADD', '#EF9F27', '#D4537E'],
-            borderWidth: 0,
-          },
-        ],
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
-        cutout: '65%',
-      },
-    });
-
+      data: { labels: facilities.map((facility) => facility.name), datasets: [{ data: facilities.map((facility) => facility.collected), backgroundColor: ['#00C9A7', '#378ADD', '#EF3E6D', '#EF9F27', '#8B5CF6', '#64748B'], borderWidth: 0 }] },
+      options: { responsive: true, maintainAspectRatio: false, cutout: '66%', plugins: { legend: { position: 'bottom', labels: { color: textColor, usePointStyle: true, padding: 14 } }, tooltip: { callbacks: { label: (item) => `${item.label}: ${formatPeso(item.raw)}` } } } },
+    }) : null;
     return () => {
       revenueChart.destroy();
-      roomsChart.destroy();
+      facilityChart?.destroy();
     };
-  }, []);
+  }, [data]);
 
-  useEffect(() => {
-    const hm = heatmapRef.current;
-    if (!hm) return;
-    const max = Math.max(...HOURLY_TRAFFIC);
-    hm.innerHTML = '';
-    HOURLY_TRAFFIC.forEach((v, i) => {
-      const cell = document.createElement('div');
-      cell.className = 'hm-cell';
-      const alpha = (0.08 + (v / max) * 0.82).toFixed(2);
-      cell.style.background = `rgba(239,62,109,${alpha})`;
-      cell.title = `${7 + i}:00 — ${v} reservations`;
-      hm.appendChild(cell);
-    });
-  }, []);
+  const peakHour = useMemo(() => {
+    const hours = data?.hourly || [];
+    return hours.reduce((best, item) => (item.count > (best?.count || 0) ? item : best), null);
+  }, [data]);
+
+  const summary = data?.summary;
+  const rows = data?.rows || [];
 
   return (
     <div className="panel active" id="panel-analytics">
-      <div className="metric-row">
-        <div className="mc">
-          <div className="mc-label"><i className="ti ti-currency-peso"></i> Weekly Revenue</div>
-          <div className="mc-val">₱38,200</div>
-          <div className="mc-sub up"><i className="ti ti-arrow-up-right"></i> +8% vs last week</div>
+      <RevenueFilters
+        from={from}
+        to={to}
+        source={source}
+        onRangeChange={(nextFrom, nextTo) => { setFrom(nextFrom); setTo(nextTo); }}
+        onSourceChange={setSource}
+        reload={reload}
+        loading={loading}
+      >
+        <button type="button" className="btn-teal" onClick={() => setPrintRequested(true)} disabled={!data || loading}>
+          <i className="ti ti-printer" aria-hidden="true" /> Print view
+        </button>
+      </RevenueFilters>
+
+      <p className="finance-basis">Collected amounts are recorded payments less manual refunds. Linked reservations and room sessions are counted once, using service dates in Asia/Manila.</p>
+      <RevenueSummary summary={summary} loading={loading} />
+
+      {error && <div className="finance-error" role="alert">{error}</div>}
+      {data?.warnings?.length > 0 && (
+        <div className="finance-warning" role="status">
+          <strong>Payment review needed</strong>
+          <ul>{data.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul>
         </div>
-        <div className="mc">
-          <div className="mc-label"><i className="ti ti-clock-hour-4"></i> Avg Session</div>
-          <div className="mc-val">1.8 hrs</div>
-          <div className="mc-sub">per reservation</div>
-        </div>
-        <div className="mc">
-          <div className="mc-label"><i className="ti ti-trophy"></i> Top Room</div>
-          <div className="mc-val">Billiards</div>
-          <div className="mc-sub">58% of reservations</div>
-        </div>
-        <div className="mc">
-          <div className="mc-label"><i className="ti ti-flame"></i> Peak Hour</div>
-          <div className="mc-val">7–9 PM</div>
-          <div className="mc-sub">busiest window</div>
-        </div>
+      )}
+
+      <div className="finance-activity" aria-live="polite">
+        <span><strong>{summary?.transactions ?? '—'}</strong> transactions</span>
+        <span><strong>{summary?.reservations ?? '—'}</strong> online reservations</span>
+        <span><strong>{summary?.walkins ?? '—'}</strong> walk-ins / manual bookings</span>
+        <span><strong>{summary?.bookedHours ?? '—'}h</strong> booked hours</span>
+        <span><strong>{summary?.averageDuration ?? '—'}h</strong> average session</span>
+        <span>Peak hour: <strong>{peakHour ? `${String(peakHour.hour).padStart(2, '0')}:00` : '—'}</strong></span>
       </div>
 
-      <div className="two-col">
-        <div className="card">
-          <div className="card-head">
-            <div>
-              <span className="card-title"><i className="ti ti-chart-bar"></i> Daily revenue this week</span>
-              <p className="card-subtitle">Total reservation revenue collected per day (₱)</p>
+      {loading && !data ? <div className="card finance-empty">Loading sales data…</div> : data && (
+        <div className="finance-charts">
+          <div className="card">
+            <div className="card-head"><span className="card-title">Collected vs charges</span><span className="finance-meta">{displayDate(from)} – {displayDate(to)}</span></div>
+            <div className="finance-chart"><canvas ref={revenueCanvasRef} aria-label="Collected payments and charges by day" /></div>
+          </div>
+          <div className="card">
+            <div className="card-head"><span className="card-title">Collected by facility</span></div>
+            {data.byFacility?.length ? <div className="finance-chart"><canvas ref={facilityCanvasRef} aria-label="Collected payments by facility" /></div> : <div className="finance-empty">No facility sales in this period.</div>}
+          </div>
+          <div className="card finance-chart-wide">
+            <div className="card-head"><span className="card-title">Facility performance</span></div>
+            <div className="admin-table-scroll" tabIndex={0} role="region" aria-label="Facility performance table">
+              <table className="tbl">
+                <thead><tr><th>Facility</th><th>Transactions</th><th>Booked hours</th><th>Charges</th><th>Collected</th></tr></thead>
+                <tbody>
+                  {data.byFacility?.length ? data.byFacility.map((facility) => (
+                    <tr key={facility.name}><td>{facility.name}</td><td>{facility.transactions}</td><td>{facility.bookedHours}</td><td>{formatPeso(facility.charged)}</td><td>{formatPeso(facility.collected)}</td></tr>
+                  )) : <tr><td colSpan="5" className="finance-empty">No data for this range.</td></tr>}
+                </tbody>
+              </table>
             </div>
           </div>
-          <div className="legend">
-            <div className="legend-item">
-              <div className="legend-dot" style={{ background: '#EF3E6D' }} />
-              Revenue
-            </div>
-          </div>
-          <div className="chart-wrap">
-            <canvas ref={revenueCanvasRef} aria-label="Daily revenue bar chart this week">
-              Mon 4200, Tue 5100, Wed 4800, Thu 6450, Fri 7200, Sat 6900, Sun 3550.
-            </canvas>
-          </div>
-        </div>
-        <div className="card">
-          <div className="card-head">
-            <div>
-              <span className="card-title"><i className="ti ti-chart-donut"></i> Reservations by room type</span>
-              <p className="card-subtitle">Share of total reservations this week</p>
-            </div>
-          </div>
-          <div className="legend">
-            <div className="legend-item">
-              <div className="legend-dot" style={{ background: '#EF3E6D' }} />
-              Billiards 58%
-            </div>
-            <div className="legend-item">
-              <div className="legend-dot" style={{ background: '#378ADD' }} />
-              KTV 22%
-            </div>
-            <div className="legend-item">
-              <div className="legend-dot" style={{ background: '#EF9F27' }} />
-              Court 12%
-            </div>
-            <div className="legend-item">
-              <div className="legend-dot" style={{ background: '#D4537E' }} />
-              VIP 8%
-            </div>
-          </div>
-          <div className="chart-wrap chart-wrap-donut">
-            <canvas ref={roomsCanvasRef} aria-label="Donut chart of reservations by room type">
-              Billiards 58%, KTV 22%, Basketball Court 12%, VIP 8%.
-            </canvas>
-            <div className="donut-center">
-              <span className="donut-center-val">142</span>
-              <span className="donut-center-label">Reservations</span>
-            </div>
+          <div className="card finance-chart-wide">
+            <details className="finance-chart-data">
+              <summary>Daily detail</summary>
+              <div className="admin-table-scroll" tabIndex={0} role="region" aria-label="Daily sales table">
+                <table className="tbl"><thead><tr><th>Date</th><th>Transactions</th><th>Charges</th><th>Collected</th><th>Outstanding</th></tr></thead><tbody>
+                  {(data.daily || []).map((day) => <tr key={day.date}><td>{displayDate(day.date)}</td><td>{day.transactions}</td><td>{formatPeso(day.charged)}</td><td>{formatPeso(day.collected)}</td><td>{formatPeso(day.outstanding)}</td></tr>)}
+                </tbody></table>
+              </div>
+            </details>
           </div>
         </div>
-      </div>
+      )}
 
       <div className="card">
-        <div className="card-head">
-          <div>
-            <span className="card-title"><i className="ti ti-clock"></i> Hourly traffic</span>
-            <p className="card-subtitle">Reservations started per hour, 7AM–12AM</p>
-          </div>
-        </div>
-        <div id="heatmap" ref={heatmapRef} />
-        <div className="hm-labels">
-          <span>7AM</span>
-          <span>10AM</span>
-          <span>1PM</span>
-          <span>4PM</span>
-          <span>7PM</span>
-          <span>10PM</span>
-          <span>12AM</span>
-        </div>
-        <div className="hm-scale">
-          <span>Fewer reservations</span>
-          <div className="hm-scale-bar" />
-          <span>More reservations</span>
+        <div className="card-head"><span className="card-title">Recent transactions</span><span className="finance-meta">{rows.length} in selected range</span></div>
+        <div className="admin-table-scroll" tabIndex={0} role="region" aria-label="Recent sales table">
+          <table className="tbl"><thead><tr><th>Date</th><th>Reference</th><th>Guest</th><th>Facility</th><th>Status</th><th>Collected</th><th>Balance</th></tr></thead><tbody>
+            {rows.length ? rows.slice(0, 20).map((row) => <tr key={row.id}><td>{displayDate(row.date)}<div className="finance-meta">{row.timeIn || '—'}</div></td><td>{row.reference}</td><td>{row.guestName}</td><td>{row.facilityName}</td><td><span className={`pill ${row.status === 'Done' || row.status === 'Finished' ? 'pill-done' : row.status === 'Cancelled' || row.status === 'No Show' ? 'pill-overdue' : 'pill-active'}`}>{row.status}</span></td><td>{formatPeso(row.collected)}</td><td>{formatPeso(row.balance)}</td></tr>) : <tr><td colSpan="7" className="finance-empty">No transactions in this period.</td></tr>}
+          </tbody></table>
         </div>
       </div>
     </div>

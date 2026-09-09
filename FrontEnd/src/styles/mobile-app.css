@@ -1,0 +1,416 @@
+/* Shared phone/tablet shell. Page-specific layouts remain owned by their existing styles. */
+.customer-app-nav,
+.admin-app-nav {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .public-site,
+  #app {
+    --app-nav-height: 72px;
+  }
+
+  .customer-app-nav,
+  .admin-app-nav {
+    position: fixed;
+    inset-inline: max(var(--space-3, 12px), env(safe-area-inset-left)) max(var(--space-3, 12px), env(safe-area-inset-right));
+    bottom: max(var(--space-3, 12px), env(safe-area-inset-bottom));
+    z-index: 30;
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
+    align-items: stretch;
+    gap: var(--space-1, 4px);
+    width: calc(100% - var(--space-6, 24px));
+    max-width: 640px;
+    margin-inline: auto;
+    min-height: var(--app-nav-height);
+    padding: var(--space-2, 8px);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg, 16px);
+    background: color-mix(in srgb, var(--surface-alt, var(--navy2)) 92%, transparent);
+    box-shadow: 0 16px 40px rgba(6, 12, 24, .24);
+    backdrop-filter: blur(20px) saturate(1.25);
+    -webkit-backdrop-filter: blur(20px) saturate(1.25);
+    transition: transform .24s var(--ease-drawer), opacity .18s var(--ease-out);
+  }
+
+  .customer-app-nav {
+    z-index: 320;
+  }
+
+  .customer-app-nav.is-obscured {
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(calc(100% + var(--space-6, 24px)));
+  }
+
+  .customer-app-nav .app-nav-item,
+  .admin-app-nav .app-nav-item {
+    position: relative;
+    display: grid;
+    min-width: 0;
+    min-height: 54px;
+    place-content: center;
+    justify-items: center;
+    gap: var(--space-1, 4px);
+    padding: var(--space-1, 4px);
+    border: 0;
+    border-radius: var(--radius-md, 12px);
+    background: transparent;
+    color: var(--text-muted-light, var(--muted));
+    font: 700 .68rem/1.15 var(--font-body, Inter, sans-serif);
+    letter-spacing: .01em;
+    text-decoration: none;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: color .18s var(--ease-out), background-color .18s var(--ease-out), transform .18s var(--ease-out);
+  }
+
+  .customer-app-nav .app-nav-item::before,
+  .admin-app-nav .app-nav-item::before {
+    content: '';
+    position: absolute;
+    inset: var(--space-1, 4px) 20% auto;
+    height: 2px;
+    border-radius: var(--radius-pill, 999px);
+    background: var(--teal);
+    opacity: 0;
+    transform: scaleX(.6);
+    transition: opacity .18s var(--ease-out), transform .18s var(--ease-out);
+  }
+
+  .customer-app-nav .app-nav-item.active,
+  .admin-app-nav .app-nav-item.active {
+    background: color-mix(in srgb, var(--teal) 12%, transparent);
+  }
+
+  .customer-app-nav .app-nav-item.active { color: color-mix(in srgb, var(--teal-strong) 80%, var(--text-main)); }
+  .admin-app-nav .app-nav-item.active { color: color-mix(in srgb, var(--teal) 58%, var(--text)); }
+
+  .customer-app-nav .app-nav-item.active::before,
+  .admin-app-nav .app-nav-item.active::before {
+    opacity: 1;
+    transform: scaleX(1);
+  }
+
+  .customer-app-nav .app-nav-item--primary {
+    color: var(--text-main);
+  }
+
+  .customer-app-nav .app-nav-item--primary svg {
+    color: var(--teal);
+  }
+
+  .public-site > footer {
+    padding-bottom: calc(var(--app-nav-height) + var(--space-10, 40px) + env(safe-area-inset-bottom));
+  }
+
+  .public-site .help-widget {
+    bottom: calc(var(--app-nav-height) + var(--space-8, 32px) + env(safe-area-inset-bottom));
+  }
+
+  .public-site .toast {
+    bottom: calc(var(--app-nav-height) + var(--space-8, 32px) + env(safe-area-inset-bottom));
+  }
+
+  #app .content {
+    padding-bottom: calc(var(--app-nav-height) + var(--space-10, 40px) + env(safe-area-inset-bottom));
+  }
+
+  #app .topbar {
+    padding-top: max(var(--space-3, 12px), env(safe-area-inset-top));
+  }
+
+  #app :is(.bk-toolbar-card, .um-toolbar-card, .fac-toolbar-card) {
+    position: sticky;
+    top: 84px;
+    z-index: 4;
+    box-shadow: var(--shadow-md);
+  }
+
+  #app .admin-table-scroll {
+    background:
+      linear-gradient(to right, var(--navy2) 30%, transparent),
+      linear-gradient(to left, var(--navy2) 30%, transparent),
+      linear-gradient(to right, color-mix(in srgb, var(--text) 14%, transparent), transparent 70%),
+      linear-gradient(to left, color-mix(in srgb, var(--text) 14%, transparent), transparent 70%);
+    background-attachment: local, local, scroll, scroll;
+    background-position: left, right, left, right;
+    background-repeat: no-repeat;
+    background-size: 40px 100%, 40px 100%, 12px 100%, 12px 100%;
+  }
+
+  #app :is(.monitor-section-tabs, .set-tabs, .um-tabs, .fac-chips) {
+    scrollbar-width: none;
+    scroll-padding-inline: var(--space-4, 16px);
+  }
+
+  #app :is(.monitor-section-tabs, .set-tabs, .um-tabs, .fac-chips)::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .public-site,
+  #app {
+    --app-nav-height: 68px;
+  }
+
+  .customer-app-nav,
+  .admin-app-nav {
+    inset-inline: max(var(--space-2, 8px), env(safe-area-inset-left)) max(var(--space-2, 8px), env(safe-area-inset-right));
+    bottom: max(var(--space-2, 8px), env(safe-area-inset-bottom));
+    width: calc(100% - var(--space-4, 16px));
+    padding: var(--space-1, 4px);
+    border-radius: var(--radius-lg, 16px);
+  }
+
+  .customer-app-nav .app-nav-item,
+  .admin-app-nav .app-nav-item {
+    min-height: 58px;
+    font-size: .64rem;
+  }
+
+  .public-site {
+    --header-h: 60px;
+    --page-gutter: max(var(--space-4, 16px), env(safe-area-inset-left));
+    --section-space: var(--space-10, 40px);
+  }
+
+  .public-site #site-header {
+    min-height: var(--header-h);
+    height: var(--header-h);
+    padding-inline: max(var(--space-4, 16px), env(safe-area-inset-left)) max(var(--space-4, 16px), env(safe-area-inset-right));
+    border-bottom: 1px solid var(--nav-border, var(--border));
+    background: color-mix(in srgb, var(--surface) 92%, transparent);
+    backdrop-filter: blur(20px) saturate(1.2);
+    -webkit-backdrop-filter: blur(20px) saturate(1.2);
+  }
+
+  .public-site #site-header .logo img {
+    width: 36px;
+    height: 36px;
+  }
+
+  .public-site #site-header .logo-name {
+    max-width: none;
+    font-size: 1rem;
+    line-height: 1;
+    white-space: nowrap;
+  }
+
+  .public-site #site-header :is(.hamburger, .announcements-bell-btn) {
+    width: 44px;
+    height: 44px;
+    min-height: 44px;
+    border-radius: var(--radius-md, 12px);
+  }
+
+  .public-site .hero-inner {
+    min-height: calc(100svh - var(--app-nav-height));
+    padding-top: calc(var(--header-h) + var(--guest-banner-h) + var(--space-8, 32px));
+    padding-bottom: var(--space-8, 32px);
+  }
+
+  .public-site .hero h1 {
+    font-size: clamp(2.35rem, 11vw, 3rem);
+    line-height: .98;
+  }
+
+  .public-site .hero-actions {
+    gap: var(--space-3, 12px);
+  }
+
+  .public-site .hero-actions a {
+    min-height: 52px;
+    border-radius: var(--radius-md, 12px);
+  }
+
+  .public-site :is(.room-card, .rp-facility-card, .contact-card, .why-book-card, .about-card, .step-card, .facility-motion) {
+    border-radius: var(--radius-lg, 16px);
+  }
+
+  .public-site .rp-hero {
+    padding-top: calc(var(--header-h) + var(--guest-banner-h) + var(--space-10, 40px));
+  }
+
+  .public-site .rp-facilities {
+    padding-top: var(--space-8, 32px);
+  }
+
+  .public-site .mobile-nav {
+    width: 100%;
+    padding: max(var(--space-5, 20px), env(safe-area-inset-top)) max(var(--space-4, 16px), env(safe-area-inset-right)) max(var(--space-4, 16px), env(safe-area-inset-bottom)) max(var(--space-4, 16px), env(safe-area-inset-left));
+    border-left: 0;
+  }
+
+  .public-site .mobile-nav-links a {
+    min-height: 56px;
+    border-radius: var(--radius-md, 12px);
+  }
+
+  .public-site .mobile-nav-heading h2 {
+    font-family: var(--font-display);
+  }
+
+  .auth-content {
+    min-height: 100dvh;
+  }
+
+  .login-page {
+    min-height: 100dvh;
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
+  .login-page .login-header {
+    position: absolute;
+    height: 68px;
+    padding-inline: max(var(--space-4, 16px), env(safe-area-inset-left)) max(var(--space-4, 16px), env(safe-area-inset-right));
+  }
+
+  .login-page .login-layout {
+    display: block;
+    min-height: 100dvh;
+    padding: calc(76px + env(safe-area-inset-top)) 0 0;
+  }
+
+  .login-page .login-copy {
+    display: none;
+  }
+
+  .login-page .login-layout > .login-card {
+    width: 100%;
+    max-width: none;
+    min-height: calc(100dvh - 76px - env(safe-area-inset-top));
+    margin: 0;
+    padding: var(--space-6, 24px) max(var(--space-5, 20px), env(safe-area-inset-right)) max(var(--space-8, 32px), env(safe-area-inset-bottom)) max(var(--space-5, 20px), env(safe-area-inset-left));
+    border-inline: 0;
+    border-bottom: 0;
+    border-radius: var(--space-6, 24px) var(--space-6, 24px) 0 0;
+    box-shadow: 0 -8px 32px rgba(0, 0, 0, .2);
+  }
+
+  .login-page .login-layout > .login-card .login-card-header {
+    margin-bottom: var(--space-6, 24px);
+  }
+
+  #app .topbar {
+    min-height: 60px;
+    padding: max(var(--space-2, 8px), env(safe-area-inset-top)) max(var(--space-3, 12px), env(safe-area-inset-right)) var(--space-2, 8px) max(var(--space-3, 12px), env(safe-area-inset-left));
+  }
+
+  #app .admin-menu-button {
+    display: none;
+  }
+
+  #app .topbar-right {
+    gap: var(--space-1, 4px);
+  }
+
+  #app #view-user-site-btn {
+    display: none;
+  }
+
+  #app .theme-toggle {
+    width: 58px;
+    min-width: 58px;
+    height: 44px;
+  }
+
+  #app .theme-toggle-thumb {
+    top: 8px;
+    left: 4px;
+  }
+
+  #app .theme-toggle[aria-checked='true'] .theme-toggle-thumb {
+    transform: translateX(24px);
+  }
+
+  #app .content {
+    padding: var(--space-4, 16px) var(--space-3, 12px) calc(var(--app-nav-height) + var(--space-8, 32px) + env(safe-area-inset-bottom));
+    gap: var(--space-4, 16px);
+  }
+
+  #app .panel.active {
+    gap: var(--space-4, 16px);
+  }
+
+  #app :is(.metric-row, .rm-stats-bar) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-2, 8px);
+  }
+
+  #app .mc {
+    min-height: 104px;
+    padding: var(--space-3, 12px);
+    border-radius: var(--radius-md, 12px);
+  }
+
+  #app .card {
+    padding: var(--space-4, 16px);
+    border-radius: var(--radius-md, 12px);
+  }
+
+  #app :is(.bk-toolbar-card, .um-toolbar-card, .fac-toolbar-card) {
+    position: static;
+    box-shadow: var(--shadow-sm);
+  }
+
+  #app :is(.set-tabs, .um-tabs, .fac-chips) {
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    overflow-x: auto;
+    scroll-snap-type: inline mandatory;
+  }
+
+  #app :is(.set-tabs, .um-tabs, .fac-chips) > * {
+    flex: 0 0 auto;
+    scroll-snap-align: start;
+  }
+
+  #app .monitor-section-tabs {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  #app :is(.bk-filters, .um-filters, .rep-log-filters, .users-filters, .rm-toolbar-actions, .monitor-report-filters) > :is(button, select, input, a) {
+    min-height: 48px;
+  }
+
+  #app :is(.save-btn, .btn-teal, .btn-confirm, .btn-cancel) {
+    min-height: 48px;
+  }
+
+  #app .admin-table-scroll {
+    margin-inline: calc(var(--space-4, 16px) * -1);
+    width: calc(100% + var(--space-8, 32px));
+    max-width: none;
+    padding-inline: var(--space-4, 16px);
+    border-radius: 0;
+  }
+
+  #app .card-flush > .admin-table-scroll,
+  #app .rep-log-table-wrap .admin-table-scroll,
+  #app .rm-table-wrap.admin-table-scroll {
+    margin-inline: 0;
+    width: 100%;
+    padding-inline: 0;
+  }
+
+  #app .dt-pagination-nav :is(button, span) {
+    min-height: 44px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .customer-app-nav,
+  .admin-app-nav,
+  .customer-app-nav .app-nav-item,
+  .admin-app-nav .app-nav-item,
+  .customer-app-nav .app-nav-item::before,
+  .admin-app-nav .app-nav-item::before {
+    transition-duration: .01ms;
+  }
+}

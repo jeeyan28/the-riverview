@@ -8,14 +8,26 @@ import PasswordInput from './PasswordInput';
 import { PASSWORD_REQUIREMENTS } from '../utils/password';
 import RescheduleModal, { canRescheduleBooking } from './RescheduleModal';
 import LogoutConfirmDialog from './LogoutConfirmDialog';
+import { AlertTriangle, CalendarDays, CheckCircle2, Download, X } from 'lucide-react';
+import ModalPortal from './ModalPortal';
 
 const EMPTY_DETAILS = { firstName: '', lastName: '', phone: '', email: '' };
 const EMPTY_PASSWORD = { currentPassword: '', newPassword: '', confirmPassword: '' };
 
 function historyStatusClass(status) {
   if (['Confirmed', 'Ongoing', 'Done'].includes(status)) return 'completed';
-  if (['Rejected', 'Cancelled', 'Overdue'].includes(status)) return 'cancelled';
+  if (['Rejected', 'Cancelled', 'Overdue', 'No Show'].includes(status)) return 'cancelled';
   return 'upcoming';
+}
+
+function paymentBreakdown(booking) {
+  const total = Math.max(0, Number(booking?.amount) || 0);
+  const received = Math.max(0, Number(booking?.paidAmount) || 0, Number(booking?.downPayment) || 0);
+  const refunded = Math.min(received, Math.max(0, Number(booking?.refundedAmount) || 0));
+  const paid = Math.max(0, received - refunded);
+  const balance = Math.max(0, total - paid);
+  const status = total > 0 && balance <= 0 ? 'Paid' : paid > 0 ? 'Downpayment paid' : 'Payment due';
+  return { total, paid, balance, status };
 }
 
 function ProfileModal({ open, onClose }) {
@@ -37,6 +49,7 @@ function ProfileModal({ open, onClose }) {
   const [bookingsError, setBookingsError] = useState('');
   const [viewingBooking, setViewingBooking] = useState(null);
   const [reschedulingBooking, setReschedulingBooking] = useState(null);
+  const [cancellingBooking, setCancellingBooking] = useState(null);
 
   const [toast, setToast] = useState({ visible: false, message: '', type: 'success' });
   const toastTimer = useRef(null);
@@ -76,6 +89,7 @@ function ProfileModal({ open, onClose }) {
       setPasswordError('');
       setBookingsError('');
       setViewingBooking(null);
+      setCancellingBooking(null);
       setLoadingBookings(true);
       try {
         const data = await bookingsService.mine();
@@ -93,7 +107,12 @@ function ProfileModal({ open, onClose }) {
   }, [open]);
 
   useEffect(() => {
-    document.body.style.overflow = open ? 'hidden' : '';
+    if (!open) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
   }, [open]);
 
   function handleClose() {
@@ -188,19 +207,22 @@ function ProfileModal({ open, onClose }) {
   const isNewPasswordValid = passwordChecks.every((c) => c.met);
 
   const completedBookings = bookings.filter((b) => historyStatusClass(b.status) === 'completed');
-  const totalSpent = completedBookings.reduce((sum, b) => sum + Number(b.amount || 0), 0);
+  const totalSpent = completedBookings.reduce((sum, booking) => sum + paymentBreakdown(booking).paid, 0);
 
   return (
-    <>
+    <ModalPortal>
       <div
         className={`pf-overlay${open ? ' open' : ''}`}
         id="profileModal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="profile-modal-title"
       >
         <div className="pf-modal">
           <div className="pf-modal-head">
-            <h2 className="pf-modal-title">My profile</h2>
+            <div><h2 className="pf-modal-title" id="profile-modal-title">Your Riverview account</h2><p className="pf-modal-subtitle">Manage your details and every reservation in one place.</p></div>
             <button className="pf-close" id="pfClose" aria-label="Close" onClick={handleClose}>
-              <i className="fa-solid fa-xmark"></i>
+              <X size={19} aria-hidden="true" />
             </button>
           </div>
 
@@ -221,7 +243,7 @@ function ProfileModal({ open, onClose }) {
               aria-selected={activeTab === 'history'}
               onClick={() => setActiveTab('history')}
             >
-              Reservation history
+              Reservations <span className="pf-tab-count">{bookings.length}</span>
             </button>
           </div>
 
@@ -235,14 +257,7 @@ function ProfileModal({ open, onClose }) {
                     initial
                   )}
                 </div>
-                <button
-                  type="button"
-                  className="pf-edit-btn"
-                  onClick={() => pfShowToast('Photo upload is coming soon.', 'error')}
-                >
-                  <i className="fa-solid fa-camera"></i>
-                  Edit
-                </button>
+                <div className="pf-identity"><strong>{`${details.firstName} ${details.lastName}`.trim() || 'Riverview guest'}</strong><span>{details.email || 'Guest account'}</span></div>
               </div>
 
               <form id="pfDetailsForm" noValidate className="pf-fields" onSubmit={handleDetailsSubmit}>
@@ -309,69 +324,74 @@ function ProfileModal({ open, onClose }) {
             </div>
 
             {!isGoogleAccount && (
-              <form id="pfPasswordForm" noValidate onSubmit={handlePasswordSubmit}>
-                <div className="pf-section-title pf-section-title--divider">Change password</div>
-                <div className="pf-field">
-                  <label htmlFor="pfCurrentPassword">Current password</label>
-                  <PasswordInput
-                    id="pfCurrentPassword"
-                    name="currentPassword"
-                    placeholder="Current password"
-                    autoComplete="current-password"
-                    value={passwordForm.currentPassword}
-                    onChange={(e) => setPasswordForm((p) => ({ ...p, currentPassword: e.target.value }))}
-                  />
-                </div>
-                <div className="pf-row">
+              <details className="pf-disclosure">
+                <summary>
+                  <span><strong>Change password</strong><small>Open only when you need to update your sign-in.</small></span>
+                  <i className="fa-solid fa-chevron-down" aria-hidden="true"></i>
+                </summary>
+                <form id="pfPasswordForm" noValidate onSubmit={handlePasswordSubmit} className="pf-disclosure-body">
                   <div className="pf-field">
-                    <label htmlFor="pfNewPassword">New password</label>
+                    <label htmlFor="pfCurrentPassword">Current password</label>
                     <PasswordInput
-                      id="pfNewPassword"
-                      name="newPassword"
-                      placeholder="At least 8 characters"
-                      autoComplete="new-password"
-                      value={passwordForm.newPassword}
-                      onChange={(e) => setPasswordForm((p) => ({ ...p, newPassword: e.target.value }))}
-                    >
-                      {passwordForm.newPassword.length > 0 && !isNewPasswordValid && (
-                        <ul className="password-requirements">
-                          {passwordChecks
-                            .filter((req) => !req.met)
-                            .map((req) => (
-                              <li key={req.key}>
-                                <span className="requirement-dot" />
-                                {req.label}
-                              </li>
-                            ))}
-                        </ul>
-                      )}
-                    </PasswordInput>
-                  </div>
-                  <div className="pf-field">
-                    <label htmlFor="pfConfirmPassword">Confirm new password</label>
-                    <PasswordInput
-                      id="pfConfirmPassword"
-                      name="confirmPassword"
-                      placeholder="Re-enter new password"
-                      autoComplete="new-password"
-                      value={passwordForm.confirmPassword}
-                      onChange={(e) => setPasswordForm((p) => ({ ...p, confirmPassword: e.target.value }))}
+                      id="pfCurrentPassword"
+                      name="currentPassword"
+                      placeholder="Current password"
+                      autoComplete="current-password"
+                      value={passwordForm.currentPassword}
+                      onChange={(e) => setPasswordForm((p) => ({ ...p, currentPassword: e.target.value }))}
                     />
                   </div>
-                </div>
-                {passwordError && <p className="pf-error pf-error--standalone">{passwordError}</p>}
-                <div className="pf-modal-actions">
-                  <button
-                    type="submit"
-                    className={`pf-btn pf-btn-solid${savingPassword ? ' loading' : ''}`}
-                    id="pfSavePasswordBtn"
-                    disabled={savingPassword}
-                  >
-                    <span className="pf-btn-text">Update password</span>
-                    <span className="pf-spinner"></span>
-                  </button>
-                </div>
-              </form>
+                  <div className="pf-row">
+                    <div className="pf-field">
+                      <label htmlFor="pfNewPassword">New password</label>
+                      <PasswordInput
+                        id="pfNewPassword"
+                        name="newPassword"
+                        placeholder="At least 8 characters"
+                        autoComplete="new-password"
+                        value={passwordForm.newPassword}
+                        onChange={(e) => setPasswordForm((p) => ({ ...p, newPassword: e.target.value }))}
+                      >
+                        {passwordForm.newPassword.length > 0 && !isNewPasswordValid && (
+                          <ul className="password-requirements">
+                            {passwordChecks
+                              .filter((req) => !req.met)
+                              .map((req) => (
+                                <li key={req.key}>
+                                  <span className="requirement-dot" />
+                                  {req.label}
+                                </li>
+                              ))}
+                          </ul>
+                        )}
+                      </PasswordInput>
+                    </div>
+                    <div className="pf-field">
+                      <label htmlFor="pfConfirmPassword">Confirm new password</label>
+                      <PasswordInput
+                        id="pfConfirmPassword"
+                        name="confirmPassword"
+                        placeholder="Re-enter new password"
+                        autoComplete="new-password"
+                        value={passwordForm.confirmPassword}
+                        onChange={(e) => setPasswordForm((p) => ({ ...p, confirmPassword: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+                  {passwordError && <p className="pf-error pf-error--standalone">{passwordError}</p>}
+                  <div className="pf-modal-actions">
+                    <button
+                      type="submit"
+                      className={`pf-btn pf-btn-solid${savingPassword ? ' loading' : ''}`}
+                      id="pfSavePasswordBtn"
+                      disabled={savingPassword}
+                    >
+                      <span className="pf-btn-text">Update password</span>
+                      <span className="pf-spinner"></span>
+                    </button>
+                  </div>
+                </form>
+              </details>
             )}
           </div>
 
@@ -387,7 +407,7 @@ function ProfileModal({ open, onClose }) {
               </div>
               <div className="pf-summary-card">
                 <div className="pf-summary-num">₱{totalSpent.toLocaleString()}</div>
-                <div className="pf-summary-label">Total spent</div>
+                <div className="pf-summary-label">Recorded payments</div>
               </div>
             </div>
 
@@ -397,10 +417,12 @@ function ProfileModal({ open, onClose }) {
               {!loadingBookings && !bookingsError && bookings.length === 0 && (
                 <p className="pf-history-empty">You haven't made any reservations yet.</p>
               )}
-              {!loadingBookings && !bookingsError && bookings.map((b) => (
-                <div className="pf-booking-row" key={b._id}>
+              {!loadingBookings && !bookingsError && bookings.map((b) => {
+                const payment = paymentBreakdown(b);
+                return (
+                <article className="pf-booking-row" key={b._id}>
                   <div className="pf-booking-icon">
-                    <i className="fa-solid fa-calendar-days"></i>
+                    <CalendarDays size={18} aria-hidden="true" />
                   </div>
                   <div className="pf-booking-main">
                     <div className="pf-booking-title">
@@ -411,6 +433,7 @@ function ProfileModal({ open, onClose }) {
                   <div className="pf-booking-right">
                     <div className="pf-booking-price">₱{Number(b.amount || 0).toLocaleString()}</div>
                     <span className={`pf-chip pf-chip--${historyStatusClass(b.status)}`}>{b.status}</span>
+                    <span className={`pf-payment-state pf-payment-state--${payment.status === 'Paid' ? 'paid' : payment.paid > 0 ? 'partial' : 'unpaid'}`}>{payment.status}{payment.balance > 0 ? ` · ₱${payment.balance.toLocaleString()} due` : ''}</span>
                   </div>
                   <button
                     type="button"
@@ -424,10 +447,10 @@ function ProfileModal({ open, onClose }) {
                     className="pf-view-btn"
                     onClick={() => openBookingReceipt(b)}
                   >
-                    <i className="fa-solid fa-download"></i> Receipt
+                    <Download size={14} aria-hidden="true" /> Receipt
                   </button>
-                </div>
-              ))}
+                </article>
+              );})}
             </div>
           </div>
 
@@ -441,11 +464,23 @@ function ProfileModal({ open, onClose }) {
         <div className="pf-overlay open">
           <div className="pf-modal">
             <div className="pf-modal-head">
-              <h2 className="pf-modal-title">Reservation details</h2>
+              <div><h2 className="pf-modal-title">Reservation details</h2><p className="pf-modal-subtitle">{viewingBooking.reservationCode || 'Reservation record'}</p></div>
               <button className="pf-close" aria-label="Close" onClick={() => setViewingBooking(null)}>
-                <i className="fa-solid fa-xmark"></i>
+                <X size={19} aria-hidden="true" />
               </button>
             </div>
+
+            {(() => {
+              const payment = paymentBreakdown(viewingBooking);
+              return (
+                <section className="pf-payment-breakdown" aria-label="Payment summary">
+                  <div><span>Total charge</span><strong>₱{payment.total.toLocaleString()}</strong></div>
+                  <div><span>Paid so far</span><strong>₱{payment.paid.toLocaleString()}</strong></div>
+                  <div className={payment.balance > 0 ? 'has-balance' : 'is-settled'}><span>{payment.balance > 0 ? 'Pay at venue' : 'Balance'}</span><strong>₱{payment.balance.toLocaleString()}</strong></div>
+                  <p>{payment.balance > 0 ? 'Your online downpayment secured the slot. Please settle the remaining balance at the venue.' : 'This reservation is fully paid.'}</p>
+                </section>
+              );
+            })()}
 
             <div className="pf-detail-list">
               <div className="pf-detail-row">
@@ -537,8 +572,13 @@ function ProfileModal({ open, onClose }) {
                   <i className="fa-solid fa-calendar-clock"></i> Reschedule
                 </button>
               )}
+              {viewingBooking.status === 'Confirmed' && viewingBooking.cancellationStatus !== 'Requested' && viewingBooking.cancellationStatus !== 'Approved' && (
+                <button type="button" className="pf-btn pf-btn-ghost pf-btn-danger" onClick={() => setCancellingBooking(viewingBooking)}>
+                  <i className="fa-solid fa-ban"></i> Request cancellation
+                </button>
+              )}
               <button type="button" className="pf-btn pf-btn-solid" onClick={() => openBookingReceipt(viewingBooking)}>
-                <i className="fa-solid fa-download"></i> Download Receipt
+                <Download size={15} aria-hidden="true" /> Download receipt
               </button>
             </div>
           </div>
@@ -557,8 +597,22 @@ function ProfileModal({ open, onClose }) {
         />
       )}
 
+      {cancellingBooking && (
+        <CancellationRequestModal
+          booking={cancellingBooking}
+          onClose={() => setCancellingBooking(null)}
+          onSubmitted={(updated) => {
+            setBookings((prev) => prev.map((b) => (b._id === updated._id ? { ...b, ...updated } : b)));
+            setViewingBooking((v) => (v && v._id === updated._id ? { ...v, ...updated } : v));
+            setCancellingBooking(null);
+            pfShowToast('Cancellation request sent for review.');
+          }}
+          onError={(message) => pfShowToast(message, 'error')}
+        />
+      )}
+
       <div className={`pf-toast${toast.visible ? ' show' : ''}${toast.type === 'error' ? ' error' : ''}`} id="pfToast">
-        <span id="pfToastIcon">{toast.type === 'error' ? '⚠️' : '✅'}</span>
+        <span id="pfToastIcon">{toast.type === 'error' ? <AlertTriangle size={17} /> : <CheckCircle2 size={17} />}</span>
         <span id="pfToastMsg">{toast.message}</span>
       </div>
 
@@ -568,7 +622,40 @@ function ProfileModal({ open, onClose }) {
         onConfirm={confirmLogout}
         onCancel={() => setShowLogoutConfirm(false)}
       />
-    </>
+    </ModalPortal>
+  );
+}
+
+function CancellationRequestModal({ booking, onClose, onSubmitted, onError }) {
+  const [reason, setReason] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  async function submit(event) {
+    event.preventDefault();
+    const value = reason.trim();
+    if (!value) return;
+    setSubmitting(true);
+    try {
+      const updated = await bookingsService.requestCancellation(booking._id, { reason: value });
+      onSubmitted(updated);
+    } catch (err) {
+      onError(err.message || 'Could not request cancellation.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="pf-overlay open" role="dialog" aria-modal="true" aria-label="Request reservation cancellation">
+      <div className="pf-modal pf-modal--compact">
+        <div className="pf-modal-head"><h2 className="pf-modal-title">Request cancellation</h2><button className="pf-close" aria-label="Close" onClick={onClose}><i className="fa-solid fa-xmark"></i></button></div>
+        <p className="pf-detail-value">Your request for {booking.reservationCode || 'this reservation'} will be reviewed by the team. Any refund is handled manually after approval.</p>
+        <form onSubmit={submit}>
+          <div className="pf-field"><label htmlFor="cancel-reason">Reason</label><textarea id="cancel-reason" rows="4" maxLength="500" required value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Tell us why you need to cancel" /></div>
+          <div className="pf-modal-actions"><button type="button" className="pf-btn pf-btn-ghost" onClick={onClose}>Keep reservation</button><button type="submit" className="pf-btn pf-btn-solid" disabled={submitting || !reason.trim()}>{submitting ? 'Sending…' : 'Send request'}</button></div>
+        </form>
+      </div>
+    </div>
   );
 }
 

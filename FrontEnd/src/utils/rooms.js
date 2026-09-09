@@ -6,9 +6,11 @@ export function dateKey(y, m, d) {
 
 export function getPaxCapacity(paxText) {
   if (!paxText) return null;
-  const matches = String(paxText).match(/\d+/g);
-  if (!matches || !matches.length) return null;
-  const max = Math.max(...matches.map(Number));
+  const text = String(paxText);
+  const paxMatches = [...text.matchAll(/(\d+)\s*(?:pax|guests?|people)/gi)].map((match) => Number(match[1]));
+  const matches = paxMatches.length ? paxMatches : (text.match(/\d+/g) || []).map(Number);
+  if (!matches.length) return null;
+  const max = Math.max(...matches);
   return max > 0 ? max : null;
 }
 

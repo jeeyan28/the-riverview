@@ -3,6 +3,7 @@ const PERMISSIONS = {
   POS_REFUND:  "pos:refund",
 
   ROOM_VIEW:   "room:view",
+  ROOM_OPERATE: "room:operate",
   ROOM_MANAGE: "room:manage",
 
   BOOKING_VIEW:   "booking:view",
@@ -35,10 +36,11 @@ const ROLE_LEVEL = {
 const ROLE_PERMISSIONS = {
   super_admin: Object.values(PERMISSIONS),
 
-  manager: Object.values(PERMISSIONS).filter((p) => p !== PERMISSIONS.FORECASTING_VIEW),
+  manager: Object.values(PERMISSIONS),
 
   staff: [
     PERMISSIONS.ROOM_VIEW,
+    PERMISSIONS.ROOM_OPERATE,
     PERMISSIONS.BOOKING_VIEW,
     PERMISSIONS.BOOKING_MANAGE,
   ],

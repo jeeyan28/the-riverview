@@ -5,30 +5,19 @@ const Settings = require("../model/settings");
 const BookingLock = require("../model/bookingLock");
 const { sendReceiptEmail } = require("./mailer");
 const { TIME_ZONE } = require("./constants");
-
-function computeDownPayment(unitPrice, hours = 1) {
-  const price = Number(unitPrice) || 0;
-  const h = Number(hours) || 1;
-  return Math.max(0, Math.round(price * h));
-}
-
-function bookingStartMs(dateStr, timeIn) {
-  const [y, m, d] = String(dateStr).split("-").map(Number);
-  const hour = parseInt(String(timeIn).split(":")[0], 10) || 0;
-  return new Date(y, (m || 1) - 1, d || 1, hour).getTime();
-}
+const { bookingStartMs, financialFields } = require("./bookingLifecycle");
+const { calculateBookingPrice, computeDownPayment, parsePaxCapacity } = require("./roomPricing");
 
 async function voidExpiredBookings() {
   const now = Date.now();
-  const confirmed = await Booking.find({ status: Booking.BOOKING_STATUS.CONFIRMED }).select("date timeIn downPaymentHours");
+  const confirmed = await Booking.find({ status: Booking.BOOKING_STATUS.CONFIRMED, cancellationStatus: { $ne: "Requested" } }).select("date timeIn duration");
   const expiredIds = confirmed
     .filter((b) => {
-      const holdHours = Math.max(1, Number(b.downPaymentHours) || 1);
-      return bookingStartMs(b.date, b.timeIn) + holdHours * 3600000 < now;
+      return bookingStartMs(b.date, b.timeIn) + Number(b.duration) * 3600000 <= now;
     })
     .map((b) => b._id);
   if (expiredIds.length) {
-    await Booking.updateMany({ _id: { $in: expiredIds } }, { status: Booking.BOOKING_STATUS.CANCELLED });
+    await Booking.updateMany({ _id: { $in: expiredIds }, status: Booking.BOOKING_STATUS.CONFIRMED, cancellationStatus: { $ne: "Requested" } }, { status: Booking.BOOKING_STATUS.NO_SHOW, noShowAt: new Date(now) });
   }
 }
 
@@ -42,13 +31,11 @@ async function updateBookingLifecycleStatuses() {
         Booking.BOOKING_STATUS.PENDING,
         Booking.BOOKING_STATUS.PENDING_PAYMENT_VERIFICATION,
         Booking.BOOKING_STATUS.AWAITING_ONLINE_PAYMENT,
-        Booking.BOOKING_STATUS.CONFIRMED,
-        Booking.BOOKING_STATUS.ONGOING,
       ],
     },
   }).select("_id");
   if (stale.length) {
-    await Booking.updateMany({ _id: { $in: stale.map((b) => b._id) } }, { status: Booking.BOOKING_STATUS.OVERDUE });
+    await Booking.updateMany({ _id: { $in: stale.map((b) => b._id) }, status: { $in: [Booking.BOOKING_STATUS.PENDING, Booking.BOOKING_STATUS.PENDING_PAYMENT_VERIFICATION, Booking.BOOKING_STATUS.AWAITING_ONLINE_PAYMENT] } }, { status: Booking.BOOKING_STATUS.OVERDUE });
   }
 }
 
@@ -73,13 +60,14 @@ async function runInTransaction(fn) {
   }
 }
 
-async function validateAndPriceBooking({ roomId, variantLabel, date, timeIn, duration, isAdminBooking, guestCount, excludeLockUserId, excludeBookingId, session }) {
+async function validateAndPriceBooking({ roomId, variantLabel, date, timeIn, duration, isAdminBooking, guestCount, hasCorkage = false, excludeLockUserId, excludeBookingId, session }) {
   if (!roomId || !date || !timeIn || !duration) {
     throw { status: 400, message: "roomId, date, timeIn and duration are required." };
   }
-  if (!Number.isFinite(duration) || duration <= 0) {
-    throw { status: 400, message: "Duration must be greater than 0." };
+  if (!Number.isInteger(duration) || duration < 1 || duration > 5) {
+    throw { status: 400, message: "Reservations must be 1–5 hours in whole-hour increments." };
   }
+  if (!Number.isFinite(bookingStartMs(date, timeIn)) || !/:00$/.test(timeIn)) throw { status: 400, message: "Choose a valid date and an hourly start time." };
   
   const settings = isAdminBooking ? null : await Settings.getSingleton();
 
@@ -94,34 +82,33 @@ async function validateAndPriceBooking({ roomId, variantLabel, date, timeIn, dur
     throw { status: 400, message: `Duration cannot exceed ${Booking.MAX_DURATION_HOURS} hours.` };
   }
 
-  const roomQuery = Room.findById(roomId);
-  const room = await (session ? roomQuery.session(session) : roomQuery);
+  // Serialize capacity checks for this facility inside booking transactions.
+  const room = session
+    ? await Room.findOneAndUpdate({ _id: roomId }, { $inc: { __v: 1 } }, { returnDocument: "after", session })
+    : await Room.findById(roomId);
   if (!room) throw { status: 404, message: "Selected room does not exist." };
 
-  let unitPrice = room.price;
+  let selectedVariant = null;
   if (room.variants && room.variants.length) {
     if (variantLabel) {
-      const variant = room.variants.find(v => v.label === variantLabel);
-      if (!variant) throw { status: 400, message: "Selected pricing option not found." };
-      if (!isAdminBooking && variant.status && variant.status !== "Available") {
-        throw { status: 409, message: `This room is currently ${variant.status.toLowerCase()} and cannot be booked.` };
+      selectedVariant = room.variants.find(v => v.label === variantLabel);
+      if (!selectedVariant) throw { status: 400, message: "Selected pricing option not found." };
+      if (!isAdminBooking && selectedVariant.status && selectedVariant.status !== "Available") {
+        throw { status: 409, message: `This room is currently ${selectedVariant.status.toLowerCase()} and cannot be booked.` };
       }
-      unitPrice = variant.price;
     } else {
-      unitPrice = Math.min(...room.variants.map(v => Number(v.price) || 0));
+      throw { status: 400, message: "Choose a room type or pricing option." };
     }
   }
-  if (!Number.isFinite(unitPrice)) {
-    throw { status: 400, message: "Could not determine price for this room/option." };
-  }
 
-  if (guestCount !== undefined && guestCount !== null && Number(room.capacity) > 0) {
+  if (guestCount !== undefined && guestCount !== null) {
     const pax = Number(guestCount);
     if (!Number.isFinite(pax) || pax < 1) {
       throw { status: 400, message: "Number of guests (pax) must be at least 1." };
     }
-    if (pax > room.capacity) {
-      throw { status: 400, message: `This room accommodates up to ${room.capacity} guest(s). Please reduce your pax or choose a bigger room.` };
+    const capacity = parsePaxCapacity(selectedVariant?.pax) || (Number(room.capacity) > 0 ? Number(room.capacity) : null);
+    if (capacity && pax > capacity) {
+      throw { status: 400, message: `This room accommodates up to ${capacity} guest(s). Please reduce your pax or choose a bigger room.` };
     }
   }
 
@@ -131,7 +118,7 @@ async function validateAndPriceBooking({ roomId, variantLabel, date, timeIn, dur
     room: room._id,
     variantLabel: variantLabel || null,
     date,
-    status: { $nin: ["Cancelled", "Rejected"] },
+    status: { $nin: ["Cancelled", "Rejected", "No Show"] },
     ...(excludeBookingId ? { _id: { $ne: excludeBookingId } } : {}),
   }).select("timeIn duration");
   const existing = await (session ? query.session(session) : query);
@@ -158,7 +145,14 @@ async function validateAndPriceBooking({ roomId, variantLabel, date, timeIn, dur
     }
   }
 
-  const amount = unitPrice * duration;
+  const pricing = calculateBookingPrice({
+    variant: selectedVariant,
+    basePrice: room.price,
+    timeIn,
+    duration,
+    guestCount,
+    hasCorkage,
+  });
   if (!isAdminBooking) {
     const isHoliday = (settings.holidays || []).some(h => h.date === date && h.fullDay);
     const oh = settings.operatingHours || {};
@@ -184,7 +178,7 @@ async function validateAndPriceBooking({ roomId, variantLabel, date, timeIn, dur
     }
   }
 
-  return { room, amount, unitPrice };
+  return { room, ...pricing };
 }
 
 
@@ -246,8 +240,9 @@ async function finalizeBookingFromPayment({ paymentIntentId, metadata, paidPayme
   try {
     booking = await runInTransaction(async (session) => {
       let room;
+      let pricing;
       try {
-        ({ room } = await validateAndPriceBooking({
+        pricing = await validateAndPriceBooking({
           roomId,
           variantLabel: variantLabel || undefined,
           date,
@@ -255,9 +250,11 @@ async function finalizeBookingFromPayment({ paymentIntentId, metadata, paidPayme
           duration: Number(duration),
           isAdminBooking: false,
           guestCount: Number(guestCount),
+          hasCorkage: metadata.hasCorkage === "true",
           excludeLockUserId: metadata.bookedBy || undefined,
           session,
-        }));
+        });
+        room = pricing.room;
       } catch (e) {
         const err = new Error(e.message || "This time slot is no longer available.");
         err.status = e.status || 409;
@@ -278,12 +275,23 @@ async function finalizeBookingFromPayment({ paymentIntentId, metadata, paidPayme
         timeIn,
         duration: Number(duration),
         amount: Number(metadata.amount),
+        roomCharge: Number(metadata.roomCharge) || pricing.roomCharge,
+        hourlyRates: (() => {
+          try {
+            const rates = JSON.parse(metadata.hourlyRates || "[]");
+            return Array.isArray(rates) && rates.length ? rates : pricing.hourlyRates;
+          } catch {
+            return pricing.hourlyRates;
+          }
+        })(),
+        corkageFee: Number(metadata.corkageFee) || 0,
         paymentMethod: "PayMongo",
         paymentProvider: "paymongo",
         bookedBy: metadata.bookedBy || undefined,
         source: "online",
         status: "Confirmed",
-        paymentStatus: "Paid",
+        ...financialFields(Number(metadata.amount), Number(metadata.downPayment) || 0),
+        paymentUpdatedAt: new Date(),
         downPayment: Number(metadata.downPayment) || 0,
         downPaymentHours: Number(metadata.downPaymentHours) || 1,
         paymongoPaymentIntentId: paymentIntentId,

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { resolveImageUrl } from '../utils/resolveImageUrl';
 import fallbackRoomImg from '../assets/pictures/Billiard.jpg';
+import { variantRateLabel } from '../utils/roomPricing';
 
 function toDisplaySrc(image) {
   if (!image) return fallbackRoomImg;
@@ -56,7 +57,7 @@ function RoomOptionCard({ option, room, selected = false, disabled = false, onSe
       tabIndex={interactive && !disabled ? 0 : undefined}
       aria-pressed={interactive ? selected : undefined}
       aria-disabled={disabled || undefined}
-      aria-label={interactive ? `Select ${option.label || 'room'}, ₱${option.price || 0} per hour` : undefined}
+      aria-label={interactive ? `Select ${option.label || 'room'}, ${variantRateLabel(option)}` : undefined}
     >
       <div className="bk-room-option-collapsed">
         <div className="bk-room-option-img">
@@ -87,7 +88,7 @@ function RoomOptionCard({ option, room, selected = false, disabled = false, onSe
             </ul>
           )}
           <div className="bk-room-option-bottom-row">
-            <span className="bk-room-option-price">₱{option.price || 0}/hr</span>
+            <span className="bk-room-option-price">{variantRateLabel(option)}</span>
             {interactive && hasDetails && (
               <button
                 type="button"
@@ -103,7 +104,16 @@ function RoomOptionCard({ option, room, selected = false, disabled = false, onSe
         </div>
       </div>
 
-
+      {expanded && (
+        <div className="bk-room-option-expanded" onClick={(event) => event.stopPropagation()}>
+          {description && <p>{description}</p>}
+          <div className="bk-room-option-detail-facts">
+            <span><strong>{totalRooms}</strong> unit{totalRooms === 1 ? '' : 's'}</span>
+            {showAvailability && <span><strong>{availableCount}</strong> available for this time</span>}
+            {Number(option.extraGuestFee) > 0 && <span><strong>₱{Number(option.extraGuestFee).toLocaleString()}</strong> per extra guest/hour after {Number(option.includedGuests) || 0}</span>}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

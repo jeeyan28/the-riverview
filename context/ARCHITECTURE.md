@@ -21,7 +21,6 @@ flowchart LR
         F[(MongoDB Atlas)]
         G[PayMongo]
         H[Cloudinary]
-        I[Gemini / OpenAI / Anthropic]
         J[Nodemailer / SMTP]
     end
 
@@ -32,7 +31,6 @@ flowchart LR
     C --> F
     C -->|checkout + webhook| G
     C -->|image upload| H
-    C -->|forecast narrative| I
     C -->|OTP / notifications| J
 ```
 
@@ -48,7 +46,7 @@ routes/       → HTTP layer: parses request, checks permission, calls model/uti
 middleware/   → cross-cutting concerns: auth, CSRF, rate limiting, upload, input validation
 model/        → Mongoose schemas — the only place data shape is defined
 validation/   → Joi schemas — the only place input rules are defined
-utils/        → business logic that doesn't belong to a single route (pricing, permissions, mailer, forecast narrative)
+utils/        → business logic that doesn't belong to a single route (pricing, permissions, mailer, sales ledger)
 scripts/      → one-off/cron-invoked maintenance jobs, not part of the request path
 ```
 
@@ -91,6 +89,13 @@ sequenceDiagram
 - The lock (20-minute TTL, auto-expiring via Mongo TTL index) prevents two customers from paying for the same slot simultaneously — this is what makes "zero double-booked slots" achievable.
 - If a webhook is missed/delayed, the `/intent/:id/attach` and `/status/:id` endpoints let the client actively confirm payment status as a fallback — the booking isn't left stuck on network flakiness alone.
 - If payment succeeds but the slot became unavailable in the meantime (race condition), the booking is flagged for manual review/refund rather than silently created — logged server-side, not surfaced as a generic error.
+- `utils/roomPricing.js` is the canonical calculator for flat rates, Court daytime/evening rates, per-guest hourly surcharges, and the fixed ₱200 corkage add-on. The API calculates the charge and downpayment; client totals are previews only. Bookings store the resulting hourly-rate and charge snapshot for finance/audit history.
+
+### 4.1 Canonical finance and cancellation lifecycle
+
+`utils/salesReport.js` loads bookings and room sessions for the requested Asia/Manila date range, then `utils/salesLedger.js` produces the single finance view consumed by the dashboard, analytics, reports, and forecast endpoints. A session linked to a booking is one transaction: the session charge supersedes the booking charge, while the booking's original deposit is carried into the session's paid amount exactly once. Collected revenue is explicit payments minus manual refunds; outstanding is charges minus paid, with closed statuses settled at zero. Records that only say `Paid` without an amount are flagged for review and excluded from totals. Source filters use `Booking.source`: online reservations remain separate from staff-entered walk-ins/manual bookings, while unlinked room sessions are walk-ins.
+
+Customer cancellation is a two-step flow (`cancellationStatus = Requested` then `Approved` or `Rejected`) and never triggers an automatic provider refund. Admin review stores the reason, reviewer, note, and manual refund amount. A confirmed booking that reaches its scheduled end without completion is marked `No Show`; its downpayment remains forfeited and the record stays in the ledger for auditability.
 
 **Path B — Staff/walk-in manual booking:**
 
@@ -107,9 +112,15 @@ sequenceDiagram
 
 ## 5. Data Flow: Room/Court Status Monitoring
 
+- Room Management is the inventory source of truth. Saving Billiards, KTV, or Court calls `syncRoomInventory()`, which creates/updates the physical `MonitorRoom` units represented by each variant's start number and count and marks removed idle units inactive.
+- Existing deployments can run `npm run align:prd` for a read-only migration preview, then `npm run align:prd:apply` to back up and transactionally align legacy room names/rates, monitor inventory, and the 07:00–00:00 daily schedule without rewriting historical booking charge snapshots, closures, announcements, or payment settings. The apply step is idempotent; `npm run restore:prd` previews the latest local backup and `npm run restore:prd:apply` restores it while preserving occupied monitor units.
 - Client polls `GET /monitor-rooms` and `GET /room-sessions` every **2 seconds** (`LOBBY_POLL_MS`) while the lobby/monitor view is open.
 - A local 1-second tick drives visual countdowns (e.g. time remaining) between polls without hitting the server every second.
 - An overdue-session alert (audible beep) re-fires at most every 30 seconds to avoid alert fatigue.
+- Staff starts a walk-in with `POST /api/room-sessions`, choosing 1–24 whole hours, guest/corkage details, amount collected, and whether payment is before or after play. The API calculates the exact hourly charge from the chosen `MonitorRoom` pricing snapshot.
+- Starting a due reservation uses the same endpoint with `bookingId`. The API assigns an available physical unit, copies the reservation charge, preserves the verified deposit, derives `Paid`/`Partial`/`Unpaid`, and changes the booking to `Ongoing`.
+- Extending, finishing, cancelling, and correcting sessions preserve the financial trail. Finish records the money actually received; it can leave a valid balance instead of forcing a paid state.
+- `GET /api/room-sessions/report?from=YYYY-MM-DD&to=YYYY-MM-DD` returns the independent played-session report. `/report/export` creates its Excel workbook with Summary, Played sessions, and Room totals sheets.
 - **This is the final approach, not a placeholder.** 2-second polling meets the "near-live" requirement without the added complexity of a WebSocket/SSE layer. Do not introduce a push-based layer without a documented reason — it's not a "todo."
 
 ## 6. Data Flow: Revenue Forecasting
@@ -117,22 +128,21 @@ sequenceDiagram
 ```mermaid
 flowchart LR
     A[Booking/revenue history] --> B["simple-statistics engine\n(SMA, trend %, volatility, seasonality, anomalies)"]
-    B --> C{AI provider key present?}
-    C -->|yes| D["LLM writes narrative\nfrom the pre-computed numbers"]
-    C -->|no / call fails| E[Rule-based fallback insights]
-    D --> F[Forecast dashboard]
-    E --> F
+    B --> C[Deterministic briefing and action signals]
+    C --> D[Forecast dashboard]
 ```
 
-- **All figures are computed deterministically** by `simple-statistics` in `forecastRoutes.js` — this is the auditable, reproducible "real" forecasting logic.
-- The AI (Gemini → OpenAI → Anthropic, auto-selected by whichever API key is configured) has exactly one job: turn the pre-computed JSON into a readable narrative (executive summary, recommendations, risk flags). **It never generates or alters a number.**
-- If no AI key is set, or the call fails for any reason, the feature falls back to existing rule-based insights — the forecast page must never break because of the AI call.
-- **Rule:** any change to forecast math goes in the statistics layer; any change to forecast *wording* goes in the narrative prompt. Don't blur the two.
+- All figures and briefing text are generated deterministically in `forecastRoutes.js`. The moving-average, linear-trend, seasonality, volatility, anomaly, and confidence-range inputs are auditable and reproducible from the canonical ledger.
+- Forecasting never calls an LLM or depends on an external model provider, matching the PRD's v1 scope.
+- The admin selects a daily (14-day), weekly (8-week), or monthly (6-month) planning horizon. Each range uses a matching 60/180/365-day history window while preserving the selectable 7/14/30-day moving average.
 
 ## 7. Concurrency & Data Integrity
 
 - **BookingLock** (Section 4) is the primary double-booking defense — a MongoDB TTL-indexed document, not an in-memory lock (which wouldn't survive serverless cold starts/multiple instances).
 - **Reschedule limits** (max 2, 3-hour cutoff) and **cancellation approval gating** are enforced server-side in the booking routes/model, not just in the frontend UI — the frontend should treat these as UX conveniences, not the source of truth.
+- **Roles:** Owner and Supervisor have full admin access; Staff can operate the live room monitor and manage booking operations without finance/settings authority. The permission map is the source of truth for both API routes and responsive admin UI affordances.
+- **Responsive admin surface:** the dashboard, booking queue, monitor, analytics, reports, users, logs, room management, and settings pages share mobile/tablet breakpoints. The sidebar becomes a focus-trapped drawer on narrow screens, tables scroll within their panels, and finance filters/metrics collapse into touch-sized controls.
+- Reservation management accepts exact-date or inclusive `from`/`to` API filters; the admin toolbar exposes the date range alongside status, cancellation, facility, and search filters.
 
 ## 8. Third-Party Integrations
 
@@ -140,10 +150,9 @@ flowchart LR
 |---|---|---|
 | PayMongo | Downpayment checkout + webhook | Signature-verified webhook; raw body parsing required on that route only |
 | Cloudinary | Image storage (rooms, uploads) | Via `multer` for upload handling |
-| Gemini / OpenAI / Anthropic | Forecast narrative only | Auto-selected by available API key; never source of numeric truth |
 | Nodemailer | OTP delivery, notifications | — |
 | Google Auth Library | Google sign-in | — |
-| ExcelJS | Exportable reports (PDF/Excel) | Backs the "exportable report" feature from DESIGN/PRD |
+| ExcelJS + browser print styles | Exportable reports | ExcelJS generates `.xlsx`; the report's print layout supports printing or saving as PDF |
 
 ## 9. Security Posture
 

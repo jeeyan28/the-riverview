@@ -1,0 +1,422 @@
+/* Compact, app-like content hierarchy for customer and admin workspaces. */
+
+/* Reservation progress: full trail on larger screens, one focused step on phones. */
+.public-site .bk-stepper { display: block; }
+.public-site .bk-stepper-steps { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.public-site .bk-stepper-status,
+.public-site .bk-stepper-progress { display: none; }
+
+/* Review related information as one grouped surface instead of nested cards. */
+.public-site .bk-review-overview {
+  overflow: hidden;
+  margin-bottom: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+.public-site .bk-review-overview .bk-review-section {
+  margin: 0;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.public-site .bk-review-overview .bk-review-section:last-child { border-bottom: 0; }
+.public-site .bk-review-overview .bk-review-card {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+.public-site .bk-review-disclosure,
+.public-site .pf-disclosure {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+.public-site .bk-review-disclosure > summary,
+.public-site .pf-disclosure > summary {
+  display: flex;
+  min-height: 48px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  color: var(--text-main);
+  cursor: pointer;
+  list-style: none;
+}
+.public-site .bk-review-disclosure > summary::-webkit-details-marker,
+.public-site .pf-disclosure > summary::-webkit-details-marker { display: none; }
+.public-site .bk-review-disclosure > summary { font-size: .78rem; font-weight: 750; }
+.public-site .bk-review-disclosure-body,
+.public-site .pf-disclosure-body { padding: 0 14px 14px; border-top: 1px solid var(--border); }
+.public-site .bk-review-disclosure-body { padding-top: 11px; }
+.public-site .bk-review-disclosure-body p { margin: 0; color: var(--text-muted-light); font-size: .74rem; line-height: 1.5; }
+.public-site .bk-review-disclosure-body p + p { margin-top: 7px; }
+
+/* Profile exposes its routine fields first and keeps account security secondary. */
+.public-site .pf-modal { width: min(680px, 100%); }
+.public-site .pf-profile-body { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 20px; }
+.public-site .pf-avatar-col { padding: 16px 12px; }
+.public-site .pf-avatar { width: 72px; height: 72px; font-size: 1.45rem; }
+.public-site .pf-identity { margin-top: 8px; }
+.public-site .pf-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 10px; }
+.public-site .pf-fields .pf-modal-actions { grid-column: 1 / -1; }
+.public-site .pf-disclosure { flex: 0 0 auto; margin-top: 14px; }
+.public-site .pf-disclosure > summary span { display: grid; gap: 2px; }
+.public-site .pf-disclosure > summary strong { font-size: .8rem; }
+.public-site .pf-disclosure > summary small { color: var(--text-muted-light); font-size: .7rem; font-weight: 500; }
+.public-site .pf-disclosure > summary i { color: var(--text-muted-light); transition: transform .2s var(--ease-out); }
+.public-site .pf-disclosure[open] > summary i { transform: rotate(180deg); }
+.public-site .pf-disclosure-body { padding-top: 14px; }
+.public-site .pf-history-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--border);
+}
+.public-site .pf-summary-card { padding: 11px 8px; border: 0; border-radius: 0; }
+.public-site .pf-booking-row { padding: 12px; gap: 10px; }
+
+/* Room type details use accordions so every option stays findable without a wall of cards. */
+.public-site .facility-detail-intro { margin-bottom: 14px; }
+.public-site .facility-detail-variants { gap: 8px; }
+.public-site .facility-detail-variant { overflow: hidden; padding: 0; }
+.public-site .facility-detail-variant > summary { list-style: none; cursor: pointer; }
+.public-site .facility-detail-variant > summary::-webkit-details-marker { display: none; }
+.public-site .facility-detail-variant-head { min-height: 64px; align-items: center; padding: 11px 14px; }
+.public-site .facility-detail-variant-name { display: grid; min-width: 0; gap: 2px; }
+.public-site .facility-detail-variant-name strong { overflow-wrap: anywhere; color: var(--text-main); font-size: .92rem; }
+.public-site .facility-detail-rate { margin: 0; }
+.public-site .facility-detail-best { margin-left: auto; }
+.public-site .facility-detail-chevron { flex: 0 0 auto; color: var(--text-muted-light); transition: transform .2s var(--ease-out); }
+.public-site .facility-detail-variant[open] .facility-detail-chevron { transform: rotate(180deg); }
+.public-site .facility-detail-variant-body { padding: 0 14px 14px; border-top: 1px solid var(--border); }
+.public-site .facility-detail-description { margin-top: 12px; font-size: .8rem; line-height: 1.5; }
+.public-site .facility-detail-facts { gap: 8px 18px; margin-top: 12px; }
+.public-site .facility-detail-features { margin-top: 12px; }
+
+/* Admin account settings only display data the application actually owns. */
+#app .admin-profile-settings { display: grid; width: min(780px, 100%); gap: 12px; }
+#app .admin-profile-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 12px; }
+#app .admin-settings-disclosure { padding: 0; }
+#app .admin-settings-disclosure > summary {
+  display: flex;
+  min-height: 56px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  color: var(--text);
+  cursor: pointer;
+  list-style: none;
+}
+#app .admin-settings-disclosure > summary::-webkit-details-marker { display: none; }
+#app .admin-settings-disclosure > summary span { display: grid; gap: 2px; }
+#app .admin-settings-disclosure > summary strong { font-size: .82rem; }
+#app .admin-settings-disclosure > summary small { color: var(--muted); font-size: .68rem; font-weight: 500; }
+#app .admin-settings-disclosure > summary i { color: var(--muted); transition: transform .2s var(--ease-out); }
+#app .admin-settings-disclosure[open] > summary i { transform: rotate(180deg); }
+#app .admin-settings-disclosure-body { padding: 14px 16px 16px; border-top: 1px solid var(--border); }
+
+/* Keep the desktop and landscape-tablet sign-in surface centered inside the viewport.
+   Longer registration content scrolls inside the card instead of pushing it off-screen. */
+@media (min-width: 901px) {
+  .login-page .login-layout {
+    height: 100dvh;
+    min-height: 100dvh;
+    padding-block: calc(var(--space-10) + var(--space-10)) var(--space-5);
+  }
+  .login-page .login-card {
+    max-width: 460px;
+    max-height: calc(100dvh - var(--space-10) - var(--space-10) - var(--space-5));
+    padding: var(--space-6);
+  }
+  .login-page .login-avatar { margin-bottom: var(--space-2); }
+  .login-page .login-card-header { margin-bottom: var(--space-4); }
+  .login-page .login-form { gap: var(--space-3); }
+  .login-page .auth-card-body { overflow-y: auto; overscroll-behavior: contain; }
+}
+
+@media (min-width: 901px) and (max-width: 1200px) {
+  .login-page .login-layout {
+    grid-template-columns: minmax(0, 1fr) minmax(400px, 460px);
+    gap: var(--space-8);
+    padding-inline: var(--space-8);
+  }
+}
+
+@media (min-width: 641px) {
+  .public-site .bk-guest-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 12px; }
+  .public-site .bk-guest-fields > :is(.bk-addon-option, .bk-field:last-of-type) { grid-column: 1 / -1; }
+  .public-site .bk-guest-fields .bk-field { margin: 0; }
+}
+
+@media (max-width: 1200px) {
+  #app .content,
+  #app .panel.active { gap: 16px; }
+  #app .card { padding: 16px; }
+  #app .mc { min-height: 106px; padding: 16px; }
+  #app .mc-label { margin-bottom: 7px; }
+}
+
+@media (max-width: 900px) {
+  /* Customer landing content becomes shorter, scan-friendly app sections. */
+  .public-site :is(.how-it-works, .why-book, .spaces, #about) { padding-block: 40px; }
+  .public-site :is(.how-it-works-inner, .why-book-inner, .spaces-header, .rooms-header) { margin-bottom: 22px; }
+  .public-site :is(.step-card, .why-book-card, .about-card) { padding: 14px; }
+  .public-site .spaces-rows { gap: 18px; }
+  .public-site .space-row { gap: 18px; }
+  .public-site .facility-motion { min-height: 260px; }
+
+  .public-site .bk-modal { height: min(780px, calc(100dvh - 32px)); }
+  .public-site .bk-header { padding: 16px 64px 12px 18px; }
+  .public-site .bk-room-icon { width: 38px; height: 38px; }
+  .public-site .bk-body { padding: 16px 18px 88px; }
+  .public-site .bk-summary-toggle { margin: 12px 18px 0; }
+  .public-site .bk-summary-panel-mobile { margin: 10px 18px 0; padding: 12px 14px; }
+  .public-site .bk-detail-actions { bottom: -88px; margin: 20px -18px -88px; padding: 10px 18px max(10px, env(safe-area-inset-bottom)); }
+  .public-site .bk-info-bar { margin-top: 8px; padding: 8px 10px; }
+
+  .public-site .pf-modal { padding: 18px; }
+  .public-site .pf-modal-head,
+  .public-site .pf-tabs { margin-bottom: 14px; }
+  .public-site .pf-profile-body { grid-template-columns: 1fr; gap: 12px; }
+  .public-site .pf-avatar-col { flex-direction: row; justify-content: flex-start; padding: 10px; }
+  .public-site .pf-identity { width: auto; margin: 0; text-align: left; }
+
+  /* Tablet admin views preserve parallel information without oversized cards. */
+  #app .mc { min-height: 92px; padding: 12px; }
+  #app .mc-label { margin-bottom: 4px; font-size: .67rem; }
+  #app .mc-val { font-size: clamp(1.2rem, 4vw, 1.55rem); }
+  #app .mc-sub { font-size: .64rem; line-height: 1.35; }
+  #app .settings-intro,
+  #app .login-history-intro,
+  #app .monitor-report-head { padding: 14px 16px; }
+  #app .monitor-section-tabs button,
+  #app .login-history-tabs button { min-height: 52px; padding: 8px 11px; }
+  #app .set-tab { min-height: 50px; }
+  #app .rm-stats-bar { margin-block: 0; }
+  #app .rm-stat { padding: 10px 12px; }
+  #app .rm-stat::before { margin-bottom: 5px; }
+  #app .rm-stat-label { margin-bottom: 2px; font-size: .68rem; }
+  #app .rm-stat-value { font-size: 1.2rem; }
+  #app .room-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  #app .rm { min-height: 148px; padding: 14px; border-radius: 12px; }
+  #app .rm-head { margin-bottom: 9px; }
+  #app .rm-name { font-size: .92rem; }
+  #app .rm-type { font-size: .72rem; }
+  #app .rm-ico { width: 32px; height: 32px; font-size: 14px; }
+  #app .rm-timer-row { gap: 9px; margin-bottom: 8px; }
+  #app .rm-timer-big { font-size: 1.12rem; }
+  #app .rm-timer-caption { font-size: .68rem; }
+  #app .rm-foot { padding-top: 7px; }
+  #app .rm-foot-info,
+  #app .rm-foot-price { font-size: .76rem; }
+  #app .rm-payment-summary { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 7px; color: var(--muted); font-size: .68rem; }
+  #app .rm-quick-actions { gap: 6px; margin-top: 8px; }
+  #app .rm-quick-actions .rm-btn { min-height: 40px; padding: 7px 8px; }
+  #app .monitor-report-summary > div,
+  #app .login-history-summary > div { padding: 10px 12px; }
+  #app .monitor-report-summary strong,
+  #app .login-history-summary strong { font-size: 1.05rem; }
+  #app .announcement-row { padding: 10px 12px; }
+  #app .profile-hero { padding: 14px; }
+}
+
+@media (max-width: 640px) {
+  .public-site .bk-stepper { padding: 9px 18px 12px; }
+  .public-site .bk-stepper-steps { display: none; }
+  .public-site .bk-stepper-status { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+  .public-site .bk-stepper-status span { color: var(--text-muted-light); font-size: .68rem; }
+  .public-site .bk-stepper-status strong { color: var(--text-main); font-size: .78rem; }
+  .public-site .bk-stepper-progress { display: block; height: 3px; margin-top: 7px; overflow: hidden; border-radius: 2px; background: var(--border); }
+  .public-site .bk-stepper-progress span { display: block; height: 100%; border-radius: inherit; background: var(--teal); transition: width .24s var(--ease-out); }
+  .public-site .bk-header h2 { font-size: 1.12rem; }
+  .public-site .bk-eyebrow { font-size: .62rem; }
+  .public-site .bk-room-option { border-radius: 12px; }
+  .public-site .bk-room-option-collapsed { padding: 9px; }
+  .public-site .bk-room-option-img { width: 68px; height: 68px; flex-basis: 68px; }
+  .public-site .bk-modal .bk-room-option-amenities-row > :nth-child(n + 3) { display: none; }
+  .public-site .bk-room-option-amenity { padding: 3px 6px; font-size: .64rem; }
+  .public-site .bk-review-overview .bk-review-section { padding: 10px 11px; }
+  .public-site .bk-review-cost { padding: 10px 11px; }
+  .public-site .bk-review-section-title { margin-bottom: 4px; }
+  .public-site .bk-payment-methods-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .public-site .bk-detail-actions { flex-direction: row; }
+  .public-site .bk-detail-actions .bk-back-btn { width: auto; flex: 0 0 84px; }
+  .public-site .bk-detail-actions .bk-continue { width: auto; flex: 1 1 auto; }
+
+  .public-site .pf-fields { grid-template-columns: 1fr; }
+  .public-site .pf-modal-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .public-site .pf-history-summary { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .public-site .pf-summary-card:last-child { grid-column: auto; }
+  .public-site .pf-summary-card { padding: 9px 5px; }
+  .public-site .pf-summary-num { font-size: 1rem; }
+  .public-site .pf-summary-label { font-size: .63rem; }
+  .public-site .pf-booking-row { padding: 10px; }
+  .public-site .facility-detail-variant-head { min-height: 58px; padding: 9px 11px; }
+  .public-site .facility-detail-variant-body { padding: 0 11px 11px; }
+  .public-site .facility-detail-best {
+    max-width: 112px;
+    overflow-wrap: anywhere;
+    white-space: normal;
+    text-align: center;
+    line-height: 1.2;
+  }
+
+  /* Mobile property cards use the compact list pattern common in booking apps. */
+  .public-site .rooms-grid { gap: 10px; }
+  .public-site .room-card {
+    display: grid;
+    grid-template-columns: 108px minmax(0, 1fr);
+    min-height: 178px;
+    border-radius: 14px;
+  }
+  .public-site .room-card-img { height: 100%; min-height: 178px; aspect-ratio: auto; }
+  .public-site .room-card-body { padding: 11px; gap: 5px; }
+  .public-site .room-card-body h3 { font-size: 1rem; }
+  .public-site .room-card-body .price-amt { font-size: .78rem; }
+  .public-site .room-card-tags { gap: 4px; }
+  .public-site .room-tag { padding: 2px 6px; font-size: .62rem; }
+  .public-site .room-card-desc { display: -webkit-box; overflow: hidden; font-size: .72rem; line-height: 1.4; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+  .public-site .room-card-actions { grid-template-columns: .85fr 1.15fr; gap: 6px; }
+  .public-site .room-card-actions :is(button, a) { min-height: 44px; padding-inline: 5px; font-size: .72rem; }
+  .public-site .room-card-status { top: 7px; left: 7px; padding: 3px 7px; font-size: .6rem; }
+}
+
+@media (max-width: 640px) {
+  .public-site { --section-space: 36px; }
+  .public-site :is(.how-it-works, .why-book, .spaces, #about) { padding: 34px 16px; }
+  .public-site .steps-grid,
+  .public-site .why-book-grid { grid-template-columns: 1fr; gap: 8px; }
+  .public-site .step-card,
+  .public-site .why-book-card {
+    display: grid;
+    grid-template-columns: 34px minmax(0, 1fr);
+    align-items: center;
+    gap: 2px 11px;
+    min-height: 72px;
+    padding: 10px 12px;
+    text-align: left;
+  }
+  .public-site .step-card .step-num { position: static; grid-row: 1 / 3; width: 32px; height: 32px; transform: none; }
+  .public-site .step-card-icon { display: none; }
+  .public-site .why-book-card-icon { grid-row: 1 / 3; width: 34px; height: 34px; margin: 0; }
+  .public-site :is(.step-card, .why-book-card) :is(h4, p) { grid-column: 2; margin: 0; }
+  .public-site :is(.step-card, .why-book-card) p { font-size: .73rem; line-height: 1.42; }
+  .public-site .about-inner { gap: 20px; }
+  .public-site .about-left h2 { margin-bottom: 10px; }
+  .public-site .about-left p { font-size: .82rem; line-height: 1.6; }
+  .public-site .about-right { gap: 8px; }
+  .public-site .about-card { min-height: 112px; padding: 11px; }
+  .public-site .about-card-icon { width: 34px; height: 34px; margin-bottom: 7px; }
+  .public-site .about-card p { font-size: .7rem; line-height: 1.4; }
+  .public-site .space-row { gap: 12px; }
+  .public-site .facility-motion { min-height: 230px; }
+  .public-site .facility-motion-stage { transform: scale(.7); }
+
+  .public-site .bk-modal,
+  .public-site .bk-modal--compact,
+  .public-site .pf-modal,
+  .public-site .modal-box,
+  .public-site .modal-box.modal-xl { max-height: calc(100dvh - 16px); border-radius: 16px; }
+  .public-site .bk-header { padding: 12px 56px 10px 14px; }
+  .public-site .bk-close { top: 9px; right: 10px; }
+  .public-site .bk-stepper { padding-inline: 14px; }
+  .public-site .bk-body { padding: 12px 14px 82px; }
+  .public-site .bk-summary-toggle { margin: 8px 14px 0; padding: 9px 11px; }
+  .public-site .bk-summary-panel-mobile { margin: 8px 14px 0; }
+  .public-site .bk-detail-actions { bottom: -82px; margin: 16px -14px -82px; padding-inline: 14px; }
+  .public-site .pf-modal { padding: 14px; }
+  .public-site .pf-modal-title { font-size: 1.18rem; }
+  .public-site .pf-modal-subtitle { font-size: .74rem; }
+  .public-site .pf-avatar { width: 58px; height: 58px; }
+  .public-site .pf-field { margin-bottom: 11px; }
+  .public-site .facility-detail-actions { margin-inline: -14px; margin-bottom: -14px; padding-inline: 14px; }
+
+  #app .content { padding-inline: 10px; gap: 12px; }
+  #app .panel.active { gap: 12px; }
+  #app .card { padding: 12px; }
+  #app .metric-row { gap: 6px; }
+  #app .mc { min-height: 82px; padding: 10px; }
+  #app .mc-label { font-size: .63rem; line-height: 1.25; }
+  #app .mc-val { font-size: 1.12rem; }
+  #app .mc-sub { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+  #app .card-head { margin-bottom: 10px; }
+  #app .modal-box,
+  #app .modal-box.modal-lg,
+  #app .modal-box.modal-xl,
+  #app .modal-box.modal-2xl { padding: 16px; }
+  #app .modal-heading { margin-bottom: 12px; }
+  #app .modal-title { font-size: 1.02rem; }
+  #app .modal-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; margin-top: 14px; padding-top: 12px; }
+  #app .monitor-section-tabs { gap: 6px; }
+  #app .monitor-section-tabs button { min-height: 48px; padding: 7px 9px; column-gap: 7px; }
+  #app .monitor-section-tabs button small { display: none; }
+  #app .rm-toolbar-head { padding: 11px 12px; }
+  #app .rm-page-sub { font-size: .68rem; }
+  #app .rm-toolbar-actions { gap: 7px; }
+  #app .fac-toolbar { padding: 9px; gap: 8px; }
+  #app .fac-chips { flex-wrap: nowrap; overflow-x: auto; }
+  #app .fac-chip { min-height: 40px; padding-inline: 11px; white-space: nowrap; }
+  #app .room-grid { grid-template-columns: 1fr; gap: 9px; }
+  #app .rm { min-height: 136px; padding: 12px; }
+  #app .rm-empty { flex-direction: row; padding: 10px 0; }
+  #app .rm-empty i { font-size: 20px; }
+  #app .rm-status-pill,
+  #app .pay-timing-tag { padding: 3px 7px; font-size: .65rem; }
+  #app .rm-quick-actions { flex-wrap: nowrap; }
+  #app .rm-quick-actions > .rm-btn { min-width: 0; min-height: 44px; flex: 1 1 0; }
+  #app .rm-quick-actions > .rm-btn--icon { width: 44px; flex: 0 0 44px; padding-inline: 0; }
+  #app .rm-stats-bar { gap: 1px; }
+  #app .rm-stat { min-height: 66px; padding: 8px 10px; }
+  #app .rm-stat-value { font-size: 1.05rem; }
+  #app .monitor-report-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  #app .monitor-report-summary > div { min-height: 70px; padding: 9px 10px; }
+  #app .monitor-report-summary strong { font-size: .98rem; }
+  #app .monitor-report-summary small { line-height: 1.3; }
+
+  #app .set-tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; overflow: visible; }
+  #app .set-tab { display: flex; min-width: 0; min-height: 52px; justify-content: center; gap: 5px; padding: 7px 4px; text-align: center; }
+  #app .set-tab > svg { width: 15px; flex: 0 0 auto; }
+  #app .set-tab span { display: block; }
+  #app .set-tab strong { font-size: .65rem; line-height: 1.2; }
+  #app .set-tab small { display: none; }
+  #app .settings-intro,
+  #app .login-history-intro { padding: 11px 12px; }
+  #app :is(.settings-intro, .login-history-intro) h2 { font-size: .92rem; }
+  #app :is(.settings-intro, .login-history-intro) p { font-size: .68rem; line-height: 1.4; }
+  #app .sched-2col,
+  #app .admin-profile-fields { grid-template-columns: 1fr; gap: 0; }
+  #app .day-row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; }
+  #app .day-pill { min-width: 0; min-height: 44px; padding-inline: 4px; }
+  #app .holiday-item { padding: 9px 10px; }
+  #app .announcement-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 8px; }
+  #app .announcement-actions { grid-column: 2 / 4; justify-content: flex-end; }
+  #app .profile-hero { gap: 10px; padding: 11px; }
+  #app .profile-av { width: 48px; height: 48px; }
+  #app .profile-meta { gap: 6px 10px; }
+  #app .admin-settings-disclosure > summary { min-height: 52px; padding: 10px 12px; }
+  #app .admin-settings-disclosure-body { padding: 12px; }
+
+  #app .login-history-tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+  #app .login-history-tabs button { min-height: 48px; padding: 7px 9px; }
+  #app .login-history-tabs button small { display: none; }
+  #app .login-history-summary { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  #app .login-history-summary > div { padding: 8px 6px; }
+  #app .login-history-summary span { font-size: .6rem; line-height: 1.25; }
+  #app .login-history-summary strong { font-size: .95rem; }
+  #app .login-history-filters { gap: 7px; margin-bottom: 10px; }
+  #app .login-history-card .table-wrap { margin-inline: -12px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .public-site .bk-stepper-progress span,
+  .public-site .pf-disclosure > summary i,
+  .public-site .facility-detail-chevron,
+  #app .admin-settings-disclosure > summary i { transition-duration: .01ms; }
+}
