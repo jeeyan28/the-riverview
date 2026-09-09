@@ -23,6 +23,20 @@ const { normalizeName, validateName } = require("../utils/nameValidation");
 const { isAdminRole, getEffectivePermissions, roleLabel } = require("../utils/permissions");
 const { isPasswordStrongEnough, PASSWORD_POLICY_MESSAGE } = require("../utils/passwordPolicy");
 const { GUEST_EMAIL_DOMAIN } = require("../utils/constants");
+const { validate } = require("../middleware/validate");
+const {
+  registerSchema,
+  emailSchema,
+  emailOtpSchema,
+  otpSchema,
+  guestSchema,
+  guestRecoveryLoginSchema,
+  claimEmailStartSchema,
+  googleCodeSchema,
+  loginSchema,
+  resetPasswordSchema,
+  emptyBodySchema,
+} = require("../validation/authSchemas");
 
 const DUMMY_HASH = "$2b$10$CwTycUXWue0Thq9StjUM0uJ8i8U6vJXd8yGdIeYbFqOZ2P0zqhkbG";
 
@@ -71,7 +85,7 @@ async function logLoginAttempt(req, { user, email, status, reason = "", method =
   }
 }
 
-router.post("/register", registerOtpLimiter, async (req, res) => {
+router.post("/register", registerOtpLimiter, validate(registerSchema), async (req, res) => {
   try {
     const { password } = req.body;
     const emailRaw = String(req.body.email || "").trim();
@@ -160,7 +174,7 @@ router.post("/register", registerOtpLimiter, async (req, res) => {
   }
 });
 
-router.post("/register/resend-otp", registerOtpLimiter, async (req, res) => {
+router.post("/register/resend-otp", registerOtpLimiter, validate(emailSchema), async (req, res) => {
   try {
     const { email } = req.body;
     if (!email) {
@@ -210,7 +224,7 @@ router.post("/register/resend-otp", registerOtpLimiter, async (req, res) => {
   }
 });
 
-router.post("/register/verify-otp", registerOtpLimiter, async (req, res) => {
+router.post("/register/verify-otp", registerOtpLimiter, validate(emailOtpSchema), async (req, res) => {
   try {
     const { email, otp } = req.body;
     if (!email || !otp) {
@@ -270,7 +284,7 @@ router.post("/register/verify-otp", registerOtpLimiter, async (req, res) => {
   }
 });
 
-router.post("/resend-verification", registerOtpLimiter, async (req, res) => {
+router.post("/resend-verification", registerOtpLimiter, validate(emailSchema), async (req, res) => {
   try {
     const { email } = req.body;
     if (!email) return res.status(400).json({ message: "Email is required." });
@@ -321,7 +335,7 @@ router.post("/resend-verification", registerOtpLimiter, async (req, res) => {
   }
 });
 
-router.post("/verify-account-otp", registerOtpLimiter, async (req, res) => {
+router.post("/verify-account-otp", registerOtpLimiter, validate(emailOtpSchema), async (req, res) => {
   try {
     const { email, otp } = req.body;
     if (!email || !otp) {
@@ -370,7 +384,7 @@ router.post("/verify-account-otp", registerOtpLimiter, async (req, res) => {
   }
 });
 
-router.post("/guest", guestCreationLimiter, async (req, res) => {
+router.post("/guest", guestCreationLimiter, validate(guestSchema), async (req, res) => {
   try {
     const firstNameError = validateName(req.body.firstName, "First name");
     const lastNameError = validateName(req.body.lastName, "Last name");
@@ -409,7 +423,7 @@ router.post("/guest", guestCreationLimiter, async (req, res) => {
 // temp email/password an admin relayed to the customer. This is the only
 // place a soft-deleted guest is considered restored — issuing the temp
 // credentials (the admin side) does not clear guestDeletedAt on its own.
-router.post("/guest-recovery-login", guestRecoveryLoginLimiter, async (req, res) => {
+router.post("/guest-recovery-login", guestRecoveryLoginLimiter, validate(guestRecoveryLoginSchema), async (req, res) => {
   try {
     const { tempEmail, tempPassword } = req.body;
     if (!tempEmail || !tempPassword) {
@@ -462,7 +476,7 @@ function requireGuest(req, res, next) {
   next();
 }
 
-router.post("/guest/claim/email/start", registerOtpLimiter, ensureAuthenticated, requireGuest, async (req, res) => {
+router.post("/guest/claim/email/start", registerOtpLimiter, ensureAuthenticated, requireGuest, validate(claimEmailStartSchema), async (req, res) => {
   try {
     const { password } = req.body;
     const emailRaw = String(req.body.email || "").trim();
@@ -521,7 +535,7 @@ router.post("/guest/claim/email/start", registerOtpLimiter, ensureAuthenticated,
   }
 });
 
-router.post("/guest/claim/email/resend-otp", registerOtpLimiter, ensureAuthenticated, requireGuest, async (req, res) => {
+router.post("/guest/claim/email/resend-otp", registerOtpLimiter, ensureAuthenticated, requireGuest, validate(emptyBodySchema), async (req, res) => {
   try {
     const user = await User.findById(req.user._id).select(
       "+pendingClaimEmail +verifyOtpExpires +otpWindowStart +otpResendCount"
@@ -569,7 +583,7 @@ router.post("/guest/claim/email/resend-otp", registerOtpLimiter, ensureAuthentic
   }
 });
 
-router.post("/guest/claim/email/verify-otp", registerOtpLimiter, ensureAuthenticated, requireGuest, async (req, res) => {
+router.post("/guest/claim/email/verify-otp", registerOtpLimiter, ensureAuthenticated, requireGuest, validate(otpSchema), async (req, res) => {
   try {
     const { otp } = req.body;
     if (!otp) {
@@ -633,7 +647,7 @@ router.post("/guest/claim/email/verify-otp", registerOtpLimiter, ensureAuthentic
   }
 });
 
-router.post("/guest/claim/google", ensureAuthenticated, requireGuest, async (req, res) => {
+router.post("/guest/claim/google", ensureAuthenticated, requireGuest, validate(googleCodeSchema), async (req, res) => {
   try {
     const { code } = req.body;
     if (!code) return res.status(400).json({ message: "Missing Google credential." });
@@ -668,7 +682,7 @@ router.post("/guest/claim/google", ensureAuthenticated, requireGuest, async (req
   }
 });
 
-router.post("/login", loginLimiter, async (req, res) => {
+router.post("/login", loginLimiter, validate(loginSchema), async (req, res) => {
   try {
     const { email, password } = req.body;
 
@@ -727,7 +741,7 @@ router.post("/login", loginLimiter, async (req, res) => {
   }
 });
 
-router.post("/google", async (req, res) => {
+router.post("/google", validate(googleCodeSchema), async (req, res) => {
   try {
     const { code } = req.body;
     if (!code) return res.status(400).json({ message: "Missing Google credential." });
@@ -778,7 +792,7 @@ router.post("/google", async (req, res) => {
   }
 });
 
-router.post("/forgot-password", forgotPasswordLimiter, async (req, res) => {
+router.post("/forgot-password", forgotPasswordLimiter, validate(emailSchema), async (req, res) => {
   const { email } = req.body;
   if (!email) return res.status(400).json({ message: "Email is required." });
 
@@ -803,7 +817,7 @@ router.post("/forgot-password", forgotPasswordLimiter, async (req, res) => {
   res.json(generic);
 });
 
-router.post("/verify-otp", forgotPasswordLimiter, async (req, res) => {
+router.post("/verify-otp", forgotPasswordLimiter, validate(emailOtpSchema), async (req, res) => {
   const { email, otp } = req.body;
   if (!email || !otp) {
     return res.status(400).json({ message: "Email and code are required." });
@@ -849,7 +863,7 @@ router.post("/verify-otp", forgotPasswordLimiter, async (req, res) => {
   res.json({ message: "Code verified.", resetSessionToken: rawSessionToken });
 });
 
-router.post("/reset-password", forgotPasswordLimiter, async (req, res) => {
+router.post("/reset-password", forgotPasswordLimiter, validate(resetPasswordSchema), async (req, res) => {
   const { resetSessionToken, password } = req.body;
 
   if (!resetSessionToken || !password) {
@@ -886,7 +900,7 @@ router.post("/reset-password", forgotPasswordLimiter, async (req, res) => {
 router.get("/me", ensureAuthenticated, async (req, res) => {
   res.json({ user: sanitizeUser(req.user) });
 });
-router.post("/logout", async (req, res) => {
+router.post("/logout", validate(emptyBodySchema), async (req, res) => {
   try {
     if (req.session && req.session.userId) {
       const user = await User.findById(req.session.userId);

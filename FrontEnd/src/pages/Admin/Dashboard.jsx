@@ -1,4 +1,5 @@
 import '../../styles/admin/dashboard.css';
+import '../../styles/admin/finance.css';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import DataTable from '../../components/DataTable';
@@ -6,7 +7,7 @@ import { dashboardService } from '../../services/dashboard';
 import { monitorRoomsService, roomSessionsService } from '../../services/monitoring';
 import { bookingsService } from '../../services/bookings';
 import { formatPeso } from '../../utils/currency';
-import { dateKey } from '../../utils/rooms';
+import { businessDate } from '../../utils/businessDate';
 import { buildRoomView, formatTimeRemaining } from '../../hooks/useRoomMonitorData';
 
 const STATUS_PILL_CLASS = {
@@ -18,6 +19,7 @@ const STATUS_PILL_CLASS = {
   'Pending Payment Verification': 'pill-pending',
   Confirmed: 'pill-active',
   Rejected: 'pill-overdue',
+  'No Show': 'pill-overdue',
 };
 
 const ROOM_STATUS_PILL_CLASS = {
@@ -98,7 +100,7 @@ function Dashboard() {
     if (!silent) setBookingsLoading(true);
     if (!silent) setBookingsError(false);
     try {
-      const today = dateKey(new Date().getFullYear(), new Date().getMonth(), new Date().getDate());
+      const today = businessDate();
       const data = await bookingsService.list({ date: today });
       if (unmountedRef.current) return;
       setRecentBookings(Array.isArray(data) ? data : []);
@@ -165,6 +167,7 @@ function Dashboard() {
   const bookingsDelta = summary?.todayBookings?.deltaVsYesterday ?? 0;
   const revenuePercent = summary?.todayRevenue?.percentVsAvg ?? 0;
   const overdueCount = summary?.overdueRooms?.count ?? 0;
+  const financial = summary?.financial;
 
   const roomViews = rooms
     .map((r) => ({ room: r, view: buildRoomView(r, sessions) }))
@@ -216,6 +219,30 @@ function Dashboard() {
           )}
         </div>
       </div>
+
+      <div className="finance-queue">
+        <button type="button" onClick={() => navigate('/admin/bookings?status=Pending')}>
+          <span><strong>{summaryLoading ? '—' : summary?.pendingReservations ?? 0}</strong><br /><span className="finance-meta">Reservations needing review</span></span>
+          <i className="ti ti-chevron-right" aria-hidden="true" />
+        </button>
+        <button type="button" onClick={() => navigate('/admin/bookings?cancellationStatus=Requested')}>
+          <span><strong>{summaryLoading ? '—' : summary?.cancellationRequests ?? 0}</strong><br /><span className="finance-meta">Cancellation requests</span></span>
+          <i className="ti ti-chevron-right" aria-hidden="true" />
+        </button>
+        <button type="button" onClick={() => navigate('/admin/reports')}>
+          <span><strong>{summaryLoading ? '—' : formatPeso(financial?.outstanding)}</strong><br /><span className="finance-meta">Outstanding today</span></span>
+          <i className="ti ti-chevron-right" aria-hidden="true" />
+        </button>
+      </div>
+
+      {!summaryLoading && financial && (
+        <div className="finance-activity">
+          <span>Today collected: <strong>{formatPeso(financial.collected)}</strong></span>
+          <span>Charges: <strong>{formatPeso(financial.charged)}</strong></span>
+          <span>Refunded: <strong>{formatPeso(financial.refunded)}</strong></span>
+          <span>Unpaid sessions: <strong>{summary.unpaidSessions || 0}</strong></span>
+        </div>
+      )}
 
       <div className="dash-grid">
         <div className="card">

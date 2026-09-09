@@ -1,5 +1,20 @@
 import { useEffect, useRef, useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
+import {
+  BarChart3,
+  Building2,
+  CalendarDays,
+  FileBarChart,
+  History,
+  LayoutDashboard,
+  LogOut,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Settings,
+  TrendingUp,
+  Users,
+  X,
+} from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import logo from '../assets/logo/logoo.png';
 
@@ -11,41 +26,54 @@ const NAV_SECTIONS = [
   {
     label: 'Main',
     items: [
-      { to: '/admin/dashboard', icon: 'ti-layout-dashboard', label: 'Dashboard', roles: MANAGER_UP },
-      { to: '/admin/monitor', icon: 'ti-device-desktop-analytics', label: 'Room Monitor' },
-      { to: '/admin/bookings', icon: 'ti-calendar-event', label: 'Reservations' },
+      { to: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard', roles: MANAGER_UP },
+      { to: '/admin/monitor', icon: BarChart3, label: 'Live Monitor' },
+      { to: '/admin/bookings', icon: CalendarDays, label: 'Reservations' },
     ],
   },
   {
     label: 'Insights',
     items: [
-      { to: '/admin/analytics', icon: 'ti-chart-bar', label: 'Analytics', roles: MANAGER_UP },
-      { to: '/admin/reports', icon: 'ti-file-analytics', label: 'Reports', permission: 'reports:view' },
-      { to: '/admin/forecasting', icon: 'ti-trending-up', label: 'Forecasting', permission: 'forecasting:view' },
+      { to: '/admin/analytics', icon: BarChart3, label: 'Analytics', roles: MANAGER_UP },
+      { to: '/admin/reports', icon: FileBarChart, label: 'Reports', permission: 'reports:view' },
+      { to: '/admin/forecasting', icon: TrendingUp, label: 'Forecasting', permission: 'forecasting:view' },
     ],
   },
   {
     label: 'Admin',
     items: [
-      { to: '/admin/users', icon: 'ti-users-group', label: 'Manage Users', permission: 'admin:manage' },
-      { to: '/admin/logs', icon: 'ti-lock-access', label: 'Login History', roles: MANAGER_UP },
-      { to: '/admin/room-management', icon: 'ti-building', label: 'Room Management', permission: 'room:manage' },
-      { to: '/admin/settings', icon: 'ti-settings', label: 'Settings', permission: 'settings:view' },
+      { to: '/admin/users', icon: Users, label: 'Team & Users', permission: 'admin:manage' },
+      { to: '/admin/logs', icon: History, label: 'Login History', roles: MANAGER_UP },
+      { to: '/admin/room-management', icon: Building2, label: 'Facilities', permission: 'room:manage' },
+      { to: '/admin/settings', icon: Settings, label: 'Settings', permission: 'settings:view' },
     ],
   },
 ];
 
 export const PAGE_TITLES = {
   dashboard: 'Dashboard',
-  monitor: 'Room Monitor',
+  monitor: 'Live Monitor',
   bookings: 'Reservations',
   analytics: 'Analytics',
   reports: 'Reports',
   forecasting: 'Forecasting',
-  users: 'Manage Users',
+  users: 'Team & Users',
   logs: 'Login History',
-  'room-management': 'Room Management',
+  'room-management': 'Facilities',
   settings: 'Settings',
+};
+
+export const PAGE_CONTEXT = {
+  dashboard: 'Business overview',
+  monitor: 'Live operations',
+  bookings: 'Booking operations',
+  analytics: 'Performance insights',
+  reports: 'Financial records',
+  forecasting: 'Revenue planning',
+  users: 'Access management',
+  logs: 'Security activity',
+  'room-management': 'Inventory & pricing',
+  settings: 'Business configuration',
 };
 
 function fullName(user) {
@@ -99,6 +127,7 @@ function AdminSidebar({ compact = false, mobileOpen = false, onClose, triggerRef
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     closeButtonRef.current?.focus();
+    const focusFrame = requestAnimationFrame(() => closeButtonRef.current?.focus());
 
     function handleKeyDown(event) {
       if (event.key === 'Escape') {
@@ -121,6 +150,7 @@ function AdminSidebar({ compact = false, mobileOpen = false, onClose, triggerRef
 
     document.addEventListener('keydown', handleKeyDown);
     return () => {
+      cancelAnimationFrame(focusFrame);
       document.body.style.overflow = previousOverflow;
       document.removeEventListener('keydown', handleKeyDown);
       triggerRef?.current?.focus();
@@ -152,7 +182,7 @@ function AdminSidebar({ compact = false, mobileOpen = false, onClose, triggerRef
         aria-expanded={!collapsed}
         aria-controls="admin-sidebar-navigation"
       >
-        <i className={`ti ${collapsed ? 'ti-chevron-right' : 'ti-chevron-left'}`}></i>
+        {collapsed ? <PanelLeftOpen size={15} aria-hidden="true" /> : <PanelLeftClose size={15} aria-hidden="true" />}
       </button>
 
       <button
@@ -162,7 +192,7 @@ function AdminSidebar({ compact = false, mobileOpen = false, onClose, triggerRef
         onClick={onClose}
         aria-label="Close navigation menu"
       >
-        <i className="ti ti-x" aria-hidden="true"></i>
+        <X size={18} aria-hidden="true" />
       </button>
 
       <div className="sb-brand">
@@ -202,7 +232,7 @@ function AdminSidebar({ compact = false, mobileOpen = false, onClose, triggerRef
                   aria-label={item.label}
                   onClick={compact ? onClose : undefined}
                 >
-                  <i className={`ti ${item.icon}`} aria-hidden="true"></i>
+                  <item.icon size={18} aria-hidden="true" />
                   {!isCollapsed && item.label}
                 </NavLink>
               ))}
@@ -230,7 +260,7 @@ function AdminSidebar({ compact = false, mobileOpen = false, onClose, triggerRef
             title="Logout"
             aria-label="Log out"
           >
-            <i className="ti ti-logout" aria-hidden="true"></i>
+            <LogOut size={18} aria-hidden="true" />
           </button>
         </div>
       </div>

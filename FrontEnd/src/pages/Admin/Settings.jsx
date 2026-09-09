@@ -8,17 +8,18 @@ import { settingsService } from '../../services/settings';
 import { auditLogService } from '../../services/auditLog';
 import { usersService } from '../../services/users';
 import { PASSWORD_REQUIREMENTS } from '../../utils/password';
+import { BellRing, ScrollText, Settings2, UserRound } from 'lucide-react';
 
 
 const SETTINGS_TABS = [
-  { key: 'profile', label: 'Profile' },
-  { key: 'announcements', label: 'Announcements' },
-  { key: 'audit', label: 'Audit Log' },
+  { key: 'announcements', label: 'Venue & notices', description: 'Schedule, closures, announcements', icon: BellRing },
+  { key: 'profile', label: 'Admin account', description: 'Profile and password', icon: UserRound },
+  { key: 'audit', label: 'Change history', description: 'Administrative activity', icon: ScrollText },
 ];
 
 const SETTINGS_MANAGE_PERMISSION = 'settings:manage';
-const DEFAULT_OPEN_TIME = '06:00';
-const DEFAULT_CLOSE_TIME = '22:00';
+const DEFAULT_OPEN_TIME = '07:00';
+const DEFAULT_CLOSE_TIME = '00:00';
 const DEFAULT_ANNOUNCEMENT_EMOJI = '📣';
 
 function Settings() {
@@ -26,15 +27,19 @@ function Settings() {
 
   return (
     <div className="panel active" id="panel-settings">
+      <div className="settings-intro"><div><h2>System settings</h2><p>Manage the customer-facing schedule, venue notices, and your administrative account.</p></div><Settings2 size={23} aria-hidden="true" /></div>
       <div className="set-layout">
-        <div className="set-tabs">
+        <div className="set-tabs" role="tablist" aria-label="Settings sections">
           {SETTINGS_TABS.map((tab) => (
             <button
               key={tab.key}
+              type="button"
+              role="tab"
+              aria-selected={activeTab === tab.key}
               className={`set-tab${activeTab === tab.key ? ' active' : ''}`}
               onClick={() => setActiveTab(tab.key)}
             >
-              {tab.label}
+              <tab.icon size={17} aria-hidden="true" /><span><strong>{tab.label}</strong><small>{tab.description}</small></span>
             </button>
           ))}
         </div>
@@ -73,7 +78,7 @@ const DAY_PILLS = [
   { day: 0, label: 'Sun' },
 ];
 
-const DEFAULT_OPEN_DAYS_BEFORE_LOAD = [1, 2, 3, 4, 5, 6];
+const DEFAULT_OPEN_DAYS_BEFORE_LOAD = [0, 1, 2, 3, 4, 5, 6];
 
 function formatHolidayDate(dateStr) {
   return new Date(dateStr + 'T00:00:00').toLocaleDateString(undefined, {
@@ -94,6 +99,9 @@ function OperatingScheduleAndHolidays() {
 
   const [saveState, setSaveState] = useState('idle');
   const [addingHoliday, setAddingHoliday] = useState(false);
+  const [holidayModalOpen, setHolidayModalOpen] = useState(false);
+  const [holidayDraft, setHolidayDraft] = useState({ name: '', date: '' });
+  const [holidayError, setHolidayError] = useState('');
 
   const fetchSettings = useCallback(async () => {
     try {
@@ -131,21 +139,29 @@ function OperatingScheduleAndHolidays() {
     }
   }
 
-  async function handleAddHoliday() {
+  function handleAddHoliday() {
     if (!guardPermission(SETTINGS_MANAGE_PERMISSION, "You don't have permission to add holidays.")) return;
-    const name = window.prompt('Holiday / closure name (e.g. "Christmas Day"):');
-    if (!name) return;
-    const date = window.prompt('Date (YYYY-MM-DD):');
-    if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-      alert('Please enter the date as YYYY-MM-DD.');
+    setHolidayDraft({ name: '', date: '' });
+    setHolidayError('');
+    setHolidayModalOpen(true);
+  }
+
+  async function saveHoliday(event) {
+    event.preventDefault();
+    const name = holidayDraft.name.trim();
+    const date = holidayDraft.date;
+    if (!name || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      setHolidayError('Enter a closure name and date.');
       return;
     }
     setAddingHoliday(true);
+    setHolidayError('');
     try {
       await settingsService.addHoliday({ name, date, fullDay: true });
       await fetchSettings();
+      setHolidayModalOpen(false);
     } catch (err) {
-      alert(err.message);
+      setHolidayError(err.message || 'Could not add this closure date.');
     } finally {
       setAddingHoliday(false);
     }
@@ -254,6 +270,16 @@ function OperatingScheduleAndHolidays() {
           )}
         </div>
       </div>
+
+      <Modal open={holidayModalOpen} onClose={() => !addingHoliday && setHolidayModalOpen(false)} title="Add closure date">
+        <form className="settings-modal-form" onSubmit={saveHoliday}>
+          <p className="settings-modal-copy">This date will be blocked in the customer reservation calendar and shown as a venue closure.</p>
+          <div className="mfield"><label htmlFor="holiday-name">Closure name</label><input id="holiday-name" type="text" maxLength="100" value={holidayDraft.name} onChange={(event) => setHolidayDraft((draft) => ({ ...draft, name: event.target.value }))} placeholder="e.g. Christmas Day" autoFocus /></div>
+          <div className="mfield"><label htmlFor="holiday-date">Date</label><input id="holiday-date" type="date" value={holidayDraft.date} onChange={(event) => setHolidayDraft((draft) => ({ ...draft, date: event.target.value }))} /></div>
+          {holidayError && <p className="settings-form-error" role="alert">{holidayError}</p>}
+          <div className="modal-actions"><button type="button" className="btn-cancel" onClick={() => setHolidayModalOpen(false)} disabled={addingHoliday}>Cancel</button><button type="submit" className="btn-confirm" disabled={addingHoliday}>{addingHoliday ? 'Adding…' : 'Add closure'}</button></div>
+        </form>
+      </Modal>
     </>
   );
 }
@@ -520,19 +546,12 @@ function initialsOf(admin) {
   return displayName(admin).charAt(0).toUpperCase();
 }
 
-const PROFILE_METRICS = [
-  { label: 'Total Logins', value: '142' },
-  { label: 'Reservations Managed', value: '388' },
-  { label: 'Reports Generated', value: '27' },
-  { label: 'Account Created', value: 'Jan 2026' },
-];
-
 function ProfileTab() {
   const { user: admin, updateUser } = useAuth();
 
   const [firstName, setFirstName] = useState(admin?.firstName || '');
   const [lastName, setLastName] = useState(admin?.lastName || '');
-  const [email, setEmail] = useState(admin?.email || '');
+  const email = admin?.email || '';
   const [phone, setPhone] = useState(admin?.phone || '');
   const [savingDetails, setSavingDetails] = useState(false);
 
@@ -602,35 +621,26 @@ function ProfileTab() {
         </div>
       </div>
 
-      <div className="metric-row">
-        {PROFILE_METRICS.map((m) => (
-          <div className="mc" key={m.label}>
-            <div className="mc-label">{m.label}</div>
-            <div className="mc-val" style={m.label === 'Account Created' ? { fontSize: '1rem' } : undefined}>
-              {m.value}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <div className="p2col">
+      <div className="admin-profile-settings">
         <div className="card">
           <div className="card-head"><span className="card-title">Personal information</span></div>
-          <div className="pfield">
-            <label>First name</label>
-            <input type="text" id="profile-firstname-input" value={firstName} onChange={(e) => setFirstName(e.target.value)} />
-          </div>
-          <div className="pfield">
-            <label>Last name</label>
-            <input type="text" id="profile-lastname-input" value={lastName} onChange={(e) => setLastName(e.target.value)} />
-          </div>
-          <div className="pfield">
-            <label>Email address</label>
-            <input type="email" id="profile-email" value={email} onChange={(e) => setEmail(e.target.value)} />
-          </div>
-          <div className="pfield">
-            <label>Phone number</label>
-            <input type="tel" id="profile-phone" value={phone} onChange={(e) => setPhone(e.target.value)} />
+          <div className="admin-profile-fields">
+            <div className="pfield">
+              <label>First name</label>
+              <input type="text" id="profile-firstname-input" value={firstName} onChange={(e) => setFirstName(e.target.value)} />
+            </div>
+            <div className="pfield">
+              <label>Last name</label>
+              <input type="text" id="profile-lastname-input" value={lastName} onChange={(e) => setLastName(e.target.value)} />
+            </div>
+            <div className="pfield">
+              <label>Email address</label>
+              <input type="email" id="profile-email" value={email} readOnly disabled />
+            </div>
+            <div className="pfield">
+              <label>Phone number</label>
+              <input type="tel" id="profile-phone" value={phone} onChange={(e) => setPhone(e.target.value)} />
+            </div>
           </div>
           <button
             className="save-btn"
@@ -643,54 +653,57 @@ function ProfileTab() {
             {savingDetails ? 'Saving…' : 'Save changes'}
           </button>
         </div>
-        <div className="card">
-          <div className="card-head"><span className="card-title">Change password</span></div>
-          <div className="pfield">
-            <label>Current password</label>
-            <PasswordInput
-              id="profile-current-password"
-              name="currentPassword"
-              placeholder="Enter current password"
-              autoComplete="current-password"
-              value={currentPassword}
-              onChange={(e) => setCurrentPassword(e.target.value)}
-            />
-          </div>
-          <div className="pfield">
-            <label>New password</label>
-            <PasswordInput
-              id="profile-new-password"
-              name="newPassword"
-              placeholder="New password"
-              autoComplete="new-password"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
+        <details className="card admin-settings-disclosure">
+          <summary><span><strong>Change password</strong><small>Keep this closed unless you need new sign-in credentials.</small></span><i className="ti ti-chevron-down" aria-hidden="true"></i></summary>
+          <div className="admin-settings-disclosure-body">
+            <div className="pfield">
+              <label>Current password</label>
+              <PasswordInput
+                id="profile-current-password"
+                name="currentPassword"
+                placeholder="Enter current password"
+                autoComplete="current-password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+              />
+            </div>
+            <div className="admin-profile-fields">
+              <div className="pfield">
+                <label>New password</label>
+                <PasswordInput
+                  id="profile-new-password"
+                  name="newPassword"
+                  placeholder="New password"
+                  autoComplete="new-password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                >
+                  <PasswordRequirementsList password={newPassword} />
+                </PasswordInput>
+              </div>
+              <div className="pfield">
+                <label>Confirm new password</label>
+                <PasswordInput
+                  id="profile-confirm-password"
+                  name="confirmPassword"
+                  placeholder="Confirm password"
+                  autoComplete="new-password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                />
+              </div>
+            </div>
+            <button
+              className="save-btn"
+              id="profile-save-password-btn"
+              type="button"
+              disabled={savingPassword}
+              onClick={handleSavePassword}
             >
-              <PasswordRequirementsList password={newPassword} />
-            </PasswordInput>
+              {savingPassword ? 'Updating…' : 'Update password'}
+            </button>
           </div>
-          <div className="pfield">
-            <label>Confirm new password</label>
-            <PasswordInput
-              id="profile-confirm-password"
-              name="confirmPassword"
-              placeholder="Confirm password"
-              autoComplete="new-password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-            />
-          </div>
-          <button
-            className="save-btn"
-            id="profile-save-password-btn"
-            style={{ marginTop: 6 }}
-            type="button"
-            disabled={savingPassword}
-            onClick={handleSavePassword}
-          >
-            {savingPassword ? 'Updating…' : 'Update password'}
-          </button>
-        </div>
+        </details>
       </div>
     </>
   );

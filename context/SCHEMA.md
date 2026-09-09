@@ -1,13 +1,17 @@
 # SCHEMA.md — The Riverview
 
-Documents the actual MongoDB/Mongoose schema as it exists in `BackEnd/model/`. This is reverse-engineered from code, not designed fresh — so it's a source of truth for what *is*, plus flags on where it disagrees with PRD.md.
+Documents the actual MongoDB/Mongoose schema as it exists in `BackEnd/model/`. This is reverse-engineered from code, not designed fresh — so it is the source of truth for persisted fields and their operational decisions.
 
-## ⚠️ Known Discrepancies — Decided, Pending Code Update
+## ✅ Resolved implementation decisions
 
-These are resolved decisions, not open questions. Code has not been changed yet — flagging here so nothing "fixes" them back to the old values by accident, and so whoever picks this up (including a future Codex session) knows what to change.
+The implementation now enforces the context decisions that affect booking, monitoring, and finance. Keep this section aligned with the models and route guards when changing the system.
 
-1. **Reschedule cutoff:** `booking.js` currently hardcodes `RESCHEDULE_CUTOFF_HOURS = 1`. **Decision: change to 3**, to match PRD.md. → `BackEnd/model/booking.js`
-2. **Operating hours vs. Court pricing:** `Settings.operatingHours` currently defaults to `06:00–22:00`. **Decision: extend to cover midnight**, so the Court pricing tier (up to 12AM) is actually reachable through the booking flow. → `BackEnd/model/settings.js` (`operatingHoursSchema` default `closeTime`), and check the live Settings document in the DB too — the schema default only applies to *new* singleton creation, not an already-existing settings document.
+1. **Reschedule cutoff:** `RESCHEDULE_CUTOFF_HOURS = 3` and `MAX_RESCHEDULES = 2` are enforced server-side.
+2. **Operating hours:** the default schedule is `07:00–00:00` every day, and the Settings screen can update the singleton schedule. Existing deployments use the backed-up `align:prd:apply` migration to replace the legacy default.
+3. **Cancellation and no-show:** cancellation is requested, reviewed by an admin, and manually refunded when appropriate. A missed confirmed booking becomes `No Show` after its scheduled end and forfeits the downpayment.
+4. **Canonical finance:** linked booking and room-session records are folded into one ledger row; explicit payment and refund amounts drive collected and outstanding totals. Legacy `Paid` flags without an amount are review-only and are excluded from collected revenue.
+5. **Partial payment:** both bookings and room sessions support `Partial`. A verified online downpayment remains a recorded payment while the rest is payable at the venue.
+6. **Whole-hour operations:** booking mutations accept 1–5 whole hours; Live Monitor sessions and extensions accept 1–24 whole hours.
 
 ## 1. Entity Relationship Diagram
 
@@ -48,8 +52,12 @@ erDiagram
         string timeIn
         number duration
         number amount
-        string status
-        string paymentStatus
+        string status "Pending|Confirmed|Ongoing|Done|Overdue|Cancelled|No Show"
+        string paymentStatus "Unpaid|Partial|Paid|Rejected"
+        number paidAmount
+        number refundedAmount
+        string cancellationStatus "None|Requested|Approved|Rejected"
+        date noShowAt
         string source "online|walk-in"
         ObjectId bookedBy FK
         ObjectId reviewedBy FK
@@ -84,8 +92,11 @@ erDiagram
         string guestName
         date startTime
         number duration
-        string paymentStatus
-        string status "Active|Finished"
+        string paymentStatus "Unpaid|Partial|Paid"
+        string paymentTiming "Before|After"
+        number paidAmount
+        number refundedAmount
+        string status "Active|Finished|Cancelled"
     }
 
     SETTINGS {
@@ -144,12 +155,17 @@ The core transactional record — one per reservation, online or walk-in.
 | `reservationCode` | String | required, unique, immutable |
 | `room` | ObjectId → Room | required |
 | `date`, `timeIn` | String | stored as plain strings, not a combined Date — avoids timezone parsing bugs |
-| `duration` | Number (hours) | min ~0 (practically 1, per Settings), max 24 |
-| `status` | enum | `Pending`, `Pending Payment Verification`, `Awaiting Online Payment`, `Confirmed`, `Rejected`, `Ongoing`, `Done`, `Overdue`, `Cancelled` |
-| `paymentStatus` | enum | `Unpaid`, `Paid`, `Rejected` |
+| `duration` | Number (hours) | persisted max 24 for legacy compatibility; validated booking mutations accept 1–5 whole hours |
+| `amount`, `roomCharge`, `hourlyRates[]`, `corkageFee` | Number(s) | immutable-at-payment pricing snapshot; `amount = roomCharge + corkageFee` |
+| `status` | enum | `Pending`, `Pending Payment Verification`, `Awaiting Online Payment`, `Confirmed`, `Rejected`, `Ongoing`, `Done`, `Overdue`, `Cancelled`, `No Show` |
+| `paymentStatus` | enum | `Unpaid`, `Partial`, `Paid`, `Rejected` |
 | `source` | enum | `online` \| `walk-in` — distinguishes the two booking paths from ARCHITECTURE.md |
 | `paymentProvider` | enum | `manual` \| `paymongo` |
 | `paymongoPaymentIntentId` | String | unique+sparse — links to the PayMongo payment flow |
+| `downPayment`, `downPaymentHours` | Number | verified online deposit and the number of hourly charges it covers |
+| `paidAmount`, `refundedAmount` | Number | explicit money values used by the canonical sales ledger; finance uses the greater valid recorded value from `paidAmount`/legacy `downPayment`, then subtracts refunds |
+| `cancellationStatus`, `cancellationReason`, `cancellationReview*` | — | customer request plus admin review/refund trail |
+| `noShowAt` | Date | set when the scheduled end passes without completion; downpayment is forfeited |
 | `rescheduleCount` | Number | capped at `MAX_RESCHEDULES = 2` (matches PRD) |
 | `bookedBy`, `reviewedBy` | ObjectId → User | who created it / who approved-rejected it (walk-in path) |
 
@@ -162,6 +178,10 @@ Defines a bookable facility and its priced variants (e.g. Billiards' Shared/Solo
 |---|---|---|
 | `name`, `price`, `capacity` | — | base facility info |
 | `variants[]` | Array | each variant has its own `label`, `price`, `pax`, `roomCount`, `status` (`Available`/`Maintenance`/`Unavailable`) — **this is what makes room inventory admin-configurable**, satisfying the PRD requirement directly |
+| `variants[].pricingMode` | enum | `flat` or `time-based`; time-based variants use `eveningPrice` from `eveningStartTime` |
+| `variants[].includedGuests`, `variants[].extraGuestFee` | Number | optional per-guest hourly surcharge; `includedGuests = 0` applies it to every guest |
+
+Only `Billiards`, `KTV`, and `Court` are accepted as facility names. Mutating room routes parse multipart JSON and validate the complete payload with Joi before saving.
 
 ### BookingLock
 Short-lived hold on a slot during checkout — prevents double-booking. See ARCHITECTURE.md Section 4/7.
@@ -175,7 +195,19 @@ Short-lived hold on a slot during checkout — prevents double-booking. See ARCH
 Lock duration: 20 minutes (`LOCK_DURATION_MINUTES`).
 
 ### MonitorRoom + RoomSession
-Separate from `Room` — this is the **live operational view** staff use (Section 5 of ARCHITECTURE.md), not the customer-facing booking catalog. `MonitorRoom` is a physical unit with a live `status`; `RoomSession` is an occupancy record (who's in the room right now, since when, for how long, payment state) optionally linked back to a `Booking`.
+Separate from `Room` — this is the **live operational view** staff use (Section 5 of ARCHITECTURE.md), not the customer-facing booking catalog. `MonitorRoom` is a physical unit with a live `status`; `RoomSession` is an occupancy record (who's in the room right now, since when, for how long, payment state) optionally linked back to a `Booking`. Saving a `Room` synchronizes its variant counts, number ranges, pricing, and availability state into `MonitorRoom`; active/occupied units are preserved during a sync.
+
+Sessions retain their `paidAmount` and `refundedAmount` when finished or cancelled. The finance ledger uses a linked session's charges as the authoritative charge and includes the booking's original deposit once, preventing double counting.
+
+| Record | Important fields | Meaning |
+|---|---|---|
+| `MonitorRoom` | `facilityName`, `roomName`, `roomNumber` | exact physical unit shown in Live Monitor |
+| `MonitorRoom` | `price`, `pricingMode`, `eveningPrice`, `eveningStartTime` | hourly pricing copied from the admin-managed catalog |
+| `MonitorRoom` | `includedGuests`, `extraGuestFee`, `pax` | capacity and per-guest pricing snapshot |
+| `RoomSession` | `startTime`, `duration`, `hourlyRates[]`, `rate`, `amount`, `corkageFee` | scheduled whole-hour usage and immutable calculated charge |
+| `RoomSession` | `booking` | optional reservation link used to carry its deposit and avoid duplicate ledger rows |
+| `RoomSession` | `paidAmount`, `refundedAmount`, `paymentStatus`, `paymentTiming` | actual collection, balance state (`Paid`/`Partial`/`Unpaid`), and before/after-play intent |
+| `RoomSession` | `status`, `endedAt`, `cancellationReason` | operational lifecycle (`Active`/`Finished`/`Cancelled`) and audit data |
 
 ### Settings (singleton)
 One document only (`_id: "global"`), enforced via `getSingleton()` rather than a schema-level singleton pattern. Holds:

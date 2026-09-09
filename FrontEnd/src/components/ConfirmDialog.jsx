@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import '../styles/confirm-dialog.css';
+import ModalPortal from './ModalPortal';
 
 const ICONS = {
   question: (
@@ -34,6 +35,8 @@ function ConfirmDialog({
   useEffect(() => {
     if (!open) return;
 
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
     confirmBtnRef.current?.focus();
 
     function onKey(e) {
@@ -41,7 +44,10 @@ function ConfirmDialog({
       if (e.key === 'Enter' && !confirmDisabled) onConfirm();
     }
     document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = previousOverflow;
+    };
   }, [open, onConfirm, onCancel, confirmDisabled]);
 
   if (!open) return null;
@@ -49,28 +55,30 @@ function ConfirmDialog({
   const resolvedTitle = title || (danger ? 'Please confirm' : 'Confirm');
 
   return (
-    <div className="uimodal-overlay uimodal-show">
-      <div className="uimodal-box">
-        <div className={`uimodal-icon${danger ? ' uimodal-danger' : ''}`}>
-          {danger ? ICONS.danger : ICONS.question}
-        </div>
-        <div className="uimodal-title">{resolvedTitle}</div>
-        <p className="uimodal-message">{message}</p>
-        <div className="uimodal-actions">
-          <button className="uimodal-btn" onClick={onCancel}>
-            {cancelText || 'Cancel'}
-          </button>
-          <button
-            ref={confirmBtnRef}
-            className={`uimodal-btn ${danger ? 'uimodal-btn-danger' : 'uimodal-btn-primary'}`}
-            onClick={onConfirm}
-            disabled={confirmDisabled}
-          >
-            {confirmText || (danger ? 'Delete' : 'Confirm')}
-          </button>
+    <ModalPortal>
+      <div className="uimodal-overlay uimodal-show" role="dialog" aria-modal="true" aria-labelledby="confirmation-dialog-title">
+        <div className="uimodal-box">
+          <div className={`uimodal-icon${danger ? ' uimodal-danger' : ''}`}>
+            {danger ? ICONS.danger : ICONS.question}
+          </div>
+          <div className="uimodal-title" id="confirmation-dialog-title">{resolvedTitle}</div>
+          <p className="uimodal-message">{message}</p>
+          <div className="uimodal-actions">
+            <button className="uimodal-btn" onClick={onCancel}>
+              {cancelText || 'Cancel'}
+            </button>
+            <button
+              ref={confirmBtnRef}
+              className={`uimodal-btn ${danger ? 'uimodal-btn-danger' : 'uimodal-btn-primary'}`}
+              onClick={onConfirm}
+              disabled={confirmDisabled}
+            >
+              {confirmText || (danger ? 'Delete' : 'Confirm')}
+            </button>
+          </div>
         </div>
       </div>
-    </div>
+    </ModalPortal>
   );
 }
 

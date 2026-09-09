@@ -2,7 +2,8 @@ const express = require("express");
 const router = express.Router();
 
 const LoginHistory = require("../model/loginHistory");
-const { requireRole } = require("../middleware/adminAuth");
+const { requirePermission } = require("../middleware/adminAuth");
+const { PERMISSIONS } = require("../utils/permissions");
 
 const PAGE_SIZE = 25;
 
@@ -21,13 +22,12 @@ function shape(entry) {
   };
 }
 
-// ── List login history, split by tab (mirrors AdminSidebar's manager/
-// super_admin-only gating for this page). Query params:
+// List login history, split by tab. Access follows the shared permission map.
 //   ?tab=users|admin   (default "users") — "admin" = staff/manager/super_admin roles
 //   ?search=text       matches name/email
 //   ?status=success|failed
 //   ?page=1
-router.get("/", requireRole("manager", "super_admin"), async (req, res) => {
+router.get("/", requirePermission(PERMISSIONS.ADMIN_MANAGE), async (req, res) => {
   try {
     const tab = req.query.tab === "admin" ? "admin" : "users";
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);

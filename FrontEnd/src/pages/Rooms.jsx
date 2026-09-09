@@ -1,273 +1,158 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
-import Modal from '../components/Modal';
+import { useEffect, useMemo, useState } from 'react';
+import { CalendarCheck, Clock3, CreditCard, Search } from 'lucide-react';
+import BookingModal from '../components/BookingModal';
+import FacilityBookingCard from '../components/FacilityBookingCard';
+import FacilityCardSkeleton from '../components/FacilityCardSkeleton';
+import RoomDetailsModal from '../components/RoomDetailsModal';
+import Toast from '../components/Toast';
+import { useSiteSettings } from '../hooks/useSiteSettings';
+import { useToast } from '../hooks/useToast';
+import { roomsService } from '../services/rooms';
 import '../styles/rooms-page.css';
 
-import billiardsImg from '../assets/images/billiards.png';
-import courtImg from '../assets/images/court.png';
-import heroBgImg from '../assets/images/main.png';
-import heroImg4 from '../assets/pictures/RiverView_4.jpg';
-import heroImg6 from '../assets/pictures/RiverView_6.jpg';
+const SERVICE_ORDER = ['All', 'Billiards', 'KTV', 'Court'];
 
-// Static/demo data only — this page has no backend yet (see
-// FEATURE_REQUESTS.md "View All Rooms" task). Facility images reuse
-// existing site assets; Karaoke/Private Drinking Rooms have no dedicated
-// photo yet, so they borrow the closest existing hero shots.
-const FACILITIES = [
-  {
-    id: 'billiards',
-    name: 'Billiards',
-    icon: 'fa-circle-nodes',
-    image: billiardsImg,
-    description: 'Premium tables for friendly games and tournaments.',
-  },
-  {
-    id: 'karaoke',
-    name: 'Karaoke',
-    icon: 'fa-microphone',
-    image: heroImg4,
-    description: 'Sing your heart out with friends and family.',
-  },
-  {
-    id: 'drinking-rooms',
-    name: 'Private Drinking Rooms',
-    icon: 'fa-martini-glass-citrus',
-    image: heroImg6,
-    description: 'Private spaces for intimate gatherings and celebrations.',
-  },
-  {
-    id: 'rental-court',
-    name: 'Rental Court',
-    icon: 'fa-basketball',
-    image: courtImg,
-    description: 'Spacious court for basketball and other sports.',
-  },
-];
-
-const ROOMS_BY_FACILITY = {
-  billiards: [
-    { id: 'B1', name: 'Room B1', type: 'Solo Room', capacity: '1–4 People', price: 200, available: true, description: 'Perfect for solo players or small groups who just want to sink a few balls without the crowd. Quiet corner spot with soft ambient lighting and a full rack of house cues.' },
-    { id: 'B2', name: 'Room B2', type: 'Big Room', capacity: '1–6 People', price: 300, available: true, description: 'Spacious room built for bigger groups and friendly matches. Extra seating around the table plus a mini fridge for drinks between rounds.' },
-    { id: 'B3', name: 'Room B3', type: 'Solo Room', capacity: '1–4 People', price: 200, available: true, description: 'A comfortable, relaxed setting for a casual game with friends. Great lighting over the table and enough space to line up your shot from any angle.' },
-    { id: 'B4', name: 'Room B4', type: 'Shared Room', capacity: '1–6 People', price: 150, available: true, description: "Share the space and the fun with other players in this open, social layout. Ideal if you're up for meeting new people over a game or two." },
-  ],
-  karaoke: [
-    { id: 'K1', name: 'Room K1', type: 'Solo Room', capacity: '1–2 People', price: 250, available: true, description: 'A cozy pod built for solo singers or duets who want their own space. Compact but comes with the same premium mic setup as the bigger rooms.' },
-    { id: 'K2', name: 'Room K2', type: 'Big Room', capacity: '1–10 People', price: 450, available: true, description: 'Our party-sized room with a premium sound system and plenty of room to move. Fits the whole barkada comfortably with couch seating around the screen.' },
-    { id: 'K3', name: 'Room K3', type: 'Shared Room', capacity: '1–6 People', price: 300, available: false, description: "A mid-sized room that's great for small groups looking for a laid-back sing-along. Currently fully reserved — check back later or pick another room." },
-    { id: 'K4', name: 'Room K4', type: 'Big Room', capacity: '1–8 People', price: 400, available: true, description: 'Spacious room with mood lighting and a song library spanning every genre. Great for birthdays or just a fun night out with friends.' },
-  ],
-  'drinking-rooms': [
-    { id: 'P1', name: 'Room P1', type: 'Shared Room', capacity: '1–8 People', price: 500, available: true, description: 'A private lounge with premium service, low lighting, and comfortable seating. Ideal for intimate get-togethers or a relaxed night with close friends.' },
-    { id: 'P2', name: 'Room P2', type: 'Big Room', capacity: '1–12 People', price: 700, available: false, description: 'Our largest private room, built for celebrations and bigger gatherings. Currently fully reserved — popular for birthdays and reunions, so reserve early next time.' },
-  ],
-  'rental-court': [
-    { id: 'R1', name: 'Court R1', type: 'Big Room', capacity: '1–10 People', price: 600, available: true, description: 'A full-size court with proper flooring, a working scoreboard, and a sound system for official games. Great for pickup games, practice, or a real tournament match.' },
-  ],
-};
-
-const TOTAL_ROOM_COUNT = FACILITIES.reduce((sum, f) => sum + ROOMS_BY_FACILITY[f.id].length, 0);
-
-// "All Facilities" is a selectable card like any other, not a special
-// mode — it's just the facility grid's own way of clearing the filter,
-// per the request to drop the separate dropdown.
-const ALL_FACILITY = {
-  id: 'all',
-  name: 'All Facilities',
-  icon: 'fa-grip',
-  image: heroBgImg,
-  description: 'Browse every room across all our facilities.',
-};
-
-// Rooms for a given facility selection, each tagged with its facility's
-// image/name so the "All Facilities" view can show mixed rooms clearly.
-function getRoomsForSelection(selectedId) {
-  const facilities = selectedId === 'all' ? FACILITIES : FACILITIES.filter((f) => f.id === selectedId);
-  return facilities.flatMap((f) =>
-    ROOMS_BY_FACILITY[f.id].map((room) => ({
-      ...room,
-      facilityImage: f.image,
-      facilityName: f.name,
-      facilityDescription: f.description,
-    }))
-  );
+function serviceFor(room) {
+  const value = `${room?.name || ''} ${room?.description || ''}`.toLowerCase();
+  if (value.includes('billiard') || value.includes('pool')) return 'Billiards';
+  if (value.includes('ktv') || value.includes('karaoke')) return 'KTV';
+  if (value.includes('court') || value.includes('basketball')) return 'Court';
+  return room?.name || 'Other';
 }
 
-function FacilityCard({ facility, isSelected, roomCount, onSelect }) {
-  return (
-    <button
-      type="button"
-      className={`rp-facility-card${isSelected ? ' is-selected' : ''}`}
-      onClick={() => onSelect(facility.id)}
-    >
-      <div className="rp-facility-img">
-        <img src={facility.image} alt={facility.name} />
-      </div>
-      <div className="rp-facility-body">
-        <div className="rp-facility-top">
-          <h3><i className={`fa-solid ${facility.icon}`}></i> {facility.name}</h3>
-          <span className="rp-facility-count">
-            {roomCount} Room{roomCount > 1 ? 's' : ''}<br />Available
-          </span>
-        </div>
-        <p>{facility.description}</p>
-      </div>
-    </button>
-  );
-}
+function Rooms() {
+  const { settings, openHour, closeHour, refetch: refetchSettings } = useSiteSettings();
+  const { toast, showToast } = useToast();
+  const [rooms, setRooms] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [filter, setFilter] = useState('All');
+  const [bookingRoom, setBookingRoom] = useState(null);
+  const [detailRoom, setDetailRoom] = useState(null);
 
-// Clicking the card opens a modal with the room + facility details —
-// this card is just the summary, the modal is where you see everything.
-function RoomCard({ room, onView }) {
-  function handleKeyDown(e) {
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault();
-      onView(room);
+  async function loadRooms() {
+    setLoading(true);
+    setLoadError(false);
+    try {
+      const data = await roomsService.list();
+      setRooms(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error(error);
+      setLoadError(true);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    loadRooms();
+  }, []);
+
+  const services = useMemo(() => {
+    const available = new Set(rooms.map(serviceFor));
+    const known = SERVICE_ORDER.filter((item) => item === 'All' || available.has(item));
+    const other = [...available].filter((item) => !SERVICE_ORDER.includes(item)).sort();
+    return [...known, ...other];
+  }, [rooms]);
+
+  const visibleRooms = filter === 'All'
+    ? rooms
+    : rooms.filter((room) => serviceFor(room) === filter);
+
+  async function openBooking(room) {
+    setBookingRoom(room);
+    refetchSettings();
+    try {
+      const freshRoom = await roomsService.get(room._id);
+      setBookingRoom(freshRoom);
+    } catch (error) {
+      if (error?.status === 404) {
+        setBookingRoom(null);
+        setRooms((current) => current.filter((item) => item._id !== room._id));
+        showToast('This facility is no longer available.', 'error');
+      }
     }
   }
 
   return (
-    <div
-      className="room-card rp-room-card"
-      role="button"
-      tabIndex={0}
-      onClick={() => onView(room)}
-      onKeyDown={handleKeyDown}
-    >
-      <div className="room-card-img">
-        <span className={`room-card-status ${room.available ? 'room-status-available' : 'room-status-fullybooked'}`}>
-          {room.available ? 'Available' : 'Fully Reserved'}
-        </span>
-        <img src={room.facilityImage} alt={room.name} />
-      </div>
-      <div className="room-card-body">
-        <span className="rp-room-facility">{room.facilityName}</span>
-        <div className="rp-room-title-row">
-          <h3>{room.name}</h3>
-          <span className="room-tag rp-room-type">{room.type}</span>
-        </div>
-        <span className="rp-room-capacity"><i className="fa-solid fa-users"></i> {room.capacity}</span>
-        <p className="room-card-desc">{room.description}</p>
-        <span className="price-amt">₱{room.price}/hr</span>
-      </div>
-    </div>
-  );
-}
-
-// Modal content — full room + facility info. `title` on the shared Modal
-// takes any node, so the close button lives there rather than requiring
-// changes to Modal.jsx itself.
-function RoomDetailsModal({ room, onClose }) {
-  return (
-    <Modal
-      open={!!room}
-      onClose={onClose}
-      size="xl"
-      title={
-        room && (
-          <div className="rp-modal-title-row">
-            <span>{room.name}</span>
-            <button type="button" className="rp-modal-close" onClick={onClose} aria-label="Close">
-              <i className="fa-solid fa-xmark"></i>
-            </button>
-          </div>
-        )
-      }
-    >
-      {room && (
-        <div className="rp-modal-body">
-          <div className="rp-modal-img">
-            <span className={`room-card-status ${room.available ? 'room-status-available' : 'room-status-fullybooked'}`}>
-              {room.available ? 'Available' : 'Fully Reserved'}
-            </span>
-            <img src={room.facilityImage} alt={room.name} />
-          </div>
-          <div className="rp-modal-info">
-            <span className="rp-room-facility">{room.facilityName}</span>
-            <div className="rp-modal-tags">
-              <span className="room-tag rp-room-type">{room.type}</span>
-              <span className="rp-room-capacity"><i className="fa-solid fa-users"></i> {room.capacity}</span>
-            </div>
-            <p className="room-card-desc">{room.description}</p>
-            <span className="price-amt rp-modal-price">₱{room.price}/hr</span>
-          </div>
-        </div>
-      )}
-      {room && (
-        <div className="rp-modal-facility-desc">
-          <h4><i className="fa-solid fa-circle-info"></i> About {room.facilityName}</h4>
-          <p>{room.facilityDescription}</p>
-        </div>
-      )}
-    </Modal>
-  );
-}
-
-function Rooms() {
-  // Defaults to "all" so landing here from "View All Rooms" already
-  // shows every room, no extra click required.
-  const [selectedId, setSelectedId] = useState('all');
-  const [activeRoom, setActiveRoom] = useState(null);
-  const isAll = selectedId === 'all';
-  const selectedFacility = isAll ? null : FACILITIES.find((f) => f.id === selectedId);
-  const rooms = getRoomsForSelection(selectedId);
-
-  return (
     <div className="rp-page">
-      {/* HEADER */}
-      <section className="rp-hero">
+      <section className="rp-hero" aria-labelledby="rooms-title">
         <div className="rp-hero-inner">
-          <Link to="/" className="rp-back-home">
-            <i className="fa-solid fa-arrow-left"></i> Back to Home
-          </Link>
-          <div className="section-label">Explore Our Spaces</div>
-          <h1>All Rooms &amp; Facilities</h1>
-          <p>Choose a facility and room that suits your needs.</p>
+          <div className="rp-hero-copy">
+            <div className="section-label">Live Facility Catalog</div>
+            <h1 id="rooms-title">Choose a space, then reserve your time.</h1>
+            <p>
+              Browse the facilities managed by The Riverview team. Prices, room types,
+              and availability come directly from the reservation system.
+            </p>
+          </div>
+          <div className="rp-hero-note" aria-label="Reservation rules">
+            <div><Clock3 size={18} aria-hidden="true" /><span><strong>1–5 hours</strong>Whole-hour reservations</span></div>
+            <div><CreditCard size={18} aria-hidden="true" /><span><strong>Secure down payment</strong>Confirms your slot online</span></div>
+          </div>
         </div>
       </section>
 
-      {/* FACILITY GRID (includes "All Facilities" as the reset/overview card) */}
-      <section className="rp-facilities">
-        <div className="rp-facilities-grid">
-          <FacilityCard
-            facility={ALL_FACILITY}
-            isSelected={isAll}
-            roomCount={TOTAL_ROOM_COUNT}
-            onSelect={setSelectedId}
-          />
-          {FACILITIES.map((f) => (
-            <FacilityCard
-              key={f.id}
-              facility={f}
-              isSelected={selectedId === f.id}
-              roomCount={ROOMS_BY_FACILITY[f.id].length}
-              onSelect={setSelectedId}
-            />
+      <section className="rp-catalog" aria-labelledby="facility-list-title">
+        <div className="rp-filter-bar">
+          <div>
+            <div className="section-label">Available Services</div>
+            <h2 id="facility-list-title" className="visually-hidden">Bookable facilities</h2>
+            <div className="rp-filter-list" role="group" aria-label="Filter facilities by service">
+              {services.map((service) => (
+                <button
+                  key={service}
+                  type="button"
+                  className={`rp-filter-button${filter === service ? ' is-selected' : ''}`}
+                  aria-pressed={filter === service}
+                  onClick={() => setFilter(service)}
+                >
+                  {service}
+                </button>
+              ))}
+            </div>
+          </div>
+          <span className="rp-result-count">
+            {loading ? 'Loading facilities…' : `${visibleRooms.length} facilit${visibleRooms.length === 1 ? 'y' : 'ies'}`}
+          </span>
+        </div>
+
+        <div className="rooms-grid">
+          {loading && <><FacilityCardSkeleton /><FacilityCardSkeleton /><FacilityCardSkeleton /></>}
+
+          {!loading && loadError && (
+            <div className="rp-empty">
+              <Search size={24} aria-hidden="true" />
+              <h3>Facilities could not be loaded</h3>
+              <p>Please check your connection and try again.</p>
+              <button type="button" className="btn-select" onClick={loadRooms}>Try again</button>
+            </div>
+          )}
+
+          {!loading && !loadError && visibleRooms.length === 0 && (
+            <div className="rp-empty">
+              <CalendarCheck size={24} aria-hidden="true" />
+              <h3>No facilities in this category yet</h3>
+              <p>The admin-managed inventory will appear here as soon as it is available.</p>
+            </div>
+          )}
+
+          {!loading && !loadError && visibleRooms.map((room) => (
+            <FacilityBookingCard key={room._id} room={room} onSelect={openBooking} onDetails={setDetailRoom} />
           ))}
         </div>
-
-        <div className="rp-rooms">
-          <div className="rp-rooms-header">
-            <h2>
-              <i className={`fa-solid ${isAll ? ALL_FACILITY.icon : selectedFacility.icon}`}></i>
-              {isAll ? ' All Rooms' : ` ${selectedFacility.name} Rooms`}
-            </h2>
-            {!isAll && (
-              <button type="button" className="btn-select rp-book-facility" disabled title="Reservation coming soon">
-                <i className="fa-solid fa-calendar-check"></i> Reserve Facility
-              </button>
-            )}
-          </div>
-
-          <div className="rooms-grid">
-            {rooms.map((room) => (
-              <RoomCard key={room.id} room={room} onView={setActiveRoom} />
-            ))}
-          </div>
-        </div>
       </section>
 
-      <RoomDetailsModal room={activeRoom} onClose={() => setActiveRoom(null)} />
+      <RoomDetailsModal room={detailRoom} onClose={() => setDetailRoom(null)} onReserve={(room) => { setDetailRoom(null); openBooking(room); }} />
+
+      <BookingModal
+        room={bookingRoom}
+        onClose={() => setBookingRoom(null)}
+        openHour={openHour}
+        closeHour={closeHour}
+        settings={settings}
+      />
+      <Toast {...toast} />
     </div>
   );
 }

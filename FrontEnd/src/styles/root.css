@@ -33,18 +33,6 @@ select{
 }
 
 /* ==========================
-   Theme toggle smoothing — applies to every element site-wide so
-   background/text/border color changes ease in on toggle, not just
-   the few components (header, theme-toggle) with their own transition.
-   Elements that already declare their own `transition` (e.g. header,
-   .theme-toggle) keep using that instead, since same-specificity rules
-   are resolved by source order and those are declared later.
-========================== */
-*{
-    transition: background-color .3s ease, color .3s ease, border-color .3s ease;
-}
-
-/* ==========================
    Toast (Toast.jsx / useToast.js) — shared app-wide, so this lives
    here rather than in any single page's stylesheet. --text falls back
    to #fff since not every page defines that token.

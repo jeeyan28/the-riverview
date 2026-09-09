@@ -10,6 +10,7 @@ import { useCountdownClock } from '../hooks/useCountdownClock';
 import { useAuth } from '../context/AuthContext';
 import { OTP_LENGTH, OTP_EXPIRY_SECONDS, RESEND_COOLDOWN_SECONDS, formatCountdown } from '../utils/otp';
 import { isPasswordStrongEnough } from '../utils/password';
+import ModalPortal from './ModalPortal';
 
 function ClaimAccountModal({ open, onClose }) {
   const { claimGuestByEmailStart, claimGuestByEmailResendOtp, claimGuestByEmailVerifyOtp, claimGuestByGoogle } = useAuth();
@@ -51,6 +52,15 @@ function ClaimAccountModal({ open, onClose }) {
     setOtpBoxKey((k) => k + 1);
     const raf = requestAnimationFrame(() => emailInputRef.current?.focus());
     return () => cancelAnimationFrame(raf);
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
   }, [open]);
 
   useEffect(() => {
@@ -186,18 +196,19 @@ function ClaimAccountModal({ open, onClose }) {
   const otpExpired = otpExpiresAt > 0 && secondsUntilExpiry === 0;
 
   return (
-    <div className="claim-modal-scope">
-      <div className="forgot-modal-backdrop">
-        <div
-          className="forgot-modal login-card"
-          ref={modalRef}
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="claim-modal-title"
-        >
-          <button type="button" className="forgot-modal-close" onClick={onClose} aria-label="Close">
-            <X size={16} />
-          </button>
+    <ModalPortal>
+      <div className="claim-modal-scope">
+        <div className="forgot-modal-backdrop">
+          <div
+            className="forgot-modal login-card"
+            ref={modalRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="claim-modal-title"
+          >
+            <button type="button" className="forgot-modal-close" onClick={onClose} aria-label="Close">
+              <X size={16} />
+            </button>
 
         {!sent ? (
           <>
@@ -366,11 +377,12 @@ function ClaimAccountModal({ open, onClose }) {
             </div>
           </>
         )}
-      </div>
+          </div>
 
-        <Toast {...toast} />
+          <Toast {...toast} />
+        </div>
       </div>
-    </div>
+    </ModalPortal>
   );
 }
 

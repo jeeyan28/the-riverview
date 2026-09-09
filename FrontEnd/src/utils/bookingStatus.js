@@ -8,4 +8,5 @@ export const BOOKING_STATUS = {
   DONE: 'Done',
   OVERDUE: 'Overdue',
   CANCELLED: 'Cancelled',
+  NO_SHOW: 'No Show',
 };

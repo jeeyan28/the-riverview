@@ -15,8 +15,13 @@ export const bookingsService = {
     if (params.search) qs.set('search', params.search);
     if (params.status) qs.set('status', params.status);
     if (params.paymentStatus) qs.set('paymentStatus', params.paymentStatus);
+    if (params.cancellationStatus) qs.set('cancellationStatus', params.cancellationStatus);
     if (params.room) qs.set('room', params.room);
     if (params.date) qs.set('date', params.date);
+    if (params.from) qs.set('from', params.from);
+    if (params.to) qs.set('to', params.to);
+    if (params.guestContact) qs.set('guestContact', params.guestContact);
+    if (params.guestName) qs.set('guestName', params.guestName);
     const s = qs.toString();
     return apiRequest(`${BASE}${s ? `?${s}` : ''}`, { fallbackMessage: 'Failed to load bookings.' });
   },
@@ -27,11 +32,15 @@ export const bookingsService = {
 
   reject: (id) => apiRequest(`${BASE}/${id}/reject`, { method: 'PUT', fallbackMessage: 'Failed to reject booking.' }),
 
+  reviewCancellation: (id, payload) => apiRequest(`${BASE}/${id}/cancellation-review`, { method: 'PUT', body: payload, fallbackMessage: 'Failed to review cancellation.' }),
+
   remove: (id) => apiRequest(`${BASE}/${id}`, { method: 'DELETE', fallbackMessage: 'Failed to delete booking.' }),
 
   mine: () => apiRequest(`${BASE}/mine`, { fallbackMessage: 'Failed to load your booking history.' }),
 
   reschedule: (id, payload) => apiRequest(`${BASE}/${id}/reschedule`, { method: 'PUT', body: payload, fallbackMessage: 'Failed to reschedule your reservation.' }),
+
+  requestCancellation: (id, payload) => apiRequest(`${BASE}/${id}/cancellation-request`, { method: 'PUT', body: payload, fallbackMessage: 'Failed to request cancellation.' }),
 
   lockSlot: (payload) => apiRequest(`${BASE}/lock`, { method: 'POST', body: payload, fallbackMessage: 'Failed to hold this time slot.' }),
 

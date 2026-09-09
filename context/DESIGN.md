@@ -1,6 +1,6 @@
 # DESIGN.md — The Riverview
 
-Source of truth for visual and interaction design. This documents the system that already exists in code (`Frontend/src/styles/`) and formalizes it so future work doesn't drift into inconsistent, "AI slop" patterns.
+Source of truth for visual and interaction design. This documents the system that already exists in code (`FrontEnd/src/styles/`) and formalizes it so future work doesn't drift into inconsistent, "AI slop" patterns.
 
 ## 1. Brand Colors
 
@@ -134,12 +134,38 @@ The `motion` (Motion/Framer Motion) library is the standard for anything beyond 
 - **Icons:** `lucide-react` — the standard icon set. Don't mix in another icon library or inline SVGs for standard UI icons.
 - **Charts:** `chart.js` — standard for analytics dashboards and revenue forecasting visualizations.
 
-## 10. Component Foundation
+## 10. Required Product Patterns
+
+### Shared dialogs
+- Login, customer, and admin dialogs render through the active app shell's modal layer so animated page content cannot change their fixed-position coordinate system. Dialogs stay centered in the visible viewport at phone, tablet, and desktop widths, account for device safe areas, and scroll internally when their content is tall.
+
+### Customer surface
+- The header must keep readable navigation text in both themes, expose the same theme control on desktop and mobile, and place account, announcements, and sign-in actions inside the mobile menu without clipping.
+- At phone and tablet widths up to 900px, the customer shell keeps Home, Reserve, Contact, and Account in a bottom tab bar that accounts for device safe areas. The full-screen menu carries secondary navigation and preferences, and temporarily disables the tab bar while open.
+- Facility cards provide separate **Details** and **Reserve** actions. Details explain every type/variant, capacity, rate behavior, and available-unit count before checkout.
+- On phones, facility cards become compact image-and-content rows. They show only the two most useful amenities and expose the complete room-type information through an accordion-style Details dialog.
+- “Our Spaces” uses dimensional CSS miniatures for billiards, court, and KTV. Each scene shows recognizable equipment, surface depth, materials, and shadows, with a slow shallow camera orbit instead of a full spin. Secondary motion stays subtle and every scene becomes static when reduced motion is requested.
+- Route, session, and post-login waits use the same compact Riverview billiards loader. Authentication redirects as soon as the account handoff is ready; never hold the user behind a fake percentage sequence.
+- Profile, reservation details, booking, reschedule, cancellation, and authentication dialogs use the shared modal behavior: labelled dialog, focus containment, Escape/close affordance, internal scrolling, and stacked full-width actions on phones.
+- Phone booking dialogs show one current step and a short progress bar. Review information is grouped into one flat summary, while policies and secondary account-security controls use progressive disclosure.
+- Reservation details lead with total charge, paid amount, and balance so a downpayment never looks like full payment.
+- The footer contains only useful venue facts, navigation, reservation, directions, support, and legal links.
+
+### Admin surface
+- At phone and tablet widths up to 900px, the staff shell keeps Live Monitor, Reservations, the first permitted overview destination, and More in a bottom tab bar that accounts for device safe areas. The top bar remains sticky; the sidebar opened by More contains the complete permission-filtered navigation.
+- Live Monitor leads with physical-unit availability and keeps payment state/balance visible on every active session. Starting a walk-in provides whole-hour choices and explicit **pay before**, **pay part now**, or **pay after play** choices.
+- Live Monitor cards stay compact and keep Extend, Finish, and accidental-start cancellation on one reachable action row at phone widths.
+- Live Monitor’s Session Report is a separate tab with service-date controls, summary totals, room-type totals, an activity table, and Excel export.
+- Facilities uses one editor for catalog type, inventory count/start number, capacity, hourly pricing, time-based pricing, guest surcharge, and availability. Long forms scroll inside the modal; buttons remain reachable.
+- Reports, Settings, and Login History use plain labels, compact summaries, and one clear primary task. Date filtering uses Today, Last 7 days, This month, and native From/To inputs.
+- Tables stay real tables on tablets/desktops and scroll inside labelled containers when their columns cannot fit. On phones, primary operational controls and modal actions span the available width.
+
+## 11. Component Foundation
 
 - **Bootstrap 5.3.3** is actively used and stays as part of the system, alongside the custom CSS-variable design system above.
 - Rule to prevent drift: when a Bootstrap utility class and a custom token conflict (e.g. Bootstrap's default spacing vs. this doc's spacing scale), **the custom token wins** — Bootstrap is for layout/grid/component scaffolding, not the source of truth for brand colors, spacing, or radius.
 
-## 11. Anti-Slop Checklist
+## 12. Anti-Slop Checklist
 
 Generic AI-generated interfaces tend to converge on the same handful of tells, regardless of what the product actually is. Before shipping a new screen or component, check it doesn't fall into these:
 

@@ -1,0 +1,205 @@
+/* Shared motion language: quick UI transitions and slower explanatory scenes. */
+:root {
+  --dur-instant: 120ms;
+  --dur-fast: 160ms;
+  --dur-medium: 240ms;
+  --dur-drawer: 300ms;
+}
+
+.page-transition { min-width: 0; }
+.page-transition--admin { width: 100%; }
+
+/* Dialogs render into a shell-level layer, outside animated page containers. */
+.modal-portal-root { width: 0; height: 0; flex: 0 0 0; }
+:is(.modal-bg,.bk-overlay,.pf-overlay,.uimodal-overlay,.forgot-modal-backdrop,.auth-morph-overlay) {
+  width: 100%;
+  height: 100dvh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+:is(.modal-bg > .modal-box,.bk-overlay > .bk-modal,.pf-overlay > .pf-modal,.uimodal-overlay > .uimodal-box,.forgot-modal-backdrop > .forgot-modal,.auth-morph-overlay > .auth-morph-card) {
+  margin: auto;
+}
+
+/* Branded loading state used by route, authentication, and session checks. */
+.rv-loader {
+  --loader-accent: #00c9a7;
+  --loader-bg: #0a1628;
+  display: grid;
+  place-items: center;
+  color: #f4f7fb;
+  font-family: var(--font-body, Inter, ui-sans-serif, system-ui, sans-serif);
+}
+.rv-loader--screen {
+  position: fixed;
+  z-index: 1600;
+  inset: 0;
+  min-height: 100dvh;
+  padding: 24px;
+  background:
+    radial-gradient(circle at 50% 43%, rgba(0,201,167,.13), transparent 30%),
+    linear-gradient(145deg,#101f36 0%,var(--loader-bg) 58%,#07101d 100%);
+}
+.rv-loader--inline { width: 100%; }
+.rv-loader-card {
+  display: grid;
+  width: min(330px, calc(100vw - 40px));
+  place-items: center;
+  text-align: center;
+}
+.rv-loader-scene { position: relative; width: 174px; height: 112px; perspective: 700px; }
+.rv-loader-glow { position: absolute; left: 24px; right: 24px; bottom: 8px; height: 34px; border-radius: 50%; background: rgba(0,201,167,.25); filter: blur(15px); }
+.rv-loader-table {
+  position: absolute;
+  inset: 22px 9px 20px;
+  border-radius: 11px;
+  background: linear-gradient(145deg,#ba7d43,#55331f 75%);
+  box-shadow: 0 18px 28px rgba(0,0,0,.34),inset 0 2px rgba(255,255,255,.2);
+  transform: perspective(320px) rotateX(58deg);
+  transform-style: preserve-3d;
+}
+.rv-loader-felt { position: absolute; inset: 8px; border-radius: 7px; background: radial-gradient(circle at 43% 35%,#13a98c,#087461 72%); box-shadow: inset 0 0 10px rgba(0,0,0,.3); }
+.rv-loader-track { position: absolute; left: 29px; right: 29px; top: 34px; height: 2px; border-radius: 2px; background: rgba(236,255,249,.22); }
+.rv-loader-pocket { position: absolute; width: 10px; height: 10px; border-radius: 50%; background: #07100f; box-shadow: inset 0 2px 3px #000; }
+.rv-loader-pocket--one { left: 4px; top: 4px; }.rv-loader-pocket--two { right: 4px; top: 4px; }
+.rv-loader-pocket--three { left: 4px; bottom: 4px; }.rv-loader-pocket--four { right: 4px; bottom: 4px; }
+.rv-loader-ball {
+  position: absolute;
+  z-index: 2;
+  left: 25px;
+  top: 27px;
+  display: grid;
+  width: 17px;
+  height: 17px;
+  place-items: center;
+  border-radius: 50%;
+  background: radial-gradient(circle at 31% 25%,#697487,#090b0f 58%);
+  box-shadow: inset -4px -5px 6px rgba(0,0,0,.55),0 4px 5px rgba(0,0,0,.4);
+  animation: rv-loader-ball-roll 1.25s var(--ease-in-out) infinite alternate;
+  will-change: transform;
+}
+.rv-loader-ball b { display: grid; width: 8px; height: 8px; place-items: center; border-radius: 50%; background: #f3f3ed; color: #11151c; font: 700 5px/1 sans-serif; }
+.rv-loader-state-icon { position: absolute; z-index: 4; right: 1px; bottom: 9px; display: grid; width: 38px; height: 38px; place-items: center; border: 1px solid rgba(0,201,167,.38); border-radius: 50%; background: #10243b; color: var(--loader-accent); box-shadow: 0 10px 22px rgba(0,0,0,.3); animation: rv-state-arrive 180ms var(--ease-out) both; }
+.rv-loader.is-success .rv-loader-ball { animation: none; transform: translate3d(83px,0,0) rotate(180deg); }
+.rv-loader.is-error { --loader-accent: #f36b7b; }
+.rv-loader.is-error .rv-loader-ball { animation: none; transform: translate3d(40px,0,0); }
+.rv-loader.is-error .rv-loader-state-icon { border-color: rgba(243,107,123,.42); }
+.rv-loader-copy { display: grid; gap: 5px; margin-top: 2px; }
+.rv-loader-copy strong { font-size: 1.02rem; font-weight: 760; letter-spacing: -.02em; }
+.rv-loader-copy span { color: #9eacbf; font-size: .78rem; line-height: 1.5; }
+.rv-loader-line { position: relative; width: 128px; height: 3px; margin-top: 18px; overflow: hidden; border-radius: 99px; background: rgba(255,255,255,.1); }
+.rv-loader-line i { position: absolute; inset: 0; border-radius: inherit; background: var(--loader-accent); transform-origin: left center; animation: rv-loader-line 1.25s var(--ease-in-out) infinite; will-change: transform; }
+.rv-loader.is-success .rv-loader-line i { animation: none; transform: scaleX(1); }
+.rv-loader.is-error .rv-loader-line i { animation: none; transform: scaleX(.34); }
+
+@keyframes rv-loader-ball-roll {
+  from { transform: translate3d(0,0,0) rotate(0); }
+  to { transform: translate3d(83px,0,0) rotate(360deg); }
+}
+@keyframes rv-loader-line {
+  0% { transform: translate3d(-112%,0,0) scaleX(.28); }
+  48% { transform: translate3d(12%,0,0) scaleX(.54); }
+  100% { transform: translate3d(112%,0,0) scaleX(.28); }
+}
+@keyframes rv-state-arrive {
+  from { opacity: 0; transform: translate3d(0,4px,0) scale(.86); }
+  to { opacity: 1; transform: translate3d(0,0,0) scale(1); }
+}
+
+/* Authentication handoff stays brief and keeps the login context visible. */
+.auth-morph-overlay {
+  position: fixed;
+  z-index: 1200;
+  inset: 0;
+  display: grid;
+  width: auto;
+  height: auto;
+  padding: 24px;
+  place-items: center;
+  background: rgba(5,13,27,.7);
+  backdrop-filter: blur(12px) saturate(120%);
+  -webkit-backdrop-filter: blur(12px) saturate(120%);
+  pointer-events: auto;
+  transform: none;
+}
+.auth-morph-card { width: min(390px,100%); padding: 28px 24px 24px; border: 1px solid rgba(255,255,255,.12); border-radius: 22px; background: rgba(13,27,47,.94); box-shadow: 0 28px 80px rgba(0,0,0,.38); }
+.auth-morph-card .rv-loader-scene { height: 106px; }
+.auth-morph-retry { display: block; min-height: 44px; margin: 20px auto 0; padding: 10px 24px; border: 1px solid rgba(0,201,167,.34); border-radius: 999px; background: rgba(0,201,167,.1); color: #5be7d0; font-size: .85rem; font-weight: 700; cursor: pointer; transition: background-color var(--dur-fast) var(--ease-out),transform var(--dur-fast) var(--ease-out); }
+.login-page .login-background { transition: opacity var(--dur-medium) var(--ease-out); }
+.login-page .login-copy :is(.login-badge,h1,p) { transition: opacity var(--dur-medium) var(--ease-out),transform var(--dur-medium) var(--ease-out); }
+.login-page .login-card.is-morph-source { transition: opacity var(--dur-fast) var(--ease-out); }
+
+/* Mounted booking/profile surfaces use interruptible transitions in both directions. */
+.bk-overlay,
+.pf-overlay {
+  display: flex;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 180ms var(--ease-out),visibility 180ms linear;
+}
+.bk-overlay.open,
+.pf-overlay.open {
+  display: flex;
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  animation: none;
+}
+.bk-modal,
+.pf-modal {
+  opacity: 0;
+  transform: translate3d(0,8px,0) scale(.97);
+  transform-origin: center;
+  transition: opacity var(--dur-medium) var(--ease-out),transform var(--dur-medium) var(--ease-out);
+  animation: none;
+}
+:is(.bk-overlay,.pf-overlay).open :is(.bk-modal,.pf-modal) { opacity: 1; transform: none; }
+
+/* Conditionally mounted generic dialogs use the same entrance language. */
+.modal-bg.open { animation: rv-backdrop-enter 180ms var(--ease-out) both; }
+.modal-bg.open .modal-box { animation: rv-dialog-enter 240ms var(--ease-out) both; transform-origin: center; }
+.public-site .mobile-nav-backdrop { animation: rv-backdrop-enter 180ms var(--ease-out) both; }
+.public-site .mobile-nav.open { animation: rv-public-drawer-enter var(--dur-drawer) var(--ease-drawer) both; }
+#app .admin-nav-backdrop { animation: rv-backdrop-enter 180ms var(--ease-out) both; }
+
+@keyframes rv-backdrop-enter { from { opacity: 0; } to { opacity: 1; } }
+@keyframes rv-dialog-enter {
+  from { opacity: 0; transform: translate3d(0,8px,0) scale(.97); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes rv-public-drawer-enter {
+  from { transform: translate3d(100%,0,0); }
+  to { transform: translate3d(0,0,0); }
+}
+
+/* Controls respond quickly and keep transitions interruptible. */
+.theme-toggle { transition: background-color var(--dur-fast) var(--ease-out),border-color var(--dur-fast) var(--ease-out); }
+.theme-toggle .theme-toggle-thumb { transition: transform 200ms var(--ease-out),background-color var(--dur-fast) var(--ease-out),color var(--dur-fast) var(--ease-out); }
+.hamburger span { transition: transform var(--dur-medium) var(--ease-drawer),opacity var(--dur-fast) var(--ease-out),background-color var(--dur-fast) var(--ease-out) !important; }
+
+@media (hover: hover) and (pointer: fine) {
+  .auth-morph-retry:hover { background: rgba(0,201,167,.18); transform: translate3d(0,-1px,0); }
+}
+
+@media (max-width: 700px) {
+  :is(.bk-modal,.pf-modal) { transform: translate3d(0,12px,0) scale(.98); transform-origin: center; }
+  :is(.bk-overlay,.pf-overlay).open :is(.bk-modal,.pf-modal) { transform: none; }
+  .modal-bg.open .modal-box { animation-name: rv-dialog-compact-enter; transform-origin: center; }
+  @keyframes rv-dialog-compact-enter {
+    from { opacity: .94; transform: translate3d(0,12px,0) scale(.98); }
+    to { opacity: 1; transform: none; }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rv-loader-ball { animation: none; transform: translate3d(40px,0,0); }
+  .rv-loader-line i { animation: none; opacity: .72; transform: scaleX(.72); }
+  :is(.bk-overlay,.pf-overlay),
+  :is(.bk-modal,.pf-modal),
+  .modal-bg.open,
+  .modal-bg.open .modal-box,
+  .public-site .mobile-nav-backdrop,
+  .public-site .mobile-nav.open,
+  #app .admin-nav-backdrop { animation: none; }
+}

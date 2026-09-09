@@ -1,286 +1,137 @@
 import '../../styles/admin/reports.css';
-import '../../styles/admin/monitor.css';
-import { useEffect, useMemo, useState } from 'react';
-import DateRangePicker from '../../components/DateRangePicker';
-import DataTable from '../../components/DataTable';
-import Modal from '../../components/Modal';
-import ConfirmDialog from '../../components/ConfirmDialog';
-import { useConfirm } from '../../hooks/useConfirm';
-import { useAuth } from '../../context/AuthContext';
+import '../../styles/admin/finance.css';
+import { useMemo, useState } from 'react';
+import RevenueFilters from '../../components/RevenueFilters';
+import RevenueSummary from '../../components/RevenueSummary';
+import { businessDate, daysBefore, useRevenueReport } from '../../hooks/useRevenueReport';
 import { reportsService } from '../../services/reports';
-import { roomSessionsService } from '../../services/monitoring';
+import { formatPeso } from '../../utils/currency';
 
-const RECENT_FINISHED_WINDOW_MS = 24 * 60 * 60 * 1000;
-
-function todayKey() {
-  return new Date().toISOString().slice(0, 10);
+function displayDate(value) {
+  if (!value) return '—';
+  const date = new Date(`${value}T12:00:00+08:00`);
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
-function formatPeso(amount) {
-  return `₱${(amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+function statusClass(status) {
+  if (status === 'Cancelled' || status === 'Rejected' || status === 'No Show') return 'pill-overdue';
+  if (status === 'Done' || status === 'Finished') return 'pill-done';
+  if (status === 'Pending' || status === 'Partial' || status === 'Unpaid') return 'pill-pending';
+  return 'pill-active';
 }
 
 function Reports() {
-  const { hasPermission, guardPermission } = useAuth();
-  const canManage = hasPermission('room:manage');
-  const { confirm, confirmProps } = useConfirm();
-
-  const [from, setFrom] = useState(todayKey());
-  const [to, setTo] = useState(todayKey());
-  const [loadingSource, setLoadingSource] = useState(null);
-  const [exportError, setExportError] = useState(null);
-
-  const [sessions, setSessions] = useState([]);
-  const [sessionsLoading, setSessionsLoading] = useState(true);
-  const [sessionsError, setSessionsError] = useState(false);
-  const [editSessionId, setEditSessionId] = useState(null);
-
+  const today = useMemo(() => businessDate(), []);
+  const [from, setFrom] = useState(() => daysBefore(today, 6));
+  const [to, setTo] = useState(today);
+  const [source, setSource] = useState('all');
   const [search, setSearch] = useState('');
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState('');
+  const { data, loading, error, reload } = useRevenueReport(from, to, source);
 
-  async function fetchFinishedSessions() {
-    setSessionsLoading(true);
-    setSessionsError(false);
-    try {
-      const data = await roomSessionsService.list();
-      setSessions(Array.isArray(data) ? data : []);
-    } catch (err) {
-      console.error(err);
-      setSessionsError(true);
-    } finally {
-      setSessionsLoading(false);
-    }
-  }
+  const visibleRows = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    if (!term) return data?.rows || [];
+    return (data?.rows || []).filter((row) => [row.reference, row.guestName, row.facilityName, row.roomName, row.status, row.paymentStatus].join(' ').toLowerCase().includes(term));
+  }, [data, search]);
 
-  useEffect(() => {
-    if (!canManage) {
-      setSessionsLoading(false);
-      return;
-    }
-    fetchFinishedSessions();
-  }, [canManage]);
-
-  function handleRangeChange(nextFrom, nextTo) {
-    setFrom(nextFrom);
-    setTo(nextTo);
-  }
-
-  async function handleExport(source) {
-    const label = source === 'booking' ? 'Reservations Report' : 'Room Monitoring Report';
-    if (!(await confirm(`Export the ${label} for ${from} to ${to}? This will download an Excel file.`, { confirmText: 'Export' }))) return;
-    setLoadingSource(source);
-    setExportError(null);
+  async function handleExport() {
+    setExporting(true);
+    setExportError('');
     try {
       await reportsService.exportRange(from, to, source);
     } catch (err) {
-      setExportError(err.message);
+      setExportError(err.message || 'Could not generate the report.');
     } finally {
-      setLoadingSource(null);
+      setExporting(false);
     }
   }
-
-  async function deleteSession(session) {
-    if (!guardPermission('room:manage')) return;
-    if (!(await confirm('Delete this session record permanently? This cannot be undone.', { confirmText: 'Delete' }))) return;
-    try {
-      await roomSessionsService.remove(session._id);
-      await fetchFinishedSessions();
-    } catch (err) {
-      console.error(err);
-      alert(err.message || 'Could not delete this session.');
-    }
-  }
-
-  async function saveSessionEdit(sessionId, payload) {
-    await roomSessionsService.editFinished(sessionId, payload);
-    setEditSessionId(null);
-    await fetchFinishedSessions();
-  }
-
-  const recentlyFinished = useMemo(
-    () =>
-      sessions
-        .filter((s) => s.status === 'Finished' && s.endedAt && Date.now() - new Date(s.endedAt).getTime() <= RECENT_FINISHED_WINDOW_MS)
-        .sort((a, b) => new Date(b.endedAt).getTime() - new Date(a.endedAt).getTime()),
-    [sessions]
-  );
-
-  const summary = useMemo(() => {
-    const totalSales = recentlyFinished.reduce((sum, s) => sum + (s.amount || 0), 0);
-    return { totalSales, transactions: recentlyFinished.length };
-  }, [recentlyFinished]);
-
-  const visibleSessions = useMemo(() => {
-    const term = search.trim().toLowerCase();
-    return recentlyFinished.filter((s) => {
-      if (!term) return true;
-      const haystack = `${s.guestName || ''} ${s.room?.facilityName || s.facilityName || ''} ${s.room?.roomNumber ?? s.roomNumber ?? ''}`.toLowerCase();
-      return haystack.includes(term);
-    });
-  }, [recentlyFinished, search]);
-
-  const columns = [
-    {
-      key: 'room',
-      label: 'Room',
-      render: (s) => (
-        <>
-          <div className="rm-name">Room {s.room?.roomNumber ?? s.roomNumber}</div>
-          <div className="rm-type">{s.room?.facilityName || s.facilityName || ''}</div>
-        </>
-      ),
-    },
-    { key: 'guest', label: 'Guest', render: (s) => s.guestName || '—' },
-    {
-      key: 'ended',
-      label: 'Ended',
-      render: (s) => (s.endedAt ? new Date(s.endedAt).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'),
-    },
-    { key: 'amount', label: 'Amount', render: (s) => formatPeso(s.amount) },
-    {
-      key: 'actions',
-      label: 'Action',
-      render: (s) => (
-        <div className="rm-actions rm-actions--table">
-          <button className="rm-btn" onClick={() => setEditSessionId(s._id)}><i className="bi bi-pencil-square"></i>Edit</button>
-          <button className="rm-btn danger" onClick={() => deleteSession(s)}><i className="bi bi-trash"></i>Delete</button>
-        </div>
-      ),
-    },
-  ];
 
   return (
     <div className="panel active" id="panel-reports">
-      <div className="card">
-        <div className="card-head">
-          <span className="card-title">Export Sales Report</span>
-        </div>
-        <p className="rep-card-desc">Download an itemized Excel report for a chosen date range, split by reservation or walk-in sales.</p>
-        <div className="rep-daterange-row">
-          <div className="field-stack">
-            <label className="field-label">Date range</label>
-            <DateRangePicker from={from} to={to} onChange={handleRangeChange} />
-          </div>
-          <button className="save-btn" onClick={() => handleExport('booking')} disabled={loadingSource !== null}>
-            <i className="ti ti-calendar-check"></i>
-            {loadingSource === 'booking' ? 'Generating…' : 'Export Reservations Report'}
-          </button>
-          <button className="save-btn" onClick={() => handleExport('walkin')} disabled={loadingSource !== null}>
-            <i className="ti ti-door-enter"></i>
-            {loadingSource === 'walkin' ? 'Generating…' : 'Export Room Monitoring Report'}
-          </button>
-        </div>
-        {exportError && (
-          <div className="rep-alert">
-            <i className="ti ti-alert-triangle"></i>
-            {exportError}
-          </div>
-        )}
+      <RevenueFilters
+        from={from}
+        to={to}
+        source={source}
+        onRangeChange={(nextFrom, nextTo) => { setFrom(nextFrom); setTo(nextTo); }}
+        onSourceChange={setSource}
+        reload={reload}
+        loading={loading}
+      >
+        <button type="button" className="save-btn" onClick={handleExport} disabled={exporting || loading}>
+          <i className="ti ti-file-spreadsheet" aria-hidden="true" /> {exporting ? 'Generating…' : 'Export Excel'}
+        </button>
+        <button type="button" className="btn-cancel" onClick={() => window.print()} disabled={!data || loading}>
+          <i className="ti ti-file-type-pdf" aria-hidden="true" /> Print / Save PDF
+        </button>
+      </RevenueFilters>
+
+      <div className="card no-print">
+        <div className="card-head"><span className="card-title">Revenue and payment report</span><span className="finance-meta">{displayDate(from)} – {displayDate(to)}</span></div>
+        <p className="rep-card-desc">Each charge stays tied to its facility, room type, hourly rate, and played or reserved hours. Linked reservations and sessions appear once.</p>
+        {exportError && <div className="finance-error" role="alert">{exportError}</div>}
+        {error && <div className="finance-error" role="alert">{error}</div>}
       </div>
 
-      {canManage && (
-        <>
-          <div className="metric-row rep-metric-row">
-            <div className="mc">
-              <div className="mc-label"><i className="ti ti-cash"></i>Sales (Last 24h)</div>
-              <div className="mc-val">{sessionsLoading ? '—' : formatPeso(summary.totalSales)}</div>
-              <div className="mc-sub">From finished sessions</div>
-            </div>
-            <div className="mc">
-              <div className="mc-label"><i className="ti ti-receipt"></i>Transactions</div>
-              <div className="mc-val">{sessionsLoading ? '—' : summary.transactions}</div>
-              <div className="mc-sub">Sessions ended in last 24h</div>
-            </div>
-          </div>
+      <p className="finance-basis">Report basis: recorded payments less manual refunds, grouped by service date in Asia/Manila. Transactions with incomplete legacy payment data are marked for review.</p>
+      <RevenueSummary summary={data?.summary} loading={loading} />
 
-          <div className="card card-flush rep-log-card">
-            <div className="rep-log-head">
-              <span className="card-title">Recently Finished Sessions</span>
-              <div className="rep-log-filters">
-                <div className="rep-search">
-                  <i className="ti ti-search"></i>
-                  <input
-                    type="text"
-                    placeholder="Search guest, room, or facility…"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="rep-log-table-wrap">
-              <DataTable
-                columns={columns}
-                rows={sessionsError ? [] : visibleSessions}
-                loading={sessionsLoading}
-                emptyMessage={sessionsError ? 'Failed to load sessions.' : recentlyFinished.length === 0 ? 'No sessions finished in the last 24 hours.' : 'No sessions match your search.'}
-                getRowKey={(s) => s._id}
-              />
-            </div>
-          </div>
-        </>
+      {data?.warnings?.length > 0 && (
+        <div className="finance-warning" role="status"><strong>Payment review needed</strong><ul>{data.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul></div>
       )}
 
-      <EditFinishedSessionModal
-        session={sessions.find((s) => s._id === editSessionId) || null}
-        onClose={() => setEditSessionId(null)}
-        onSubmit={saveSessionEdit}
-      />
+      <div className="finance-activity">
+        <span><strong>{data?.summary?.transactions ?? '—'}</strong> transactions</span>
+        <span><strong>{data?.summary?.reservations ?? '—'}</strong> online reservations</span>
+        <span><strong>{data?.summary?.walkins ?? '—'}</strong> walk-ins / manual bookings</span>
+        <span><strong>{data?.summary?.bookedHours ?? '—'}h</strong> booked hours</span>
+      </div>
 
-      <ConfirmDialog {...confirmProps} />
+      {data?.byFacility?.length > 0 && (
+        <div className="report-room-types" aria-label="Revenue by room type">
+          {data.byFacility.map((item) => <div key={item.name}><span><strong>{item.roomType || item.name}</strong><small>{item.facilityName || ''} · {item.bookedHours}h</small></span><span><strong>{formatPeso(item.collected)}</strong><small>{formatPeso(item.outstanding)} due</small></span></div>)}
+        </div>
+      )}
+
+      <div className="card card-flush rep-log-card">
+        <div className="rep-log-head no-print">
+          <span className="card-title">Transactions</span>
+          <div className="rep-log-filters">
+            <div className="rep-search">
+              <i className="ti ti-search" aria-hidden="true" />
+              <input type="search" placeholder="Search reference, guest, or facility…" value={search} onChange={(event) => setSearch(event.target.value)} aria-label="Search transactions" />
+            </div>
+          </div>
+        </div>
+        <div className="rep-log-table-wrap">
+          <div className="admin-table-scroll finance-screen-table" tabIndex={0} role="region" aria-label="Sales transactions table">
+            <table className="tbl">
+              <thead><tr><th>Date / time</th><th>Facility / room</th><th>Guest / source</th><th>Hours</th><th>Rate / hour</th><th>Charge</th><th>Paid</th><th>Balance</th><th>Payment / status</th></tr></thead>
+              <tbody>
+                {loading && !data ? <tr><td colSpan="9" className="finance-empty">Loading report…</td></tr> : visibleRows.length ? visibleRows.map((row) => (
+                  <tr key={row.id}>
+                    <td>{displayDate(row.date)}<div className="finance-meta">{row.timeIn || '—'}{row.timeOut ? ` – ${row.timeOut}` : ''} · {row.reference}</div></td>
+                    <td>{row.facilityName}<div className="finance-meta">{row.roomType || row.roomName}{row.unitNumber ? ` · Unit ${row.unitNumber}` : ''}</div></td>
+                    <td>{row.guestName}<div className="finance-meta">{row.source === 'booking' ? 'Reservation' : 'Walk-in'}</div></td>
+                    <td className="finance-value">{row.duration}h</td>
+                    <td>{row.rateLabel || formatPeso(row.rate)}</td>
+                    <td className="finance-value">{formatPeso(row.amount)}</td>
+                    <td className="finance-value">{formatPeso(row.collected)}</td>
+                    <td className="finance-value">{formatPeso(row.balance)}</td>
+                    <td><span className={`pill ${statusClass(row.paymentStatus)}`}>{row.paymentStatus}</span><div className="finance-meta">{row.status}</div></td>
+                  </tr>
+                )) : <tr><td colSpan="9" className="finance-empty">No transactions match this range.</td></tr>}
+              </tbody>
+            </table>
+          </div>
+          <table className="finance-print-table">
+            <thead><tr><th>Date / time</th><th>Facility / room</th><th>Guest / source</th><th>Hours</th><th>Rate</th><th>Charge</th><th>Paid</th><th>Balance</th><th>Payment / status</th></tr></thead>
+            <tbody>{visibleRows.map((row) => <tr key={`print-${row.id}`}><td>{displayDate(row.date)} {row.timeIn || ''} {row.timeOut ? `– ${row.timeOut}` : ''}<br />{row.reference}</td><td>{row.facilityName} {row.roomType || row.roomName || ''}</td><td>{row.guestName}<br />{row.source === 'booking' ? 'Reservation' : 'Walk-in'}</td><td>{row.duration}h</td><td>{row.rateLabel || formatPeso(row.rate)}</td><td>{formatPeso(row.amount)}</td><td>{formatPeso(row.collected)}</td><td>{formatPeso(row.balance)}</td><td>{row.paymentStatus} / {row.status}</td></tr>)}</tbody>
+          </table>
+        </div>
+      </div>
     </div>
-  );
-}
-
-function EditFinishedSessionModal({ session, onClose, onSubmit }) {
-  const [guestName, setGuestName] = useState('');
-  const [amount, setAmount] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-
-  useEffect(() => {
-    if (!session) return;
-    setGuestName(session.guestName || '');
-    setAmount(String(session.amount ?? 0));
-  }, [session]);
-
-  async function handleSubmit() {
-    const parsedAmount = Number(amount);
-    if (Number.isNaN(parsedAmount) || parsedAmount < 0) {
-      alert('Amount must be a valid non-negative number.');
-      return;
-    }
-    setSubmitting(true);
-    try {
-      await onSubmit(session._id, { amount: parsedAmount, guestName });
-    } catch (err) {
-      console.error(err);
-      alert(err.message || 'Could not save this correction.');
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  return (
-    <Modal open={!!session} onClose={onClose} title="Edit Finished Session">
-      {session && (
-        <>
-          <div className="mfield">
-            <label>Guest Name</label>
-            <input type="text" value={guestName} onChange={(e) => setGuestName(e.target.value)} placeholder="e.g. Juan Dela Cruz" />
-          </div>
-          <div className="mfield">
-            <label>Amount (₱)</label>
-            <input type="number" min="0" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} />
-          </div>
-          <div className="modal-actions">
-            <button className="btn-cancel" onClick={onClose}>Cancel</button>
-            <button className="btn-confirm" disabled={submitting} onClick={handleSubmit}>
-              {submitting ? 'Saving…' : 'Save Changes'}
-            </button>
-          </div>
-        </>
-      )}
-    </Modal>
   );
 }
 

@@ -1,22 +1,33 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Navigate, Outlet, useLocation } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
+import { Clock3, ExternalLink, MapPin, Menu } from 'lucide-react';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import '../styles/admin/shared.css';
-import AdminSidebar, { PAGE_TITLES } from '../components/AdminSidebar';
+import AdminSidebar, { PAGE_CONTEXT, PAGE_TITLES } from '../components/AdminSidebar';
 import ThemeToggle from '../components/ThemeToggle';
+import PageTransition from '../components/PageTransition';
+import RiverviewLoader from '../components/RiverviewLoader';
 import { useAuth } from '../context/AuthContext';
+import { AdminAppNavigation } from '../components/MobileAppNavigation';
 
 const ADMIN_THEME_KEY = 'rv_admin_theme';
 
 function AdminLayout() {
-  const { initializing, isAdmin } = useAuth();
+  const { initializing, isAdmin, hasPermission } = useAuth();
   const location = useLocation();
-  const pageTitle = PAGE_TITLES[location.pathname.split('/').pop()] || 'Dashboard';
-  const [liveTime, setLiveTime] = useState('');
+  const pageKey = location.pathname.split('/').pop();
+  const pageTitle = PAGE_TITLES[pageKey] || 'Dashboard';
+  const pageContext = PAGE_CONTEXT[pageKey] || 'Operations workspace';
+  const [liveTime, setLiveTime] = useState({ time: '', date: '' });
   const [compactNavigation, setCompactNavigation] = useState(() => window.matchMedia('(max-width: 1200px)').matches);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const menuButtonRef = useRef(null);
+  const menuTriggerRef = useRef(null);
   const closeMobileMenu = useCallback(() => setMobileMenuOpen(false), []);
+  const openMobileMenu = useCallback((event) => {
+    menuTriggerRef.current = event?.currentTarget || menuButtonRef.current;
+    setMobileMenuOpen(true);
+  }, []);
   const [theme, setTheme] = useState(() => {
     try {
       return localStorage.getItem(ADMIN_THEME_KEY) === 'dark' ? 'dark' : 'light';
@@ -52,7 +63,19 @@ function AdminLayout() {
 
   useEffect(() => {
     function tick() {
-      setLiveTime(new Date().toLocaleTimeString());
+      const now = new Date();
+      setLiveTime({
+        time: new Intl.DateTimeFormat('en-PH', {
+          timeZone: 'Asia/Manila',
+          hour: 'numeric',
+          minute: '2-digit',
+        }).format(now),
+        date: new Intl.DateTimeFormat('en-PH', {
+          timeZone: 'Asia/Manila',
+          month: 'short',
+          day: 'numeric',
+        }).format(now),
+      });
     }
     tick();
     const id = setInterval(tick, 1000);
@@ -60,11 +83,7 @@ function AdminLayout() {
   }, []);
 
   if (initializing) {
-    return (
-      <div style={{ padding: '3rem', fontFamily: 'sans-serif', color: 'var(--muted, #888)' }}>
-        Checking your session…
-      </div>
-    );
+    return <RiverviewLoader message="Checking your staff session…" />;
   }
 
   if (!isAdmin) {
@@ -77,7 +96,7 @@ function AdminLayout() {
         compact={compactNavigation}
         mobileOpen={mobileMenuOpen}
         onClose={closeMobileMenu}
-        triggerRef={menuButtonRef}
+        triggerRef={menuTriggerRef}
       />
       {compactNavigation && mobileMenuOpen && (
         <div className="admin-nav-backdrop" onClick={closeMobileMenu} aria-hidden="true" />
@@ -93,44 +112,44 @@ function AdminLayout() {
               aria-label="Open navigation menu"
               aria-controls="sidebar"
               aria-expanded={mobileMenuOpen}
-              onClick={() => setMobileMenuOpen(true)}
+              onClick={openMobileMenu}
             >
-              <i className="ti ti-menu-2" aria-hidden="true"></i>
+              <Menu size={20} aria-hidden="true" />
             </button>
-            <span className="page-title" id="page-title">{pageTitle}</span>
+            <div className="admin-title-stack">
+              <span className="admin-page-eyebrow">{pageContext}</span>
+              <span className="page-title" id="page-title">{pageTitle}</span>
+            </div>
           </div>
           <div className="topbar-right">
-            <div className="tb-chip admin-location-chip"><i className="ti ti-map-pin"></i>San Rafael Caingin</div>
-            <div className="tb-chip admin-clock-chip"><i className="ti ti-clock"></i><span id="live-time">{liveTime}</span></div>
+            <div className="tb-chip admin-location-chip"><MapPin size={14} aria-hidden="true" />Caingin, San Rafael</div>
+            <div className="tb-chip admin-clock-chip" title={`Philippine time · ${liveTime.date}`}><Clock3 size={14} aria-hidden="true" /><span id="live-time">{liveTime.time}</span></div>
             <a
-              className="tb-chip"
+              className="tb-chip admin-site-link"
               id="view-user-site-btn"
               href="/"
               target="_blank"
               rel="noreferrer"
-              style={{
-                cursor: 'pointer',
-                background: 'rgba(239,62,109,.08)',
-                borderColor: 'rgba(239,62,109,.25)',
-                color: 'var(--teal)',
-                textDecoration: 'none',
-              }}
               title="Open the public-facing site in a new tab"
               aria-label="View user site (opens in a new tab)"
             >
-              <i className="ti ti-external-link" aria-hidden="true"></i><span className="admin-site-link-label">View User Site</span>
+              <ExternalLink size={14} aria-hidden="true" /><span className="admin-site-link-label">Customer site</span>
             </a>
-            <button className="notif-btn" aria-label="Notifications">
-              <i className="ti ti-bell"></i><span className="notif-dot"></span>
-            </button>
             <ThemeToggle id="admin-theme-toggle" theme={theme} onToggle={toggleTheme} />
           </div>
         </div>
 
         <div className="content">
-          <Outlet />
+          <PageTransition variant="admin" />
         </div>
+
+        <AdminAppNavigation
+          hasPermission={hasPermission}
+          menuOpen={mobileMenuOpen}
+          onOpenMenu={openMobileMenu}
+        />
       </div>
+      <div className="modal-portal-root" data-modal-portal />
     </div>
   );
 }

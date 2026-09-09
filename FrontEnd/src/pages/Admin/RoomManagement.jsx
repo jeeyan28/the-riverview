@@ -7,6 +7,34 @@ import RoomOptionCard from '../../components/RoomOptionCard';
 import { resolveImageUrl } from '../../utils/resolveImageUrl';
 import { useAuth } from '../../context/AuthContext';
 import { roomsService } from '../../services/rooms';
+import { variantRateLabel } from '../../utils/roomPricing';
+
+const SERVICE_CATEGORIES = ['Billiards', 'KTV', 'Court'];
+
+const SERVICE_DEFAULTS = {
+  Billiards: {
+    description: 'Choose from shared, solo, and VIP billiards rooms.',
+    variants: [
+      { label: 'Shared Room', price: 150, pax: '', features: ['Shared billiards space'] },
+      { label: 'Solo Regular', price: 200, pax: '', features: ['Private billiards table'] },
+      { label: 'Solo Big Room', price: 250, pax: '', features: ['Larger private billiards room'] },
+      { label: 'VIP', price: 400, pax: 'Max 10 pax', extraGuestFee: 50, includedGuests: 0, features: ['KTV + Pool', 'Maximum 10 guests'] },
+    ],
+  },
+  KTV: {
+    description: 'Private KTV rooms for groups and celebrations.',
+    variants: [
+      { label: 'Standard Room', price: 300, pax: '', features: ['Private KTV room'] },
+    ],
+  },
+  Court: {
+    description: 'Court rentals for casual play and official games.',
+    variants: [
+      { label: 'Standard', price: 350, pricingMode: 'time-based', eveningPrice: 400, eveningStartTime: '17:00', pax: '', features: ['₱350/hr from 7 AM–5 PM', '₱400/hr from 5 PM–12 AM'] },
+      { label: 'Official Games', price: 500, pax: '', features: ['Scoreboard', 'Timer', 'Sound system'] },
+    ],
+  },
+};
 
 const FORM_STEPS = [
   { key: 'facility', label: 'Facility' },
@@ -16,20 +44,34 @@ const FORM_STEPS = [
 const ROOM_STATUS_PILL_CLASS = { Available: 'pill-active', Maintenance: 'pill-pending', Unavailable: 'pill-overdue' };
 
 function emptyVariant() {
-  return { label: '', price: '', pax: '', startingRoomNumber: '', roomCount: 1, status: 'Available', image: '', features: [] };
+  return {
+    label: '', price: '', pax: '', startingRoomNumber: '', roomCount: 1,
+    status: 'Available', image: '', features: [], pricingMode: 'flat',
+    eveningPrice: '', eveningStartTime: '17:00', includedGuests: 0, extraGuestFee: 0,
+  };
 }
 
-function emptyFacilityForm() {
+function emptyFacilityForm(name = '') {
+  const preset = SERVICE_DEFAULTS[name];
   return {
-    name: '',
-    description: '',
-    variants: [],
+    name,
+    description: preset?.description || '',
+    variants: (preset?.variants || []).map((variant, index) => ({
+      ...emptyVariant(),
+      ...variant,
+      startingRoomNumber: index + 1,
+      roomCount: 1,
+      features: [...(variant.features || [])],
+    })),
   };
 }
 
 function lowestRoomPrice(variants) {
   if (!variants || !variants.length) return 0;
-  return Math.min(...variants.map((v) => Number(v.price) || 0));
+  return Math.min(...variants.flatMap((variant) => [
+    Number(variant.price) || 0,
+    ...(variant.pricingMode === 'time-based' && variant.eveningPrice !== '' && variant.eveningPrice !== null && variant.eveningPrice !== undefined ? [Number(variant.eveningPrice) || 0] : []),
+  ]));
 }
 
 function roomNumberRangeLabel(v) {
@@ -41,9 +83,9 @@ function roomNumberRangeLabel(v) {
 function statusCounts(variants) {
   const list = variants || [];
   return {
-    available: list.filter((v) => v.status === 'Available').length,
-    maintenance: list.filter((v) => v.status === 'Maintenance').length,
-    unavailable: list.filter((v) => v.status === 'Unavailable').length,
+    available: list.filter((v) => v.status === 'Available').reduce((sum, variant) => sum + Math.max(1, Number(variant.roomCount) || 1), 0),
+    maintenance: list.filter((v) => v.status === 'Maintenance').reduce((sum, variant) => sum + Math.max(1, Number(variant.roomCount) || 1), 0),
+    unavailable: list.filter((v) => v.status === 'Unavailable').reduce((sum, variant) => sum + Math.max(1, Number(variant.roomCount) || 1), 0),
   };
 }
 
@@ -68,7 +110,6 @@ function RoomManagement() {
   const [editingId, setEditingId] = useState(null);
   const [formStep, setFormStep] = useState('facility');
   const [activeRoomIndex, setActiveRoomIndex] = useState(null);
-  const [addingNewCategory, setAddingNewCategory] = useState(false);
   const [form, setForm] = useState(emptyFacilityForm());
   const [existingImageUrl, setExistingImageUrl] = useState('');
   const [selectedImageFile, setSelectedImageFile] = useState(null);
@@ -80,7 +121,7 @@ function RoomManagement() {
   const fetchRooms = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await roomsService.list();
+      const data = await roomsService.adminList();
       const normalized = (Array.isArray(data) ? data : []).map((r) => ({
         ...r,
         features: Array.isArray(r.features)
@@ -119,11 +160,15 @@ function RoomManagement() {
 
   function openAddModal() {
     if (!guardPermission('room:manage')) return;
+    const nextService = SERVICE_CATEGORIES.find((name) => !rooms.some((room) => room.name === name));
+    if (!nextService) {
+      alert('Billiards, KTV, and Court are already configured. Edit an existing facility to change its rooms or pricing.');
+      return;
+    }
     setEditingId(null);
     setFormStep('facility');
     setActiveRoomIndex(null);
-    setAddingNewCategory(false);
-    setForm(emptyFacilityForm());
+    setForm(emptyFacilityForm(nextService));
     resetImageState();
     setFeatureInput('');
     setModalOpen(true);
@@ -134,7 +179,6 @@ function RoomManagement() {
     setEditingId(room._id);
     setFormStep('facility');
     setActiveRoomIndex(null);
-    setAddingNewCategory(false);
     setForm({
       name: room.name || '',
       description: room.description || '',
@@ -143,6 +187,11 @@ function RoomManagement() {
         startingRoomNumber: v.startingRoomNumber ?? '',
         roomCount: v.roomCount ?? 1,
         status: v.status || 'Available',
+        pricingMode: v.pricingMode || 'flat',
+        eveningPrice: v.eveningPrice ?? '',
+        eveningStartTime: v.eveningStartTime || '17:00',
+        includedGuests: v.includedGuests ?? 0,
+        extraGuestFee: v.extraGuestFee ?? 0,
         features: Array.isArray(v.features) ? v.features : [],
       })),
     });
@@ -257,6 +306,10 @@ function RoomManagement() {
       alert('Please fill in the facility category name.');
       return;
     }
+    if (!SERVICE_CATEGORIES.includes(form.name.trim())) {
+      alert('Facility must be Billiards, KTV, or Court. Those are the services defined for this project.');
+      return;
+    }
     const normalized = form.name.trim().toLowerCase();
     const clash = rooms.find((r) => r.name.trim().toLowerCase() === normalized && r._id !== editingId);
     if (clash) {
@@ -275,6 +328,16 @@ function RoomManagement() {
       alert(`Starting Room No. for "${invalidRoomNumber.v.label || 'Untitled Room'}" must be greater than 0, or left blank to default to 1.`);
       return;
     }
+    const invalidVariant = cleanVariantEntries.find(({ v }) => {
+      const price = Number(v.price);
+      const eveningPrice = Number(v.eveningPrice);
+      return !v.label.trim() || v.price === '' || !Number.isFinite(price) || price < 0 ||
+        (v.pricingMode === 'time-based' && (v.eveningPrice === '' || !Number.isFinite(eveningPrice) || eveningPrice < 0));
+    });
+    if (invalidVariant) {
+      alert('Every room needs a name and a valid rate. Time-based rooms also need a valid evening rate.');
+      return;
+    }
     const cleanVariants = cleanVariantEntries.map(({ v }) => ({
       label: v.label.trim(),
       price: Number(v.price) || 0,
@@ -284,6 +347,11 @@ function RoomManagement() {
       status: v.status || 'Available',
       image: v.image || '',
       features: v.features || [],
+      pricingMode: v.pricingMode || 'flat',
+      eveningPrice: v.pricingMode === 'time-based' ? Number(v.eveningPrice) : null,
+      eveningStartTime: v.eveningStartTime || '17:00',
+      includedGuests: Math.max(0, Number(v.includedGuests) || 0),
+      extraGuestFee: Math.max(0, Number(v.extraGuestFee) || 0),
     }));
     if (cleanVariants.length === 0) {
       alert('Add at least one room before saving this facility.');
@@ -352,25 +420,8 @@ function RoomManagement() {
     }
   }
 
-  async function duplicate(room) {
-    if (!guardPermission('room:manage')) return;
-    const payload = {
-      name: room.name + ' (Copy)',
-      description: room.description,
-      price: room.price,
-      variants: JSON.stringify(room.variants || []),
-    };
-    try {
-      await roomsService.create(payload);
-      await fetchRooms();
-    } catch (err) {
-      console.error(err);
-      alert('Could not duplicate this facility.');
-    }
-  }
-
   const categories = useMemo(
-    () => Array.from(new Set(rooms.map((r) => r.name).filter(Boolean))).sort(),
+    () => [...SERVICE_CATEGORIES.filter((name) => rooms.some((room) => room.name === name)), ...Array.from(new Set(rooms.map((room) => room.name).filter((name) => name && !SERVICE_CATEGORIES.includes(name)))).sort()],
     [rooms]
   );
 
@@ -389,9 +440,9 @@ function RoomManagement() {
     const allVariants = visibleRooms.flatMap((r) => r.variants || []);
     return {
       facilities: visibleRooms.length,
-      totalRooms: allVariants.length,
-      available: allVariants.filter((v) => v.status === 'Available').length,
-      maintenance: allVariants.filter((v) => v.status === 'Maintenance').length,
+      totalRooms: allVariants.reduce((sum, variant) => sum + Math.max(1, Number(variant.roomCount) || 1), 0),
+      available: allVariants.filter((v) => v.status === 'Available').reduce((sum, variant) => sum + Math.max(1, Number(variant.roomCount) || 1), 0),
+      maintenance: allVariants.filter((v) => v.status === 'Maintenance').reduce((sum, variant) => sum + Math.max(1, Number(variant.roomCount) || 1), 0),
     };
   }, [visibleRooms]);
 
@@ -417,11 +468,6 @@ function RoomManagement() {
 
   const activeRoom = activeRoomIndex !== null ? form.variants[activeRoomIndex] : null;
 
-  const normalizedName = form.name.trim().toLowerCase();
-  const duplicateCategoryRoom =
-    normalizedName === ''
-      ? null
-      : rooms.find((r) => r.name.trim().toLowerCase() === normalizedName && r._id !== editingId);
   const stepIndex = FORM_STEPS.findIndex((s) => s.key === formStep);
 
   return (
@@ -463,12 +509,12 @@ function RoomManagement() {
             <i className="ti ti-building"></i>
             <div>
               <div className="fac-head-title">Manage your Facility</div>
-              <div className="fac-head-sub">Add facilities, then define the rooms guests can reserve.</div>
+              <div className="fac-head-sub">Configure the Billiards, KTV, and Court inventory guests can reserve.</div>
             </div>
           </div>
           {canManage && (
-            <button className="btn-teal" onClick={openAddModal}>
-              <i className="ti ti-plus"></i>Add Facility
+            <button className="btn-teal" onClick={openAddModal} disabled={SERVICE_CATEGORIES.every((name) => rooms.some((room) => room.name === name))}>
+              <i className="ti ti-plus"></i>{SERVICE_CATEGORIES.every((name) => rooms.some((room) => room.name === name)) ? 'All Services Added' : 'Add Missing Service'}
             </button>
           )}
         </div>
@@ -583,9 +629,6 @@ function RoomManagement() {
                             <button className="fac-edit-btn" onClick={() => openEditModal(r)}>
                               <i className="ti ti-edit"></i>Edit
                             </button>
-                            <button className="fac-icon-btn" title="Duplicate" onClick={() => duplicate(r)}>
-                              <i className="ti ti-copy"></i>
-                            </button>
                             <button className="fac-icon-btn del" title="Remove" onClick={() => quickDelete(r._id)}>
                               <i className="ti ti-trash"></i>
                             </button>
@@ -608,7 +651,7 @@ function RoomManagement() {
           <div>
             <div className="modal-lg-title">{editingId ? 'Edit Facility' : 'Add Facility'}</div>
             <div className="modal-lg-sub">
-              {editingId ? 'Update this facility and the rooms that belong to it.' : 'Add a new facility to your listing.'}
+              {editingId ? 'Update this service, inventory, and pricing.' : 'Add the missing service with PRD-aligned starter pricing.'}
             </div>
           </div>
           <button type="button" className="fm-close-btn" title="Close" onClick={closeModal}>
@@ -647,57 +690,22 @@ function RoomManagement() {
                 <div className="fm-section">
                 <div className="ffield">
                   <label className="flabel"><i className="ti ti-category"></i> Category</label>
-                  <span className="flabel-hint">Pick an existing category, or add a new one.</span>
-
-                  {addingNewCategory ? (
-                    <div className="fm-category-new-row">
-                      <input
-                        type="text" autoFocus placeholder="New category name"
-                        value={form.name}
-                        onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                      />
-                      <button
-                        type="button" className="fm-inline-link"
-                        onClick={() => { setAddingNewCategory(false); setForm((f) => ({ ...f, name: '' })); }}
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  ) : (
-                    <select
-                      value={categories.includes(form.name) ? form.name : ''}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        if (val === '__new__') {
-                          setForm((f) => ({ ...f, name: '' }));
-                          setAddingNewCategory(true);
-                          return;
-                        }
-                        const existingRoom = rooms.find((r) => r.name === val && r._id !== editingId);
-                        if (existingRoom) {
-                          openEditModal(existingRoom);
-                          return;
-                        }
-                        setForm((f) => ({ ...f, name: val }));
-                      }}
-                    >
-                      <option value="" disabled>Select a category…</option>
-                      {categories.map((cat) => (
-                        <option key={cat} value={cat}>{cat}</option>
-                      ))}
-                      <option value="__new__">+ Add New Category</option>
-                    </select>
-                  )}
-
-                  {addingNewCategory && duplicateCategoryRoom && (
-                    <div className="fm-field-warning">
-                      A facility named "{duplicateCategoryRoom.name}" already exists.
-                      {' '}
-                      <button type="button" className="fm-inline-link" onClick={() => openEditModal(duplicateCategoryRoom)}>
-                        Edit it instead
-                      </button>
-                      {' '}to add rooms to it, rather than creating a duplicate.
-                    </div>
+                  <span className="flabel-hint">The public catalogue only supports the three services defined in the project context.</span>
+                  <select
+                    value={SERVICE_CATEGORIES.includes(form.name) ? form.name : ''}
+                    onChange={(event) => {
+                      const name = event.target.value;
+                      setForm((current) => editingId ? { ...current, name } : emptyFacilityForm(name));
+                    }}
+                  >
+                    {!SERVICE_CATEGORIES.includes(form.name) && <option value="">Choose a supported service…</option>}
+                    {SERVICE_CATEGORIES.map((name) => {
+                      const usedByAnother = rooms.some((room) => room.name === name && room._id !== editingId);
+                      return <option key={name} value={name} disabled={usedByAnother}>{name}{usedByAnother ? ' — already configured' : ''}</option>;
+                    })}
+                  </select>
+                  {!SERVICE_CATEGORIES.includes(form.name) && editingId && (
+                    <div className="fm-field-warning">This legacy category is outside project scope. Choose Billiards, KTV, or Court, or remove it.</div>
                   )}
                 </div>
                 </div>
@@ -758,7 +766,7 @@ function RoomManagement() {
                       <div className="fm-room-card-body">
                         <div className="fm-room-card-name">{v.label || 'Untitled Room'}</div>
                         <div className="fm-room-card-meta">
-                          ₱{v.price || 0}/hr{v.pax ? ` · ${v.pax}` : ''} · {roomNumberRangeLabel(v)}
+                          {variantRateLabel(v)}{v.pax ? ` · ${v.pax}` : ''} · {roomNumberRangeLabel(v)}
                         </div>
                       </div>
                       <div className="fm-room-card-actions">
@@ -802,7 +810,7 @@ function RoomManagement() {
 
                   <div className="frow">
                     <div className="ffield">
-                      <label className="flabel">Rate (₱/hr)</label>
+                      <label className="flabel">{activeRoom.pricingMode === 'time-based' ? 'Daytime Rate (₱/hr)' : 'Rate (₱/hr)'}</label>
                       <input
                         type="number" min={0} placeholder="0"
                         value={activeRoom.price} onChange={(e) => updateVariant(activeRoomIndex, 'price', e.target.value)}
@@ -813,6 +821,59 @@ function RoomManagement() {
                       <input
                         type="text" placeholder="e.g. 6 pax"
                         value={activeRoom.pax} onChange={(e) => updateVariant(activeRoomIndex, 'pax', e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="ffield">
+                    <label className="flabel">Pricing schedule</label>
+                    <select
+                      value={activeRoom.pricingMode || 'flat'}
+                      onChange={(event) => updateVariant(activeRoomIndex, 'pricingMode', event.target.value)}
+                    >
+                      <option value="flat">Same rate all day</option>
+                      <option value="time-based">Daytime and evening rates</option>
+                    </select>
+                  </div>
+
+                  {activeRoom.pricingMode === 'time-based' && (
+                    <div className="frow">
+                      <div className="ffield">
+                        <label className="flabel">Evening Rate (₱/hr)</label>
+                        <input
+                          type="number" min={0} placeholder="400"
+                          value={activeRoom.eveningPrice}
+                          onChange={(event) => updateVariant(activeRoomIndex, 'eveningPrice', event.target.value)}
+                        />
+                      </div>
+                      <div className="ffield">
+                        <label className="flabel">Evening starts</label>
+                        <input
+                          type="time" step="3600"
+                          value={activeRoom.eveningStartTime || '17:00'}
+                          onChange={(event) => updateVariant(activeRoomIndex, 'eveningStartTime', event.target.value)}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="frow">
+                    <div className="ffield">
+                      <label className="flabel">Included Guests</label>
+                      <span className="flabel-hint">Use 0 when the per-guest fee applies to everyone.</span>
+                      <input
+                        type="number" min={0}
+                        value={activeRoom.includedGuests ?? 0}
+                        onChange={(event) => updateVariant(activeRoomIndex, 'includedGuests', event.target.value)}
+                      />
+                    </div>
+                    <div className="ffield">
+                      <label className="flabel">Extra Guest Fee (₱/guest/hr)</label>
+                      <span className="flabel-hint">Set 0 when no guest surcharge applies.</span>
+                      <input
+                        type="number" min={0}
+                        value={activeRoom.extraGuestFee ?? 0}
+                        onChange={(event) => updateVariant(activeRoomIndex, 'extraGuestFee', event.target.value)}
                       />
                     </div>
                   </div>
@@ -980,7 +1041,7 @@ function RoomManagement() {
           <button className="btn-remove" onClick={handleRemove} style={{ display: editingId ? 'inline-flex' : 'none' }}>
             <i className="ti ti-trash"></i> Remove
           </button>
-          <button className="btn-save" disabled={saving || !!duplicateCategoryRoom} onClick={handleSave}>
+          <button className="btn-save" disabled={saving || !SERVICE_CATEGORIES.includes(form.name)} onClick={handleSave}>
             {saving ? (
               <><i className="ti ti-loader-2 spin"></i> Saving…</>
             ) : (

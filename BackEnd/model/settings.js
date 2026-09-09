@@ -25,8 +25,8 @@ const announcementSchema = new mongoose.Schema({
 // (not per-room) — matches the "Operating Schedule" card already in the
 // admin Settings UI. `openDays` uses 0=Sunday..6=Saturday (JS Date.getDay()).
 const operatingHoursSchema = new mongoose.Schema({
-  openTime:  { type: String, default: "06:00" }, // "HH:MM", 24h
-  closeTime: { type: String, default: "22:00" },
+  openTime:  { type: String, default: "07:00" }, // "HH:MM", 24h
+  closeTime: { type: String, default: "00:00" },
   openDays:  { type: [Number], default: [0, 1, 2, 3, 4, 5, 6] },
   // Min/max hours a customer can select per online booking (admin bookings
   // are capped separately at 24h in bookingHelper.js). Admin-configurable

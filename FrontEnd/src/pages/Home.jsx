@@ -10,9 +10,12 @@ import {
 import { useSiteSettings } from '../hooks/useSiteSettings';
 import { useToast } from '../hooks/useToast';
 import { dateKey, fetchReservedHours } from '../utils/rooms';
+import { operatingHoursSummary } from '../utils/operatingHours';
 import BookingModal from '../components/BookingModal';
 import FacilityBookingCard from '../components/FacilityBookingCard';
 import FacilityCardSkeleton from '../components/FacilityCardSkeleton';
+import FacilityMotionVisual from '../components/FacilityMotionVisual';
+import RoomDetailsModal from '../components/RoomDetailsModal';
 import Toast from '../components/Toast';
 import { API_BASE_URL } from '../services/api';
 
@@ -21,9 +24,6 @@ import heroImg5 from '../assets/pictures/RiverView_5.jpg';
 import heroImg6 from '../assets/pictures/RiverView_6.jpg';
 import heroImg7 from '../assets/pictures/RiverView_7.jpg';
 import heroImg8 from '../assets/pictures/RiverView_8.jpg';
-import billiardsImg from '../assets/images/about-billiards.png';
-import courtImg from '../assets/images/about-court.png';
-import ktvImg from '../assets/images/about-ktv.png';
 import heroBgImg from '../assets/images/main.png';
 
 const HERO_CAROUSEL_INTERVAL_MS = 4000;
@@ -53,27 +53,27 @@ const WHY_BOOK_CARDS = [
 const BOOKING_STEPS = [
   {
     icon: CalendarDays,
-    title: 'Choose Your Slot',
-    desc: 'Pick your preferred date, time, and reserve right on our reservation page.',
+    title: 'Choose a facility and time',
+    desc: 'Select a live facility, room type, date, and whole-hour time slot from the booking calendar.',
   },
   {
     icon: Wallet,
-    title: 'Pay the Down Payment',
-    desc: 'Pay a down payment equal to the 1-hour rate directly online via GCash, Maya, or Credit/Debit Card.',
+    title: 'Complete the down payment',
+    desc: 'Secure the reservation through the available PayMongo checkout options before the temporary hold expires.',
   },
   {
     icon: CheckCircle2,
-    title: 'Get Confirmed',
-    desc: 'Once your payment succeeds, your reservation is automatically confirmed and finalized — no more extra steps.',
+    title: 'Receive confirmation',
+    desc: 'A successful payment confirms the reservation automatically and saves it to your account history.',
   },
 ];
 
 const HELPFUL_INFO_CARDS = [
-  { icon: Wallet, title: 'Down Payment Required', desc: "All reservations require a down payment equal to your first hour's rate to be approved." },
+  { icon: Wallet, title: 'Down Payment Required', desc: "Online reservations require a down payment. A successful payment confirms the slot automatically." },
   { icon: Timer, title: '20-Minute Payment Window', desc: 'Complete your online payment within 20 minutes, or the slot is released to other customers.' },
-  { icon: Hourglass, title: '5-Hour Maximum Rental', desc: 'You can reserve up to 5 hours per transaction.' },
-  { icon: DoorOpen, title: 'Arrive On Time', desc: 'Since your first hour is prepaid, you must arrive at least 20 minutes before your first reserved hour ends, or the system will automatically cancel your reservation.' },
-  { icon: FileText, title: 'Non-Refundable', desc: 'All down payments are strictly non-refundable, especially for no-shows.' },
+  { icon: Hourglass, title: '1–5 Hour Reservations', desc: 'Online reservations use whole-hour increments, with a one-hour minimum and five-hour maximum.' },
+  { icon: DoorOpen, title: 'Arrive On Time', desc: 'A confirmed reservation that passes its scheduled end without completion is recorded as a no-show.' },
+  { icon: FileText, title: 'Cancellation Review', desc: 'Cancellation requests require admin approval. Any approved refund is processed manually; no-show down payments are forfeited.' },
   { icon: Clock3, title: 'Open Daily', desc: '7AM to midnight, every day of the week.' },
   { icon: MessageCircle, title: 'Need Help?', desc: 'Questions or issues? Message our official Facebook page "The Riverview" we\u2019re happy to help.' },
 ];
@@ -165,10 +165,12 @@ function Home() {
   const [liveStatuses, setLiveStatuses] = useState({});
 
   const [bookingRoom, setBookingRoom] = useState(null);
+  const [detailRoom, setDetailRoom] = useState(null);
   const [paymongoReturn, setPaymongoReturn] = useState(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const [helpOpen, setHelpOpen] = useState(false);
   const location = useLocation();
+  const hoursLabel = operatingHoursSummary(settings);
 
   useEffect(() => {
     if (!location.hash) return;
@@ -294,14 +296,15 @@ function Home() {
 
         <div className="hero-inner">
           <div className="hero-content">
-            <p className="hero-eyebrow">San Rafael Caingin · Open Daily 7AM–12AM</p>
-            <h1>Where Family<br />Fun <em>Begins.</em></h1>
+            <p className="hero-eyebrow">Caingin, San Rafael · {hoursLabel}</p>
+            <h1>Your next game<br />starts <em>here.</em></h1>
             <p className="hero-sub">
-              Billiards, basketball, KTV, and more — all under one roof. Reserve a room in minutes, have fun all night.
+              Reserve billiards, KTV, or the court from one live schedule. Choose your time,
+              complete the down payment, and receive confirmation automatically.
             </p>
             <div className="hero-actions">
-              <a href="#" className="btn-primary-hero" onClick={(e) => e.preventDefault()}>Reserve a Space</a>
-              <a href="Rooms" className="btn-ghost-hero">See Rooms</a>
+              <Link to="/rooms" className="btn-primary-hero">Reserve a space</Link>
+              <a href="#rooms" className="btn-ghost-hero">View facilities</a>
             </div>
           </div>
 
@@ -312,7 +315,7 @@ function Home() {
       <section className="how-it-works">
         <div className="how-it-works-inner reveal">
           <div className="section-label">3 Easy Steps</div>
-          <h2>Reservation takes less than a minute.</h2>
+          <h2>A clear path from available slot to confirmed booking.</h2>
         </div>
         <div className="steps-grid reveal-stagger">
           {BOOKING_STEPS.map((s, i) => (
@@ -330,12 +333,12 @@ function Home() {
         <div className="rooms-header reveal">
           <div>
             <div className="section-label">Reserve Your Space</div>
-            <h2>Choose Your Room</h2>
+            <h2>Choose your facility</h2>
           </div>
           <div className="rooms-header-right">
-            <p>Walk-ins welcome.<br />Reservations recommended on weekends.</p>
+            <p>Live, admin-managed inventory.<br />Walk-ins can still be recorded by staff.</p>
             <Link to="/rooms" className="btn-view-all">
-              View All Rooms <i className="fa-solid fa-chevron-right"></i>
+              Browse all facilities <i className="fa-solid fa-chevron-right"></i>
             </Link>
           </div>
         </div>
@@ -365,6 +368,7 @@ function Home() {
                 room={room}
                 liveStatus={liveStatuses[room._id]}
                 onSelect={handleSelectRoom}
+                onDetails={setDetailRoom}
               />
             ))}
         </div>
@@ -373,7 +377,7 @@ function Home() {
       <section className="why-book">
         <div className="why-book-inner reveal">
           <div className="section-label">Why Reserve Online?</div>
-          <h2>A few reasons to reserve ahead.</h2>
+          <h2>Plan ahead without waiting for a reply.</h2>
         </div>
         <div className="why-book-grid reveal-stagger">
           {WHY_BOOK_CARDS.map((c) => (
@@ -390,8 +394,8 @@ function Home() {
         <div className="spaces">
           <div className="spaces-header reveal">
             <div className="section-label">Our Spaces</div>
-            <h2>Designed for play,<br />built to last.</h2>
-            <p>Every space at The Riverview is kept clean, well-lit, and ready to go — whether it's your first visit or your fiftieth.</p>
+            <h2>Three ways to spend your time.</h2>
+            <p>Bookable services stay focused on the spaces the venue manages: billiards, the basketball court, and KTV.</p>
           </div>
 
           <div className="spaces-rows reveal-stagger">
@@ -400,9 +404,7 @@ function Home() {
                 <h3>Billiards Room</h3>
                 <p>Multiple tables, great lighting, and a chill atmosphere. Perfect for a quick session or a long evening with friends.</p>
               </div>
-              <div className="space-img">
-                <img src={billiardsImg} alt="Billiards" />
-              </div>
+              <FacilityMotionVisual type="billiards" label="Billiards" />
             </div>
 
             <div className="space-row space-row-reverse">
@@ -410,9 +412,7 @@ function Home() {
                 <h3>Basketball Court</h3>
                 <p>Full-size court with proper flooring. Includes scoreboard, timer, and sound system for official games.</p>
               </div>
-              <div className="space-img">
-                <img src={courtImg} alt="Basketball Court" />
-              </div>
+              <FacilityMotionVisual type="court" label="Court" />
             </div>
 
             <div className="space-row">
@@ -420,9 +420,7 @@ function Home() {
                 <h3>KTV Room</h3>
                 <p>Private rooms with updated song libraries. Bring your barkada, bring your voice. No judgment here.</p>
               </div>
-              <div className="space-img">
-                <img src={ktvImg} alt="KTV Room" />
-              </div>
+              <FacilityMotionVisual type="ktv" label="KTV" />
             </div>
           </div>
         </div>
@@ -432,15 +430,15 @@ function Home() {
         <div className="about-inner">
           <div className="about-left reveal-left">
             <div className="section-label">About Us</div>
-            <h2>Fun comes first.<br />Always.</h2>
-            <p>At The Riverview, we believe the best nights are the ones you didn't plan. Play billiards, shoot hoops, belt out your favorite songs — we've got every kind of good time covered. A cozy, vibrant atmosphere with great vibes and even better company. Come as you are.</p>
+            <h2>Made for easy visits and better nights.</h2>
+            <p>The Riverview brings billiards, court rental, and KTV together in Caingin, San Rafael. The reservation system keeps schedules clear while the team stays available for walk-ins, events, and on-site support.</p>
           </div>
 
           <div className="about-right reveal-stagger">
             <div className="about-card">
               <div className="about-card-icon"><Clock3 size={20} color="var(--teal)" /></div>
               <h4>Open Daily</h4>
-              <p>7AM to midnight, every day of the week. We keep the lights on so you can play longer.</p>
+              <p>{hoursLabel}. Current closures are reflected in the reservation calendar.</p>
             </div>
             <div className="about-card">
               <div className="about-card-icon"><CalendarCheck size={20} color="var(--teal)" /></div>
@@ -510,6 +508,8 @@ function Home() {
         closeHour={closeHour}
         settings={settings}
       />
+
+      <RoomDetailsModal room={detailRoom} onClose={() => setDetailRoom(null)} onReserve={(room) => { setDetailRoom(null); handleSelectRoom(room); }} />
 
       <Toast {...toast} />
     </>

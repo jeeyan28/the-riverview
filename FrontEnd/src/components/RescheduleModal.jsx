@@ -3,6 +3,7 @@ import { useSiteSettings } from '../hooks/useSiteSettings';
 import { bookingsService } from '../services/bookings';
 import { roomsService } from '../services/rooms';
 import { formatHour } from '../utils/receipt';
+import ModalPortal from './ModalPortal';
 import {
   dateKey,
   fetchReservedHours,
@@ -20,7 +21,7 @@ const MONTHS = [
 ];
 
 export const RESCHEDULE_MAX_USES = 2;
-export const RESCHEDULE_CUTOFF_HOURS = 1;
+export const RESCHEDULE_CUTOFF_HOURS = 3;
 
 export function bookingStartMs(dateStr, timeIn) {
   const [y, m, d] = String(dateStr).split('-').map(Number);
@@ -230,8 +231,9 @@ function RescheduleModal({ booking, onClose, onRescheduled }) {
   const currentTimeLabel = `${formatHour(currentStartHour)} – ${formatHour(currentStartHour + duration)}`;
 
   return (
-    <div className="bk-overlay open" id="reschedule-modal">
-      <div className="bk-modal bk-modal--compact">
+    <ModalPortal>
+      <div className="bk-overlay open" id="reschedule-modal" role="dialog" aria-modal="true" aria-labelledby="reschedule-modal-title">
+        <div className="bk-modal bk-modal--compact">
         <button className="bk-close" aria-label="Close" onClick={onClose}>✕</button>
 
         <div className="bk-header">
@@ -240,7 +242,7 @@ function RescheduleModal({ booking, onClose, onRescheduled }) {
           </div>
           <div>
             <p className="bk-eyebrow">{booking.reservationCode || 'Reservation'}</p>
-            <h2>Reschedule your reservation</h2>
+            <h2 id="reschedule-modal-title">Reschedule your reservation</h2>
           </div>
         </div>
 
@@ -471,8 +473,9 @@ function RescheduleModal({ booking, onClose, onRescheduled }) {
             )}
           </div>
         </div>
+        </div>
       </div>
-    </div>
+    </ModalPortal>
   );
 }
 

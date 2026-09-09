@@ -1,0 +1,73 @@
+#app .finance-toolbar { display: flex; align-items: flex-end; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; }
+#app .finance-toolbar .field-stack { min-width: 0; }
+#app .finance-toolbar select { min-height: 44px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--navy3); color: var(--text); font: inherit; }
+#app .finance-toolbar button { min-height: 44px; }
+#app .finance-basis { margin: 0 0 20px; color: var(--muted); font-size: .8rem; line-height: 1.6; }
+#app .finance-period { margin-bottom: 8px; font-size: 1rem; font-weight: 600; }
+#app .finance-metrics { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+#app .finance-activity { display: flex; flex-wrap: wrap; gap: 12px 24px; margin-bottom: 20px; color: var(--muted); font-size: .85rem; }
+#app .finance-activity strong { color: var(--text); }
+#app .finance-error, #app .finance-warning { padding: 16px; margin-bottom: 20px; border: 1px solid var(--border); border-radius: 12px; background: var(--navy3); line-height: 1.6; }
+#app .finance-error { color: var(--red); }
+#app .finance-warning { border-left: 4px solid var(--amber); }
+#app .finance-warning ul { margin-bottom: 0; padding-left: 20px; }
+#app .finance-value { font-variant-numeric: tabular-nums; white-space: nowrap; }
+#app .finance-meta { color: var(--muted); font-size: .75rem; margin-top: 4px; }
+#app .finance-charts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+#app .finance-chart { position: relative; min-width: 0; height: 280px; }
+#app .finance-chart canvas { display: block; width: 100% !important; max-width: 100%; height: 100% !important; }
+#app .finance-chart-wide { grid-column: 1 / -1; }
+#app .finance-empty { padding: 32px 16px; text-align: center; color: var(--muted); }
+#app .finance-chart-data { margin-top: 16px; color: var(--muted); font-size: .8rem; }
+#app .finance-chart-data summary { cursor: pointer; min-height: 44px; padding-block: 12px; }
+#app .finance-chart-data table { width: 100%; }
+#app .finance-chart-data th, #app .finance-chart-data td { padding: 8px; text-align: left; }
+#app .finance-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; }
+#app .finance-queue { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 20px; }
+#app .finance-queue button { display: flex; justify-content: space-between; align-items: center; gap: 12px; min-height: 64px; padding: 16px; border: 1px solid var(--border); background: var(--navy2); border-radius: 12px; color: var(--text); text-align: left; }
+#app .finance-queue strong { font-size: 1.25rem; }
+#app .finance-print-table { display: none; }
+#app .booking-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+#app .booking-form-grid .mfield { min-width: 0; margin: 0; }
+#app .booking-form-grid .booking-form-wide { grid-column: 1 / -1; }
+#app .booking-form-grid :is(input, select, textarea) { width: 100%; min-height: 44px; }
+#app .booking-form-grid textarea { padding: 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--navy3); color: var(--text); }
+#app .booking-addon-check { display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 12px 16px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--navy3); color: var(--text); cursor: pointer; }
+#app .booking-addon-check input { width: 18px; height: 18px; flex: 0 0 auto; accent-color: var(--teal); }
+#app .booking-addon-check strong, #app .booking-addon-check small { display: block; }
+#app .booking-addon-check small { margin-top: 2px; color: var(--muted); }
+#app .booking-charge-preview { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; border-radius: var(--radius-sm); background: var(--teal-soft); color: var(--text); }
+#app .booking-charge-preview strong { color: var(--teal); font-size: 1rem; }
+#app .booking-form-help { color: var(--muted); font-size: .8rem; line-height: 1.5; margin-top: 8px; }
+
+@media (max-width: 900px) {
+  #app .finance-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  #app .finance-charts { grid-template-columns: minmax(0, 1fr); }
+  #app .finance-queue { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (max-width: 640px) {
+  #app .finance-toolbar { align-items: stretch; }
+  #app .finance-toolbar > * { flex: 1 1 100%; }
+  #app .finance-toolbar .drp-root, #app .finance-toolbar .drp-trigger { width: 100%; }
+  #app .finance-toolbar select, #app .booking-form-grid :is(input, select, textarea) { font-size: 16px; }
+  #app .finance-actions > button { flex: 1 1 100%; }
+  #app .booking-form-grid { grid-template-columns: minmax(0, 1fr); }
+  #app .finance-chart { height: 240px; }
+}
+
+@media print {
+  body:has(#panel-reports) { background: white !important; }
+  body:has(#panel-reports) #sidebar, body:has(#panel-reports) .topbar,
+  #panel-reports .no-print, #panel-reports .finance-screen-table { display: none !important; }
+  body:has(#panel-reports) #app, body:has(#panel-reports) #main,
+  body:has(#panel-reports) .content, #panel-reports { display: block !important; width: 100% !important; height: auto !important; overflow: visible !important; margin: 0 !important; padding: 0 !important; background: white !important; color: black !important; }
+  #app #panel-reports { --text: #000; --muted: #333; --navy2: #fff; --navy3: #fff; --border: #bbb; }
+  #panel-reports .card, #panel-reports .mc { box-shadow: none; break-inside: avoid; }
+  #app #panel-reports .finance-print-table { display: table; width: 100%; font-size: 8pt; border-collapse: collapse; }
+  #panel-reports .finance-print-table th, #panel-reports .finance-print-table td { padding: 8px 4px; border-bottom: 1px solid #bbb; text-align: left; overflow-wrap: anywhere; }
+  #panel-reports .finance-print-table tr { break-inside: avoid; }
+  #panel-reports .finance-print-table thead { display: table-header-group; }
+  #app #panel-reports .finance-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  #panel-reports .mc-val { font-size: 1.1rem; }
+}

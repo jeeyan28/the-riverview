@@ -20,6 +20,16 @@ const { logAudit } = require("../utils/auditLog");
 const { hashOtp } = require("../utils/otp");
 const { GUEST_RECOVERY_WINDOW_DAYS, GUEST_RECOVERY_CREDENTIAL_TTL_MS, GUEST_EMAIL_DOMAIN } = require("../utils/constants");
 const { purgeExpiredGuests } = require("../scripts/purgeExpiredGuests");
+const { validate } = require("../middleware/validate");
+const {
+  userIdParamsSchema,
+  createUserSchema,
+  roleSchema,
+  statusSchema,
+  profileSchema,
+  changePasswordSchema,
+  emptyBodySchema,
+} = require("../validation/userSchemas");
 
 const GUEST_RECOVERY_WINDOW_MS = GUEST_RECOVERY_WINDOW_DAYS * 24 * 60 * 60 * 1000;
 
@@ -91,7 +101,7 @@ router.get("/", requirePermission(PERMISSIONS.ADMIN_MANAGE), async (req, res) =>
   }
 });
 
-router.post("/", requirePermission(PERMISSIONS.ADMIN_MANAGE), async (req, res) => {
+router.post("/", requirePermission(PERMISSIONS.ADMIN_MANAGE), validate(createUserSchema), async (req, res) => {
   try {
     const { firstName, lastName, phone, email, password, role } = req.body;
 
@@ -133,7 +143,7 @@ router.post("/", requirePermission(PERMISSIONS.ADMIN_MANAGE), async (req, res) =
   }
 });
 
-router.put("/:id/role", requirePermission(PERMISSIONS.ADMIN_MANAGE), async (req, res) => {
+router.put("/:id/role", requirePermission(PERMISSIONS.ADMIN_MANAGE), validate(userIdParamsSchema, "params"), validate(roleSchema), async (req, res) => {
   try {
     const { role } = req.body;
     const target = await User.findById(req.params.id);
@@ -155,7 +165,7 @@ router.put("/:id/role", requirePermission(PERMISSIONS.ADMIN_MANAGE), async (req,
   }
 });
 
-router.post("/:id/recover", requirePermission(PERMISSIONS.ADMIN_MANAGE), async (req, res) => {
+router.post("/:id/recover", requirePermission(PERMISSIONS.ADMIN_MANAGE), validate(userIdParamsSchema, "params"), validate(emptyBodySchema), async (req, res) => {
   try {
     const target = await User.findById(req.params.id);
     if (!target) return res.status(404).json({ message: "User not found." });
@@ -192,7 +202,7 @@ router.post("/:id/recover", requirePermission(PERMISSIONS.ADMIN_MANAGE), async (
   }
 });
 
-router.post("/guests/cleanup-now", requirePermission(PERMISSIONS.ADMIN_MANAGE), async (req, res) => {
+router.post("/guests/cleanup-now", requirePermission(PERMISSIONS.ADMIN_MANAGE), validate(emptyBodySchema), async (req, res) => {
   try {
     const result = await purgeExpiredGuests({ dryRun: false });
 
@@ -210,7 +220,7 @@ router.post("/guests/cleanup-now", requirePermission(PERMISSIONS.ADMIN_MANAGE), 
   }
 });
 
-router.put("/:id/status", requirePermission(PERMISSIONS.ADMIN_MANAGE), async (req, res) => {
+router.put("/:id/status", requirePermission(PERMISSIONS.ADMIN_MANAGE), validate(userIdParamsSchema, "params"), validate(statusSchema), async (req, res) => {
   try {
     const { isActive } = req.body;
     const target = await User.findById(req.params.id);
@@ -229,7 +239,7 @@ router.put("/:id/status", requirePermission(PERMISSIONS.ADMIN_MANAGE), async (re
   }
 });
 
-router.delete("/:id", requirePermission(PERMISSIONS.ADMIN_MANAGE), async (req, res) => {
+router.delete("/:id", requirePermission(PERMISSIONS.ADMIN_MANAGE), validate(userIdParamsSchema, "params"), validate(emptyBodySchema), async (req, res) => {
   try {
     const target = await User.findById(req.params.id);
     if (!target) return res.status(404).json({ message: "User not found." });
@@ -246,7 +256,7 @@ router.delete("/:id", requirePermission(PERMISSIONS.ADMIN_MANAGE), async (req, r
   }
 });
 
-router.put("/:id", ensureAuthenticated, async (req, res) => {
+router.put("/:id", ensureAuthenticated, validate(userIdParamsSchema, "params"), validate(profileSchema), async (req, res) => {
   try {
     const target = await User.findById(req.params.id);
     if (!target) return res.status(404).json({ message: "User not found." });
@@ -280,7 +290,7 @@ router.put("/:id", ensureAuthenticated, async (req, res) => {
   }
 });
 
-router.put("/:id/password", ensureAuthenticated, async (req, res) => {
+router.put("/:id/password", ensureAuthenticated, validate(userIdParamsSchema, "params"), validate(changePasswordSchema), async (req, res) => {
   try {
     const user = await User.findById(req.params.id).select("+password");
     if (!user) return res.status(404).json({ message: "User not found." });
@@ -315,4 +325,4 @@ router.put("/:id/password", ensureAuthenticated, async (req, res) => {
   }
 });
 
-module.exports = router;  
+module.exports = router;

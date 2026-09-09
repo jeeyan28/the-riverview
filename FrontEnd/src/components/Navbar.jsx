@@ -135,7 +135,7 @@ function Navbar({
 
         <nav id="nav-menu" aria-label="Main navigation">
           <a href="/#home" className={isHome && activeSection === 'home' ? 'active' : ''} onClick={(e) => handleSectionLink(e, 'home')}>Home</a>
-          <a href="/#rooms" className={isRooms || (isHome && activeSection === 'rooms') ? 'active' : ''} onClick={(e) => handleSectionLink(e, 'rooms')}>Rooms</a>
+          <Link to="/rooms" className={isRooms ? 'active' : ''}>Facilities</Link>
           <a href="/#about" className={isHome && activeSection === 'about' ? 'active' : ''} onClick={(e) => handleSectionLink(e, 'about')}>About</a>
           <Link to="/contact" className={isContact ? 'active' : ''}>Contact</Link>
         </nav>
@@ -198,7 +198,7 @@ function Navbar({
                   onOpenProfile?.();
                 }}
               >
-                <i className="fa-solid fa-user"></i> My Profile
+                <i className="fa-solid fa-user"></i> Account & reservations
               </button>
               <button
                 type="button"
@@ -250,13 +250,13 @@ function Navbar({
             <div className="mobile-nav-heading">
               <div>
                 <span className="mobile-nav-eyebrow">THE RIVERVIEW</span>
-                <h2 id="mobile-nav-title">Explore & unwind</h2>
+                <h2 id="mobile-nav-title">Plan your visit</h2>
               </div>
               <button type="button" className="mobile-nav-close" id="nav-close" aria-label="Close menu" onClick={onCloseMobileNav}>✕</button>
             </div>
             <nav className="mobile-nav-links" aria-label="Mobile navigation">
               <a href="/#home" aria-current={isHome && activeSection === 'home' ? 'page' : undefined} onClick={(e) => { handleSectionLink(e, 'home'); onCloseMobileNav(); }}>Home <i className="fa-solid fa-arrow-right" aria-hidden="true"></i></a>
-              <Link to="/rooms" aria-current={isRooms ? 'page' : undefined} onClick={onCloseMobileNav}>Rooms & spaces <i className="fa-solid fa-arrow-right" aria-hidden="true"></i></Link>
+              <Link to="/rooms" aria-current={isRooms ? 'page' : undefined} onClick={onCloseMobileNav}>Facilities <i className="fa-solid fa-arrow-right" aria-hidden="true"></i></Link>
               <a href="/#about" aria-current={isHome && activeSection === 'about' ? 'page' : undefined} onClick={(e) => { handleSectionLink(e, 'about'); onCloseMobileNav(); }}>About us <i className="fa-solid fa-arrow-right" aria-hidden="true"></i></a>
               <Link to="/contact" aria-current={isContact ? 'page' : undefined} onClick={onCloseMobileNav}>Contact <i className="fa-solid fa-arrow-right" aria-hidden="true"></i></Link>
             </nav>
@@ -264,7 +264,7 @@ function Navbar({
               <Link className="mobile-nav-primary" id="mobile-book-btn" to="/rooms" onClick={onCloseMobileNav}>Reserve a space <i className="fa-solid fa-arrow-right" aria-hidden="true"></i></Link>
               {loggedIn ? (
                 <>
-                  <button type="button" className="mobile-nav-secondary" onClick={() => { onCloseMobileNav(); onOpenProfile?.(); }}><i className="fa-regular fa-user" aria-hidden="true"></i> My profile</button>
+                  <button type="button" className="mobile-nav-secondary" onClick={() => { onCloseMobileNav(); onOpenProfile?.(); }}><i className="fa-regular fa-user" aria-hidden="true"></i> Account & reservations</button>
                   {isAdmin && <Link className="mobile-nav-secondary" to="/admin/dashboard" onClick={onCloseMobileNav}><i className="fa-solid fa-gauge" aria-hidden="true"></i> Admin dashboard</Link>}
                   <button type="button" className="mobile-nav-secondary" id="mobile-logout-button" onClick={() => { onCloseMobileNav(); handleLogout(); }}><i className="fa-solid fa-right-from-bracket" aria-hidden="true"></i> Log out</button>
                 </>

@@ -1,11 +1,11 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { monitorRoomsService, roomSessionsService } from '../services/monitoring';
 
 export const MONITOR_WARNING_MS = 10 * 60 * 1000;
 export const MONITOR_CRITICAL_MS = 60 * 1000;
 
 const OVERDUE_ALERT_REPEAT_MS = 30 * 1000;
-const LOBBY_POLL_MS = 2 * 1000;
+const MONITOR_POLL_MS = 2 * 1000;
 
 const BASE_STATUS_CLASS = { Available: 'available', Occupied: 'occupied', 'Under Maintenance': 'overdue', Inactive: 'vacant' };
 
@@ -47,10 +47,10 @@ export function sessionEnd(session) {
   return new Date(sessionStart(session).getTime() + session.duration * 60 * 60 * 1000);
 }
 export function formatStartTime(session) {
-  return sessionStart(session).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  return sessionStart(session).toLocaleString([], { timeZone: 'Asia/Manila', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 export function formatEndTime(session) {
-  return sessionEnd(session).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  return sessionEnd(session).toLocaleString([], { timeZone: 'Asia/Manila', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 export function formatTimeRemaining(ms, isPastEnd) {
   if (isPastEnd) return '00:00:00';
@@ -89,6 +89,8 @@ export function useRoomMonitorData(namespace = 'admin') {
   const [rooms, setRooms] = useState([]);
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshError, setRefreshError] = useState('');
+  const [lastUpdatedAt, setLastUpdatedAt] = useState(null);
   const [, forceTick] = useState(0);
   const [viewMode, setViewMode] = useState(() => {
     try {
@@ -109,6 +111,9 @@ export function useRoomMonitorData(namespace = 'admin') {
   const previouslyOverdueRef = useRef(new Set());
   const lastAlertAtRef = useRef(0);
   const soundMutedRef = useRef(soundMuted);
+  const mountedRef = useRef(false);
+  const generationRef = useRef(0);
+  const pendingRefreshRef = useRef(null);
 
   function changeViewMode(mode) {
     setViewMode(mode);
@@ -127,30 +132,34 @@ export function useRoomMonitorData(namespace = 'admin') {
     });
   }
 
-  async function fetchRooms() {
-    try {
-      const data = await monitorRoomsService.list();
-      const list = Array.isArray(data) ? data : [];
-      setRooms(list.map(normalizeRoom));
-      return list;
-    } catch (err) {
-      console.error(err);
-      setRooms([]);
-      return [];
-    }
-  }
+  const refreshMonitor = useCallback(() => {
+    if (pendingRefreshRef.current) return pendingRefreshRef.current;
+    const generation = generationRef.current;
+    const request = (async () => {
+      try {
+        const [nextRooms, nextSessions] = await Promise.all([monitorRoomsService.list(), roomSessionsService.list()]);
+        if (!Array.isArray(nextRooms) || !Array.isArray(nextSessions)) throw new Error('Invalid monitoring response.');
+        if (!mountedRef.current || generation !== generationRef.current) return;
+        setRooms(nextRooms.map(normalizeRoom));
+        setSessions(nextSessions);
+        setRefreshError('');
+        setLastUpdatedAt(Date.now());
+      } catch (err) {
+        if (mountedRef.current && generation === generationRef.current) {
+          setRefreshError(err.message || 'Could not refresh table status.');
+        }
+      } finally {
+        if (mountedRef.current && generation === generationRef.current) setLoading(false);
+        if (pendingRefreshRef.current === request) pendingRefreshRef.current = null;
+      }
+    })();
+    pendingRefreshRef.current = request;
+    return request;
+  }, []);
 
-  async function fetchMonitorSessions() {
-    try {
-      const data = await roomSessionsService.list();
-      const list = Array.isArray(data) ? data : [];
-      setSessions(list);
-      return list;
-    } catch (err) {
-      console.error(err);
-      setSessions([]);
-      return [];
-    }
+  async function refreshAfterChange() {
+    if (pendingRefreshRef.current) await pendingRefreshRef.current;
+    return refreshMonitor();
   }
 
   useEffect(() => {
@@ -158,19 +167,13 @@ export function useRoomMonitorData(namespace = 'admin') {
   }, [soundMuted]);
 
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      setLoading(true);
-      await Promise.all([fetchRooms(), fetchMonitorSessions()]);
-      if (!cancelled) setLoading(false);
-    })();
+    mountedRef.current = true;
+    setLoading(true);
+    refreshMonitor();
 
     const tickHandle = setInterval(() => forceTick((n) => n + 1), 1000);
 
-    const pollHandle = isLobby ? setInterval(() => {
-      fetchRooms();
-      fetchMonitorSessions();
-    }, LOBBY_POLL_MS) : null;
+    const pollHandle = setInterval(refreshMonitor, MONITOR_POLL_MS);
 
     const alertHandle = setInterval(() => {
       const current = overdueIdsRef.current;
@@ -192,10 +195,12 @@ export function useRoomMonitorData(namespace = 'admin') {
     }, 1000);
 
     return () => {
-      cancelled = true;
+      mountedRef.current = false;
+      generationRef.current += 1;
+      pendingRefreshRef.current = null;
       clearInterval(tickHandle);
       clearInterval(alertHandle);
-      if (pollHandle) clearInterval(pollHandle);
+      clearInterval(pollHandle);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -208,12 +213,14 @@ export function useRoomMonitorData(namespace = 'admin') {
     .map((r) => r._id);
 
   return {
-    rooms,
+    rooms: refreshError ? rooms.map((room) => room.status === 'Available' ? { ...room, status: 'Status unavailable' } : room) : rooms,
     setRooms,
     sessions,
     loading,
-    fetchRooms,
-    fetchMonitorSessions,
+    refreshError,
+    lastUpdatedAt,
+    fetchRooms: refreshAfterChange,
+    fetchMonitorSessions: refreshAfterChange,
     viewMode,
     changeViewMode,
     soundMuted,

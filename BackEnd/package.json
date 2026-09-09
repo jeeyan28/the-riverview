@@ -4,6 +4,12 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
+    "align:prd": "node scripts/alignCatalogWithPrd.js",
+    "align:prd:apply": "node scripts/alignCatalogWithPrd.js --apply",
+    "align:catalog": "npm run align:prd",
+    "align:catalog:apply": "npm run align:prd:apply",
+    "restore:prd": "node scripts/restorePrdBackup.js",
+    "restore:prd:apply": "node scripts/restorePrdBackup.js --apply",
     "audit": "npm audit --omit=dev"
   },
   "dependencies": {

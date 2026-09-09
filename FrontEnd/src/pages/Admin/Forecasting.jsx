@@ -7,6 +7,11 @@ import { API_BASE_URL } from '../../services/api';
 
 const TREND_WORD = { up: 'Trending up', down: 'Trending down', flat: 'Flat' };
 const VOLATILITY_WORD = { low: 'Low', moderate: 'Moderate', high: 'High' };
+const DEFAULT_RANGES = [
+  { value: 'daily', label: 'Daily', forecastLabel: 'next 14 days' },
+  { value: 'weekly', label: 'Weekly', forecastLabel: 'next 8 weeks' },
+  { value: 'monthly', label: 'Monthly', forecastLabel: 'next 6 months' },
+];
 const INSIGHT_ICON = {
   'trending-up': 'ti-trending-up',
   'trending-down': 'ti-trending-down',
@@ -24,21 +29,25 @@ function Forecasting() {
   const [error, setError] = useState(null);
   const [smaWindow, setSmaWindow] = useState(7);
   const [windowOptions, setWindowOptions] = useState([7]);
+  const [forecastRange, setForecastRange] = useState('daily');
+  const [rangeOptions, setRangeOptions] = useState(DEFAULT_RANGES);
   const [retryKey, setRetryKey] = useState(0);
 
   const revenueCanvasRef = useRef(null);
   const bookingsCanvasRef = useRef(null);
 
-  const loadForecast = useCallback(async (window, cancelledRef) => {
+  const loadForecast = useCallback(async (window, range, cancelledRef) => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${API_BASE_URL}/api/forecast?window=${window}`, { credentials: 'include' });
+      const params = new URLSearchParams({ window: String(window), range });
+      const res = await fetch(`${API_BASE_URL}/api/forecast?${params}`, { credentials: 'include' });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body.message || 'Failed to load forecast.');
       if (!cancelledRef.current) {
         setData(body);
         if (Array.isArray(body.validWindows) && body.validWindows.length) setWindowOptions(body.validWindows);
+        if (Array.isArray(body.validRanges) && body.validRanges.length) setRangeOptions(body.validRanges);
       }
     } catch (err) {
       console.error(err);
@@ -50,11 +59,11 @@ function Forecasting() {
 
   useEffect(() => {
     const cancelledRef = { current: false };
-    loadForecast(smaWindow, cancelledRef);
+    loadForecast(smaWindow, forecastRange, cancelledRef);
     return () => {
       cancelledRef.current = true;
     };
-  }, [smaWindow, retryKey, loadForecast]);
+  }, [smaWindow, forecastRange, retryKey, loadForecast]);
 
   useEffect(() => {
     if (!data) return;
@@ -261,6 +270,9 @@ function Forecasting() {
   const weekdayMax = data
     ? Math.max(1, ...data.seasonality.revenue.byWeekday.map((w) => w.average))
     : 1;
+  const selectedRange = rangeOptions.find((option) => option.value === forecastRange) || DEFAULT_RANGES[0];
+  const forecastLabel = data?.forecastLabel || selectedRange.forecastLabel;
+  const historyDays = data?.historyDays || (forecastRange === 'monthly' ? 365 : forecastRange === 'weekly' ? 180 : 60);
 
   return (
     <div className="panel active" id="panel-forecasting">
@@ -278,7 +290,7 @@ function Forecasting() {
                 )}
                 {data.trend.revenueDirection === 'flat' ? 'Flat vs prior period' : `${revenuePercent > 0 ? '+' : ''}${revenuePercent}% vs prior period`}
               </>
-            ) : 'based on last 60 days'}
+            ) : `based on last ${historyDays} days`}
           </div>
         </div>
         <div className="mc">
@@ -294,18 +306,18 @@ function Forecasting() {
                 )}
                 {data.trend.bookingDirection === 'flat' ? 'Flat vs prior period' : `${bookingPercent > 0 ? '+' : ''}${bookingPercent}% vs prior period`}
               </>
-            ) : 'based on last 60 days'}
+            ) : `based on last ${historyDays} days`}
           </div>
         </div>
         <div className="mc">
-          <div className="mc-label"><i className="ti ti-cash"></i>Projected Revenue (next 14 days)</div>
+          <div className="mc-label"><i className="ti ti-cash"></i>Projected Revenue ({forecastLabel})</div>
           <div className="mc-val" id="fc-projected-revenue">
             {data ? formatPeso(projRevenue) : '—'}
           </div>
           <div className="mc-sub">trend-adjusted SMA, 80% confidence</div>
         </div>
         <div className="mc">
-          <div className="mc-label"><i className="ti ti-calendar-event"></i>Projected Reservations (next 14 days)</div>
+          <div className="mc-label"><i className="ti ti-calendar-event"></i>Projected Reservations ({forecastLabel})</div>
           <div className="mc-val" id="fc-projected-bookings">
             {data ? projBookings : '—'}
           </div>
@@ -316,7 +328,7 @@ function Forecasting() {
           <div className="mc-val" id="fc-volatility">
             {volatility ? VOLATILITY_WORD[volatility.level] : '—'}
           </div>
-          <div className="mc-sub">{volatility ? `±${formatPeso(volatility.revenueStdDev)} / day` : 'based on last 60 days'}</div>
+          <div className="mc-sub">{volatility ? `±${formatPeso(volatility.revenueStdDev)} / day` : `based on last ${historyDays} days`}</div>
         </div>
         <div className="mc">
           <div className="mc-label"><i className="ti ti-calendar-heart"></i>Best Day</div>
@@ -324,6 +336,20 @@ function Forecasting() {
             {bestDay ? bestDay.day : '—'}
           </div>
           <div className="mc-sub">{bestDay ? `avg ${formatPeso(bestDay.average)} revenue` : 'not enough data yet'}</div>
+        </div>
+        <div className="mc">
+          <label className="mc-label" htmlFor="fc-forecast-range"><i className="ti ti-calendar-forward"></i>Forecast Range</label>
+          <select
+            id="fc-forecast-range"
+            className="users-filter-input fc-sma-select"
+            value={forecastRange}
+            onChange={(event) => setForecastRange(event.target.value)}
+          >
+            {rangeOptions.map((option) => (
+              <option key={option.value} value={option.value}>{option.label} · {option.forecastLabel}</option>
+            ))}
+          </select>
+          <div className="mc-sub">planning horizon</div>
         </div>
         <div className="mc">
           <label className="mc-label" htmlFor="fc-sma-window"><i className="ti ti-adjustments-horizontal"></i>SMA Window</label>
@@ -347,20 +373,20 @@ function Forecasting() {
         <>
           <div className="card">
             <div className="card-head">
-              <span className="card-title">Revenue: last 60 days + 14-day projection</span>
+              <span className="card-title">Revenue: last {historyDays} days + {forecastLabel} projection</span>
             </div>
             <div className="chart-wrap"><div className="skeleton fc-chart-skeleton" /></div>
           </div>
           <div className="two-col">
             <div className="card">
               <div className="card-head">
-                <span className="card-title">Reservations: last 60 days + 14-day projection</span>
+                <span className="card-title">Reservations: last {historyDays} days + {forecastLabel} projection</span>
               </div>
               <div className="chart-wrap"><div className="skeleton fc-chart-skeleton" /></div>
             </div>
             <div className="card">
               <div className="card-head">
-                <span className="card-title">Top room demand (last 60 days)</span>
+                <span className="card-title">Top room demand (last {historyDays} days)</span>
               </div>
               <div className="fc-table-skeleton">
                 <div className="skeleton fc-skeleton-row" />
@@ -376,7 +402,7 @@ function Forecasting() {
         <>
           <div className="card">
             <div className="card-head">
-              <span className="card-title">Revenue: last 60 days + 14-day projection</span>
+              <span className="card-title">Revenue: last {historyDays} days + {forecastLabel} projection</span>
               <p className="card-subtitle">Solid line is actual revenue, dashed grey is the {data.window}-day SMA, dashed orange is the trend-adjusted forecast with an 80% confidence band.</p>
             </div>
             <div className="chart-wrap">
@@ -387,7 +413,7 @@ function Forecasting() {
           <div className="two-col">
             <div className="card">
               <div className="card-head">
-                <span className="card-title">Reservations: last 60 days + 14-day projection</span>
+                <span className="card-title">Reservations: last {historyDays} days + {forecastLabel} projection</span>
               </div>
               <div className="chart-wrap">
                 <canvas
@@ -399,7 +425,7 @@ function Forecasting() {
             </div>
             <div className="card">
               <div className="card-head">
-                <span className="card-title">Top room demand (last 60 days)</span>
+                <span className="card-title">Top room demand (last {historyDays} days)</span>
               </div>
               <div className="admin-table-scroll admin-table-scroll-compact" tabIndex={0} role="region" aria-label="Top room demand table">
                 <table className="tbl">
@@ -411,8 +437,8 @@ function Forecasting() {
                   </thead>
                   <tbody id="fc-top-rooms">
                     {data.topRooms.length ? (
-                      data.topRooms.map((r) => (
-                        <tr key={r.roomLabel}>
+                      data.topRooms.map((r, index) => (
+                        <tr key={`${r.roomLabel}-${index}`}>
                           <td>{r.roomLabel}</td>
                           <td>{r.count}</td>
                         </tr>
@@ -433,45 +459,44 @@ function Forecasting() {
           <div className="card">
             <div className="card-head">
               <span className="card-title">
-                <i className="ti ti-sparkles"></i> AI Executive Briefing
-                {data.aiNarrative?.available && <span className="fc-ai-badge"><i className="ti ti-bolt"></i>AI-generated</span>}
+                <i className="ti ti-chart-dots"></i> Forecast Briefing
+                <span className="fc-ai-badge"><i className="ti ti-calculator"></i>Statistical model</span>
               </span>
               <p className="card-subtitle">
-                An AI model reads the computed SMA trend, seasonality, volatility, and anomaly data below and writes a plain-language briefing from it — it never invents its own numbers.
+                A plain-language summary generated directly from the moving average, seasonality, volatility, and anomaly results.
               </p>
             </div>
-            {data.aiNarrative?.available ? (
+            {data.briefing ? (
               <>
-                <p className="fc-ai-summary">{data.aiNarrative.summary}</p>
+                <p className="fc-ai-summary">{data.briefing.summary}</p>
                 <div className="fc-ai-columns">
-                  {data.aiNarrative.recommendations?.length > 0 && (
+                  {data.briefing.actions?.length > 0 && (
                     <div>
-                      <p className="fc-ai-section-title"><i className="ti ti-bulb"></i>Recommendations</p>
+                      <p className="fc-ai-section-title"><i className="ti ti-bulb"></i>Suggested actions</p>
                       <ul className="fc-ai-list">
-                        {data.aiNarrative.recommendations.map((r, i) => (
+                        {data.briefing.actions.map((r, i) => (
                           <li key={i}><i className="ti ti-circle-check"></i>{r}</li>
                         ))}
                       </ul>
                     </div>
                   )}
-                  {data.aiNarrative.risks?.length > 0 && (
+                  {data.briefing.risks?.length > 0 && (
                     <div>
-                      <p className="fc-ai-section-title"><i className="ti ti-alert-triangle"></i>Watch out for</p>
+                      <p className="fc-ai-section-title"><i className="ti ti-alert-triangle"></i>Watch items</p>
                       <ul className="fc-ai-list risks">
-                        {data.aiNarrative.risks.map((r, i) => (
+                        {data.briefing.risks.map((r, i) => (
                           <li key={i}><i className="ti ti-point"></i>{r}</li>
                         ))}
                       </ul>
                     </div>
                   )}
                 </div>
+                <p className="card-subtitle">Method: {data.briefing.method}</p>
               </>
             ) : (
               <div className="fc-ai-fallback">
                 <i className="ti ti-info-circle" style={{ fontSize: '1.1rem' }}></i>
-                <span>
-                  AI briefing isn&apos;t available right now (the AI service may be unconfigured or unreachable). The computed, rule-based insights below are still fully up to date.
-                </span>
+                <span>There is not enough recorded activity to prepare a forecast briefing yet.</span>
               </div>
             )}
           </div>
@@ -480,7 +505,7 @@ function Forecasting() {
             <div className="card">
               <div className="card-head">
                 <span className="card-title"><i className="ti ti-chart-histogram"></i> Computed Signals</span>
-                <p className="card-subtitle">Trend, seasonality, and anomaly signals computed directly from the SMA — the raw input the AI briefing above is grounded in.</p>
+                <p className="card-subtitle">Trend, seasonality, and anomaly signals computed directly from the selected moving-average window.</p>
               </div>
               {data.insights.length ? (
                 <ul className="fc-insights-list">
@@ -500,7 +525,7 @@ function Forecasting() {
             <div className="card">
               <div className="card-head">
                 <span className="card-title">Revenue by Day of Week</span>
-                <p className="card-subtitle">Average revenue per weekday, last 60 days.</p>
+                <p className="card-subtitle">Average revenue per weekday, last {historyDays} days.</p>
               </div>
               <div className="fc-weekday-list">
                 {data.seasonality.revenue.byWeekday.map((w) => (

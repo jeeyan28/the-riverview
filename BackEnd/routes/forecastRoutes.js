@@ -2,19 +2,22 @@ const express = require("express");
 const router = express.Router();
 const ss = require("simple-statistics");
 
-const Booking = require("../model/booking");
-const { RoomSession } = require("../model/monitoring");
 const { requirePermission } = require("../middleware/adminAuth");
 const { PERMISSIONS } = require("../utils/permissions");
-const { generateForecastNarrative } = require("../utils/aiForecastNarrative");
+const { businessDate, addDays } = require("../utils/businessDate");
+const { getSalesReport } = require("../utils/salesReport");
 
 router.use(requirePermission(PERMISSIONS.FORECASTING_VIEW));
 
-const DAY_MS = 24 * 60 * 60 * 1000;
-const HISTORY_DAYS = 60;
-const FORECAST_DAYS = 14;
 const VALID_WINDOWS = [7, 14, 30];
 const DEFAULT_WINDOW = 7;
+const FORECAST_RANGES = Object.freeze({
+  daily: { label: "Daily", forecastLabel: "next 14 days", historyDays: 60, forecastDays: 14 },
+  weekly: { label: "Weekly", forecastLabel: "next 8 weeks", historyDays: 180, forecastDays: 56 },
+  monthly: { label: "Monthly", forecastLabel: "next 6 months", historyDays: 365, forecastDays: 180 },
+});
+const DEFAULT_RANGE = "daily";
+const EXCLUDED_BOOKING_STATUSES = new Set(["Cancelled", "Rejected", "No Show"]);
 
 // 80% confidence interval z-score. A lightweight, defensible band for a
 // business dashboard without overstating precision (95% would imply more
@@ -25,42 +28,6 @@ const CONFIDENCE_Z = 1.28;
 const ANOMALY_STDDEV_THRESHOLD = 2;
 
 const WEEKDAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-
-// In-memory cache for AI-generated narratives, keyed by `${window}:${dateKey}`.
-// The underlying data only moves forward one day at a time, so re-generating
-// the narrative on every dashboard refresh would just burn API calls for an
-// identical answer. Process-local (not Redis/DB) is an acceptable tradeoff
-// here: worst case after a redeploy is one extra AI call per window.
-const AI_NARRATIVE_CACHE = new Map();
-const AI_NARRATIVE_CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours
-// If the AI call fails (rate limit, provider overloaded, etc.), also cache
-// the *failure* for a short cooldown. Without this, every forecast request
-// during an outage/rate-limit window re-attempts the AI call — which is
-// exactly what can turn a single transient error into a burst that exhausts
-// a free-tier quota (observed with Gemini's free tier during development).
-const AI_NARRATIVE_FAILURE_COOLDOWN_MS = 3 * 60 * 1000; // 3 minutes
-const AI_NARRATIVE_FAILURE_AT = new Map();
-
-async function getCachedNarrative(cacheKey, context) {
-  const cached = AI_NARRATIVE_CACHE.get(cacheKey);
-  if (cached && cached.expiresAt > Date.now()) return cached.value;
-
-  const lastFailure = AI_NARRATIVE_FAILURE_AT.get(cacheKey);
-  if (lastFailure && Date.now() - lastFailure < AI_NARRATIVE_FAILURE_COOLDOWN_MS) return null;
-
-  const value = await generateForecastNarrative(context);
-  if (value) {
-    AI_NARRATIVE_CACHE.set(cacheKey, { value, expiresAt: Date.now() + AI_NARRATIVE_CACHE_TTL_MS });
-    AI_NARRATIVE_FAILURE_AT.delete(cacheKey);
-  } else {
-    AI_NARRATIVE_FAILURE_AT.set(cacheKey, Date.now());
-  }
-  return value;
-}
-
-function toDateKey(d) {
-  return d.toISOString().slice(0, 10);
-}
 
 function weekdayOf(dateKey) {
   return new Date(`${dateKey}T00:00:00Z`).getUTCDay();
@@ -110,7 +77,7 @@ function residualStdDev(series, sma) {
 }
 
 // Trend-adjusted projection: instead of repeating a single flat SMA value
-// for all 14 forecast days, fit a linear regression over the most recent
+// for every forecast day, fit a linear regression over the most recent
 // `window * 2` days (or all available history if shorter) and extend that
 // line forward. The SMA anchors the starting level; the slope carries the
 // trend. This is still an SMA-based model (no external ML dependency) but
@@ -189,7 +156,7 @@ function detectAnomalies(days, series, sma, metric, label) {
   return anomalies.slice(-5);
 }
 
-function buildInsights({ trend, seasonality, volatility, anomalies, topRooms, window }) {
+function buildInsights({ trend, seasonality, volatility, anomalies, topRooms, window, forecastLabel }) {
   const insights = [];
 
   if (trend.revenueDirection !== "flat") {
@@ -221,7 +188,7 @@ function buildInsights({ trend, seasonality, volatility, anomalies, topRooms, wi
 
   insights.push({
     icon: "chart-histogram",
-    text: `Revenue volatility is ${volatility.level} (±₱${Math.round(volatility.revenueStdDev).toLocaleString()} per day), giving the 14-day forecast an 80% confidence range rather than a single fixed number.`,
+    text: `Revenue volatility is ${volatility.level} (±₱${Math.round(volatility.revenueStdDev).toLocaleString()} per day), giving the ${forecastLabel} forecast an 80% confidence range rather than a single fixed number.`,
   });
 
   if (anomalies.length) {
@@ -242,44 +209,71 @@ function buildInsights({ trend, seasonality, volatility, anomalies, topRooms, wi
   return insights;
 }
 
+function buildForecastBriefing({ trend, seasonality, volatility, anomalies, topRooms, projection, window, historyDays, forecastLabel }) {
+  const projectedRevenue = projection.reduce((sum, day) => sum + day.projectedRevenue, 0);
+  const projectedBookings = Math.round(projection.reduce((sum, day) => sum + day.projectedBookings, 0));
+  const directionText = trend.revenueDirection === "flat"
+    ? "is holding steady"
+    : `is trending ${trend.revenueDirection} by ${Math.abs(trend.revenuePercent)}%`;
+
+  const actions = [];
+  if (seasonality.revenue.best) {
+    actions.push(`Plan staffing and room readiness around ${seasonality.revenue.best.day}, the strongest recent revenue day.`);
+  }
+  if (seasonality.revenue.worst && seasonality.revenue.worst.day !== seasonality.revenue.best?.day) {
+    actions.push(`Consider a targeted offer for ${seasonality.revenue.worst.day}, the weakest recent revenue day.`);
+  }
+  if (topRooms[0]) {
+    actions.push(`Protect availability and maintenance time for ${topRooms[0].roomLabel}, the most requested service in the history window.`);
+  }
+  if (!actions.length) actions.push("Keep recording completed sessions and payments so the next forecast has a stronger history base.");
+
+  const risks = [];
+  if (volatility.level !== "low") {
+    risks.push(`Daily revenue variability is ${volatility.level}; use the confidence range when planning cash and staffing.`);
+  }
+  if (anomalies.length) {
+    risks.push(`${anomalies.length} recent unusual result${anomalies.length === 1 ? " was" : "s were"} detected and should be checked against closures, events, or data-entry corrections.`);
+  }
+  if (!projectedRevenue && !projectedBookings) {
+    risks.push("The selected history window has no collected revenue or completed reservation activity, so projections remain at zero.");
+  }
+
+  return {
+    summary: `Using the last ${historyDays} days and a ${window}-day moving average, revenue ${directionText}. The ${forecastLabel} project about ₱${Math.round(projectedRevenue).toLocaleString()} from ${projectedBookings} reservation${projectedBookings === 1 ? "" : "s"}.`,
+    actions: actions.slice(0, 3),
+    risks: risks.slice(0, 3),
+    method: "Trend-adjusted moving average with weekday seasonality, anomaly detection, and an 80% confidence range.",
+  };
+}
+
 router.get("/", async (req, res) => {
   try {
     const window = VALID_WINDOWS.includes(Number(req.query.window)) ? Number(req.query.window) : DEFAULT_WINDOW;
+    const forecastRange = Object.hasOwn(FORECAST_RANGES, req.query.range) ? req.query.range : DEFAULT_RANGE;
+    const rangeConfig = FORECAST_RANGES[forecastRange];
 
     const now = new Date();
-    const since = new Date(now.getTime() - (HISTORY_DAYS - 1) * DAY_MS);
-
-    const [bookings, sessions] = await Promise.all([
-      Booking.find({
-        createdAt: { $gte: since },
-        status: { $nin: [Booking.BOOKING_STATUS.REJECTED, Booking.BOOKING_STATUS.CANCELLED] },
-      }).select("createdAt amount roomLabel status"),
-      RoomSession.find({ startTime: { $gte: since } }).select("startTime amount"),
-    ]);
+    const todayKey = businessDate(now);
+    const sinceKey = addDays(todayKey, -(rangeConfig.historyDays - 1));
+    const sales = await getSalesReport({
+      from: sinceKey,
+      to: todayKey,
+      maxDays: rangeConfig.historyDays,
+    });
 
     const byDay = new Map();
-    for (let i = 0; i < HISTORY_DAYS; i++) {
-      const key = toDateKey(new Date(since.getTime() + i * DAY_MS));
+    for (let i = 0; i < rangeConfig.historyDays; i++) {
+      const key = addDays(sinceKey, i);
       byDay.set(key, { revenue: 0, bookingCount: 0 });
     }
     const roomDemand = new Map();
-
-    for (const b of bookings) {
-      const key = toDateKey(new Date(b.createdAt));
-      const bucket = byDay.get(key);
-      if (bucket) {
-        bucket.revenue += b.amount || 0;
-        bucket.bookingCount += 1;
-      }
-      roomDemand.set(b.roomLabel, (roomDemand.get(b.roomLabel) || 0) + 1);
-    }
-
-    for (const s of sessions) {
-      const key = toDateKey(new Date(s.startTime));
-      const bucket = byDay.get(key);
-      if (bucket) {
-        bucket.revenue += s.amount || 0;
-      }
+    for (const day of sales.daily) byDay.set(day.date, { revenue: day.collected, bookingCount: 0 });
+    for (const row of sales.rows) {
+      const bucket = byDay.get(row.date);
+      const isOperationalBooking = row.bookingId && !EXCLUDED_BOOKING_STATUSES.has(row.status);
+      if (bucket && isOperationalBooking) bucket.bookingCount += 1;
+      if (isOperationalBooking) roomDemand.set(row.facilityName, (roomDemand.get(row.facilityName) || 0) + 1);
     }
 
     const days = Array.from(byDay.entries()).sort((a, b) => (a[0] < b[0] ? -1 : 1));
@@ -290,12 +284,12 @@ router.get("/", async (req, res) => {
     const revenueSMA = rollingSMA(revenueSeries, window);
     const bookingSMA = rollingSMA(bookingSeries, window);
 
-    const revenueForecast = trendAdjustedProjection(revenueSeries, window, FORECAST_DAYS);
-    const bookingForecast = trendAdjustedProjection(bookingSeries, window, FORECAST_DAYS);
+    const revenueForecast = trendAdjustedProjection(revenueSeries, window, rangeConfig.forecastDays);
+    const bookingForecast = trendAdjustedProjection(bookingSeries, window, rangeConfig.forecastDays);
 
     const projection = [];
-    for (let i = 0; i < FORECAST_DAYS; i++) {
-      const date = toDateKey(new Date(now.getTime() + (i + 1) * DAY_MS));
+    for (let i = 0; i < rangeConfig.forecastDays; i++) {
+      const date = addDays(todayKey, i + 1);
       projection.push({
         date,
         projectedRevenue: revenueForecast.values[i].value,
@@ -343,33 +337,33 @@ router.get("/", async (req, res) => {
       anomalies,
       topRooms,
       window,
+      forecastLabel: rangeConfig.forecastLabel,
     });
 
-    // AI-assisted narrative: hand the model the exact numbers already
-    // computed above (nothing else) and ask it to explain them in prose.
-    // See utils/aiForecastNarrative.js for why the model never sees raw
-    // booking records — only these derived, already-rounded statistics.
-    const todayKey = toDateKey(now);
-    const aiContext = {
-      window,
-      historyDays: HISTORY_DAYS,
-      forecastDays: FORECAST_DAYS,
+    const briefing = buildForecastBriefing({
       trend,
+      seasonality: { revenue: revenueSeasonality, booking: bookingSeasonality },
       volatility,
-      seasonality: {
-        revenueBestDay: revenueSeasonality.best,
-        revenueWorstDay: revenueSeasonality.worst,
-      },
       anomalies,
       topRooms,
-      next14DayProjectedRevenueTotal: projection.reduce((sum, p) => sum + p.projectedRevenue, 0),
-      next14DayProjectedBookingsTotal: Math.round(projection.reduce((sum, p) => sum + p.projectedBookings, 0)),
-    };
-    const aiResult = await getCachedNarrative(`${window}:${todayKey}`, aiContext);
+      projection,
+      window,
+      historyDays: rangeConfig.historyDays,
+      forecastLabel: rangeConfig.forecastLabel,
+    });
 
     res.json({
       window,
       validWindows: VALID_WINDOWS,
+      forecastRange,
+      validRanges: Object.entries(FORECAST_RANGES).map(([value, config]) => ({
+        value,
+        label: config.label,
+        forecastLabel: config.forecastLabel,
+      })),
+      historyDays: rangeConfig.historyDays,
+      forecastDays: rangeConfig.forecastDays,
+      forecastLabel: rangeConfig.forecastLabel,
       history: days.map(([date, v], i) => ({
         date,
         revenue: v.revenue,
@@ -387,9 +381,7 @@ router.get("/", async (req, res) => {
       },
       anomalies,
       insights,
-      aiNarrative: aiResult
-        ? { available: true, ...aiResult }
-        : { available: false, summary: null, recommendations: [], risks: [] },
+      briefing,
     });
   } catch (err) {
     console.error(err);

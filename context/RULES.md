@@ -34,7 +34,7 @@ try {
 ## 5. Input Validation
 
 - All new mutating routes (POST/PUT/PATCH/DELETE) must use `validate()` with a Joi schema.
-- **Known gap:** `auth.js`, `roomRoutes.js`, and `userRoutes.js` currently have mutating routes without `validate()`. This is existing debt, not a pattern to copy — don't add a new unvalidated mutating route anywhere, including those three files.
+- `auth.js`, `roomRoutes.js`, and `userRoutes.js` use route-specific Joi schemas. Keep both request bodies and identifier params validated when adding account or catalog mutations.
 
 ## 6. Frontend Conventions
 
@@ -66,8 +66,17 @@ Documenting what's already consistent in the codebase, so new code matches:
 - **Double-check before presenting as done:** before handing off a finished task, double-check it to make sure no errors happen and the result still aligns with the project's context (PRD/ARCHITECTURE/DESIGN/SCHEMA as relevant).
 - **Purpose of this section:** these rules exist to reduce token usage, while still making sure each task that *is* started gets fully finished.
 
-## 10. Known Debt (flagged, not yet fixed)
+## 10. Booking, Monitoring, and Finance Invariants
 
-1. **Validation gap:** `auth.js`, `roomRoutes.js`, `userRoutes.js` have mutating routes without `validate()` — see Section 5.
-2. **Error-shape inconsistency:** some routes use `err.status`/`err.message` passthrough instead of the standardized `{ message: "Server error." }` shape — see Section 4.
-3. Reschedule cutoff / operating hours vs. Court pricing — already tracked in ARCHITECTURE.md and SCHEMA.md, not duplicated here.
+- Use `utils/roomPricing.js` for every customer booking, walk-in session, and extension charge. Frontend totals are previews; the backend result is authoritative.
+- Accept whole-hour inputs only: 1–5 hours for bookings and 1–24 hours for Live Monitor sessions/extensions.
+- Never infer collected revenue from `paymentStatus` alone. Persist and report explicit `paidAmount` and `refundedAmount` values.
+- Preserve a reservation's verified downpayment when its session starts. Do not add it twice when the booking and session are linked.
+- Keep charges, collected revenue, refunds, and outstanding balances distinct in API responses, UI labels, and exports.
+- Use Asia/Manila service-date boundaries for dashboard, analytics, forecast, sales-report, and Live Monitor report queries.
+- Saving customer-facing facility inventory must synchronize idle monitor units without replacing an occupied unit.
+
+## 11. Known Debt (flagged, not yet fixed)
+
+1. **Error-shape inconsistency:** some legacy routes use `err.status`/`err.message` passthrough instead of the standardized `{ message: "Server error." }` shape — see Section 4.
+2. Reschedule cutoff, operating hours, Court time-band pricing, guest surcharges, and corkage are resolved in the shared pricing path; keep ARCHITECTURE.md and SCHEMA.md synchronized if those policies change.

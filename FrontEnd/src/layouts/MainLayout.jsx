@@ -16,6 +16,7 @@ import { useTheme } from '../hooks/useTheme';
 import { useAuth } from '../context/AuthContext';
 import { useSiteSettings } from '../hooks/useSiteSettings';
 import { useAnnouncements } from '../hooks/useAnnouncements';
+import { CustomerAppNavigation } from '../components/MobileAppNavigation';
 
 function MainLayout() {
   const { initializing, user } = useAuth();
@@ -92,11 +93,20 @@ function MainLayout() {
         <PageTransition />
       </main>
 
-      <Footer />
+      <Footer settings={settings} />
+
+      <CustomerAppNavigation
+        user={user}
+        profileOpen={profileOpen}
+        obscured={mobileNavOpen}
+        onOpenProfile={() => setProfileOpen(true)}
+      />
 
       <ProfileModal open={profileOpen} onClose={() => setProfileOpen(false)} />
 
       <ClaimAccountModal open={claimAccountOpen} onClose={() => setClaimAccountOpen(false)} />
+
+      <div className="modal-portal-root" data-modal-portal />
     </div>
   );
 }

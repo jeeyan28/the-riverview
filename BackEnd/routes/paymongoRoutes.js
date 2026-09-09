@@ -16,7 +16,7 @@ const {
 const { isAdminRole } = require("../utils/permissions");
 const { GUEST_EMAIL_DOMAIN } = require("../utils/constants");
 const { validate } = require("../middleware/validate");
-const { createIntentSchema, attachIntentSchema } = require("../validation/paymentSchemas");
+const { paymentIntentIdParamsSchema, createIntentSchema, attachIntentSchema } = require("../validation/paymentSchemas");
 const { paymentIntentLimiter, paymentAttachLimiter } = require("../middleware/rateLimiter");
 
 function getReturnBaseUrl() {
@@ -60,7 +60,7 @@ router.get("/config", (req, res) => {
 
 router.post("/intent", ensureAuthenticated, paymentIntentLimiter, validate(createIntentSchema), async (req, res) => {
   try {
-    const { guestName, guestContact, guestEmail, guestCount: guestCountRaw, specialRequests, roomId, variantLabel, date, timeIn, duration, downPaymentHours: downPaymentHoursRaw } = req.body;
+    const { guestName, guestContact, guestEmail, guestCount: guestCountRaw, hasCorkage, specialRequests, roomId, variantLabel, date, timeIn, duration, downPaymentHours: downPaymentHoursRaw } = req.body;
     const guestCount = guestCountRaw || 1;
 
     const downPaymentHours = downPaymentHoursRaw !== undefined ? downPaymentHoursRaw : 1;
@@ -88,14 +88,14 @@ router.post("/intent", ensureAuthenticated, paymentIntentLimiter, validate(creat
       return res.status(409).json({ message: "Your hold on this time slot has expired. Please select a time again." });
     }
 
-    let room, amount, unitPrice;
+    let room, amount, roomCharge, corkageFee, hourlyRates;
     try {
-      ({ room, amount, unitPrice } = await validateAndPriceBooking({ roomId, variantLabel, date, timeIn, duration, isAdminBooking: false, guestCount, excludeLockUserId: req.user._id }));
+      ({ room, amount, roomCharge, corkageFee, hourlyRates } = await validateAndPriceBooking({ roomId, variantLabel, date, timeIn, duration, isAdminBooking: false, guestCount, hasCorkage, excludeLockUserId: req.user._id }));
     } catch (e) {
       return res.status(e.status || 500).json({ message: e.message || "Server error." });
     }
 
-    const downPayment = computeDownPayment(unitPrice, downPaymentHours);
+    const downPayment = computeDownPayment(hourlyRates, downPaymentHours);
 
     let intent;
     try {
@@ -108,6 +108,7 @@ router.post("/intent", ensureAuthenticated, paymentIntentLimiter, validate(creat
           guestContact: (guestContact || "").trim(),
           guestEmail: resolveGuestEmail({ guestEmail, guestContact, accountEmail: req.user.email, isGuest: req.user.isGuest }),
           guestCount,
+          hasCorkage,
           specialRequests: (specialRequests || "").trim(),
           roomId: room._id,
           variantLabel: variantLabel || "",
@@ -115,6 +116,9 @@ router.post("/intent", ensureAuthenticated, paymentIntentLimiter, validate(creat
           timeIn,
           duration,
           amount,
+          roomCharge,
+          corkageFee,
+          hourlyRates: JSON.stringify(hourlyRates),
           downPayment,
           downPaymentHours,
           bookedBy: req.session.userId,
@@ -136,7 +140,7 @@ router.post("/intent", ensureAuthenticated, paymentIntentLimiter, validate(creat
   }
 });
 
-router.post("/intent/:paymentIntentId/attach", ensureAuthenticated, paymentAttachLimiter, validate(attachIntentSchema), async (req, res) => {
+router.post("/intent/:paymentIntentId/attach", ensureAuthenticated, paymentAttachLimiter, validate(paymentIntentIdParamsSchema, "params"), validate(attachIntentSchema), async (req, res) => {
   try {
     const { paymentIntentId } = req.params;
     const { paymentMethodId, paymentMethodType } = req.body;
@@ -222,7 +226,7 @@ router.post("/intent/:paymentIntentId/attach", ensureAuthenticated, paymentAttac
   }
 });
 
-router.get("/status/:paymentIntentId", ensureAuthenticated, async (req, res) => {
+router.get("/status/:paymentIntentId", ensureAuthenticated, validate(paymentIntentIdParamsSchema, "params"), async (req, res) => {
   try {
     const { paymentIntentId } = req.params;
 

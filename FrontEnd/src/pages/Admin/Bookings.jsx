@@ -1,4 +1,5 @@
 import '../../styles/admin/bookings.css';
+import '../../styles/admin/finance.css';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import DataTable from '../../components/DataTable';
 import Modal from '../../components/Modal';
@@ -8,10 +9,12 @@ import { dateKey } from '../../utils/rooms';
 import { resolveImageUrl } from '../../utils/resolveImageUrl';
 import { formatPeso } from '../../utils/currency';
 import { guestPhoneDisplay } from '../../utils/receipt';
+import { businessDate } from '../../utils/businessDate';
 import { useAuth } from '../../context/AuthContext';
 import { useSiteSettings } from '../../hooks/useSiteSettings';
 import { roomsService } from '../../services/rooms';
 import { bookingsService } from '../../services/bookings';
+import { CORKAGE_FEE, calculateBookingPrice } from '../../utils/roomPricing';
 
 
 
@@ -21,13 +24,14 @@ const STATUS_PILL_CLASS = {
   Done: 'pill-done',
   Overdue: 'pill-overdue',
   Cancelled: 'pill-done',
+  'No Show': 'pill-overdue',
   'Pending Payment Verification': 'pill-pending',
   'Awaiting Online Payment': 'pill-pending',
   Confirmed: 'pill-active',
   Rejected: 'pill-overdue',
 };
-const BOOKING_STATUSES = ['Pending Payment Verification', 'Awaiting Online Payment', 'Confirmed', 'Rejected', 'Ongoing', 'Pending', 'Done', 'Overdue', 'Cancelled'];
-const EDITABLE_BOOKING_STATUSES = BOOKING_STATUSES.filter((s) => s !== 'Done');
+const BOOKING_STATUSES = ['Pending Payment Verification', 'Awaiting Online Payment', 'Confirmed', 'Rejected', 'Ongoing', 'Pending', 'Done', 'Overdue', 'Cancelled', 'No Show'];
+const EDITABLE_BOOKING_STATUSES = BOOKING_STATUSES.filter((s) => !['Done', 'No Show', 'Rejected', 'Cancelled', 'Ongoing', 'Overdue'].includes(s));
 const PAYMENT_METHODS = ['Cash', 'GCash', 'Maya'];
 const SEARCH_DEBOUNCE_MS = 350;
 const BOOKINGS_POLL_MS = 15000;
@@ -49,16 +53,25 @@ function facilityName(b) {
   return b.room?.name || b.roomLabel || '—';
 }
 
+function recordedPayment(b) {
+  return Math.max(Number(b?.paidAmount) || 0, Number(b?.downPayment) || 0);
+}
+
+function outstandingBalance(b) {
+  if (['Cancelled', 'Rejected', 'No Show'].includes(b?.status)) return 0;
+  return Math.max(0, Number(b?.amount || 0) - recordedPayment(b) + Number(b?.refundedAmount || 0));
+}
+
 function isFullPayment(b) {
-  const hours = Number(b.downPaymentHours) || 0;
-  const duration = Number(b.duration) || 0;
-  return hours >= duration || (b.amount && b.downPayment >= b.amount);
+  return Number(b?.amount || 0) > 0 && recordedPayment(b) >= Number(b.amount);
 }
 
 function paymentPlanLabel(b) {
-  if (isFullPayment(b)) return 'Full payment';
-  const hours = Number(b.downPaymentHours) || 1;
-  return `Downpayment (${hours} hr${hours === 1 ? '' : 's'})`;
+  const paid = recordedPayment(b);
+  const balance = outstandingBalance(b);
+  if (isFullPayment(b)) return `Paid ${formatPeso(paid)}`;
+  if (paid > 0) return `${formatPeso(paid)} paid · ${formatPeso(balance)} due`;
+  return `${formatPeso(balance)} due`;
 }
 
 function paymentPlanPillClass(b) {
@@ -94,9 +107,11 @@ function Bookings() {
   const { minDuration, maxDuration } = useSiteSettings();
 
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState(() => new URLSearchParams(window.location.search).get('status') || '');
+  const [cancellationFilter, setCancellationFilter] = useState(() => new URLSearchParams(window.location.search).get('cancellationStatus') || '');
   const [roomFilter, setRoomFilter] = useState('');
-  const [dateFilter, setDateFilter] = useState('');
+  const [dateFrom, setDateFrom] = useState(() => new URLSearchParams(window.location.search).get('from') || new URLSearchParams(window.location.search).get('date') || '');
+  const [dateTo, setDateTo] = useState(() => new URLSearchParams(window.location.search).get('to') || new URLSearchParams(window.location.search).get('date') || '');
   const searchDebounce = useRef(null);
 
   const [bookings, setBookings] = useState([]);
@@ -109,6 +124,8 @@ function Bookings() {
   const [detailId, setDetailId] = useState(null);
   const [editId, setEditId] = useState(null);
   const [proofId, setProofId] = useState(null);
+  const [cancellationReviewId, setCancellationReviewId] = useState(null);
+  const [manualBookingOpen, setManualBookingOpen] = useState(() => new URLSearchParams(window.location.search).get('openManualBooking') === '1');
   const [historyOpen, setHistoryOpen] = useState(false);
   const [fullHistory, setFullHistory] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -135,8 +152,10 @@ function Bookings() {
       const data = await bookingsService.list({
         search: search.trim(),
         status: statusFilter,
+        cancellationStatus: cancellationFilter,
         room: roomFilter,
-        date: dateFilter,
+        from: dateFrom,
+        to: dateTo,
       });
       setBookings(Array.isArray(data) ? data : []);
     } catch (err) {
@@ -145,11 +164,11 @@ function Bookings() {
     } finally {
       if (!silent) setLoading(false);
     }
-  }, [search, statusFilter, roomFilter, dateFilter]);
+  }, [search, statusFilter, cancellationFilter, roomFilter, dateFrom, dateTo]);
 
   useEffect(() => {
     fetchBookings();
-  }, [statusFilter, roomFilter, dateFilter]);
+  }, [statusFilter, cancellationFilter, roomFilter, dateFrom, dateTo]);
 
   useEffect(() => {
     clearTimeout(searchDebounce.current);
@@ -170,8 +189,10 @@ function Bookings() {
   function clearFilters() {
     setSearch('');
     setStatusFilter('');
+    setCancellationFilter('');
     setRoomFilter('');
-    setDateFilter('');
+    setDateFrom('');
+    setDateTo('');
   }
 
   async function updateBookingStatus(id, status) {
@@ -220,6 +241,19 @@ function Bookings() {
     }
   }
 
+  async function reviewCancellation(id, payload) {
+    if (!guardPermission('booking:manage')) return;
+    try {
+      await bookingsService.reviewCancellation(id, payload);
+      setCancellationReviewId(null);
+      setDetailId(null);
+      await fetchBookings();
+    } catch (err) {
+      console.error(err);
+      alert(err.message || 'Could not review this cancellation.');
+    }
+  }
+
   async function openFullHistory() {
     if (!detailBooking) return;
     setHistoryOpen(true);
@@ -242,7 +276,7 @@ function Bookings() {
   const stats = useMemo(
     () => ({
       total: bookings.length,
-      pendingPayments: bookings.filter((b) => b.status === 'Pending').length,
+      pendingPayments: bookings.filter((b) => ['Pending', 'Pending Payment Verification', 'Awaiting Online Payment'].includes(b.status)).length,
       activeGuests: bookings.filter((b) => b.status === 'Ongoing').length,
       cancelled: bookings.filter((b) => b.status === 'Cancelled').length,
     }),
@@ -252,6 +286,7 @@ function Bookings() {
   const detailBooking = useMemo(() => bookings.find((b) => b._id === detailId) || null, [bookings, detailId]);
   const editBooking = useMemo(() => bookings.find((b) => b._id === editId) || null, [bookings, editId]);
   const proofBooking = useMemo(() => bookings.find((b) => b._id === proofId) || null, [bookings, proofId]);
+  const cancellationReviewBooking = useMemo(() => bookings.find((b) => b._id === cancellationReviewId) || null, [bookings, cancellationReviewId]);
 
   const historyForDetail = useMemo(() => {
     if (!detailBooking) return [];
@@ -279,7 +314,7 @@ function Bookings() {
     const month = calendarViewDate.getMonth();
     const firstDay = new Date(year, month, 1).getDay();
     const daysInMonth = new Date(year, month + 1, 0).getDate();
-    const todayKey = dateKey(new Date().getFullYear(), new Date().getMonth(), new Date().getDate());
+    const todayKey = businessDate();
 
     const cells = [];
     for (let i = 0; i < firstDay; i++) cells.push(null);
@@ -345,18 +380,19 @@ function Bookings() {
       key: 'paymentStatus',
       label: 'Payment',
       sortable: true,
+      sortValue: (b) => recordedPayment(b),
       render: (b) =>
         b.paymentScreenshot ? (
-          <span
-            className={`pill ${paymentPlanPillClass(b)}`}
-            style={{ cursor: 'pointer' }}
+          <button
+            type="button"
+            className={`pill bk-payment-pill ${paymentPlanPillClass(b)}`}
             title="Click to view screenshot"
             onClick={() => setProofId(b._id)}
           >
             {paymentPlanLabel(b)}
-          </span>
+          </button>
         ) : (
-          <span className={`pill ${paymentPlanPillClass(b)}`}>{paymentPlanLabel(b)}</span>
+          <span className={`pill bk-payment-pill ${paymentPlanPillClass(b)}`}>{paymentPlanLabel(b)}</span>
         ),
     },
     {
@@ -440,6 +476,12 @@ function Bookings() {
                 <option key={s} value={s}>{s}</option>
               ))}
             </select>
+            <select className="bk-filter-input" value={cancellationFilter} onChange={(e) => setCancellationFilter(e.target.value)} aria-label="Cancellation review filter">
+              <option value="">All cancellation states</option>
+              <option value="Requested">Needs cancellation review</option>
+              <option value="Approved">Cancellation approved</option>
+              <option value="Rejected">Cancellation rejected</option>
+            </select>
             <select className="bk-filter-input" value={roomFilter} onChange={(e) => setRoomFilter(e.target.value)}>
               <option value="">All Facilities</option>
               {rooms.map((r) => (
@@ -448,18 +490,33 @@ function Bookings() {
                 </option>
               ))}
             </select>
-            <input
-              type="date"
-              className="bk-filter-input"
-              title="Filter by exact date"
-              value={dateFilter}
-              onChange={(e) => setDateFilter(e.target.value)}
-            />
-            {(search || statusFilter || roomFilter || dateFilter) && (
+            <div className="bk-date-range" role="group" aria-label="Reservation date range">
+              <input
+                type="date"
+                className="bk-filter-input"
+                aria-label="Reservations from date"
+                title="Reservations from date"
+                value={dateFrom}
+                max={dateTo || undefined}
+                onChange={(event) => setDateFrom(event.target.value)}
+              />
+              <span aria-hidden="true">to</span>
+              <input
+                type="date"
+                className="bk-filter-input"
+                aria-label="Reservations to date"
+                title="Reservations to date"
+                value={dateTo}
+                min={dateFrom || undefined}
+                onChange={(event) => setDateTo(event.target.value)}
+              />
+            </div>
+            {(search || statusFilter || cancellationFilter || roomFilter || dateFrom || dateTo) && (
               <button type="button" className="bk-clear-btn" onClick={clearFilters}>
                 <i className="ti ti-x"></i> Clear
               </button>
             )}
+            {canManage && <button type="button" className="save-btn" onClick={() => setManualBookingOpen(true)}><i className="ti ti-plus" aria-hidden="true" /> Add walk-in</button>}
           </div>
         </div>
         <div className="bk-results-row">
@@ -478,6 +535,7 @@ function Bookings() {
       </div>
 
       <EditBookingModal booking={editBooking} rooms={rooms} onClose={() => setEditId(null)} onSaved={fetchBookings} minDuration={minDuration} maxDuration={maxDuration} />
+      <CreateBookingModal open={manualBookingOpen} rooms={rooms} onClose={() => setManualBookingOpen(false)} onCreated={fetchBookings} minDuration={minDuration} maxDuration={maxDuration} />
 
       <Modal open={!!proofBooking} onClose={() => setProofId(null)} title="Payment Screenshot">
         {proofBooking && (
@@ -544,15 +602,17 @@ function Bookings() {
                       <p>{guestPhoneDisplay(detailBooking.guestContact)}</p>
                     </div>
                     <div className="bd-field"><label>Number of Guests</label><p>{detailBooking.guestCount ? String(detailBooking.guestCount) : '—'}</p></div>
+                    <div className="bd-field"><label>Corkage</label><p>{Number(detailBooking.corkageFee) > 0 ? formatPeso(detailBooking.corkageFee) : 'None'}</p></div>
                   </div>
                 </div>
 
                 <div className="bd-card">
                   <div className="bd-section-title"><i className="ti ti-credit-card"></i> Payment Breakdown</div>
                   <div className="bd-grid">
-                    <div className="bd-field"><label>Downpayment</label><p>{formatPeso(detailBooking.downPayment)}</p></div>
-                    <div className="bd-field"><label>Remaining Balance</label><p>{formatPeso((detailBooking.amount || 0) - (detailBooking.downPayment || 0))}</p></div>
-                    <div className="bd-field"><label>Total Amount</label><p>{formatPeso(detailBooking.amount)}</p></div>
+                    <div className="bd-field"><label>Recorded payment</label><p>{formatPeso(recordedPayment(detailBooking))}</p></div>
+                    <div className="bd-field"><label>Refunded</label><p>{formatPeso(detailBooking.refundedAmount)}</p></div>
+                    <div className="bd-field"><label>Outstanding balance</label><p>{formatPeso(outstandingBalance(detailBooking))}</p></div>
+                    <div className="bd-field"><label>Total charge</label><p>{formatPeso(detailBooking.amount)}</p></div>
                     <div className="bd-field"><label>Payment Method</label><p>{detailBooking.paymentMethod || '—'}</p></div>
                   </div>
                 </div>
@@ -625,7 +685,9 @@ function Bookings() {
                 <div className="bd-card">
                   <div className="bd-section-title"><i className="ti ti-credit-card"></i> Payment</div>
                   <p style={{ fontSize: '.85rem', color: 'var(--muted)', margin: 0 }}>
-                    Paid automatically online via PayMongo — confirmed and verified directly, no screenshot or manual approval needed.
+                    {outstandingBalance(detailBooking) > 0
+                      ? `The ${formatPeso(recordedPayment(detailBooking))} online downpayment is verified. Collect ${formatPeso(outstandingBalance(detailBooking))} at the venue.`
+                      : 'Paid in full online via PayMongo. The payment is verified and needs no manual approval.'}
                   </p>
                 </div>
               )}
@@ -634,11 +696,22 @@ function Bookings() {
                 <div className="bd-section-title"><i className="ti ti-file-text"></i> Special Requests / Notes</div>
                 <p className="bd-notes-body">{detailBooking.specialRequests?.trim() || 'No special requests provided.'}</p>
               </div>
+
+              {detailBooking.cancellationStatus && detailBooking.cancellationStatus !== 'None' && (
+                <div className="bd-card">
+                  <div className="bd-section-title"><i className="ti ti-file-x"></i> Cancellation review</div>
+                  <p className="bd-notes-body">Status: <strong>{detailBooking.cancellationStatus}</strong>{detailBooking.cancellationReason ? ` · ${detailBooking.cancellationReason}` : ''}</p>
+                  {detailBooking.cancellationReviewNote && <p className="bd-screenshot-hint">Review note: {detailBooking.cancellationReviewNote}</p>}
+                  {canManage && detailBooking.cancellationStatus === 'Requested' && (
+                    <button type="button" className="btn-confirm" style={{ marginTop: 12 }} onClick={() => setCancellationReviewId(detailBooking._id)}>Review request</button>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="modal-actions bd-footer" style={{ justifyContent: 'space-between' }}>
               <div style={{ display: 'flex', gap: 10 }}>
-                {canManage && (
+                {canManage && !['Done', 'No Show', 'Rejected', 'Cancelled', 'Ongoing', 'Overdue'].includes(detailBooking.status) && (
                   <button
                     className="btn-cancel"
                     onClick={() => { const id = detailBooking._id; setDetailId(null); openEditBooking(id); }}
@@ -655,7 +728,7 @@ function Bookings() {
                     Delete
                   </button>
                 )}
-                {canManage && ['Confirmed', 'Ongoing', 'Overdue'].includes(detailBooking.status) && (
+                {canManage && detailBooking.status === 'Confirmed' && (
                   <button
                     className="btn-cancel"
                     style={{ color: 'var(--teal)', borderColor: 'rgba(45,212,191,.35)' }}
@@ -721,6 +794,12 @@ function Bookings() {
         )}
       </Modal>
 
+      <CancellationReviewModal
+        booking={cancellationReviewBooking}
+        onClose={() => setCancellationReviewId(null)}
+        onSubmit={reviewCancellation}
+      />
+
       <Modal open={historyOpen} onClose={() => setHistoryOpen(false)} title={`Reservation History — ${detailBooking?.guestName || ''}`}>
         <div className="card card-flush">
           <table className="tbl">
@@ -755,6 +834,137 @@ function Bookings() {
   );
 }
 
+function CreateBookingModal({ open, rooms, onClose, onCreated, minDuration = 1, maxDuration = 5 }) {
+  const [guestName, setGuestName] = useState('');
+  const [guestContact, setGuestContact] = useState('');
+  const [guestCount, setGuestCount] = useState('1');
+  const [roomId, setRoomId] = useState('');
+  const [variantLabel, setVariantLabel] = useState('');
+  const [date, setDate] = useState(() => businessDate());
+  const [timeIn, setTimeIn] = useState('07:00');
+  const [duration, setDuration] = useState(String(minDuration));
+  const [paidAmount, setPaidAmount] = useState('0');
+  const [hasCorkage, setHasCorkage] = useState(false);
+  const [specialRequests, setSpecialRequests] = useState('');
+  const [saving, setSaving] = useState(false);
+  const selectedRoom = rooms.find((room) => room._id === roomId);
+  const variants = Array.isArray(selectedRoom?.variants) ? selectedRoom.variants.filter((variant) => variant.status !== 'Unavailable') : [];
+  const selectedVariant = variants.find((variant) => variant.label === variantLabel) || null;
+  const estimatedCharge = selectedVariant
+    ? calculateBookingPrice({ variant: selectedVariant, startHour: Number.parseInt(timeIn, 10) || 0, duration: Number(duration) || 1, guestCount: Number(guestCount) || 1, hasCorkage }).amount
+    : 0;
+
+  useEffect(() => {
+    if (!open) return;
+    setGuestName('');
+    setGuestContact('');
+    setGuestCount('1');
+    setRoomId(rooms[0]?._id || '');
+    setVariantLabel('');
+    setDate(businessDate());
+    setTimeIn('07:00');
+    setDuration(String(minDuration));
+    setPaidAmount('0');
+    setHasCorkage(false);
+    setSpecialRequests('');
+  }, [open, rooms, minDuration]);
+
+  useEffect(() => {
+    if (variants.length && !variants.some((variant) => variant.label === variantLabel)) setVariantLabel(variants[0].label);
+    if (!variants.length) setVariantLabel('');
+  }, [roomId, variants, variantLabel]);
+
+  async function submit(event) {
+    event.preventDefault();
+    const amountReceived = Number(paidAmount);
+    const parsedDuration = Number(duration);
+    const parsedGuestCount = Number(guestCount);
+    if (!guestName.trim() || !roomId || !date || !/^([01]\d|2[0-3]):00$/.test(timeIn) || !Number.isInteger(parsedDuration) || parsedDuration < minDuration || parsedDuration > maxDuration || !Number.isInteger(parsedGuestCount) || parsedGuestCount < 1 || !Number.isFinite(amountReceived) || amountReceived < 0) {
+      alert('Complete the guest, room, hourly schedule, and payment fields.');
+      return;
+    }
+    setSaving(true);
+    try {
+      await bookingsService.create({ guestName: guestName.trim(), guestContact: guestContact.trim(), guestCount: parsedGuestCount, hasCorkage, specialRequests: specialRequests.trim(), roomId, variantLabel: variantLabel || undefined, date, timeIn, duration: parsedDuration, paidAmount: amountReceived, status: 'Pending', paymentMethod: 'Cash' });
+      onClose();
+      await onCreated();
+    } catch (err) {
+      alert(err.message || 'Could not create the walk-in booking.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Modal open={open} onClose={onClose} title="Add walk-in reservation" size="lg">
+      <form onSubmit={submit}>
+        <p className="booking-form-help">Creates a pending walk-in reservation. Confirm it after the guest details and schedule are checked; any money received is recorded separately from the charge.</p>
+        <div className="booking-form-grid">
+          <div className="mfield"><label htmlFor="manual-guest-name">Guest name</label><input id="manual-guest-name" required value={guestName} onChange={(event) => setGuestName(event.target.value)} placeholder="e.g. Juan Dela Cruz" /></div>
+          <div className="mfield"><label htmlFor="manual-guest-contact">Phone or email</label><input id="manual-guest-contact" value={guestContact} onChange={(event) => setGuestContact(event.target.value)} placeholder="Optional contact" /></div>
+          <div className="mfield"><label htmlFor="manual-guest-count">Guests</label><input id="manual-guest-count" type="number" min="1" required value={guestCount} onChange={(event) => setGuestCount(event.target.value)} /></div>
+          <div className="mfield"><label htmlFor="manual-room">Facility</label><select id="manual-room" required value={roomId} onChange={(event) => setRoomId(event.target.value)}><option value="">Choose a facility</option>{rooms.map((room) => <option key={room._id} value={room._id}>{room.name}</option>)}</select></div>
+          <div className="mfield"><label htmlFor="manual-variant">Room type</label><select id="manual-variant" value={variantLabel} onChange={(event) => setVariantLabel(event.target.value)} disabled={!variants.length}><option value="">{variants.length ? 'Choose a room type' : 'Base price'}</option>{variants.map((variant) => <option key={variant.label} value={variant.label}>{variant.label}</option>)}</select></div>
+          <div className="mfield"><label htmlFor="manual-date">Date</label><input id="manual-date" type="date" required value={date} onChange={(event) => setDate(event.target.value)} /></div>
+          <div className="mfield"><label htmlFor="manual-time">Start time</label><input id="manual-time" type="time" step="3600" required value={timeIn} onChange={(event) => setTimeIn(event.target.value)} /></div>
+          <div className="mfield"><label htmlFor="manual-duration">Duration (hours)</label><input id="manual-duration" type="number" min={minDuration} max={maxDuration} step="1" required value={duration} onChange={(event) => setDuration(event.target.value)} /></div>
+          <div className="mfield"><label htmlFor="manual-paid">Amount received (₱)</label><input id="manual-paid" type="number" min="0" step="0.01" value={paidAmount} onChange={(event) => setPaidAmount(event.target.value)} /><p className="booking-form-help">Leave 0 if the guest pays after the session.</p></div>
+          <label className="booking-addon-check booking-form-wide"><input type="checkbox" checked={hasCorkage} onChange={(event) => setHasCorkage(event.target.checked)} /><span><strong>Outside food or drinks</strong><small>Add ₱{CORKAGE_FEE.toLocaleString()} corkage.</small></span></label>
+          <div className="mfield booking-form-wide"><label htmlFor="manual-notes">Special requests / notes</label><textarea id="manual-notes" rows="2" value={specialRequests} onChange={(event) => setSpecialRequests(event.target.value)} placeholder="Optional booking notes" /></div>
+          <div className="booking-charge-preview booking-form-wide"><span>Calculated reservation charge</span><strong>{formatPeso(estimatedCharge)}</strong></div>
+        </div>
+        <div className="modal-actions"><button type="button" className="btn-cancel" onClick={onClose}>Cancel</button><button type="submit" className="btn-confirm" disabled={saving}>{saving ? 'Creating…' : 'Create pending booking'}</button></div>
+      </form>
+    </Modal>
+  );
+}
+
+function CancellationReviewModal({ booking, onClose, onSubmit }) {
+  const [decision, setDecision] = useState('approve');
+  const [refundedAmount, setRefundedAmount] = useState('0');
+  const [note, setNote] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!booking) return;
+    setDecision('approve');
+    setRefundedAmount(String(booking.refundedAmount ?? 0));
+    setNote('');
+  }, [booking]);
+
+  async function submit() {
+    const refund = Number(refundedAmount);
+    if (!Number.isFinite(refund) || refund < 0) {
+      alert('Refund must be a valid non-negative amount.');
+      return;
+    }
+    if (decision === 'approve' && refund > recordedPayment(booking)) {
+      alert('Refund cannot exceed the recorded payment.');
+      return;
+    }
+    setSaving(true);
+    try {
+      await onSubmit(booking._id, { decision, refundedAmount: refund, note });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Modal open={!!booking} onClose={onClose} title="Review cancellation request">
+      {booking && (
+        <>
+          <p className="mfield-note">{booking.guestName} · {booking.reservationCode || shortBookingId(booking)} · recorded payment {formatPeso(recordedPayment(booking))}</p>
+          <div className="mfield"><label htmlFor="cancellation-decision">Decision</label><select id="cancellation-decision" value={decision} onChange={(event) => setDecision(event.target.value)}><option value="approve">Approve cancellation</option><option value="reject">Reject request</option></select></div>
+          <div className="mfield"><label htmlFor="cancellation-refund">Manual refund (₱)</label><input id="cancellation-refund" type="number" min="0" step="0.01" value={refundedAmount} onChange={(event) => setRefundedAmount(event.target.value)} disabled={decision === 'reject'} /><p className="mfield-note">Record the amount actually refunded. The system never sends an automatic provider refund.</p></div>
+          <div className="mfield"><label htmlFor="cancellation-note">Review note</label><textarea id="cancellation-note" rows="3" value={note} onChange={(event) => setNote(event.target.value)} placeholder="Optional note for the audit trail" /></div>
+          <div className="modal-actions"><button type="button" className="btn-cancel" onClick={onClose}>Keep request</button><button type="button" className="btn-confirm" disabled={saving} onClick={submit}>{saving ? 'Saving…' : 'Save review'}</button></div>
+        </>
+      )}
+    </Modal>
+  );
+}
+
 function EditBookingModal({ booking, rooms, onClose, onSaved, minDuration, maxDuration }) {
   const { guardPermission } = useAuth();
   const [guestName, setGuestName] = useState('');
@@ -767,8 +977,7 @@ function EditBookingModal({ booking, rooms, onClose, onSaved, minDuration, maxDu
   const [timeIn, setTimeIn] = useState('');
   const [duration, setDuration] = useState(1);
   const [paymentMethod, setPaymentMethod] = useState('Cash');
-  const [downPayment, setDownPayment] = useState(0);
-  const [amount, setAmount] = useState(0);
+  const [hasCorkage, setHasCorkage] = useState(false);
   const [status, setStatus] = useState('Pending');
   const [specialRequests, setSpecialRequests] = useState('');
   const [saving, setSaving] = useState(false);
@@ -785,8 +994,7 @@ function EditBookingModal({ booking, rooms, onClose, onSaved, minDuration, maxDu
       setTimeIn(booking.timeIn || '');
       setDuration(booking.duration || 1);
       setPaymentMethod(booking.paymentMethod || 'Cash');
-      setDownPayment(booking.downPayment || 0);
-      setAmount(booking.amount || 0);
+      setHasCorkage(Number(booking.corkageFee) > 0);
       setStatus(booking.status || 'Pending');
       setSpecialRequests(booking.specialRequests || '');
     }
@@ -829,8 +1037,7 @@ function EditBookingModal({ booking, rooms, onClose, onSaved, minDuration, maxDu
         timeIn,
         duration: d,
         paymentMethod,
-        downPayment: Number(downPayment) || 0,
-        amount: Number(amount) || 0,
+        hasCorkage,
         status,
         specialRequests: specialRequests.trim(),
       });
@@ -886,13 +1093,14 @@ function EditBookingModal({ booking, rooms, onClose, onSaved, minDuration, maxDu
                 </select>
               </div>
               <div className="mfield">
-                <label>Downpayment (₱)</label>
-                <input type="number" min="0" value={downPayment} onChange={(e) => setDownPayment(e.target.value)} />
+                <label>Original downpayment</label>
+                <p className="mfield-note">{formatPeso(booking.downPayment)} · use the payment controls to record additional money received.</p>
               </div>
               <div className="mfield">
-                <label>Total amount (₱)</label>
-                <input type="number" min="0" value={amount} onChange={(e) => setAmount(e.target.value)} />
+                <label>Current total charge</label>
+                <p className="mfield-note">{formatPeso(booking.amount)} · recalculated automatically when room, time, guests, or corkage changes.</p>
               </div>
+              <label className="booking-addon-check"><input type="checkbox" checked={hasCorkage} onChange={(event) => setHasCorkage(event.target.checked)} /><span><strong>Outside food or drinks</strong><small>Apply the ₱{CORKAGE_FEE.toLocaleString()} corkage fee.</small></span></label>
             </div>
           </div>
 

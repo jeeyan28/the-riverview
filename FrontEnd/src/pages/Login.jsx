@@ -1,6 +1,6 @@
-import { useState, useRef, useLayoutEffect } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { User } from 'lucide-react';
+import { CheckCircle2, User } from 'lucide-react';
 import AuthForm from '../components/AuthForm';
 import ForgotPasswordModal from '../components/ForgotPasswordModal';
 import AuthMorphOverlay from '../components/AuthMorphOverlay';
@@ -11,19 +11,11 @@ import loginIllustration from "../assets/images/login-illustration.jpg";
 function Login() {
   const [isLogin, setIsLogin] = useState(true);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
-  const cardRef = useRef(null);
-  const [cardHeight, setCardHeight] = useState(null);
-  const { stage, rect, progress, beginMorph, retry } = useAuthMorph();
+  const { stage, beginMorph, retry } = useAuthMorph();
   const isMorphing = stage !== 'idle';
 
-  useLayoutEffect(() => {
-    if (isLogin && cardHeight === null && cardRef.current) {
-      setCardHeight(cardRef.current.getBoundingClientRect().height);
-    }
-  }, [isLogin, cardHeight]);
-
   function handleAuthSuccess(user) {
-    beginMorph(user, cardRef.current?.getBoundingClientRect());
+    beginMorph(user);
   }
 
   return (
@@ -48,23 +40,23 @@ function Login() {
       <section className="login-layout">
 
         <div className={`login-copy${isMorphing ? ' is-exiting' : ''}`}>
-          <span className="login-badge">PREMIUM RECREATION</span>
+          <span className="login-badge">THE RIVERVIEW RESERVATIONS</span>
           <h1>
-            <span>Reserve.</span>
-            <span>Play.</span>
-            <span>Unwind.</span>
+            <span>Book your time.</span>
+            <span>Enjoy the rest.</span>
           </h1>
           <p>
-            Reserve billiards and recreation spaces with
-            real-time availability in one seamless experience.
+            One account for billiards, KTV, and court reservations — with secure
+            payment, automatic confirmation, and your booking history in one place.
           </p>
+          <div className="login-proof" aria-label="Account benefits">
+            <span><CheckCircle2 size={16} aria-hidden="true" /> Live availability</span>
+            <span><CheckCircle2 size={16} aria-hidden="true" /> Secure checkout</span>
+            <span><CheckCircle2 size={16} aria-hidden="true" /> Reservation history</span>
+          </div>
         </div>
 
-        <aside
-          className={`login-card${isMorphing ? ' is-morph-source' : ''}`}
-          ref={cardRef}
-          style={cardHeight ? { height: cardHeight } : undefined}
-        >
+        <aside className={`login-card${isMorphing ? ' is-morph-source' : ''}`}>
           <div
             className={`auth-card-inner ${isLogin ? 'slide-to-login' : 'slide-to-register'}`}
             key={isLogin ? 'login' : 'register'}
@@ -73,13 +65,13 @@ function Login() {
               {isLogin ? (
                 <>
                   <div className="login-avatar"><User size={18} /></div>
-                  <h2>Welcome back </h2>
-                  <p>Continue where you left off.</p>
+                  <h2>Welcome back</h2>
+                  <p>Sign in to continue to your reservations.</p>
                 </>
               ) : (
                 <>
-                  <h2>Create your free account</h2>
-                  <p>Takes less than a minute. No credit card needed.</p>
+                  <h2>Create your account</h2>
+                  <p>Save reservations, receipts, and schedule changes in one place.</p>
                 </>
               )}
             </div>
@@ -97,7 +89,7 @@ function Login() {
 
       </section>
 
-      <AuthMorphOverlay stage={stage} rect={rect} progress={progress} onRetry={retry} />
+      <AuthMorphOverlay stage={stage} onRetry={retry} />
 
       <ForgotPasswordModal
         open={showForgotPassword}
@@ -107,6 +99,8 @@ function Login() {
           requestAnimationFrame(() => document.getElementById('email')?.focus());
         }}
       />
+
+      <div className="modal-portal-root" data-modal-portal />
     </main>
   );
 }
