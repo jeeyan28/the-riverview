@@ -1,9 +1,6 @@
 import { useEffect, useState } from 'react';
 
-// Site-wide light/dark preference for the public Home page (Navbar toggle).
-// Applied as a `data-theme` attribute on <html>, read by style.css's
-// `:root[data-theme="light"]` overrides. Login has its own fixed dark
-// design and no longer connects to this.
+// Site-wide light/dark preference shared by customer, authentication, and admin surfaces.
 const THEME_KEY = 'riverview-theme';
 
 export function useTheme() {

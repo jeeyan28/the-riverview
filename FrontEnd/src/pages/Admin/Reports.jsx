@@ -1,8 +1,10 @@
 import '../../styles/admin/reports.css';
 import '../../styles/admin/finance.css';
 import { useMemo, useState } from 'react';
+import { Activity, WalletCards } from 'lucide-react';
 import RevenueFilters from '../../components/RevenueFilters';
 import RevenueSummary from '../../components/RevenueSummary';
+import SessionReportPanel from '../../components/SessionReportPanel';
 import { businessDate, daysBefore, useRevenueReport } from '../../hooks/useRevenueReport';
 import { reportsService } from '../../services/reports';
 import { formatPeso } from '../../utils/currency';
@@ -21,6 +23,7 @@ function statusClass(status) {
 }
 
 function Reports() {
+  const [reportView, setReportView] = useState('revenue');
   const today = useMemo(() => businessDate(), []);
   const [from, setFrom] = useState(() => daysBefore(today, 6));
   const [to, setTo] = useState(today);
@@ -50,6 +53,18 @@ function Reports() {
 
   return (
     <div className="panel active" id="panel-reports">
+      <div className="reports-view-tabs" role="tablist" aria-label="Report type">
+        <button type="button" role="tab" aria-selected={reportView === 'revenue'} className={reportView === 'revenue' ? 'active' : ''} onClick={() => setReportView('revenue')}>
+          <WalletCards size={18} aria-hidden="true" />
+          <span><strong>Revenue &amp; payments</strong><small>Collected, outstanding, and hourly sales</small></span>
+        </button>
+        <button type="button" role="tab" aria-selected={reportView === 'sessions'} className={reportView === 'sessions' ? 'active' : ''} onClick={() => setReportView('sessions')}>
+          <Activity size={18} aria-hidden="true" />
+          <span><strong>Live sessions</strong><small>Played hours, walk-ins, and reservation starts</small></span>
+        </button>
+      </div>
+
+      {reportView === 'sessions' ? <SessionReportPanel /> : <>
       <RevenueFilters
         from={from}
         to={to}
@@ -131,6 +146,7 @@ function Reports() {
           </table>
         </div>
       </div>
+      </>}
     </div>
   );
 }

@@ -1,11 +1,12 @@
-import { ArrowUp, ArrowUpRight, CalendarCheck, Clock3, Facebook, MapPin } from 'lucide-react';
+import { ArrowUp, ArrowUpRight, Clock3, Facebook, MapPin } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { operatingHoursSummary } from '../utils/operatingHours';
+import ThemeToggle from './ThemeToggle';
 
 const FACEBOOK_URL = 'https://www.facebook.com/profile.php?id=61550783505442';
 const MAPS_URL = 'https://maps.app.goo.gl/2VqEJXFJifUz2KF76';
 
-function Footer({ settings }) {
+function Footer({ settings, theme, onToggleTheme }) {
   const navigate = useNavigate();
   const location = useLocation();
   const isHome = location.pathname === '/';
@@ -43,11 +44,8 @@ function Footer({ settings }) {
           </div>
 
           <div className="footer-col footer-cta">
-            <h4>Ready when you are</h4>
-            <p>Choose a room type, see the hourly total, and secure the time with a down payment.</p>
-            <Link className="footer-reserve-link" to="/rooms">
-              <CalendarCheck size={16} aria-hidden="true" /> Reserve a space
-            </Link>
+            <h4>Visit &amp; support</h4>
+            <p>Find the venue or message the team if you need help planning your visit.</p>
             <a href={MAPS_URL} target="_blank" rel="noreferrer">
               <MapPin size={15} aria-hidden="true" /> Get directions <ArrowUpRight size={14} aria-hidden="true" />
             </a>
@@ -65,6 +63,10 @@ function Footer({ settings }) {
           <div className="footer-legal-links">
             <Link to="/terms">Terms</Link>
             <Link to="/privacy">Privacy</Link>
+          </div>
+          <div className="footer-appearance">
+            <span>Appearance</span>
+            <ThemeToggle id="footer-theme-toggle" theme={theme} onToggle={onToggleTheme} />
           </div>
           <a href="/#home" className="footer-back-top" onClick={(event) => handleSectionLink(event, 'home')}>
             Back to top <ArrowUp size={14} aria-hidden="true" />

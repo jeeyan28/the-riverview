@@ -37,15 +37,20 @@ export function AuthProvider({ children }) {
   const revalidate = useCallback(async () => {
     try {
       const res = await fetch(`${API_BASE_URL}/api/auth/me`, { credentials: 'include' });
-      if (!res.ok) throw new Error('not authenticated');
+      if (res.status === 401 || res.status === 403) {
+        setUser(null);
+        clearStoredUser();
+        return null;
+      }
+      if (!res.ok) throw new Error('session check unavailable');
       const { user: freshUser } = await res.json();
       setUser(freshUser);
       writeStoredUser(freshUser);
       return freshUser;
     } catch {
-      setUser(null);
-      clearStoredUser();
-      return null;
+      const cachedUser = readStoredUser();
+      setUser(cachedUser);
+      return cachedUser;
     } finally {
       setInitializing(false);
     }

@@ -5,7 +5,7 @@ import {
   Zap, LayoutGrid, ShieldCheck,
   DoorOpen, CalendarDays, Wallet, FileText, MessageCircle,
   Timer, Hourglass, CheckCircle2,
-  HelpCircle, X,
+  HelpCircle, X, ArrowRight,
 } from 'lucide-react';
 import { useSiteSettings } from '../hooks/useSiteSettings';
 import { useToast } from '../hooks/useToast';
@@ -15,9 +15,11 @@ import BookingModal from '../components/BookingModal';
 import FacilityBookingCard from '../components/FacilityBookingCard';
 import FacilityCardSkeleton from '../components/FacilityCardSkeleton';
 import FacilityMotionVisual from '../components/FacilityMotionVisual';
-import RoomDetailsModal from '../components/RoomDetailsModal';
 import Toast from '../components/Toast';
 import { API_BASE_URL } from '../services/api';
+import { useAuth } from '../context/AuthContext';
+import { buildLoginPath } from '../utils/auth';
+import '../styles/home-refinement.css';
 
 import heroImg4 from '../assets/pictures/RiverView_4.jpg';
 import heroImg5 from '../assets/pictures/RiverView_5.jpg';
@@ -49,6 +51,34 @@ const WHY_BOOK_CARDS = [
   { icon: LayoutGrid, title: 'See What\u2019s Available', desc: 'Browse room types and real-time availability first.' },
   { icon: ShieldCheck, title: 'Secure Reservation', desc: 'Your reservation and payment details stay protected.' },
 ];
+
+const SPACE_ITEMS = [
+  {
+    type: 'billiards',
+    title: 'Billiards Room',
+    label: 'Billiards',
+    description: 'Multiple tables, great lighting, and a chill atmosphere. Perfect for a quick session or a long evening with friends.',
+  },
+  {
+    type: 'court',
+    title: 'Basketball Court',
+    label: 'Court',
+    description: 'Full-size court with proper flooring. Includes scoreboard, timer, and sound system for official games.',
+  },
+  {
+    type: 'ktv',
+    title: 'KTV Room',
+    label: 'KTV',
+    description: 'Private rooms with updated song libraries. Bring your barkada, bring your voice. No judgment here.',
+  },
+];
+
+function matchesSpace(room, type) {
+  const value = `${room?.name || ''} ${room?.description || ''}`.toLowerCase();
+  if (type === 'billiards') return value.includes('billiard') || value.includes('pool');
+  if (type === 'court') return value.includes('court') || value.includes('basketball');
+  return value.includes('ktv') || value.includes('karaoke');
+}
 
 const BOOKING_STEPS = [
   {
@@ -158,6 +188,7 @@ function HeroCarousel() {
 }
 
 function Home() {
+  const { user } = useAuth();
   const { settings, openHour, closeHour, loaded: settingsLoaded, refetch: refetchSettings } = useSiteSettings();
   const { toast, showToast } = useToast();
   const [rooms, setRooms] = useState(null);
@@ -165,7 +196,6 @@ function Home() {
   const [liveStatuses, setLiveStatuses] = useState({});
 
   const [bookingRoom, setBookingRoom] = useState(null);
-  const [detailRoom, setDetailRoom] = useState(null);
   const [paymongoReturn, setPaymongoReturn] = useState(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const [helpOpen, setHelpOpen] = useState(false);
@@ -303,7 +333,7 @@ function Home() {
               complete the down payment, and receive confirmation automatically.
             </p>
             <div className="hero-actions">
-              <Link to="/rooms" className="btn-primary-hero">Reserve a space</Link>
+              <Link to={user ? '/rooms' : buildLoginPath('/rooms')} className="btn-primary-hero">Reserve a space</Link>
               <a href="#rooms" className="btn-ghost-hero">View facilities</a>
             </div>
           </div>
@@ -368,29 +398,35 @@ function Home() {
                 room={room}
                 liveStatus={liveStatuses[room._id]}
                 onSelect={handleSelectRoom}
-                onDetails={setDetailRoom}
               />
             ))}
         </div>
       </section>
 
       <section className="why-book">
-        <div className="why-book-inner reveal">
-          <div className="section-label">Why Reserve Online?</div>
-          <h2>Plan ahead without waiting for a reply.</h2>
-        </div>
-        <div className="why-book-grid reveal-stagger">
-          {WHY_BOOK_CARDS.map((c) => (
-            <div className="why-book-card" key={c.title}>
-              <div className="why-book-card-icon"><c.icon size={18} color="var(--teal)" /></div>
-              <h4>{c.title}</h4>
-              <p>{c.desc}</p>
-            </div>
-          ))}
+        <div className="why-book-shell">
+          <div className="why-book-intro reveal">
+            <h2>Plan ahead without waiting for a reply.</h2>
+            <p>See managed room types, choose a whole-hour schedule, and keep your reservation and balance together in one account.</p>
+            <Link to="/rooms" className="why-book-link">
+              Browse live facilities <ArrowRight size={17} aria-hidden="true" />
+            </Link>
+          </div>
+          <div className="why-book-list reveal-stagger">
+            {WHY_BOOK_CARDS.map((c) => (
+              <div className="why-book-item" key={c.title}>
+                <span className="why-book-item-icon"><c.icon size={19} aria-hidden="true" /></span>
+                <div>
+                  <h3>{c.title}</h3>
+                  <p>{c.desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
-      <section className="spaces-showcase" style={{ background: 'var(--surface-alt)' }}>
+      <section className="spaces-showcase">
         <div className="spaces">
           <div className="spaces-header reveal">
             <div className="section-label">Our Spaces</div>
@@ -399,29 +435,23 @@ function Home() {
           </div>
 
           <div className="spaces-rows reveal-stagger">
-            <div className="space-row">
-              <div className="space-text">
-                <h3>Billiards Room</h3>
-                <p>Multiple tables, great lighting, and a chill atmosphere. Perfect for a quick session or a long evening with friends.</p>
-              </div>
-              <FacilityMotionVisual type="billiards" label="Billiards" />
-            </div>
-
-            <div className="space-row space-row-reverse">
-              <div className="space-text">
-                <h3>Basketball Court</h3>
-                <p>Full-size court with proper flooring. Includes scoreboard, timer, and sound system for official games.</p>
-              </div>
-              <FacilityMotionVisual type="court" label="Court" />
-            </div>
-
-            <div className="space-row">
-              <div className="space-text">
-                <h3>KTV Room</h3>
-                <p>Private rooms with updated song libraries. Bring your barkada, bring your voice. No judgment here.</p>
-              </div>
-              <FacilityMotionVisual type="ktv" label="KTV" />
-            </div>
+            {SPACE_ITEMS.map((space, index) => {
+              const managedRoom = rooms?.find((room) => matchesSpace(room, space.type));
+              const detailsHref = managedRoom?._id ? `/rooms/${encodeURIComponent(managedRoom._id)}` : '/rooms';
+              return (
+                <div className={`space-row${index % 2 === 1 ? ' space-row-reverse' : ''}`} key={space.type}>
+                  <div className="space-text">
+                    <h3>{space.title}</h3>
+                    <p>{space.description}</p>
+                    <Link to={detailsHref} className="space-details-link">
+                      {managedRoom ? 'View rooms and rates' : 'Browse facilities'}
+                      <ArrowRight size={17} aria-hidden="true" />
+                    </Link>
+                  </div>
+                  <FacilityMotionVisual type={space.type} label={space.label} />
+                </div>
+              );
+            })}
           </div>
         </div>
       </section>
@@ -442,8 +472,8 @@ function Home() {
             </div>
             <div className="about-card">
               <div className="about-card-icon"><CalendarCheck size={20} color="var(--teal)" /></div>
-              <h4>Easy Reservation</h4>
-              <p>Reserve your room online in seconds. Walk-ins always welcome, reservations always smoother.</p>
+              <h4>Walk-ins Welcome</h4>
+              <p>Drop in for a game or ask the team for help choosing the right space for your group.</p>
             </div>
             <div className="about-card">
               <div className="about-card-icon"><PartyPopper size={20} color="var(--teal)" /></div>
@@ -508,8 +538,6 @@ function Home() {
         closeHour={closeHour}
         settings={settings}
       />
-
-      <RoomDetailsModal room={detailRoom} onClose={() => setDetailRoom(null)} onReserve={(room) => { setDetailRoom(null); handleSelectRoom(room); }} />
 
       <Toast {...toast} />
     </>

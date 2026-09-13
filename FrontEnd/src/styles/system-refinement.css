@@ -1,0 +1,455 @@
+/* Final cross-surface refinements: compact overlays, clear light mode, and app-like navigation. */
+
+:root[data-theme="light"] {
+  --surface: #f2f7f5;
+  --surface-alt: #ffffff;
+  --surface-raised: #e7f0ed;
+  --card-light: #e7f0ed;
+  --text-main: #17312d;
+  --text-muted-light: #58706b;
+  --header-scroll-bg: rgba(242, 247, 245, .94);
+  --input-bg: #ffffff;
+  --input-text: #17312d;
+  --border: rgba(18, 68, 60, .11);
+  --border-strong: rgba(18, 68, 60, .2);
+  --shadow-depth: 0 10px 26px rgba(23, 49, 45, .09);
+  --shadow-high: 0 24px 64px rgba(23, 49, 45, .16);
+  --nav-bg: #f2f7f5;
+  --nav-bg-scroll: rgba(242, 247, 245, .96);
+  --nav-text: #17312d;
+  --nav-muted: #526a65;
+  --nav-card: #e4efec;
+  --nav-border: rgba(18, 68, 60, .13);
+}
+
+/* Compact customer notifications. */
+.public-site .announcements-panel {
+  width: min(326px, calc(100vw - 24px));
+  border-radius: var(--radius-md);
+}
+
+.public-site #announcements-panel-mobile { width: min(326px, calc(100vw - 2 * var(--page-gutter))); }
+
+.public-site .announcements-panel-header {
+  gap: 10px;
+  padding: 12px 14px;
+}
+
+.public-site .announcements-panel-title { font-size: .84rem; }
+.public-site .announcements-panel-subtitle { font-size: .65rem; }
+.public-site .announcements-mark-all { min-height: 30px; padding-inline: 8px; font-size: .66rem; }
+.public-site .announcements-list { max-height: 300px; padding: 4px; }
+.public-site .announcement-item { gap: 8px; padding: 10px 8px 10px 12px; border-radius: 9px; }
+.public-site .announcement-item:not(.is-read)::before { left: 3px; top: 9px; bottom: 9px; width: 2px; }
+.public-site .announcement-item:not(:last-child)::after { left: 12px; right: 8px; }
+.public-site .announcement-item-icon { width: 28px; height: 28px; }
+.public-site .announcement-item-emoji { font-size: .82rem; }
+.public-site .announcement-item-title { font-size: .76rem; }
+.public-site .announcement-item-time { font-size: .61rem; }
+.public-site .announcement-item-message { font-size: .69rem; line-height: 1.42; }
+.public-site .announcement-item-close { width: 24px; height: 24px; opacity: .72; }
+.public-site .announcements-empty { padding: 28px 16px; gap: 8px; }
+.public-site .announcements-empty-icon { width: 40px; height: 40px; }
+
+/* The footer follows the selected appearance and keeps the switch available at page end. */
+.public-site > footer {
+  color: #f1f3f7;
+  transition: background-color 220ms var(--ease-out), color 220ms var(--ease-out);
+}
+
+.public-site .footer-appearance {
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  gap: 10px;
+  color: #a9b3c4;
+  font-size: .72rem;
+  font-weight: 650;
+}
+
+.public-site .footer-appearance .theme-toggle {
+  border-color: rgba(255,255,255,.16);
+  background: rgba(255,255,255,.07);
+  color: #c5ceda;
+}
+
+:root[data-theme="light"] .public-site > footer {
+  border-top: 1px solid var(--border-strong);
+  background: #e3efeb;
+  color: var(--text-main);
+}
+
+:root[data-theme="light"] .public-site > footer::before {
+  background: linear-gradient(90deg, transparent, rgba(0, 143, 120, .45), transparent);
+}
+
+:root[data-theme="light"] .public-site :is(.footer-brand p, .footer-col p, .footer-col > a:not(.footer-reserve-link), .footer-bottom, .footer-legal-links a, .footer-back-top, .footer-visit-facts span, .footer-appearance) {
+  color: var(--text-muted-light);
+}
+
+:root[data-theme="light"] .public-site :is(.footer-brand .logo-name, .footer-col h4) { color: var(--text-main); }
+:root[data-theme="light"] .public-site .footer-appearance .theme-toggle { border-color: var(--border-strong); background: var(--surface-alt); color: var(--text-muted-light); }
+
+/* Authentication is part of the same appearance system. */
+.auth-theme-control {
+  position: fixed;
+  top: 18px;
+  right: max(20px, env(safe-area-inset-right));
+  z-index: 40;
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  gap: 10px;
+  color: rgba(255,255,255,.72);
+  font-size: .72rem;
+  font-weight: 650;
+}
+
+:root[data-theme="light"] .login-page {
+  --bg: #eaf3f0;
+  --card: rgba(255,255,255,.9);
+  --text: #17312d;
+  --muted: #5b706c;
+  --border: rgba(18,68,60,.13);
+  --shadow: 0 28px 72px rgba(23,49,45,.17);
+  --ovl-04: rgba(18,68,60,.04);
+  --ovl-06: rgba(18,68,60,.06);
+  --ovl-07: rgba(18,68,60,.07);
+  --ovl-08: rgba(18,68,60,.09);
+  --ovl-14: rgba(18,68,60,.14);
+  --ovl-16: rgba(18,68,60,.17);
+  --muted-2: #667d78;
+}
+
+:root[data-theme="light"] :is(.auth-content, .login-page) { background: #f2f7f5; }
+
+:root[data-theme="light"] .login-page .login-background-image {
+  opacity: .2;
+  filter: saturate(.7) contrast(.9);
+}
+
+:root[data-theme="light"] .login-page .login-background-tint { mix-blend-mode: multiply; opacity: .3; }
+:root[data-theme="light"] .login-page .login-background-overlay {
+  background:
+    linear-gradient(90deg, rgba(234,243,240,.82), rgba(234,243,240,.75) 48%, rgba(242,247,245,.94) 72%, #f2f7f5 100%),
+    linear-gradient(to bottom, rgba(255,255,255,.34), transparent 50%, rgba(227,239,235,.72));
+}
+:root[data-theme="light"] .login-page .login-copy { text-shadow: none; }
+:root[data-theme="light"] .login-page .login-brand-title { color: var(--text); }
+:root[data-theme="light"] .auth-theme-control { color: var(--text-muted-light); }
+:root[data-theme="light"] .login-page .login-card {
+  border-color: var(--border);
+  background: var(--card);
+  color: var(--text);
+  box-shadow: var(--shadow);
+}
+:root[data-theme="light"] .login-page :is(.login-copy p, .login-proof span) { color: var(--muted); }
+:root[data-theme="light"] .login-page :is(.field input:not(.otp-input), .rf-scope .field input:not(.otp-input)) {
+  border-color: var(--border);
+  background: rgba(18,68,60,.035);
+  color: var(--text);
+}
+:root[data-theme="light"] .login-page :is(.btn-social, .btn-guest) { color: #17211f; }
+:root[data-theme="light"] .login-page .btn-social { border-color: var(--border); background: #ffffff; }
+:root[data-theme="light"] .login-page .btn-guest:hover { background: rgba(18,68,60,.06); color: #101418; }
+
+:is(.login-page, .claim-modal-scope) .btn-social:hover,
+:is(.login-page, .claim-modal-scope) .btn-social:hover :is(.btn-social-label, .btn-social-arrow) {
+  color: #101418;
+}
+
+/* Auth dialogs share the same compact, centered chrome on every viewport. */
+:is(.login-page, .claim-modal-scope) .modal-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 850;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  background: rgba(5, 13, 27, .76);
+  backdrop-filter: blur(10px);
+}
+
+:is(.login-page, .claim-modal-scope) .modal-box {
+  width: min(440px, 100%);
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+  padding: 22px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--card);
+  color: var(--text);
+  box-shadow: 0 24px 70px rgba(3, 10, 20, .42);
+  overscroll-behavior: contain;
+}
+
+:is(.login-page, .claim-modal-scope) .modal-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+:is(.login-page, .claim-modal-scope) .modal-title {
+  margin: 0;
+  color: var(--text);
+  font-size: 1.15rem;
+  font-weight: 760;
+  letter-spacing: -.025em;
+  line-height: 1.3;
+}
+
+:is(.login-page, .claim-modal-scope) .modal-close {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  place-items: center;
+  margin: -9px -9px 0 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: background-color 160ms ease, color 160ms ease, transform 160ms ease;
+}
+
+:is(.login-page, .claim-modal-scope) .modal-close:hover {
+  background: var(--ovl-08);
+  color: var(--text);
+}
+
+:is(.login-page, .claim-modal-scope) .modal-close:active { transform: scale(.94); }
+
+:is(.login-page, .claim-modal-scope) .modal-actions {
+  display: grid;
+  grid-template-columns: minmax(0, .72fr) minmax(0, 1.28fr);
+  gap: 9px;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+:is(.login-page, .claim-modal-scope) .modal-actions > button {
+  min-width: 0;
+  min-height: 44px;
+  justify-content: center;
+}
+
+@media (max-width: 480px) {
+  :is(.login-page, .claim-modal-scope) .modal-box {
+    max-height: calc(100dvh - 24px);
+    padding: 18px;
+    border-radius: 16px;
+  }
+
+  :is(.login-page, .claim-modal-scope) .modal-actions { margin-top: 16px; padding-top: 14px; }
+}
+
+/* A light admin workspace reads as light from the sidebar through the content area. */
+#app[data-theme="light"] {
+  --navy1: #eef5f2;
+  --navy2: #ffffff;
+  --navy3: #f3f8f6;
+  --navy4: #e2eeea;
+  --text: #17312d;
+  --muted: #5a706b;
+  --border: rgba(18,68,60,.12);
+  --border-soft: rgba(18,68,60,.075);
+  --teal: #087d6b;
+  --teal-soft: rgba(8,125,107,.11);
+  --shadow-sm: 0 1px 3px rgba(23,49,45,.07);
+  --shadow-md: 0 14px 38px rgba(23,49,45,.12);
+}
+
+#app[data-theme="light"] #sidebar {
+  border-right-color: var(--border);
+  background: #f8fcfa;
+  color: var(--text);
+  box-shadow: 8px 0 30px rgba(23,49,45,.04);
+}
+
+#app[data-theme="light"] :is(.sb-logo, .admin-info-row) { border-color: var(--border); }
+#app[data-theme="light"] .sb-logo { background: var(--navy4); }
+#app[data-theme="light"] .sb-title,
+#app[data-theme="light"] .admin-name { color: var(--text); }
+#app[data-theme="light"] :is(.sb-sub, .sb-section, .admin-role, .sb-logout-button) { color: var(--muted); }
+#app[data-theme="light"] .sb-item { color: #49635d; }
+#app[data-theme="light"] .sb-item :is(i, svg) { color: #6c837e; }
+#app[data-theme="light"] .sb-item:hover { background: var(--navy4); color: var(--text); }
+#app[data-theme="light"] .sb-item.active { background: var(--teal-soft); color: var(--teal); }
+#app[data-theme="light"] .sb-item.active :is(i, svg) { color: var(--teal); }
+#app[data-theme="light"] .sb-bottom { border-top-color: var(--border); }
+#app[data-theme="light"] .admin-info-row { background: var(--navy3); }
+#app[data-theme="light"] .admin-av { background: var(--teal-soft); color: var(--teal); }
+#app[data-theme="light"] :is(.save-btn, .btn-teal, .btn-confirm, .btn-save) { color: #ffffff; }
+
+/* Reports owns both money reporting and the live-monitor session history. */
+#app #panel-reports .reports-view-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  background: var(--navy3);
+}
+
+#app #panel-reports .reports-view-tabs button {
+  display: flex;
+  min-width: 0;
+  min-height: 54px;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--muted);
+  text-align: left;
+}
+
+#app #panel-reports .reports-view-tabs button > span { display: grid; min-width: 0; }
+#app #panel-reports .reports-view-tabs strong { color: inherit; font-size: .75rem; }
+#app #panel-reports .reports-view-tabs small { overflow: hidden; color: var(--muted); font-size: .62rem; text-overflow: ellipsis; white-space: nowrap; }
+#app #panel-reports .reports-view-tabs button.active { background: var(--navy2); color: var(--teal); box-shadow: var(--shadow-sm); }
+#app #panel-reports .reports-session-panel { animation: reports-panel-enter 180ms var(--ease-out) both; }
+#app #panel-reports .reports-section-kicker { display: block; margin-bottom: 5px; color: var(--teal); font-size: .61rem; font-weight: 780; letter-spacing: .11em; }
+
+@keyframes reports-panel-enter {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 900px) {
+  .customer-app-nav.app-nav-scrollable,
+  .admin-app-nav.app-nav-scrollable {
+    display: flex;
+    justify-content: flex-start;
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-inline: contain;
+    scroll-padding-inline: 8px;
+    scroll-snap-type: x proximity;
+    scrollbar-width: none;
+    touch-action: pan-x;
+  }
+
+  .customer-app-nav.app-nav-scrollable::-webkit-scrollbar,
+  .admin-app-nav.app-nav-scrollable::-webkit-scrollbar { display: none; }
+
+  .customer-app-nav.app-nav-scrollable .app-nav-item {
+    flex: 1 0 72px;
+    scroll-snap-align: center;
+  }
+
+  .admin-app-nav.app-nav-scrollable .app-nav-item {
+    flex: 0 0 clamp(72px, 16vw, 88px);
+    scroll-snap-align: center;
+  }
+}
+
+@media (max-width: 640px) {
+  .auth-theme-control { top: 13px; right: max(12px, env(safe-area-inset-right)); }
+  .auth-theme-control > span { display: none; }
+  .public-site .footer-bottom { padding-right: 0; }
+  .public-site .footer-appearance { order: 3; }
+  #app #panel-reports .reports-view-tabs { grid-template-columns: 1fr; }
+  #app #panel-reports .reports-view-tabs button { min-height: 48px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .public-site > footer { transition: none; }
+}
+
+/* Reservation navigation stays visible and uses a familiar back affordance. */
+.public-site .bk-header {
+  position: sticky;
+  top: 0;
+  z-index: 7;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 14px;
+  padding: 18px 24px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-alt);
+}
+
+.public-site .bk-modal-back {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  align-self: center;
+  gap: 7px;
+  padding: 0 4px 0 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted-light);
+  font-size: .8rem;
+  font-weight: 700;
+  touch-action: manipulation;
+  transition: color 140ms var(--ease-out), transform 140ms var(--ease-out);
+}
+
+.public-site .bk-modal-back:hover { color: var(--teal-strong); transform: translateX(-2px); }
+.public-site .bk-modal-back:focus-visible { outline: 2px solid var(--teal); outline-offset: 3px; border-radius: 6px; }
+.public-site .bk-header-identity { display: flex; min-width: 0; align-items: center; gap: 12px; }
+.public-site .bk-header-identity > div:last-child { min-width: 0; }
+.public-site .bk-header h2 { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.public-site :is(.btn-select, .fd-primary-button, .fd-room-cta, .btn-primary-hero, .bk-room-option, .bk-confirm) {
+  touch-action: manipulation;
+}
+
+/* Embedded social browsers cannot complete Google's secure OAuth page. */
+:is(.login-page, .claim-modal-scope) .embedded-browser-notice {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  padding: 11px 12px;
+  border: 1px solid rgba(239, 159, 39, .32);
+  border-radius: 12px;
+  background: rgba(239, 159, 39, .1);
+  color: var(--text);
+}
+
+:is(.login-page, .claim-modal-scope) .embedded-browser-notice > svg { margin-top: 2px; color: #ef9f27; }
+:is(.login-page, .claim-modal-scope) .embedded-browser-notice strong { display: block; font-size: .8rem; line-height: 1.35; }
+:is(.login-page, .claim-modal-scope) .embedded-browser-notice p { margin: 3px 0 8px; color: var(--muted); font-size: .72rem; line-height: 1.45; }
+:is(.login-page, .claim-modal-scope) .embedded-browser-notice button {
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 9px;
+  border: 1px solid rgba(239, 159, 39, .34);
+  border-radius: 8px;
+  background: rgba(239, 159, 39, .08);
+  color: var(--text);
+  font-size: .7rem;
+  font-weight: 700;
+}
+
+/* Admin links give immediate directional feedback on pointer devices. */
+@media (hover: hover) and (pointer: fine) {
+  #app #sidebar:not(.collapsed) .sb-item:hover { transform: translateX(3px); }
+  #app .sb-item:hover :is(i, svg) { color: var(--teal); }
+}
+
+@media (max-width: 599px) {
+  .public-site .bk-header {
+    padding: calc(10px + env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) 10px max(14px, env(safe-area-inset-left));
+    gap: 9px;
+  }
+  .public-site .bk-modal-back { min-height: 40px; }
+  .public-site .bk-room-icon { width: 38px; height: 38px; }
+  .public-site .bk-header-identity { gap: 9px; }
+}
+
+@media (max-width: 370px) {
+  .public-site .bk-modal-back span { display: none; }
+  .public-site .bk-modal-back { width: 36px; justify-content: center; padding: 0; }
+}

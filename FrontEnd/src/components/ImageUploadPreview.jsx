@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { ImagePlus, UploadCloud } from 'lucide-react';
 
 export default function ImageUploadPreview({
-  icon = 'ti-photo',
   title = 'Click to upload image',
   subtitle = 'PNG, JPG',
   accept = 'image/*',
@@ -13,6 +13,7 @@ export default function ImageUploadPreview({
   const inputRef = useRef(null);
 
   const [preview, setPreview] = useState('');
+  const [error, setError] = useState('');
 
   useEffect(() => {
     if (typeof value === 'string') {
@@ -34,6 +35,7 @@ export default function ImageUploadPreview({
   );
 
   function chooseFile() {
+    setError('');
     inputRef.current?.click();
   }
 
@@ -42,13 +44,13 @@ export default function ImageUploadPreview({
     if (!file) return;
 
     if (file.size > maxSizeMB * 1024 * 1024) {
-      alert(`Image must be smaller than ${maxSizeMB}MB.`);
+      setError(`Choose an image smaller than ${maxSizeMB}MB.`);
       e.target.value = '';
       return;
     }
 
     if (!file.type.startsWith('image/')) {
-      alert('Please select a valid image.');
+      setError('Choose a valid PNG or JPG image.');
       e.target.value = '';
       return;
     }
@@ -61,6 +63,7 @@ export default function ImageUploadPreview({
     });
 
     onFileSelect?.(file);
+    setError('');
   }
 
   return (
@@ -73,70 +76,27 @@ export default function ImageUploadPreview({
         onChange={handleFile}
       />
 
-      <div
+      <button
+        type="button"
         className="image-upload-preview"
         onClick={chooseFile}
-        style={{
-          cursor: 'pointer',
-          border: '2px dashed var(--border,#d9d9d9)',
-          borderRadius: 12,
-          overflow: 'hidden',
-          minHeight: maxHeight,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          background: '#fafafa',
-          transition: '.2s',
-        }}
+        aria-label={preview ? 'Change selected image' : title}
+        style={{ '--upload-min-height': `${maxHeight}px` }}
       >
         {preview ? (
-          <img
-            src={preview}
-            alt="Preview"
-            style={{
-              width: '100%',
-              maxHeight,
-              objectFit: 'cover',
-              display: 'block',
-            }}
-          />
+          <>
+            <img src={preview} alt="Selected preview" />
+            <span className="image-upload-change"><ImagePlus size={16} />Change image</span>
+          </>
         ) : (
-          <div
-            style={{
-              padding: 24,
-              textAlign: 'center',
-              color: '#6b7280',
-            }}
-          >
-            <i
-              className={`ti ${icon}`}
-              style={{
-                fontSize: 34,
-                display: 'block',
-                marginBottom: 10,
-              }}
-            />
-
-            <div
-              style={{
-                fontWeight: 600,
-                marginBottom: 4,
-              }}
-            >
-              {title}
-            </div>
-
-            <div
-              style={{
-                fontSize: '.8rem',
-                color: '#9ca3af',
-              }}
-            >
-              {helper}
-            </div>
+          <div className="image-upload-empty">
+            <span className="image-upload-icon"><UploadCloud size={23} aria-hidden="true" /></span>
+            <strong>{title}</strong>
+            <span>{helper}</span>
           </div>
         )}
-      </div>
+      </button>
+      {error && <div className="image-upload-error" role="alert">{error}</div>}
     </>
   );
 }

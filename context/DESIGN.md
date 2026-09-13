@@ -6,18 +6,18 @@ Source of truth for visual and interaction design. This documents the system tha
 
 | Token | Dark theme (default) | Light theme | Usage |
 |---|---|---|---|
-| `--surface` | `#101d33` | `#F8F9FB` | Page background |
+| `--surface` | `#101d33` | `#F2F7F5` | Page background |
 | `--surface-alt` | `#16243f` | `#FFFFFF` | Secondary surface / raised panels |
-| `--card-light` | `#1c2c4a` | `#EEF1F6` | Card backgrounds |
-| `--text-main` | `#F1F3F7` | `#16243D` | Primary text (15.2:1 / 14.7:1 contrast — passes AAA) |
-| `--text-muted-light` | `#9aa4b8` | `#5B6B82` | Secondary text (6.7:1 / 5.2:1 — passes AA) |
+| `--card-light` | `#1c2c4a` | `#E7F0ED` | Card backgrounds |
+| `--text-main` | `#F1F3F7` | `#17312D` | Primary text |
+| `--text-muted-light` | `#9aa4b8` | `#58706B` | Secondary text |
 | `--teal` | `#00C9A7` | `#00C9A7` | Primary accent / CTA / brand color |
 | `--warning` | `#e0a13a` | `#e0a13a` | Warnings, alerts |
 | `--border` | `rgba(255,255,255,.12)` | `rgba(10,22,40,.1)` | Dividers, outlines |
 
 **Rule — teal contrast:** Teal on dark background = 7.96:1 (safe for text). Teal on light background = **2.01:1 — fails WCAG AA**. On the light theme, teal is accent/icon/border only — never body text. If teal text is needed on light backgrounds, use a darkened variant, not raw `--teal`.
 
-Theme switching is handled via `[data-theme="light"]` CSS variable overrides — keep all new colors as variables, never hardcode hex values in components.
+Theme switching is handled via `[data-theme="light"]` CSS variable overrides and applies to customer pages, authentication, footer, and the complete admin shell. Light mode uses a pale green-gray canvas, white raised surfaces, dark green-gray text, and a light sidebar so the selected appearance is immediately recognizable.
 
 ## 2. Typography
 
@@ -142,21 +142,22 @@ The `motion` (Motion/Framer Motion) library is the standard for anything beyond 
 ### Customer surface
 - The header must keep readable navigation text in both themes, expose the same theme control on desktop and mobile, and place account, announcements, and sign-in actions inside the mobile menu without clipping.
 - At phone and tablet widths up to 900px, the customer shell keeps Home, Reserve, Contact, and Account in a bottom tab bar that accounts for device safe areas. The full-screen menu carries secondary navigation and preferences, and temporarily disables the tab bar while open.
-- Facility cards provide separate **Details** and **Reserve** actions. Details explain every type/variant, capacity, rate behavior, and available-unit count before checkout.
-- On phones, facility cards become compact image-and-content rows. They show only the two most useful amenities and expose the complete room-type information through an accordion-style Details dialog.
-- “Our Spaces” uses dimensional CSS miniatures for billiards, court, and KTV. Each scene shows recognizable equipment, surface depth, materials, and shadows, with a slow shallow camera orbit instead of a full spin. Secondary motion stays subtle and every scene becomes static when reduced motion is requested.
+- Facility cards provide separate **Details** and **Reserve** actions. Details open the dedicated `/rooms/:roomId` page, where customers can compare every type/variant, capacity, exact hourly rate, amenities, status, and available-unit count before checkout. Reserving a listed room type carries that choice into the booking flow.
+- On phones, facility cards become compact image-and-content rows. They show only the two most useful amenities; the Details action opens the dedicated facility page with every room type and its complete information.
+- “Our Spaces” uses circular dimensional CSS miniatures for billiards, court, and KTV. Each scene shows recognizable equipment, surface depth, materials, and shadows. A slow shallow camera orbit runs at rest; holding and dragging turns the model through a full 360 degrees, then a spring returns it to the front on release. Arrow keys provide the same interaction, while reduced-motion users receive a static scene.
+- The reserve-online explanation is a compact full-width editorial section with a short benefit list and one route to live facilities. Avoid placing a small card grid inside an oversized floating slab.
 - Route, session, and post-login waits use the same compact Riverview billiards loader. Authentication redirects as soon as the account handoff is ready; never hold the user behind a fake percentage sequence.
 - Profile, reservation details, booking, reschedule, cancellation, and authentication dialogs use the shared modal behavior: labelled dialog, focus containment, Escape/close affordance, internal scrolling, and stacked full-width actions on phones.
 - Phone booking dialogs show one current step and a short progress bar. Review information is grouped into one flat summary, while policies and secondary account-security controls use progressive disclosure.
 - Reservation details lead with total charge, paid amount, and balance so a downpayment never looks like full payment.
-- The footer contains only useful venue facts, navigation, reservation, directions, support, and legal links.
+- The footer contains only useful venue facts, navigation, reservation, directions, support, legal links, and the shared appearance switch.
 
 ### Admin surface
-- At phone and tablet widths up to 900px, the staff shell keeps Live Monitor, Reservations, the first permitted overview destination, and More in a bottom tab bar that accounts for device safe areas. The top bar remains sticky; the sidebar opened by More contains the complete permission-filtered navigation.
+- At phone and tablet widths up to 900px, the staff shell exposes every permitted primary destination in a horizontally swipeable bottom tab bar that accounts for device safe areas. The active destination scrolls into view, and the sidebar opened by More contains the complete permission-filtered navigation.
 - Live Monitor leads with physical-unit availability and keeps payment state/balance visible on every active session. Starting a walk-in provides whole-hour choices and explicit **pay before**, **pay part now**, or **pay after play** choices.
 - Live Monitor cards stay compact and keep Extend, Finish, and accidental-start cancellation on one reachable action row at phone widths.
-- Live Monitor’s Session Report is a separate tab with service-date controls, summary totals, room-type totals, an activity table, and Excel export.
-- Facilities uses one editor for catalog type, inventory count/start number, capacity, hourly pricing, time-based pricing, guest surcharge, and availability. Long forms scroll inside the modal; buttons remain reachable.
+- Reports contains a dedicated **Live sessions** view with service-date controls, summary totals, room-type totals, an activity table, and Excel export. Live Monitor stays focused on the active floor.
+- Facilities uses a responsive image-led card catalog with visible room rates, inventory health, and direct **Add room** and **Manage** actions. The persistent **Add facility** action opens a service chooser: missing Billiards/KTV/Court categories create a suggested facility template, while configured categories open a blank room form. Its two-section editor covers inventory count/start number, capacity, hourly and time-based pricing, guest surcharge, availability, and guest-facing imagery; validation stays inside the dialog and long forms scroll with actions always reachable.
 - Reports, Settings, and Login History use plain labels, compact summaries, and one clear primary task. Date filtering uses Today, Last 7 days, This month, and native From/To inputs.
 - Tables stay real tables on tablets/desktops and scroll inside labelled containers when their columns cannot fit. On phones, primary operational controls and modal actions span the available width.
 

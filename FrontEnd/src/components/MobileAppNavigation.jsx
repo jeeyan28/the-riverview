@@ -1,5 +1,14 @@
-import { Activity, CalendarDays, DoorOpen, House, LayoutDashboard, Menu, MessageCircle, UserRound } from 'lucide-react';
+import { useEffect, useRef } from 'react';
+import { Activity, BarChart3, CalendarDays, DoorOpen, House, LayoutDashboard, Menu, MessageCircle, UserRound } from 'lucide-react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { buildLoginPath } from '../utils/auth';
+
+function scrollNavWithWheel(event) {
+  const nav = event.currentTarget;
+  if (nav.scrollWidth <= nav.clientWidth || Math.abs(event.deltaX) >= Math.abs(event.deltaY)) return;
+  event.preventDefault();
+  nav.scrollLeft += event.deltaY;
+}
 
 function CustomerAppNavigation({ user, profileOpen = false, obscured = false, onOpenProfile }) {
   const navigate = useNavigate();
@@ -14,16 +23,17 @@ function CustomerAppNavigation({ user, profileOpen = false, obscured = false, on
 
   return (
     <nav
-      className={`customer-app-nav${obscured ? ' is-obscured' : ''}`}
+      className={`customer-app-nav app-nav-scrollable${obscured ? ' is-obscured' : ''}`}
       aria-label="Customer app navigation"
       aria-hidden={obscured || undefined}
       inert={obscured ? '' : undefined}
+      onWheel={scrollNavWithWheel}
     >
       <NavLink to="/" end className={({ isActive }) => `app-nav-item${isActive ? ' active' : ''}`}>
         <House size={20} aria-hidden="true" />
         <span>Home</span>
       </NavLink>
-      <NavLink to="/rooms" className={({ isActive }) => `app-nav-item app-nav-item--primary${isActive ? ' active' : ''}`}>
+      <NavLink to={user ? '/rooms' : buildLoginPath('/rooms')} className={({ isActive }) => `app-nav-item app-nav-item--primary${isActive ? ' active' : ''}`}>
         <DoorOpen size={20} aria-hidden="true" />
         <span>Reserve</span>
       </NavLink>
@@ -38,7 +48,7 @@ function CustomerAppNavigation({ user, profileOpen = false, obscured = false, on
         onClick={handleAccount}
       >
         <UserRound size={20} aria-hidden="true" />
-        <span>{user ? 'Account' : 'Log in'}</span>
+        <span>{user ? 'Account' : 'Sign in'}</span>
       </button>
     </nav>
   );
@@ -46,17 +56,23 @@ function CustomerAppNavigation({ user, profileOpen = false, obscured = false, on
 
 function AdminAppNavigation({ hasPermission, menuOpen = false, onOpenMenu }) {
   const location = useLocation();
+  const navRef = useRef(null);
   const candidates = [
     { to: '/admin/monitor', label: 'Monitor', icon: Activity, permission: 'room:view' },
     { to: '/admin/bookings', label: 'Bookings', icon: CalendarDays, permission: 'booking:view' },
     { to: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard, permission: 'reports:view' },
+    { to: '/admin/reports', label: 'Reports', icon: BarChart3, permission: 'reports:view' },
     { to: '/admin/room-management', label: 'Facilities', icon: DoorOpen, permission: 'room:manage' },
   ];
-  const links = candidates.filter((item) => hasPermission(item.permission)).slice(0, 3);
+  const links = candidates.filter((item) => hasPermission(item.permission));
   const moreActive = menuOpen || !links.some((item) => location.pathname === item.to);
 
+  useEffect(() => {
+    navRef.current?.querySelector('.active')?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+  }, [location.pathname, menuOpen]);
+
   return (
-    <nav className="admin-app-nav" aria-label="Staff app navigation">
+    <nav ref={navRef} className="admin-app-nav app-nav-scrollable" aria-label="Staff app navigation" onWheel={scrollNavWithWheel}>
       {links.map((item) => (
         <NavLink key={item.to} to={item.to} className={({ isActive }) => `app-nav-item${isActive ? ' active' : ''}`}>
           <item.icon size={20} aria-hidden="true" />

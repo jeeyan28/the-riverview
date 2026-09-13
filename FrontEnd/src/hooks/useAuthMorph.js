@@ -18,7 +18,7 @@ export function useAuthMorph() {
     if (stage !== 'success') return undefined;
     const timer = setTimeout(() => {
       try {
-        redirectAfterLogin(userRef.current);
+        redirectAfterLogin(userRef.current?.user, userRef.current?.returnTo);
       } catch {
         setStage('error');
       }
@@ -26,8 +26,8 @@ export function useAuthMorph() {
     return () => clearTimeout(timer);
   }, [stage]);
 
-  const beginMorph = useCallback((user) => {
-    userRef.current = user;
+  const beginMorph = useCallback((user, returnTo = '') => {
+    userRef.current = { user, returnTo };
     setStage('loading');
   }, []);
 

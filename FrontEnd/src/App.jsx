@@ -5,13 +5,14 @@ import AuthLayout from './layouts/AuthLayout';
 import AdminLayout from './layouts/AdminLayout';
 import { useAuth } from './context/AuthContext';
 import RiverviewLoader from './components/RiverviewLoader';
+import Login from './pages/Login';
 
 const Home = lazy(() => import('./pages/Home'));
 const Rooms = lazy(() => import('./pages/Rooms'));
+const FacilityDetails = lazy(() => import('./pages/FacilityDetails'));
 const Contact = lazy(() => import('./pages/Contact'));
 const TermsOfService = lazy(() => import('./pages/TermsOfService'));
 const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
-const Login = lazy(() => import('./pages/Login'));
 const Dashboard = lazy(() => import('./pages/Admin/Dashboard'));
 const Bookings = lazy(() => import('./pages/Admin/Bookings'));
 const Monitor = lazy(() => import('./pages/Admin/Monitor'));
@@ -52,6 +53,7 @@ function App() {
       <Route element={<MainLayout />}>
         <Route path="/" element={<Home />} />
         <Route path="/rooms" element={<Rooms />} />
+        <Route path="/rooms/:roomId" element={<FacilityDetails />} />
         <Route path="/contact" element={<Contact />} />
         <Route path="/terms" element={<TermsOfService />} />
         <Route path="/privacy" element={<PrivacyPolicy />} />
