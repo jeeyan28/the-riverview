@@ -17,7 +17,7 @@ function featureIcon(feature) {
   return 'fa-solid fa-circle-check';
 }
 
-function RoomOptionCard({ option, room, selected = false, disabled = false, onSelect, availableCount }) {
+function RoomOptionCard({ option, room, selected = false, disabled = false, onSelect, availableCount, showSelectionIndicator = true }) {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const cardImage = toDisplaySrc(option.image);
   const description = option.description || room?.description;
@@ -69,7 +69,7 @@ function RoomOptionCard({ option, room, selected = false, disabled = false, onSe
               <p className="bk-room-option-name">{option.label || 'Untitled'}</p>
               {bestFor && <span className="bk-room-option-badge">{bestFor}</span>}
             </div>
-            {interactive && (
+            {interactive && showSelectionIndicator && (
               <span className={'bk-radio' + (selected ? ' bk-radio--selected' : '')}>
                 {selected && <i className="fa-solid fa-check"></i>}
               </span>

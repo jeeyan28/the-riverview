@@ -55,7 +55,7 @@ Room/table/court **inventory (counts) is admin-configurable**, not hardcoded —
 - **Charges**, **collected revenue**, **refunds**, and **outstanding balances** are separate values. Revenue means money actually collected, after recorded refunds.
 - The room charge is calculated per whole hour from the exact room/facility type used. Time-based court rates are calculated hour by hour; corkage stays a separate flat add-on.
 - A reservation linked to a played session appears once in finance totals. The played session supplies the final charge while the reservation supplies its previously verified deposit.
-- Live Monitor has its own service-date report for a day, month, or custom inclusive range. It shows time in/out, hours, rate, charge, collected amount, balance, source, payment timing/status, and totals by room type.
+- Reports has a dedicated Live Monitor session report for a day, month, or custom inclusive range. It shows time in/out, hours, rate, charge, collected amount, balance, source, payment timing/status, and totals by room type.
 - The main sales report uses the same ledger and offers Today, Last 7 days, This month, and simple From/To service-date controls. Excel exports contain a concise Summary, activity/transactions, room totals, and daily totals where applicable.
 
 ## 6. MVP Feature Set

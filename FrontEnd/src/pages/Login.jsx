@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { CheckCircle2, User } from 'lucide-react';
 import AuthForm from '../components/AuthForm';
 import ForgotPasswordModal from '../components/ForgotPasswordModal';
@@ -9,13 +9,16 @@ import logo from "../assets/logo/logoo.png";
 import loginIllustration from "../assets/images/login-illustration.jpg";
 
 function Login() {
-  const [isLogin, setIsLogin] = useState(true);
+  const [searchParams] = useSearchParams();
+  const [isLogin, setIsLogin] = useState(() => searchParams.get('mode') !== 'register');
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const { stage, beginMorph, retry } = useAuthMorph();
   const isMorphing = stage !== 'idle';
+  const returnTo = searchParams.get('returnTo') || '';
+  const hasReservationIntent = returnTo.startsWith('/rooms');
 
   function handleAuthSuccess(user) {
-    beginMorph(user);
+    beginMorph(user, returnTo);
   }
 
   return (
@@ -65,8 +68,12 @@ function Login() {
               {isLogin ? (
                 <>
                   <div className="login-avatar"><User size={18} /></div>
-                  <h2>Welcome back</h2>
-                  <p>Sign in to continue to your reservations.</p>
+                  <h2>Continue to The Riverview</h2>
+                  <p>
+                    {hasReservationIntent
+                      ? 'Choose an option below to continue your reservation.'
+                      : 'Sign in, create an account, or book as a guest.'}
+                  </p>
                 </>
               ) : (
                 <>

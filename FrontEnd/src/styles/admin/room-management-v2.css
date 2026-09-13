@@ -1,0 +1,1762 @@
+/* Facilities workspace: one catalog surface with a compact, task-led editor. */
+#app #panel-room-management { gap: 18px; }
+
+#app #panel-room-management .facility-command-bar {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 4px 2px;
+}
+
+#app #panel-room-management .facility-kicker,
+#app .fm-modal-kicker {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--teal);
+  font-size: .64rem;
+  font-weight: 780;
+  letter-spacing: .12em;
+}
+
+#app #panel-room-management .facility-command-bar h2 {
+  margin: 0;
+  color: var(--text);
+  font-size: clamp(1.45rem, 2.5vw, 2rem);
+  font-weight: 780;
+  letter-spacing: -.04em;
+  line-height: 1.12;
+}
+
+#app #panel-room-management .facility-command-bar p {
+  max-width: 650px;
+  margin: 7px 0 0;
+  color: var(--muted);
+  font-size: .82rem;
+  line-height: 1.55;
+}
+
+#app #panel-room-management .facility-add-button {
+  flex: 0 0 auto;
+  min-height: 44px;
+  padding-inline: 16px;
+}
+
+#app #panel-room-management .facility-overview-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--navy2);
+  box-shadow: var(--shadow-sm);
+}
+
+#app #panel-room-management .facility-overview-strip > div {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  padding: 15px 18px;
+}
+
+#app #panel-room-management .facility-overview-strip > div + div { border-left: 1px solid var(--border); }
+#app #panel-room-management .facility-overview-strip span { color: var(--muted); font-size: .68rem; font-weight: 650; }
+#app #panel-room-management .facility-overview-strip strong { color: var(--text); font-size: 1.28rem; line-height: 1; }
+#app #panel-room-management .facility-overview-strip .needs-attention strong { color: var(--amber); }
+
+#app #panel-room-management .facility-catalog-shell {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--navy2);
+  box-shadow: var(--shadow-sm);
+}
+
+#app #panel-room-management .facility-catalog-tools {
+  display: grid;
+  grid-template-columns: minmax(210px, 1fr) auto minmax(82px, auto);
+  gap: 14px;
+  align-items: center;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--navy3);
+}
+
+#app #panel-room-management .facility-search {
+  position: relative;
+  display: block;
+  max-width: 360px;
+}
+
+#app #panel-room-management .facility-search > i {
+  position: absolute;
+  top: 50%;
+  left: 12px;
+  color: var(--muted);
+  transform: translateY(-50%);
+}
+
+#app #panel-room-management .facility-search input {
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 34px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--navy2);
+  color: var(--text);
+  font-size: .78rem;
+}
+
+#app #panel-room-management .facility-filter-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 3px;
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: var(--navy2);
+  scrollbar-width: none;
+}
+
+#app #panel-room-management .facility-filter-tabs::-webkit-scrollbar { display: none; }
+#app #panel-room-management .facility-filter-tabs button {
+  display: inline-flex;
+  flex: 0 0 auto;
+  min-height: 32px;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 9px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  font-size: .7rem;
+  font-weight: 680;
+}
+
+#app #panel-room-management .facility-filter-tabs button span {
+  display: grid;
+  min-width: 18px;
+  height: 18px;
+  place-items: center;
+  border-radius: 9px;
+  background: var(--navy4);
+  font-size: .6rem;
+}
+
+#app #panel-room-management .facility-filter-tabs button.active { background: var(--teal-soft); color: var(--teal); }
+#app #panel-room-management .facility-filter-tabs button.active span { background: color-mix(in srgb, var(--teal) 16%, transparent); }
+
+#app #panel-room-management .facility-results {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  color: var(--muted);
+  font-size: .68rem;
+  white-space: nowrap;
+}
+
+#app #panel-room-management .facility-results button {
+  display: inline-flex;
+  min-height: 32px;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--navy2);
+  color: var(--text);
+  font-size: .68rem;
+}
+
+#app #panel-room-management .facility-catalog-list { display: grid; }
+
+#app #panel-room-management .facility-catalog-row {
+  display: grid;
+  grid-template-columns: 176px minmax(0, 1fr) 126px;
+  gap: 18px;
+  align-items: stretch;
+  padding: 18px;
+}
+
+#app #panel-room-management .facility-catalog-row + .facility-catalog-row { border-top: 1px solid var(--border); }
+
+#app #panel-room-management .facility-catalog-media {
+  position: relative;
+  min-height: 144px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  background: linear-gradient(145deg, var(--navy3), var(--navy4));
+}
+
+#app #panel-room-management .facility-catalog-media img { width: 100%; height: 100%; object-fit: cover; }
+#app #panel-room-management .facility-catalog-media > div { display: grid; height: 100%; place-content: center; justify-items: center; gap: 7px; color: var(--muted); font-size: .68rem; }
+#app #panel-room-management .facility-catalog-media > div i { font-size: 1.25rem; }
+#app #panel-room-management .facility-catalog-media > span {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  padding: 5px 8px;
+  border: 1px solid rgba(255,255,255,.16);
+  border-radius: 8px;
+  background: rgba(7,17,31,.82);
+  color: #f7faf9;
+  font-size: .67rem;
+  font-weight: 760;
+  backdrop-filter: blur(10px);
+}
+
+#app #panel-room-management .facility-catalog-main { min-width: 0; }
+#app #panel-room-management .facility-catalog-title { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+#app #panel-room-management .facility-catalog-title h3 { margin: 0; color: var(--text); font-size: 1.02rem; font-weight: 760; letter-spacing: -.02em; }
+#app #panel-room-management .facility-catalog-title > div > span { color: var(--muted); font-size: .68rem; }
+#app #panel-room-management .facility-status-summary { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 5px; }
+#app #panel-room-management .facility-catalog-main > p { margin: 7px 0 12px; color: var(--muted); font-size: .76rem; line-height: 1.48; }
+
+#app #panel-room-management .facility-room-type-list {
+  overflow: hidden;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  background: var(--navy3);
+}
+
+#app #panel-room-management .facility-room-type-row {
+  display: grid;
+  grid-template-columns: minmax(150px, 1fr) auto minmax(88px, auto);
+  gap: 10px;
+  align-items: center;
+  min-height: 44px;
+  padding: 7px 10px;
+}
+
+#app #panel-room-management .facility-room-type-row + .facility-room-type-row { border-top: 1px solid var(--border-soft); }
+#app #panel-room-management .facility-room-type-row > span:first-child { display: grid; min-width: 0; }
+#app #panel-room-management .facility-room-type-row strong { overflow: hidden; color: var(--text); font-size: .73rem; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+#app #panel-room-management .facility-room-type-row small { color: var(--muted); font-size: .62rem; }
+#app #panel-room-management .facility-room-type-row > strong:last-child { color: var(--teal); text-align: right; }
+#app #panel-room-management .facility-room-type-empty { padding: 14px; color: var(--muted); font-size: .72rem; text-align: center; }
+
+#app #panel-room-management .facility-catalog-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: 7px;
+  padding-left: 14px;
+  border-left: 1px solid var(--border-soft);
+}
+
+#app #panel-room-management .facility-catalog-actions > span { color: var(--muted); font-size: .7rem; text-align: center; }
+#app #panel-room-management :is(.facility-edit-button, .facility-remove-button) {
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--navy3);
+  color: var(--text);
+  font-size: .7rem;
+  font-weight: 700;
+}
+
+#app #panel-room-management .facility-edit-button:hover { border-color: color-mix(in srgb, var(--teal) 42%, var(--border)); background: var(--teal-soft); color: var(--teal); }
+#app #panel-room-management .facility-remove-button { width: 38px; color: var(--red); }
+#app #panel-room-management .facility-remove-button:hover { border-color: color-mix(in srgb, var(--red) 36%, var(--border)); background: color-mix(in srgb, var(--red) 8%, transparent); }
+
+#app #panel-room-management .facility-empty-state {
+  display: grid;
+  min-height: 240px;
+  place-content: center;
+  justify-items: center;
+  gap: 5px;
+  padding: 24px;
+  color: var(--muted);
+  font-size: .75rem;
+  text-align: center;
+}
+#app #panel-room-management .facility-empty-state i { margin-bottom: 5px; color: var(--teal); font-size: 1.55rem; }
+#app #panel-room-management .facility-empty-state strong { color: var(--text); font-size: .9rem; }
+
+/* Editor modal */
+#app .fm-editor-modal.modal-2xl {
+  display: flex;
+  width: min(1120px, calc(100vw - 32px));
+  max-width: 1120px;
+  max-height: calc(100dvh - 32px);
+  padding: 0;
+  overflow: hidden;
+  flex-direction: column;
+}
+
+#app .fm-editor-modal .fm-modal-header {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  margin: 0;
+  padding: 18px 22px 15px;
+  border-bottom: 1px solid var(--border);
+  background: var(--navy2);
+}
+
+#app .fm-editor-modal .modal-lg-title { color: var(--text); font-size: 1.15rem; font-weight: 760; letter-spacing: -.025em; }
+#app .fm-editor-modal .modal-lg-sub { max-width: 620px; margin-top: 3px; color: var(--muted); font-size: .72rem; }
+#app .fm-editor-modal .fm-close-btn { display: grid; width: 38px; height: 38px; flex: 0 0 auto; place-items: center; border: 1px solid var(--border); border-radius: 10px; background: var(--navy3); color: var(--muted); }
+#app .fm-editor-modal .fm-close-btn:hover { background: var(--navy4); color: var(--text); }
+
+#app .fm-editor-modal .fm-editor-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 16px 20px 22px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+#app .fm-editor-modal .fm-stepper {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5px;
+  margin: 0 0 16px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--navy3);
+}
+
+#app .fm-editor-modal .fm-step-dot {
+  display: flex;
+  min-width: 0;
+  min-height: 48px;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--muted);
+  text-align: left;
+}
+
+#app .fm-editor-modal .fm-step-dot--active { background: var(--navy2); color: var(--text); box-shadow: var(--shadow-sm); }
+#app .fm-editor-modal .fm-step-dot--done { color: var(--teal); }
+#app .fm-editor-modal .fm-step-dot-num { display: grid; width: 28px; height: 28px; flex: 0 0 auto; place-items: center; border: 1px solid var(--border); border-radius: 9px; background: var(--navy4); color: inherit; font-size: .68rem; font-weight: 780; }
+#app .fm-editor-modal .fm-step-dot--active .fm-step-dot-num { border-color: transparent; background: var(--teal); color: #fff; }
+#app .fm-editor-modal .fm-step-copy { display: grid; min-width: 0; }
+#app .fm-editor-modal .fm-step-copy strong { color: inherit; font-size: .75rem; }
+#app .fm-editor-modal .fm-step-copy small { color: var(--muted); font-size: .61rem; }
+
+#app .fm-editor-modal .fm-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(290px, 350px);
+  gap: 18px;
+  align-items: start;
+}
+
+#app .fm-editor-modal .fm-form-col { min-width: 0; }
+#app .fm-editor-modal .fm-section { margin: 0; padding: 14px 0; border-bottom: 1px solid var(--border-soft); }
+#app .fm-editor-modal .fm-section:first-child { padding-top: 0; }
+#app .fm-editor-modal .fm-section:last-child { border-bottom: 0; }
+#app .fm-editor-modal .fm-section-title { margin: 0 0 11px; color: var(--text); font-size: .76rem; font-weight: 740; }
+#app .fm-editor-modal .ffield { gap: 6px; margin-bottom: 12px; }
+#app .fm-editor-modal .ffield:last-child { margin-bottom: 0; }
+#app .fm-editor-modal .flabel { color: var(--text); font-size: .7rem; }
+#app .fm-editor-modal .flabel-hint { color: var(--muted); font-size: .63rem; line-height: 1.45; }
+#app .fm-editor-modal :is(input, select, textarea) { min-height: 42px; border-radius: 9px; font-size: .76rem; }
+#app .fm-editor-modal textarea { min-height: 88px; resize: vertical; }
+#app .fm-editor-modal .frow { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+#app .fm-editor-modal .fm-upload-zone { padding: 3px; border-radius: 11px; background: var(--navy3); }
+
+#app .fm-editor-modal .fm-preview-col {
+  position: sticky;
+  top: 0;
+  display: block;
+  width: auto;
+  max-height: calc(100dvh - 230px);
+  overflow: hidden auto;
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  background: var(--navy3);
+}
+
+#app .fm-editor-modal .fm-preview-col > summary {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 8px;
+  align-items: center;
+  min-height: 48px;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  cursor: pointer;
+  list-style: none;
+}
+
+#app .fm-editor-modal .fm-preview-col > summary::-webkit-details-marker { display: none; }
+#app .fm-editor-modal .fm-preview-col > summary > i:first-child { color: var(--teal); }
+#app .fm-editor-modal .fm-preview-col > summary span { font-size: .72rem; font-weight: 720; }
+#app .fm-editor-modal .fm-preview-col > summary small { grid-column: 2; color: var(--muted); font-size: .6rem; }
+#app .fm-editor-modal .fm-preview-col > summary > i:last-child { grid-column: 3; grid-row: 1 / span 2; color: var(--muted); transition: transform 180ms ease; }
+#app .fm-editor-modal .fm-preview-col[open] > summary > i:last-child { transform: rotate(180deg); }
+#app .fm-editor-modal .fm-preview-content { padding: 12px; }
+#app .fm-editor-modal .fm-preview-label { margin: 0 0 9px; color: var(--muted); font-size: .63rem; font-weight: 720; letter-spacing: .06em; text-transform: uppercase; }
+#app .fm-editor-modal .fm-preview-cards { gap: 9px; }
+
+#app .fm-editor-modal .fm-room-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+#app .fm-editor-modal .fm-room-card {
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr) 36px;
+  min-height: 82px;
+  overflow: hidden;
+  border-radius: 10px;
+  background: var(--navy3);
+}
+#app .fm-editor-modal .fm-room-card-media { width: auto; height: 100%; min-height: 82px; }
+#app .fm-editor-modal .fm-room-card-body { display: grid; align-content: center; padding: 9px; }
+#app .fm-editor-modal .fm-room-card-actions { flex-direction: column; border-top: 0; border-left: 1px solid var(--border-soft); }
+#app .fm-editor-modal .fm-room-card-actions button { min-height: 40px; padding: 0; }
+#app .fm-editor-modal .fm-room-card-actions button:first-child { border-right: 0; border-bottom: 1px solid var(--border-soft); }
+#app .fm-editor-modal .fm-room-add-card { min-height: 82px; border-radius: 10px; }
+#app .fm-editor-modal .fm-room-back { min-height: 36px; margin-bottom: 10px; border-radius: 8px; }
+#app .fm-editor-modal .fm-status-toggle { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+#app .fm-editor-modal .fm-status-btn { min-height: 40px; }
+#app .fm-editor-modal .fm-step-nav { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border-soft); }
+
+#app .fm-editor-modal .modal-actions-split {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0;
+  padding: 12px 20px;
+  border-top: 1px solid var(--border);
+  background: var(--navy2);
+}
+
+#app .fm-editor-modal .fm-primary-actions { display: flex; gap: 8px; }
+#app .fm-editor-modal .modal-actions-split :is(.btn-remove, .btn-cancel, .btn-save) { min-height: 40px; border-radius: 9px; }
+
+@media (max-width: 900px) {
+  #app #panel-room-management .facility-command-bar { align-items: flex-start; }
+  #app #panel-room-management .facility-overview-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  #app #panel-room-management .facility-overview-strip > div:nth-child(3) { border-left: 0; border-top: 1px solid var(--border); }
+  #app #panel-room-management .facility-overview-strip > div:nth-child(4) { border-top: 1px solid var(--border); }
+  #app #panel-room-management .facility-catalog-tools { grid-template-columns: 1fr auto; }
+  #app #panel-room-management .facility-search { max-width: none; }
+  #app #panel-room-management .facility-filter-tabs { grid-column: 1 / -1; grid-row: 2; }
+  #app #panel-room-management .facility-catalog-row { grid-template-columns: 150px minmax(0, 1fr); }
+  #app #panel-room-management .facility-catalog-actions { grid-column: 2; flex-direction: row; padding: 0; border: 0; }
+  #app #panel-room-management .facility-edit-button { flex: 1; }
+
+  #app .fm-editor-modal .fm-layout { grid-template-columns: 1fr; }
+  #app .fm-editor-modal .fm-preview-col { position: static; max-height: none; }
+}
+
+@media (max-width: 640px) {
+  #app #panel-room-management { gap: 14px; }
+  #app #panel-room-management .facility-command-bar { display: grid; gap: 14px; }
+  #app #panel-room-management .facility-add-button { width: 100%; justify-content: center; }
+  #app #panel-room-management .facility-overview-strip > div { padding: 12px; }
+  #app #panel-room-management .facility-overview-strip span { font-size: .62rem; }
+  #app #panel-room-management .facility-overview-strip strong { font-size: 1.1rem; }
+  #app #panel-room-management .facility-catalog-tools { grid-template-columns: 1fr; padding: 12px; }
+  #app #panel-room-management .facility-filter-tabs { grid-column: 1; grid-row: auto; margin-inline: -12px; padding-inline: 12px; border-inline: 0; border-radius: 0; scroll-snap-type: x proximity; }
+  #app #panel-room-management .facility-filter-tabs button { scroll-snap-align: start; }
+  #app #panel-room-management .facility-results { justify-content: space-between; }
+  #app #panel-room-management .facility-catalog-row { grid-template-columns: 1fr; gap: 13px; padding: 13px; }
+  #app #panel-room-management .facility-catalog-media { min-height: 156px; }
+  #app #panel-room-management .facility-catalog-title { display: grid; }
+  #app #panel-room-management .facility-status-summary { justify-content: flex-start; }
+  #app #panel-room-management .facility-room-type-row { grid-template-columns: minmax(120px, 1fr) auto; }
+  #app #panel-room-management .facility-room-type-row > .pill { display: none; }
+  #app #panel-room-management .facility-catalog-actions { grid-column: 1; }
+
+  #app .modal-bg:has(.fm-editor-modal) { align-items: flex-end; padding: 0; }
+  #app .fm-editor-modal.modal-2xl {
+    width: 100%;
+    max-width: none;
+    max-height: calc(100dvh - max(8px, env(safe-area-inset-top)));
+    border-radius: 18px 18px 0 0;
+  }
+  #app .fm-editor-modal .fm-modal-header { padding: 15px 16px 13px; }
+  #app .fm-editor-modal .fm-editor-body { padding: 12px 14px 18px; }
+  #app .fm-editor-modal .fm-step-dot { min-height: 44px; padding: 6px 8px; }
+  #app .fm-editor-modal .fm-step-copy small { display: none; }
+  #app .fm-editor-modal .fm-step-dot-num { width: 26px; height: 26px; }
+  #app .fm-editor-modal .frow { grid-template-columns: 1fr; }
+  #app .fm-editor-modal .fm-room-grid { grid-template-columns: 1fr; }
+  #app .fm-editor-modal .modal-actions-split { padding: 10px 14px max(10px, env(safe-area-inset-bottom)); }
+  #app .fm-editor-modal .modal-actions-split > div:first-child { display: none; }
+  #app .fm-editor-modal .fm-primary-actions { width: 100%; }
+  #app .fm-editor-modal .fm-primary-actions > * { flex: 1; justify-content: center; }
+}
+
+/* Facilities v3 — visual catalog and an always-available create flow. */
+#app #panel-room-management {
+  gap: 20px;
+}
+
+#app #panel-room-management .facility-command-bar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 28px;
+  overflow: hidden;
+  padding: 22px 24px;
+  border: 1px solid color-mix(in srgb, var(--teal) 18%, var(--border));
+  border-radius: 20px;
+  background:
+    radial-gradient(circle at 4% 0%, color-mix(in srgb, var(--teal) 16%, transparent), transparent 34%),
+    linear-gradient(135deg, color-mix(in srgb, var(--navy2) 94%, var(--teal)), var(--navy2));
+  box-shadow: var(--shadow-sm);
+}
+
+#app #panel-room-management .facility-command-bar::after {
+  position: absolute;
+  top: -68px;
+  right: 24%;
+  width: 170px;
+  height: 170px;
+  border: 1px solid color-mix(in srgb, var(--teal) 12%, transparent);
+  border-radius: 50%;
+  content: '';
+  pointer-events: none;
+}
+
+#app #panel-room-management .facility-heading-lockup {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 15px;
+}
+
+#app #panel-room-management .facility-heading-icon {
+  display: grid;
+  width: 50px;
+  height: 50px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--teal) 30%, transparent);
+  border-radius: 15px;
+  background: var(--teal-soft);
+  color: var(--teal);
+  box-shadow: inset 0 1px rgba(255,255,255,.08);
+}
+
+#app #panel-room-management .facility-kicker,
+#app .facility-action-modal .facility-kicker {
+  margin-bottom: 4px;
+  color: var(--teal);
+  font-size: .67rem;
+  font-weight: 800;
+  letter-spacing: .13em;
+}
+
+#app #panel-room-management .facility-command-bar h2 {
+  font-size: clamp(1.5rem, 2.5vw, 2.05rem);
+  font-weight: 780;
+  letter-spacing: -.045em;
+}
+
+#app #panel-room-management .facility-command-bar p {
+  max-width: 590px;
+  margin-top: 6px;
+  color: color-mix(in srgb, var(--text) 66%, var(--muted));
+  font-size: .86rem;
+  line-height: 1.5;
+}
+
+#app #panel-room-management .facility-command-stats {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--navy3) 88%, transparent);
+  backdrop-filter: blur(12px);
+}
+
+#app #panel-room-management .facility-command-stats > div {
+  display: grid;
+  min-width: 82px;
+  gap: 3px;
+  padding: 12px 15px;
+  text-align: center;
+}
+
+#app #panel-room-management .facility-command-stats > div + div {
+  border-left: 1px solid var(--border-soft);
+}
+
+#app #panel-room-management .facility-command-stats strong {
+  color: var(--text);
+  font-size: 1.12rem;
+  line-height: 1;
+}
+
+#app #panel-room-management .facility-command-stats span {
+  color: var(--muted);
+  font-size: .65rem;
+  font-weight: 650;
+}
+
+#app #panel-room-management .facility-command-stats .needs-attention strong {
+  color: var(--amber);
+}
+
+#app #panel-room-management .facility-catalog-shell {
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+#app #panel-room-management .facility-catalog-tools {
+  position: sticky;
+  z-index: 8;
+  top: 10px;
+  display: grid;
+  grid-template-columns: minmax(230px, 1fr) auto auto auto;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 16px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--navy2) 92%, transparent);
+  box-shadow: 0 10px 28px rgba(2, 10, 20, .12);
+  backdrop-filter: blur(18px);
+}
+
+#app #panel-room-management .facility-search {
+  max-width: none;
+}
+
+#app #panel-room-management .facility-search > svg {
+  position: absolute;
+  z-index: 1;
+  top: 50%;
+  left: 13px;
+  color: var(--muted);
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+#app #panel-room-management .facility-search input {
+  min-height: 43px;
+  padding: 9px 14px 9px 40px;
+  border-color: var(--border);
+  border-radius: 11px;
+  background: var(--navy3);
+  color: var(--text);
+  font-size: .79rem;
+}
+
+#app #panel-room-management .facility-search input:focus {
+  border-color: color-mix(in srgb, var(--teal) 58%, var(--border));
+  outline: 0;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--teal) 13%, transparent);
+}
+
+#app #panel-room-management .facility-filter-tabs {
+  min-width: 0;
+  padding: 4px;
+  border-radius: 11px;
+  background: var(--navy3);
+}
+
+#app #panel-room-management .facility-filter-tabs button {
+  min-height: 34px;
+  padding: 6px 10px;
+  color: color-mix(in srgb, var(--text) 64%, var(--muted));
+  font-size: .72rem;
+  cursor: pointer;
+}
+
+#app #panel-room-management .facility-filter-tabs button:hover {
+  color: var(--text);
+}
+
+#app #panel-room-management .facility-filter-tabs button.active {
+  background: var(--teal-soft);
+  color: var(--teal);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--teal) 14%, transparent);
+}
+
+#app #panel-room-management .facility-results {
+  min-width: 62px;
+  font-size: .7rem;
+}
+
+#app #panel-room-management .facility-add-button {
+  display: inline-flex;
+  min-height: 43px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 9px 15px;
+  border: 1px solid color-mix(in srgb, var(--teal) 80%, #fff);
+  border-radius: 11px;
+  background: var(--teal);
+  color: #042f2b;
+  font-size: .78rem;
+  font-weight: 800;
+  white-space: nowrap;
+  cursor: pointer;
+  box-shadow: 0 7px 18px color-mix(in srgb, var(--teal) 20%, transparent);
+  transition: transform 160ms ease, filter 160ms ease, box-shadow 160ms ease;
+}
+
+#app #panel-room-management .facility-add-button:hover {
+  color: #021b18;
+  filter: brightness(1.06);
+  transform: translateY(-1px);
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--teal) 26%, transparent);
+}
+
+#app #panel-room-management .facility-add-button:active {
+  transform: translateY(0) scale(.98);
+}
+
+#app #panel-room-management .facility-catalog-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+#app #panel-room-management .facility-catalog-row {
+  display: flex;
+  min-width: 0;
+  overflow: hidden;
+  flex-direction: column;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 19px;
+  background: var(--navy2);
+  box-shadow: 0 8px 28px rgba(2, 10, 20, .08);
+  transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+}
+
+#app #panel-room-management .facility-catalog-row + .facility-catalog-row {
+  border-top: 1px solid var(--border);
+}
+
+#app #panel-room-management .facility-catalog-row:hover {
+  border-color: color-mix(in srgb, var(--teal) 27%, var(--border));
+  box-shadow: 0 14px 36px rgba(2, 10, 20, .13);
+  transform: translateY(-2px);
+}
+
+#app #panel-room-management .facility-catalog-media {
+  position: relative;
+  min-height: 210px;
+  aspect-ratio: 16 / 7;
+  overflow: hidden;
+  border: 0;
+  border-radius: 0;
+  background:
+    radial-gradient(circle at 25% 15%, color-mix(in srgb, var(--teal) 24%, transparent), transparent 42%),
+    linear-gradient(145deg, var(--navy3), var(--navy4));
+}
+
+#app #panel-room-management .facility-catalog-media::after {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(3, 12, 22, .08), transparent 45%, rgba(3, 12, 22, .7));
+  content: '';
+  pointer-events: none;
+}
+
+#app #panel-room-management .facility-catalog-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 420ms cubic-bezier(.2,.7,.2,1);
+}
+
+#app #panel-room-management .facility-catalog-row:hover .facility-catalog-media img {
+  transform: scale(1.025);
+}
+
+#app #panel-room-management .facility-media-placeholder {
+  display: grid;
+  height: 100%;
+  place-content: center;
+  justify-items: center;
+  gap: 9px;
+  color: color-mix(in srgb, var(--teal) 72%, var(--muted));
+}
+
+#app #panel-room-management .facility-media-placeholder span {
+  color: var(--muted);
+  font-size: .73rem;
+  font-weight: 650;
+}
+
+#app #panel-room-management :is(.facility-category-mark, .facility-price-mark) {
+  position: absolute;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid rgba(255,255,255,.18);
+  background: rgba(5, 16, 29, .78);
+  color: #f5fbfa;
+  font-weight: 760;
+  backdrop-filter: blur(12px);
+}
+
+#app #panel-room-management .facility-catalog-media > .facility-category-mark {
+  top: 14px;
+  right: auto;
+  bottom: auto;
+  left: 14px;
+  padding: 7px 10px;
+  border-radius: 10px;
+  font-size: .72rem;
+}
+
+#app #panel-room-management .facility-catalog-media > .facility-price-mark {
+  top: auto;
+  right: 14px;
+  bottom: 14px;
+  left: auto;
+  padding: 7px 10px;
+  border-radius: 10px;
+  color: #5ff1d8;
+  font-size: .73rem;
+}
+
+#app #panel-room-management .facility-catalog-main {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  padding: 19px 19px 17px;
+}
+
+#app #panel-room-management .facility-catalog-title {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+#app #panel-room-management .facility-catalog-title h3 {
+  margin: 0 0 3px;
+  color: var(--text);
+  font-size: 1.23rem;
+  font-weight: 780;
+  letter-spacing: -.025em;
+}
+
+#app #panel-room-management .facility-catalog-title > div > span {
+  color: var(--muted);
+  font-size: .7rem;
+  font-weight: 580;
+}
+
+#app #panel-room-management .facility-health {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 9px;
+  border: 1px solid color-mix(in srgb, var(--teal) 18%, transparent);
+  border-radius: 999px;
+  background: var(--teal-soft);
+  color: var(--teal);
+  font-size: .67rem;
+  font-weight: 760;
+}
+
+#app #panel-room-management .facility-health::before {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  content: '';
+  box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 12%, transparent);
+}
+
+#app #panel-room-management .facility-health--attention {
+  border-color: color-mix(in srgb, var(--amber) 22%, transparent);
+  background: color-mix(in srgb, var(--amber) 11%, transparent);
+  color: var(--amber);
+}
+
+#app #panel-room-management .facility-catalog-main > p {
+  min-height: 2.8em;
+  margin: 10px 0 15px;
+  color: color-mix(in srgb, var(--text) 70%, var(--muted));
+  font-size: .79rem;
+  line-height: 1.52;
+}
+
+#app #panel-room-management .facility-catalog-main > p.facility-copy-missing {
+  color: var(--muted);
+  font-style: italic;
+}
+
+#app #panel-room-management .facility-card-facts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+  margin-bottom: 16px;
+}
+
+#app #panel-room-management .facility-card-facts > span {
+  display: flex;
+  min-width: 0;
+  min-height: 38px;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 7px;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  background: var(--navy3);
+  color: var(--muted);
+  font-size: .65rem;
+  text-align: center;
+}
+
+#app #panel-room-management .facility-card-facts svg {
+  flex: 0 0 auto;
+  color: var(--teal);
+}
+
+#app #panel-room-management .facility-card-facts strong {
+  color: var(--text);
+  font-size: .72rem;
+}
+
+#app #panel-room-management .facility-room-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 0 2px 7px;
+  color: var(--text);
+  font-size: .69rem;
+  font-weight: 760;
+  letter-spacing: .02em;
+}
+
+#app #panel-room-management .facility-room-section-head span:last-child {
+  color: var(--muted);
+  font-size: .63rem;
+  font-weight: 650;
+}
+
+#app #panel-room-management .facility-room-type-list {
+  margin-top: auto;
+  overflow: hidden;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--navy3) 82%, var(--navy2));
+}
+
+#app #panel-room-management .facility-room-type-row {
+  display: grid;
+  grid-template-columns: 8px minmax(115px, 1fr) auto auto;
+  gap: 9px;
+  align-items: center;
+  min-height: 52px;
+  padding: 8px 11px;
+}
+
+#app #panel-room-management .facility-room-type-row + .facility-room-type-row {
+  border-top: 1px solid var(--border-soft);
+}
+
+#app #panel-room-management .facility-room-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--teal);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--teal) 12%, transparent);
+}
+
+#app #panel-room-management .facility-room-status-dot--maintenance {
+  background: var(--amber);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--amber) 12%, transparent);
+}
+
+#app #panel-room-management .facility-room-status-dot--unavailable {
+  background: var(--red);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--red) 12%, transparent);
+}
+
+#app #panel-room-management .facility-room-name {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+#app #panel-room-management .facility-room-name strong {
+  overflow: hidden;
+  color: var(--text);
+  font-size: .76rem;
+  font-weight: 720;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#app #panel-room-management .facility-room-name small {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: .64rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#app #panel-room-management .facility-room-status {
+  padding: 4px 7px;
+  border-radius: 999px;
+  background: var(--teal-soft);
+  color: var(--teal);
+  font-size: .61rem;
+  font-weight: 730;
+}
+
+#app #panel-room-management .facility-room-status.pill-pending {
+  background: color-mix(in srgb, var(--amber) 12%, transparent);
+  color: var(--amber);
+}
+
+#app #panel-room-management .facility-room-status.pill-overdue {
+  background: color-mix(in srgb, var(--red) 11%, transparent);
+  color: var(--red);
+}
+
+#app #panel-room-management .facility-room-rate {
+  min-width: 77px;
+  color: var(--teal);
+  font-size: .75rem;
+  font-weight: 780;
+  text-align: right;
+  white-space: nowrap;
+}
+
+#app #panel-room-management .facility-catalog-actions {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  padding: 13px 18px;
+  border-top: 1px solid var(--border-soft);
+  border-left: 0;
+  background: color-mix(in srgb, var(--navy3) 72%, var(--navy2));
+}
+
+#app #panel-room-management :is(.facility-add-room-button, .facility-edit-button, .facility-remove-button) {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--navy2);
+  color: var(--text);
+  font-size: .72rem;
+  font-weight: 730;
+  cursor: pointer;
+  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease, transform 150ms ease;
+}
+
+#app #panel-room-management .facility-add-room-button {
+  flex: 1;
+  border-color: color-mix(in srgb, var(--teal) 23%, var(--border));
+  background: var(--teal-soft);
+  color: var(--teal);
+}
+
+#app #panel-room-management .facility-edit-button {
+  min-width: 104px;
+}
+
+#app #panel-room-management .facility-remove-button {
+  width: 40px;
+  flex: 0 0 40px;
+  padding: 0;
+  color: var(--red);
+}
+
+#app #panel-room-management :is(.facility-add-room-button, .facility-edit-button, .facility-remove-button):hover {
+  border-color: color-mix(in srgb, var(--teal) 38%, var(--border));
+  background: color-mix(in srgb, var(--teal) 13%, var(--navy2));
+  color: var(--teal);
+  transform: translateY(-1px);
+}
+
+#app #panel-room-management .facility-remove-button:hover {
+  border-color: color-mix(in srgb, var(--red) 35%, var(--border));
+  background: color-mix(in srgb, var(--red) 9%, var(--navy2));
+  color: var(--red);
+}
+
+#app #panel-room-management .facility-empty-state {
+  grid-column: 1 / -1;
+  min-height: 310px;
+  gap: 8px;
+  border: 1px dashed color-mix(in srgb, var(--teal) 24%, var(--border));
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--navy2) 74%, transparent);
+  font-size: .78rem;
+}
+
+#app #panel-room-management .facility-empty-state strong {
+  margin-top: 5px;
+  font-size: 1rem;
+}
+
+#app #panel-room-management .facility-empty-icon {
+  display: grid;
+  width: 54px;
+  height: 54px;
+  place-items: center;
+  border-radius: 16px;
+  background: var(--teal-soft);
+  color: var(--teal);
+}
+
+#app #panel-room-management .facility-loading-mark {
+  width: 30px;
+  height: 30px;
+  margin-bottom: 5px;
+  border: 3px solid var(--border);
+  border-top-color: var(--teal);
+  border-radius: 50%;
+  animation: facility-loader 700ms linear infinite;
+}
+
+@keyframes facility-loader { to { transform: rotate(360deg); } }
+
+/* Add facility / add room chooser */
+#app .facility-action-modal.modal-lg {
+  width: min(760px, calc(100vw - 32px));
+  max-width: 760px;
+  padding: 0;
+  overflow: hidden;
+  border-radius: 20px;
+}
+
+#app .facility-action-modal .facility-action-header {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 13px;
+  align-items: start;
+  padding: 21px 22px 18px;
+  border-bottom: 1px solid var(--border);
+  background:
+    radial-gradient(circle at 0 0, color-mix(in srgb, var(--teal) 15%, transparent), transparent 45%),
+    var(--navy2);
+}
+
+#app .facility-action-modal .facility-action-icon {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border-radius: 13px;
+  background: var(--teal-soft);
+  color: var(--teal);
+}
+
+#app .facility-action-modal h2 {
+  margin: 0;
+  color: var(--text);
+  font-size: 1.23rem;
+  font-weight: 780;
+  letter-spacing: -.03em;
+}
+
+#app .facility-action-modal .facility-action-header p {
+  max-width: 570px;
+  margin: 5px 0 0;
+  color: var(--muted);
+  font-size: .75rem;
+  line-height: 1.5;
+}
+
+#app .facility-action-modal .fm-close-btn {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--navy3);
+  color: var(--muted);
+}
+
+#app .facility-action-modal .fm-close-btn:hover {
+  color: var(--text);
+}
+
+#app .facility-action-modal .facility-action-options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 11px;
+  padding: 18px 20px;
+  background: var(--navy2);
+}
+
+#app .facility-action-modal .facility-action-option {
+  display: flex;
+  min-width: 0;
+  min-height: 210px;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 15px;
+  background: var(--navy3);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 170ms ease, background-color 170ms ease, transform 170ms ease, box-shadow 170ms ease;
+}
+
+#app .facility-action-modal .facility-action-option:hover {
+  border-color: color-mix(in srgb, var(--teal) 42%, var(--border));
+  background: color-mix(in srgb, var(--teal) 7%, var(--navy3));
+  box-shadow: 0 10px 24px rgba(2,10,20,.11);
+  transform: translateY(-2px);
+}
+
+#app .facility-action-modal .facility-action-option-icon {
+  display: grid;
+  width: 43px;
+  height: 43px;
+  margin-bottom: 14px;
+  place-items: center;
+  border-radius: 13px;
+  background: var(--teal-soft);
+  color: var(--teal);
+}
+
+#app .facility-action-modal .facility-action-option-copy {
+  display: grid;
+  gap: 4px;
+}
+
+#app .facility-action-modal .facility-action-state {
+  width: max-content;
+  padding: 3px 6px;
+  border-radius: 999px;
+  background: var(--teal-soft);
+  color: var(--teal);
+  font-size: .58rem;
+  font-weight: 760;
+  letter-spacing: .02em;
+}
+
+#app .facility-action-modal .facility-action-state.is-new {
+  background: color-mix(in srgb, var(--amber) 12%, transparent);
+  color: var(--amber);
+}
+
+#app .facility-action-modal .facility-action-option-copy strong {
+  color: var(--text);
+  font-size: .91rem;
+}
+
+#app .facility-action-modal .facility-action-option-copy small {
+  color: var(--muted);
+  font-size: .68rem;
+  line-height: 1.46;
+}
+
+#app .facility-action-modal .facility-action-option-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: auto;
+  color: var(--teal);
+  font-size: .7rem;
+  font-weight: 760;
+}
+
+#app .facility-action-modal .facility-action-note {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 13px 20px 16px;
+  border-top: 1px solid var(--border-soft);
+  background: var(--navy2);
+  color: var(--muted);
+  font-size: .69rem;
+}
+
+#app .facility-action-modal .facility-action-note svg {
+  flex: 0 0 auto;
+  color: var(--teal);
+}
+
+/* Editor typography and validation */
+#app .fm-editor-modal .modal-lg-title {
+  font-size: 1.25rem;
+}
+
+#app .fm-editor-modal .modal-lg-sub {
+  margin-top: 5px;
+  font-size: .76rem;
+  line-height: 1.45;
+}
+
+#app .fm-editor-modal .fm-form-alert {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 9px;
+  align-items: center;
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--red) 28%, var(--border));
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--red) 8%, var(--navy3));
+  color: color-mix(in srgb, var(--text) 84%, var(--red));
+  font-size: .72rem;
+  line-height: 1.4;
+}
+
+#app .fm-editor-modal .fm-form-alert > :first-child {
+  flex: 0 0 auto;
+  color: var(--red);
+}
+
+#app .fm-editor-modal .fm-form-alert button {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+}
+
+#app .fm-editor-modal .fm-section {
+  margin: 0 0 12px;
+  padding: 15px;
+  border: 1px solid var(--border-soft);
+  border-radius: 13px;
+  background: color-mix(in srgb, var(--navy3) 72%, var(--navy2));
+}
+
+#app .fm-editor-modal .fm-section:first-child { padding-top: 15px; }
+#app .fm-editor-modal .fm-section:last-child { border-bottom: 1px solid var(--border-soft); }
+#app .fm-editor-modal .fm-section-title { font-size: .8rem; }
+#app .fm-editor-modal :is(.fm-section-title, .flabel, .fm-room-back, .fm-room-number-preview) {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+#app .fm-editor-modal .flabel { font-size: .75rem; font-weight: 720; }
+#app .fm-editor-modal :is(.flabel, .fm-section-title) svg { flex: 0 0 auto; color: var(--teal); }
+#app .fm-editor-modal .flabel-hint { font-size: .67rem; line-height: 1.5; }
+#app .fm-editor-modal :is(input, select, textarea) { min-height: 44px; font-size: .78rem; }
+#app .fm-editor-modal textarea { min-height: 96px; }
+#app .fm-editor-modal .fm-room-card-media > svg { color: var(--muted); }
+#app .fm-editor-modal .image-upload-preview {
+  position: relative;
+  display: flex;
+  width: 100%;
+  min-height: var(--upload-min-height, 120px);
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  padding: 0;
+  border: 1px dashed color-mix(in srgb, var(--teal) 30%, var(--border));
+  border-radius: 11px;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--teal) 5%, transparent), transparent),
+    var(--navy2);
+  color: var(--text);
+  cursor: pointer;
+  transition: border-color 160ms ease, background-color 160ms ease, box-shadow 160ms ease;
+}
+#app .fm-editor-modal .image-upload-preview:hover {
+  border-color: color-mix(in srgb, var(--teal) 58%, var(--border));
+  background-color: color-mix(in srgb, var(--teal) 5%, var(--navy2));
+}
+#app .fm-editor-modal .image-upload-preview:focus-visible {
+  outline: 0;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--teal) 15%, transparent);
+}
+#app .fm-editor-modal .image-upload-preview > img {
+  display: block;
+  width: 100%;
+  height: var(--upload-min-height, 120px);
+  object-fit: cover;
+}
+#app .fm-editor-modal .image-upload-empty {
+  display: grid;
+  justify-items: center;
+  gap: 5px;
+  padding: 18px;
+  text-align: center;
+}
+#app .fm-editor-modal .image-upload-icon {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  margin-bottom: 3px;
+  place-items: center;
+  border-radius: 12px;
+  background: var(--teal-soft);
+  color: var(--teal);
+}
+#app .fm-editor-modal .image-upload-empty strong { color: var(--text); font-size: .75rem; }
+#app .fm-editor-modal .image-upload-empty > span:last-child { color: var(--muted); font-size: .65rem; }
+#app .fm-editor-modal .image-upload-change {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 9px;
+  border: 1px solid rgba(255,255,255,.18);
+  border-radius: 9px;
+  background: rgba(5,16,29,.78);
+  color: #fff;
+  font-size: .67rem;
+  font-weight: 730;
+  backdrop-filter: blur(9px);
+}
+#app .fm-editor-modal .image-upload-error {
+  margin-top: 6px;
+  color: var(--red);
+  font-size: .67rem;
+}
+#app .fm-editor-modal .fm-preview-col > summary > svg:first-child { color: var(--teal); }
+#app .fm-editor-modal .fm-preview-col > summary > svg:last-child {
+  grid-column: 3;
+  grid-row: 1 / span 2;
+  color: var(--muted);
+  transition: transform 180ms ease;
+}
+#app .fm-editor-modal .fm-preview-col[open] > summary > svg:last-child { transform: rotate(180deg); }
+
+@media (max-width: 1180px) {
+  #app #panel-room-management .facility-catalog-tools {
+    grid-template-columns: minmax(220px, 1fr) auto auto;
+  }
+  #app #panel-room-management .facility-filter-tabs {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+}
+
+@media (max-width: 980px) {
+  #app #panel-room-management .facility-command-bar {
+    align-items: flex-start;
+  }
+  #app #panel-room-management .facility-command-stats {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  #app #panel-room-management .facility-command-stats > div {
+    min-width: 76px;
+  }
+  #app #panel-room-management .facility-command-stats > div:nth-child(3) {
+    border-top: 1px solid var(--border-soft);
+    border-left: 0;
+  }
+  #app #panel-room-management .facility-command-stats > div:nth-child(4) {
+    border-top: 1px solid var(--border-soft);
+  }
+  #app #panel-room-management .facility-catalog-list {
+    grid-template-columns: 1fr;
+  }
+  #app #panel-room-management .facility-catalog-media {
+    min-height: 205px;
+    max-height: 250px;
+    aspect-ratio: 16 / 5;
+  }
+}
+
+@media (max-width: 700px) {
+  #app #panel-room-management {
+    gap: 14px;
+  }
+
+  #app #panel-room-management .facility-command-bar {
+    display: grid;
+    gap: 17px;
+    padding: 17px;
+    border-radius: 17px;
+  }
+
+  #app #panel-room-management .facility-heading-lockup {
+    align-items: flex-start;
+  }
+
+  #app #panel-room-management .facility-heading-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 13px;
+  }
+
+  #app #panel-room-management .facility-command-bar h2 {
+    font-size: 1.45rem;
+  }
+
+  #app #panel-room-management .facility-command-bar p {
+    font-size: .76rem;
+  }
+
+  #app #panel-room-management .facility-command-stats {
+    display: flex;
+    width: 100%;
+  }
+
+  #app #panel-room-management .facility-command-stats > div {
+    min-width: 0;
+    flex: 1;
+    padding: 10px 7px;
+  }
+
+  #app #panel-room-management .facility-command-stats > div:nth-child(3),
+  #app #panel-room-management .facility-command-stats > div:nth-child(4) {
+    border-top: 0;
+    border-left: 1px solid var(--border-soft);
+  }
+
+  #app #panel-room-management .facility-catalog-tools {
+    top: 6px;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
+    margin-bottom: 12px;
+    padding: 8px;
+    border-radius: 14px;
+  }
+
+  #app #panel-room-management .facility-search {
+    grid-column: 1;
+  }
+
+  #app #panel-room-management .facility-add-button {
+    grid-column: 2;
+    min-height: 42px;
+    padding-inline: 12px;
+  }
+
+  #app #panel-room-management .facility-filter-tabs {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    margin: 0;
+    padding: 4px;
+    border: 1px solid var(--border);
+    border-radius: 11px;
+  }
+
+  #app #panel-room-management .facility-results {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    justify-content: space-between;
+    padding: 0 3px 1px;
+  }
+
+  #app #panel-room-management .facility-catalog-row {
+    gap: 0;
+    padding: 0;
+    border-radius: 17px;
+  }
+
+  #app #panel-room-management .facility-catalog-row:hover {
+    transform: none;
+  }
+
+  #app #panel-room-management .facility-catalog-media {
+    min-height: 178px;
+    aspect-ratio: 16 / 8;
+  }
+
+  #app #panel-room-management .facility-catalog-main {
+    padding: 15px;
+  }
+
+  #app #panel-room-management .facility-catalog-title {
+    gap: 9px;
+  }
+
+  #app #panel-room-management .facility-catalog-title h3 {
+    font-size: 1.08rem;
+  }
+
+  #app #panel-room-management .facility-catalog-main > p {
+    min-height: 0;
+    margin-block: 8px 12px;
+    font-size: .75rem;
+  }
+
+  #app #panel-room-management .facility-card-facts {
+    gap: 5px;
+    margin-bottom: 14px;
+  }
+
+  #app #panel-room-management .facility-card-facts > span {
+    min-height: 36px;
+    font-size: .59rem;
+  }
+
+  #app #panel-room-management .facility-room-type-row {
+    grid-template-columns: 7px minmax(90px, 1fr) auto;
+    min-height: 50px;
+  }
+
+  #app #panel-room-management .facility-room-status {
+    display: none;
+  }
+
+  #app #panel-room-management .facility-catalog-actions {
+    grid-column: auto;
+    padding: 11px 14px max(11px, env(safe-area-inset-bottom));
+  }
+
+  #app #panel-room-management .facility-edit-button {
+    min-width: 94px;
+  }
+
+  #app .modal-bg:has(.facility-action-modal) {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  #app .facility-action-modal.modal-lg {
+    width: 100%;
+    max-width: none;
+    max-height: calc(100dvh - max(8px, env(safe-area-inset-top)));
+    overflow-y: auto;
+    border-radius: 20px 20px 0 0;
+  }
+
+  #app .facility-action-modal .facility-action-header {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    padding: 17px 15px 15px;
+  }
+
+  #app .facility-action-modal .facility-action-icon {
+    width: 40px;
+    height: 40px;
+  }
+
+  #app .facility-action-modal h2 {
+    font-size: 1.05rem;
+  }
+
+  #app .facility-action-modal .facility-action-header p {
+    font-size: .69rem;
+  }
+
+  #app .facility-action-modal .facility-action-options {
+    grid-template-columns: 1fr;
+    padding: 13px 14px;
+  }
+
+  #app .facility-action-modal .facility-action-option {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    min-height: 0;
+    gap: 11px;
+    align-items: center;
+    padding: 13px;
+  }
+
+  #app .facility-action-modal .facility-action-option-icon {
+    width: 42px;
+    height: 42px;
+    margin: 0;
+  }
+
+  #app .facility-action-modal .facility-action-option-cta {
+    margin: 0;
+  }
+
+  #app .facility-action-modal .facility-action-note {
+    padding: 12px 15px max(16px, env(safe-area-inset-bottom));
+  }
+}
+
+@media (max-width: 430px) {
+  #app #panel-room-management .facility-heading-icon {
+    display: none;
+  }
+
+  #app #panel-room-management .facility-command-stats span {
+    font-size: .58rem;
+  }
+
+  #app #panel-room-management .facility-search input {
+    font-size: .73rem;
+  }
+
+  #app #panel-room-management .facility-add-button {
+    font-size: .7rem;
+  }
+
+  #app #panel-room-management .facility-health {
+    padding-inline: 7px;
+    font-size: .61rem;
+  }
+
+  #app #panel-room-management .facility-card-facts > span {
+    display: grid;
+    justify-items: center;
+    gap: 2px;
+  }
+
+  #app #panel-room-management .facility-room-rate {
+    min-width: 67px;
+    font-size: .69rem;
+  }
+
+  #app #panel-room-management .facility-catalog-actions {
+    gap: 6px;
+  }
+
+  #app #panel-room-management .facility-edit-button {
+    min-width: 82px;
+  }
+
+  #app .facility-action-modal .facility-action-icon {
+    display: none;
+  }
+
+  #app .facility-action-modal .facility-action-header {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  #app .facility-action-modal .facility-action-option {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  #app .facility-action-modal .facility-action-option-cta {
+    grid-column: 2;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #app #panel-room-management .facility-catalog-row,
+  #app #panel-room-management .facility-catalog-media img,
+  #app #panel-room-management .facility-add-button,
+  #app .facility-action-modal .facility-action-option {
+    transition: none;
+  }
+}

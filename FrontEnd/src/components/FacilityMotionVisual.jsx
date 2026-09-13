@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
+import { Rotate3D } from 'lucide-react';
+import { animate, motion, useMotionTemplate, useMotionValue, useReducedMotion } from 'motion/react';
 
 const POCKETS = ['one', 'two', 'three', 'four', 'five', 'six'];
 
@@ -82,10 +84,70 @@ function KtvModel() {
 
 function FacilityMotionVisual({ type, label }) {
   const figureRef = useRef(null);
+  const dragRef = useRef(null);
+  const returnAnimationRef = useRef(null);
   const [isVisible, setIsVisible] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const reduceMotion = useReducedMotion();
+  const rotation = useMotionValue(0);
+  const objectTransform = useMotionTemplate`rotateY(${rotation}deg)`;
   const kind = String(type || '').toLowerCase();
   const normalized = kind.includes('court') ? 'court' : kind.includes('ktv') ? 'ktv' : 'billiards';
   const displayLabel = label || normalized;
+
+  function settleToFront() {
+    dragRef.current = null;
+    setIsDragging(false);
+    returnAnimationRef.current?.stop();
+    if (reduceMotion) {
+      rotation.set(0);
+      return;
+    }
+    returnAnimationRef.current = animate(rotation, 0, {
+      type: 'spring',
+      duration: 0.5,
+      bounce: 0.2,
+    });
+  }
+
+  function handlePointerDown(event) {
+    if (reduceMotion || event.button !== 0 || dragRef.current) return;
+    returnAnimationRef.current?.stop();
+    const bounds = event.currentTarget.getBoundingClientRect();
+    dragRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startRotation: rotation.get(),
+      width: Math.max(bounds.width, 1),
+    };
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    setIsDragging(true);
+  }
+
+  function handlePointerMove(event) {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    const nextRotation = drag.startRotation + ((event.clientX - drag.startX) / drag.width) * 360;
+    rotation.set(Math.max(-360, Math.min(360, nextRotation)));
+  }
+
+  function handlePointerEnd(event) {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    settleToFront();
+  }
+
+  function handleKeyDown(event) {
+    if (reduceMotion || !['ArrowLeft', 'ArrowRight'].includes(event.key)) return;
+    event.preventDefault();
+    returnAnimationRef.current?.stop();
+    setIsDragging(true);
+    const direction = event.key === 'ArrowRight' ? 1 : -1;
+    rotation.set(Math.max(-360, Math.min(360, rotation.get() + direction * 24)));
+  }
 
   useEffect(() => {
     const figure = figureRef.current;
@@ -102,11 +164,26 @@ function FacilityMotionVisual({ type, label }) {
     return () => observer.disconnect();
   }, []);
 
+  useEffect(() => () => returnAnimationRef.current?.stop(), []);
+
   return (
     <figure
       ref={figureRef}
-      className={`facility-motion facility-motion--${normalized}${isVisible ? '' : ' is-paused'}`}
-      aria-label={`${displayLabel} dimensional room preview`}
+      className={`facility-motion facility-motion--${normalized}${isVisible ? '' : ' is-paused'}${isDragging ? ' is-dragging' : ''}`}
+      role="group"
+      tabIndex={reduceMotion ? -1 : 0}
+      aria-label={reduceMotion
+        ? `${displayLabel} dimensional room preview`
+        : `${displayLabel} interactive dimensional room preview. Hold and drag left or right to rotate it; release to return to the front.`}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerEnd}
+      onPointerCancel={handlePointerEnd}
+      onKeyDown={handleKeyDown}
+      onKeyUp={(event) => {
+        if (['ArrowLeft', 'ArrowRight'].includes(event.key)) settleToFront();
+      }}
+      onBlur={settleToFront}
     >
       <div className="facility-motion-atmosphere" aria-hidden="true">
         <span className="facility-motion-halo" />
@@ -114,13 +191,19 @@ function FacilityMotionVisual({ type, label }) {
         <span className="facility-motion-orbit facility-motion-orbit--two" />
       </div>
       <div className="facility-motion-stage" aria-hidden="true">
-        <div className="facility-motion-object">
-          {normalized === 'billiards' && <BilliardsModel />}
-          {normalized === 'court' && <CourtModel />}
-          {normalized === 'ktv' && <KtvModel />}
+        <div className="facility-motion-auto-orbit">
+          <motion.div className="facility-motion-object" style={{ transform: objectTransform }}>
+            <span className="facility-motion-plinth" />
+            {normalized === 'billiards' && <BilliardsModel />}
+            {normalized === 'court' && <CourtModel />}
+            {normalized === 'ktv' && <KtvModel />}
+          </motion.div>
         </div>
       </div>
-      <figcaption><span>{displayLabel}</span><small>Dimensional preview</small></figcaption>
+      <figcaption>
+        <span>{displayLabel}</span>
+        <small>{reduceMotion ? 'Dimensional preview' : <><Rotate3D size={13} aria-hidden="true" /> Hold + drag · 360°</>}</small>
+      </figcaption>
     </figure>
   );
 }

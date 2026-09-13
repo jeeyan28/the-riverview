@@ -93,7 +93,7 @@ function MainLayout() {
         <PageTransition />
       </main>
 
-      <Footer settings={settings} />
+      <Footer settings={settings} theme={theme} onToggleTheme={toggleTheme} />
 
       <CustomerAppNavigation
         user={user}

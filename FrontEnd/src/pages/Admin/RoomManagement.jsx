@@ -1,5 +1,32 @@
 import '../../styles/admin/room-management.css';
+import '../../styles/admin/room-management-v2.css';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  AlertCircle,
+  ArrowLeft,
+  ArrowRight,
+  Building2,
+  CheckCircle2,
+  ChevronDown,
+  CircleDot,
+  DoorOpen,
+  Eye,
+  FileText,
+  Hash,
+  ImageIcon,
+  Info,
+  Loader2,
+  Mic2,
+  Pencil,
+  Plus,
+  Save,
+  Search,
+  Sparkles,
+  Tags,
+  Trash2,
+  Trophy,
+  X,
+} from 'lucide-react';
 import Modal from '../../components/Modal';
 import ImageUploadPreview from '../../components/ImageUploadPreview';
 import FacilityBookingCard from '../../components/FacilityBookingCard';
@@ -42,6 +69,17 @@ const FORM_STEPS = [
 ];
 
 const ROOM_STATUS_PILL_CLASS = { Available: 'pill-active', Maintenance: 'pill-pending', Unavailable: 'pill-overdue' };
+
+const SERVICE_ICON = {
+  Billiards: CircleDot,
+  KTV: Mic2,
+  Court: Trophy,
+};
+
+function FacilityIcon({ name, size = 20 }) {
+  const Icon = SERVICE_ICON[name] || Building2;
+  return <Icon size={size} strokeWidth={1.9} aria-hidden="true" />;
+}
 
 function emptyVariant() {
   return {
@@ -107,6 +145,7 @@ function RoomManagement() {
   const [search, setSearch] = useState('');
 
   const [modalOpen, setModalOpen] = useState(false);
+  const [catalogActionOpen, setCatalogActionOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [formStep, setFormStep] = useState('facility');
   const [activeRoomIndex, setActiveRoomIndex] = useState(null);
@@ -117,6 +156,7 @@ function RoomManagement() {
   const [variantImagePreviews, setVariantImagePreviews] = useState({});
   const [featureInput, setFeatureInput] = useState('');
   const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState('');
 
   const fetchRooms = useCallback(async () => {
     setLoading(true);
@@ -160,40 +200,44 @@ function RoomManagement() {
 
   function openAddModal() {
     if (!guardPermission('room:manage')) return;
-    const nextService = SERVICE_CATEGORIES.find((name) => !rooms.some((room) => room.name === name));
-    if (!nextService) {
-      alert('Billiards, KTV, and Court are already configured. Edit an existing facility to change its rooms or pricing.');
-      return;
-    }
+    setCatalogActionOpen(true);
+  }
+
+  function startNewFacility(name) {
     setEditingId(null);
     setFormStep('facility');
     setActiveRoomIndex(null);
-    setForm(emptyFacilityForm(nextService));
+    setForm(emptyFacilityForm(name));
     resetImageState();
     setFeatureInput('');
+    setFormError('');
+    setCatalogActionOpen(false);
     setModalOpen(true);
   }
 
-  function openEditModal(room) {
+  function openEditModal(room, { addRoom = false } = {}) {
     if (!guardPermission('room:manage')) return;
+    const variants = (room.variants || []).map((v) => ({
+      ...v,
+      startingRoomNumber: v.startingRoomNumber ?? '',
+      roomCount: v.roomCount ?? 1,
+      status: v.status || 'Available',
+      pricingMode: v.pricingMode || 'flat',
+      eveningPrice: v.eveningPrice ?? '',
+      eveningStartTime: v.eveningStartTime || '17:00',
+      includedGuests: v.includedGuests ?? 0,
+      extraGuestFee: v.extraGuestFee ?? 0,
+      features: Array.isArray(v.features) ? v.features : [],
+    }));
+    if (addRoom) variants.push(emptyVariant());
+
     setEditingId(room._id);
-    setFormStep('facility');
-    setActiveRoomIndex(null);
+    setFormStep(addRoom ? 'rooms' : 'facility');
+    setActiveRoomIndex(addRoom ? variants.length - 1 : null);
     setForm({
       name: room.name || '',
       description: room.description || '',
-      variants: (room.variants || []).map((v) => ({
-        ...v,
-        startingRoomNumber: v.startingRoomNumber ?? '',
-        roomCount: v.roomCount ?? 1,
-        status: v.status || 'Available',
-        pricingMode: v.pricingMode || 'flat',
-        eveningPrice: v.eveningPrice ?? '',
-        eveningStartTime: v.eveningStartTime || '17:00',
-        includedGuests: v.includedGuests ?? 0,
-        extraGuestFee: v.extraGuestFee ?? 0,
-        features: Array.isArray(v.features) ? v.features : [],
-      })),
+      variants,
     });
     setExistingImageUrl(room.image ? resolveImageUrl(room.image) : '');
     setSelectedImageFile(null);
@@ -203,6 +247,8 @@ function RoomManagement() {
       return {};
     });
     setFeatureInput('');
+    setFormError('');
+    setCatalogActionOpen(false);
     setModalOpen(true);
   }
 
@@ -210,12 +256,14 @@ function RoomManagement() {
     setModalOpen(false);
     setEditingId(null);
     setSelectedImageFile(null);
+    setFormError('');
   }
 
   function addRoom() {
     const newIndex = form.variants.length;
     setForm((f) => ({ ...f, variants: [...f.variants, emptyVariant()] }));
     setFeatureInput('');
+    setFormError('');
     setActiveRoomIndex(newIndex);
   }
 
@@ -302,30 +350,34 @@ function RoomManagement() {
 
   async function handleSave() {
     if (!guardPermission('room:manage')) return;
+    setFormError('');
     if (!form.name.trim()) {
-      alert('Please fill in the facility category name.');
+      setFormStep('facility');
+      setFormError('Choose a facility category before continuing.');
       return;
     }
     if (!SERVICE_CATEGORIES.includes(form.name.trim())) {
-      alert('Facility must be Billiards, KTV, or Court. Those are the services defined for this project.');
+      setFormStep('facility');
+      setFormError('Choose Billiards, KTV, or Court. These are the reservable facilities configured for Riverview.');
       return;
     }
     const normalized = form.name.trim().toLowerCase();
     const clash = rooms.find((r) => r.name.trim().toLowerCase() === normalized && r._id !== editingId);
     if (clash) {
-      alert(`A facility named "${clash.name}" already exists. Edit that one to add rooms to it instead.`);
+      setFormStep('facility');
+      setFormError(`${clash.name} is already set up. Use “Add room” on its card to expand its inventory.`);
       return;
     }
-    const cleanVariantEntries = form.variants
-      .map((v, originalIndex) => ({ v, originalIndex }))
-      .filter(({ v }) => v.label.trim() !== '' || v.price !== '');
+    const cleanVariantEntries = form.variants.map((v, originalIndex) => ({ v, originalIndex }));
     const invalidRoomNumber = cleanVariantEntries.find(({ v }) => {
       if (v.startingRoomNumber === '' || v.startingRoomNumber === null || v.startingRoomNumber === undefined) return false;
       const parsed = Number(v.startingRoomNumber);
       return !Number.isFinite(parsed) || parsed <= 0;
     });
     if (invalidRoomNumber) {
-      alert(`Starting Room No. for "${invalidRoomNumber.v.label || 'Untitled Room'}" must be greater than 0, or left blank to default to 1.`);
+      setFormStep('rooms');
+      setActiveRoomIndex(invalidRoomNumber.originalIndex);
+      setFormError(`Starting room number for “${invalidRoomNumber.v.label || 'Untitled room'}” must be greater than 0.`);
       return;
     }
     const invalidVariant = cleanVariantEntries.find(({ v }) => {
@@ -335,7 +387,9 @@ function RoomManagement() {
         (v.pricingMode === 'time-based' && (v.eveningPrice === '' || !Number.isFinite(eveningPrice) || eveningPrice < 0));
     });
     if (invalidVariant) {
-      alert('Every room needs a name and a valid rate. Time-based rooms also need a valid evening rate.');
+      setFormStep('rooms');
+      setActiveRoomIndex(invalidVariant.originalIndex);
+      setFormError('Give this room a name and a valid hourly rate. Scheduled pricing also needs an evening rate.');
       return;
     }
     const cleanVariants = cleanVariantEntries.map(({ v }) => ({
@@ -354,7 +408,9 @@ function RoomManagement() {
       extraGuestFee: Math.max(0, Number(v.extraGuestFee) || 0),
     }));
     if (cleanVariants.length === 0) {
-      alert('Add at least one room before saving this facility.');
+      setFormStep('rooms');
+      setActiveRoomIndex(null);
+      setFormError('Add at least one reservable room before saving the facility.');
       return;
     }
 
@@ -388,7 +444,7 @@ function RoomManagement() {
       await fetchRooms();
     } catch (err) {
       console.error(err);
-      alert(err.message || 'Something went wrong saving the facility.');
+      setFormError(err.message || 'The facility could not be saved. Check the fields and try again.');
     } finally {
       setSaving(false);
     }
@@ -430,21 +486,23 @@ function RoomManagement() {
     const q = search.trim().toLowerCase();
     if (q) {
       list = list.filter(
-        (r) => r.name.toLowerCase().includes(q) || (r.description || '').toLowerCase().includes(q)
+        (r) => r.name.toLowerCase().includes(q) ||
+          (r.description || '').toLowerCase().includes(q) ||
+          (r.variants || []).some((variant) => (variant.label || '').toLowerCase().includes(q))
       );
     }
     return list;
   }, [rooms, selectedCategory, search]);
 
   const stats = useMemo(() => {
-    const allVariants = visibleRooms.flatMap((r) => r.variants || []);
+    const allVariants = rooms.flatMap((r) => r.variants || []);
     return {
-      facilities: visibleRooms.length,
+      facilities: rooms.length,
       totalRooms: allVariants.reduce((sum, variant) => sum + Math.max(1, Number(variant.roomCount) || 1), 0),
       available: allVariants.filter((v) => v.status === 'Available').reduce((sum, variant) => sum + Math.max(1, Number(variant.roomCount) || 1), 0),
       maintenance: allVariants.filter((v) => v.status === 'Maintenance').reduce((sum, variant) => sum + Math.max(1, Number(variant.roomCount) || 1), 0),
     };
-  }, [visibleRooms]);
+  }, [rooms]);
 
   function clearFilters() {
     setSearch('');
@@ -472,216 +530,189 @@ function RoomManagement() {
 
   return (
     <div className="panel active" id="panel-room-management">
-      <div className="metric-row">
-        <div className="mc">
-          <div className="mc-icon"><i className="ti ti-building"></i></div>
-          <div className="mc-info">
-            <div className="mc-label">Total Facilities</div>
-            <div className="mc-val">{stats.facilities.toLocaleString()}</div>
+      <header className="facility-command-bar">
+        <div className="facility-heading-lockup">
+          <span className="facility-heading-icon"><Building2 size={24} aria-hidden="true" /></span>
+          <div>
+            <span className="facility-kicker">FACILITIES &amp; INVENTORY</span>
+            <h2>Manage your spaces</h2>
+            <p>Keep guest-facing details, room inventory, hourly rates, and availability in one place.</p>
           </div>
         </div>
-        <div className="mc">
-          <div className="mc-icon"><i className="ti ti-door"></i></div>
-          <div className="mc-info">
-            <div className="mc-label">Total Rooms</div>
-            <div className="mc-val">{stats.totalRooms.toLocaleString()}</div>
-          </div>
+        <div className="facility-command-stats" aria-label="Facility inventory summary">
+          <div><strong>{rooms.length.toLocaleString()}</strong><span>Facilities</span></div>
+          <div><strong>{stats.totalRooms.toLocaleString()}</strong><span>Total units</span></div>
+          <div><strong>{stats.available.toLocaleString()}</strong><span>Ready</span></div>
+          {stats.maintenance > 0 && <div className="needs-attention"><strong>{stats.maintenance.toLocaleString()}</strong><span>Maintenance</span></div>}
         </div>
-        <div className="mc">
-          <div className="mc-icon"><i className="ti ti-circle-check"></i></div>
-          <div className="mc-info">
-            <div className="mc-label">Available</div>
-            <div className="mc-val">{stats.available.toLocaleString()}</div>
-          </div>
-        </div>
-        <div className="mc">
-          <div className="mc-icon"><i className="ti ti-tool"></i></div>
-          <div className="mc-info">
-            <div className="mc-label">Under Maintenance</div>
-            <div className="mc-val">{stats.maintenance.toLocaleString()}</div>
-          </div>
-        </div>
-      </div>
+      </header>
 
-      <div className="card">
-        <div className="fac-head">
-          <div className="fac-head-left">
-            <i className="ti ti-building"></i>
-            <div>
-              <div className="fac-head-title">Manage your Facility</div>
-              <div className="fac-head-sub">Configure the Billiards, KTV, and Court inventory guests can reserve.</div>
-            </div>
+      <section className="facility-catalog-shell" aria-labelledby="facility-catalog-list-title">
+        <div className="facility-catalog-tools">
+          <label className="facility-search">
+            <span className="visually-hidden">Search facilities</span>
+            <Search size={17} aria-hidden="true" />
+            <input type="search" placeholder="Search a facility or room type" value={search} onChange={(event) => setSearch(event.target.value)} />
+          </label>
+          <div className="facility-filter-tabs" role="tablist" aria-label="Facility category">
+            <button type="button" role="tab" aria-selected={selectedCategory === 'all'} className={selectedCategory === 'all' ? 'active' : ''} onClick={() => setSelectedCategory('all')}>All <span>{rooms.length}</span></button>
+            {categories.map((category) => (
+              <button type="button" role="tab" key={category} aria-selected={selectedCategory === category} className={selectedCategory === category ? 'active' : ''} onClick={() => setSelectedCategory(category)}>
+                {category} <span>{rooms.filter((room) => room.name === category).length}</span>
+              </button>
+            ))}
+          </div>
+          <div className="facility-results">
+            <span id="facility-catalog-list-title">{loading ? 'Loading…' : `${visibleRooms.length} shown`}</span>
+            {(search || selectedCategory !== 'all') && <button type="button" onClick={clearFilters}><X size={13} aria-hidden="true" />Reset</button>}
           </div>
           {canManage && (
-            <button className="btn-teal" onClick={openAddModal} disabled={SERVICE_CATEGORIES.every((name) => rooms.some((room) => room.name === name))}>
-              <i className="ti ti-plus"></i>{SERVICE_CATEGORIES.every((name) => rooms.some((room) => room.name === name)) ? 'All Services Added' : 'Add Missing Service'}
+            <button type="button" className="facility-add-button" onClick={openAddModal}>
+              <Plus size={18} strokeWidth={2.4} aria-hidden="true" />
+              Add facility
             </button>
           )}
         </div>
-      </div>
 
-      <div className="card fac-toolbar-card">
-        <div className="fac-toolbar">
-          <div className="fac-search-wrap">
-            <i className="ti ti-search fac-search-icon"></i>
-            <input
-              type="text"
-              placeholder="Search facility name or description…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="fac-filter-input fac-search-input"
-            />
-          </div>
-          {(search || selectedCategory !== 'all') && (
-            <button type="button" className="fac-clear-btn" onClick={clearFilters}>
-              <i className="ti ti-x"></i> Clear
-            </button>
-          )}
-        </div>
-        <div className="fac-results-row">
-          {loading ? 'Loading facilities…' : `${visibleRooms.length.toLocaleString()} facilit${visibleRooms.length === 1 ? 'y' : 'ies'} found`}
-        </div>
-      </div>
-
-      <div className="set-layout">
-        <div className="set-tabs fac-cat-tabs">
-          <button
-            type="button"
-            className={`set-tab${selectedCategory === 'all' ? ' active' : ''}`}
-            onClick={() => setSelectedCategory('all')}
-          >
-            <span>All Categories</span>
-            <span className="fac-cat-count">{rooms.length}</span>
-          </button>
-          {categories.map((cat) => (
-            <button
-              type="button"
-              key={cat}
-              className={`set-tab${selectedCategory === cat ? ' active' : ''}`}
-              onClick={() => setSelectedCategory(cat)}
-            >
-              <span>{cat}</span>
-              <span className="fac-cat-count">{rooms.filter((r) => r.name === cat).length}</span>
-            </button>
-          ))}
-        </div>
-
-        <div className="set-content">
-          <div className="fac-grid" id="fac-grid">
-            {loading ? (
-              <div className="room-grid-empty">Loading facilities…</div>
-            ) : visibleRooms.length === 0 ? (
-              <div className="room-grid-empty">
-                <i className="ti ti-building"></i>
-                {rooms.length === 0 ? 'No facilities yet. Click "Add Facility" to create one.' : 'No facilities match your filters.'}
-              </div>
-            ) : (
-              visibleRooms.map((r) => {
-                const hasVariants = r.variants && r.variants.length > 0;
-                const topPrice = hasVariants ? `From ₱${lowestRoomPrice(r.variants)}/hr` : 'No rooms yet';
-                const counts = statusCounts(r.variants);
-                const shownVariants = r.variants ? r.variants.slice(0, 3) : [];
-                const extraVariants = hasVariants ? r.variants.length - shownVariants.length : 0;
-                return (
-                  <div className="fac-card" key={r._id}>
-                    <div className="fac-card-media">
-                      {r.image ? (
-                        <img src={resolveImageUrl(r.image)} alt={r.name} />
-                      ) : (
-                        <div className="fac-card-noimg">
-                          <i className="ti ti-photo"></i>
-                          No image
-                        </div>
-                      )}
-                      <span className="fac-card-badge">{topPrice}</span>
-                    </div>
-                    <div className="fac-body">
-                      <div className="fac-title-row">
-                        <div className="fac-name">{r.name}</div>
-                        <div className="fac-meta">{hasVariants ? `${r.variants.length} room type${r.variants.length > 1 ? 's' : ''}` : 'No rooms yet'}</div>
-                      </div>
-
-                      {hasVariants && (
-                        <div className="fac-status-row">
-                          {counts.available > 0 && <span className="pill pill-active">{counts.available} Available</span>}
-                          {counts.maintenance > 0 && <span className="pill pill-pending">{counts.maintenance} Maintenance</span>}
-                          {counts.unavailable > 0 && <span className="pill pill-overdue">{counts.unavailable} Unavailable</span>}
-                        </div>
-                      )}
-
-                      {r.description && <div className="fac-desc">{r.description}</div>}
-
-                      {hasVariants && (
-                        <div className="fac-variants">
-                          {shownVariants.map((v, i) => (
-                            <span className="fac-variant-chip" key={i}>
-                              {v.label} <span className="fv-price">₱{v.price}</span>
-                              <span className="fv-room-range">{roomNumberRangeLabel(v)}</span>
-                            </span>
-                          ))}
-                          {extraVariants > 0 && <span className="fac-variant-more">+{extraVariants} more</span>}
-                        </div>
-                      )}
-
-                      <div className="fac-actions">
-                        {canManage ? (
-                          <>
-                            <button className="fac-edit-btn" onClick={() => openEditModal(r)}>
-                              <i className="ti ti-edit"></i>Edit
-                            </button>
-                            <button className="fac-icon-btn del" title="Remove" onClick={() => quickDelete(r._id)}>
-                              <i className="ti ti-trash"></i>
-                            </button>
-                          </>
-                        ) : (
-                          <span style={{ fontSize: '.72rem', color: 'var(--muted)' }}>View only</span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
-        </div>
-      </div>
-
-      <Modal open={modalOpen} onClose={closeModal} size="2xl">
-        <div className="fm-modal-header">
-          <div>
-            <div className="modal-lg-title">{editingId ? 'Edit Facility' : 'Add Facility'}</div>
-            <div className="modal-lg-sub">
-              {editingId ? 'Update this service, inventory, and pricing.' : 'Add the missing service with PRD-aligned starter pricing.'}
+        <div className="facility-catalog-list">
+          {loading ? (
+            <div className="facility-empty-state"><span className="facility-loading-mark" /><strong>Loading facilities</strong><span>Getting the latest room inventory…</span></div>
+          ) : visibleRooms.length === 0 ? (
+            <div className="facility-empty-state">
+              <span className="facility-empty-icon"><Building2 size={28} aria-hidden="true" /></span>
+              <strong>{rooms.length === 0 ? 'Your catalog is empty' : 'No matching facilities'}</strong>
+              <span>{rooms.length === 0 ? 'Create your first facility and add its reservable rooms.' : 'Try another search or clear the active filter.'}</span>
+              {canManage && rooms.length === 0 && <button type="button" className="facility-add-button" onClick={openAddModal}><Plus size={18} />Add first facility</button>}
             </div>
-          </div>
-          <button type="button" className="fm-close-btn" title="Close" onClick={closeModal}>
-            <i className="ti ti-x"></i>
-          </button>
-        </div>
-
-        <div className="fm-stepper">
-          {FORM_STEPS.map((s, i) => {
-            const state = i < stepIndex ? 'done' : i === stepIndex ? 'active' : 'upcoming';
+          ) : visibleRooms.map((facility) => {
+            const variants = Array.isArray(facility.variants) ? facility.variants : [];
+            const counts = statusCounts(variants);
+            const totalUnits = counts.available + counts.maintenance + counts.unavailable;
             return (
-              <div key={s.key} style={{ display: 'flex', alignItems: 'center' }}>
-                {i > 0 && <span className="fm-step-connector"></span>}
-                <button
-                  type="button"
-                  className={`fm-step-dot fm-step-dot--${state}`}
-                  onClick={() => {
-                    setFormStep(s.key);
-                    if (s.key !== 'rooms') setActiveRoomIndex(null);
-                  }}
-                >
-                  <span className="fm-step-dot-num">{state === 'done' ? <i className="ti ti-check"></i> : i + 1}</span>
-                  <span className="fm-step-dot-label">
-                    {s.label}{s.key === 'rooms' && form.variants.length > 0 ? ` (${form.variants.length})` : ''}
-                  </span>
-                </button>
-              </div>
+              <article className="facility-catalog-row" key={facility._id}>
+                <div className="facility-catalog-media">
+                  {facility.image ? <img src={resolveImageUrl(facility.image)} alt={`${facility.name} facility`} /> : <div className="facility-media-placeholder"><FacilityIcon name={facility.name} size={38} /><span>Add a cover photo</span></div>}
+                  <span className="facility-category-mark"><FacilityIcon name={facility.name} size={18} />{facility.name}</span>
+                  <span className="facility-price-mark">{variants.length ? `From ₱${lowestRoomPrice(variants).toLocaleString()}/hr` : 'Add pricing'}</span>
+                </div>
+
+                <div className="facility-catalog-main">
+                  <div className="facility-catalog-title">
+                    <div><h3>{facility.name}</h3><span>Visible in the customer booking catalog</span></div>
+                    <span className={`facility-health ${counts.maintenance || counts.unavailable ? 'facility-health--attention' : ''}`}>
+                      {counts.maintenance || counts.unavailable ? `${counts.maintenance + counts.unavailable} need attention` : `${counts.available} ready`}
+                    </span>
+                  </div>
+                  <p className={facility.description ? '' : 'facility-copy-missing'}>{facility.description || 'Add a short description so guests know what makes this facility useful.'}</p>
+
+                  <div className="facility-card-facts" aria-label={`${facility.name} summary`}>
+                    <span><DoorOpen size={16} /><strong>{variants.length}</strong> room type{variants.length === 1 ? '' : 's'}</span>
+                    <span><CheckCircle2 size={16} /><strong>{counts.available}</strong> ready</span>
+                    <span><Building2 size={16} /><strong>{totalUnits}</strong> total unit{totalUnits === 1 ? '' : 's'}</span>
+                  </div>
+
+                  <div className="facility-room-section-head"><span>Rooms &amp; hourly rates</span><span>{variants.length} type{variants.length === 1 ? '' : 's'}</span></div>
+                  <div className="facility-room-type-list" aria-label={`${facility.name} room types`}>
+                    {variants.length ? variants.map((variant, index) => (
+                      <div className="facility-room-type-row" key={`${variant.label}-${index}`}>
+                        <span className={`facility-room-status-dot facility-room-status-dot--${(variant.status || 'Available').toLowerCase().replace(' ', '-')}`} aria-hidden="true" />
+                        <span className="facility-room-name"><strong>{variant.label || `Room type ${index + 1}`}</strong><small>{roomNumberRangeLabel(variant)}{variant.pax ? ` · ${variant.pax}` : ''}</small></span>
+                        <span className={`facility-room-status ${ROOM_STATUS_PILL_CLASS[variant.status] || 'pill-active'}`}>{variant.status || 'Available'}</span>
+                        <strong className="facility-room-rate">{variantRateLabel(variant)}</strong>
+                      </div>
+                    )) : <div className="facility-room-type-empty">Add at least one room type and hourly price.</div>}
+                  </div>
+                </div>
+
+                <div className="facility-catalog-actions">
+                  {canManage ? <>
+                    <button type="button" className="facility-add-room-button" onClick={() => openEditModal(facility, { addRoom: true })}><Plus size={17} aria-hidden="true" />Add room</button>
+                    <button type="button" className="facility-edit-button" onClick={() => openEditModal(facility)}><Pencil size={16} aria-hidden="true" />Manage</button>
+                    <button type="button" className="facility-remove-button" aria-label={`Remove ${facility.name}`} title={`Remove ${facility.name}`} onClick={() => quickDelete(facility._id)}><Trash2 size={16} aria-hidden="true" /></button>
+                  </> : <span>View only</span>}
+                </div>
+              </article>
             );
           })}
         </div>
+      </section>
+
+      <Modal open={catalogActionOpen} onClose={() => setCatalogActionOpen(false)} ariaLabel="Add to facility catalog" size="lg" className="facility-action-modal">
+        <div className="facility-action-header">
+          <div className="facility-action-icon"><Plus size={22} aria-hidden="true" /></div>
+          <div>
+            <span className="facility-kicker">ADD TO CATALOG</span>
+            <h2>What would you like to add?</h2>
+            <p>Choose a facility below. New services get a ready-to-edit template; configured services open a blank room form.</p>
+          </div>
+          <button type="button" className="fm-close-btn" aria-label="Close" onClick={() => setCatalogActionOpen(false)}><X size={18} /></button>
+        </div>
+        <div className="facility-action-options">
+          {SERVICE_CATEGORIES.map((name) => {
+            const existing = rooms.find((room) => room.name === name);
+            return (
+              <button key={name} type="button" className="facility-action-option" onClick={() => existing ? openEditModal(existing, { addRoom: true }) : startNewFacility(name)}>
+                <span className="facility-action-option-icon"><FacilityIcon name={name} size={24} /></span>
+                <span className="facility-action-option-copy">
+                  <span className={`facility-action-state ${existing ? 'is-configured' : 'is-new'}`}>{existing ? 'Facility configured' : 'Not set up yet'}</span>
+                  <strong>{name}</strong>
+                  <small>{existing ? `Add another room type to ${name}.` : `Create the ${name} facility with suggested rooms and rates.`}</small>
+                </span>
+                <span className="facility-action-option-cta"><Plus size={16} />{existing ? 'Add room' : 'Create'}</span>
+              </button>
+            );
+          })}
+        </div>
+        <div className="facility-action-note"><CheckCircle2 size={17} /><span>Billiards, KTV, and Court are the guest booking categories defined for Riverview.</span></div>
+      </Modal>
+
+      <Modal open={modalOpen} onClose={closeModal} ariaLabel={editingId ? `Edit ${form.name || 'facility'}` : 'Add facility'} size="2xl" className="fm-editor-modal">
+        <div className="fm-modal-header">
+          <div>
+            <span className="fm-modal-kicker">FACILITY EDITOR</span>
+            <div className="modal-lg-title">{editingId ? `Edit ${form.name || 'facility'}` : 'Add a facility'}</div>
+            <div className="modal-lg-sub">
+              Set what guests see, then configure each reservable room and hourly rate.
+            </div>
+          </div>
+          <button type="button" className="fm-close-btn" aria-label="Close facility editor" onClick={closeModal}>
+            <X size={18} aria-hidden="true" />
+          </button>
+        </div>
+
+        <div className="fm-editor-body">
+        <div className="fm-stepper" role="tablist" aria-label="Facility editor sections">
+          {FORM_STEPS.map((s, i) => {
+            const state = i < stepIndex ? 'done' : i === stepIndex ? 'active' : 'upcoming';
+            return (
+              <button
+                key={s.key}
+                type="button"
+                role="tab"
+                aria-selected={state === 'active'}
+                className={`fm-step-dot fm-step-dot--${state}`}
+                onClick={() => {
+                  setFormStep(s.key);
+                  if (s.key !== 'rooms') setActiveRoomIndex(null);
+                }}
+              >
+                <span className="fm-step-dot-num">{state === 'done' ? <CheckCircle2 size={15} aria-hidden="true" /> : i + 1}</span>
+                <span className="fm-step-copy">
+                  <strong>{s.label}{s.key === 'rooms' && form.variants.length > 0 ? ` (${form.variants.length})` : ''}</strong>
+                  <small>{s.key === 'facility' ? 'Guest-facing basics' : 'Inventory and pricing'}</small>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        {formError && (
+          <div className="fm-form-alert" role="alert">
+            <AlertCircle size={17} aria-hidden="true" />
+            <span>{formError}</span>
+            <button type="button" aria-label="Dismiss message" onClick={() => setFormError('')}><X size={15} aria-hidden="true" /></button>
+          </div>
+        )}
 
         <div className="fm-layout">
           <div className="fm-form-col">
@@ -689,8 +720,8 @@ function RoomManagement() {
               <>
                 <div className="fm-section">
                 <div className="ffield">
-                  <label className="flabel"><i className="ti ti-category"></i> Category</label>
-                  <span className="flabel-hint">The public catalogue only supports the three services defined in the project context.</span>
+                  <label className="flabel"><Tags size={15} aria-hidden="true" /> Facility category</label>
+                  <span className="flabel-hint">This controls where the facility appears in the guest booking catalog.</span>
                   <select
                     value={SERVICE_CATEGORIES.includes(form.name) ? form.name : ''}
                     onChange={(event) => {
@@ -712,7 +743,7 @@ function RoomManagement() {
 
                 <div className="fm-section">
                 <div className="ffield">
-                  <label className="flabel"><i className="ti ti-file-text"></i> Description</label>
+                  <label className="flabel"><FileText size={15} aria-hidden="true" /> Guest description</label>
                   <textarea
                     placeholder="Short description guests will see"
                     value={form.description}
@@ -723,11 +754,10 @@ function RoomManagement() {
 
                 <div className="fm-section">
                 <div className="ffield">
-                  <label className="flabel"><i className="ti ti-photo"></i> Facility Image</label>
-                  <span className="flabel-hint">Shown on the category card in the main catalogue grid.</span>
+                  <label className="flabel"><ImageIcon size={15} aria-hidden="true" /> Cover photo</label>
+                  <span className="flabel-hint">Use a bright landscape photo that helps guests recognize the space.</span>
                   <div className="fm-upload-zone">
                   <ImageUploadPreview
-                    icon="ti-photo"
                     title={existingImageUrl || selectedImageFile ? 'Click to change image' : 'Click to upload facility image'}
                     subtitle="PNG, JPG up to 10MB"
                     accept="image/png,image/jpeg"
@@ -745,7 +775,7 @@ function RoomManagement() {
             {formStep === 'rooms' && activeRoom === null && (
               <div className="ffield">
                 <div className="flabel-row">
-                  <label className="flabel"><i className="ti ti-door"></i> Rooms</label>
+                  <label className="flabel"><DoorOpen size={15} aria-hidden="true" /> Rooms</label>
                   <span className="flabel-hint">Each room is what guests actually pick and reserve — its own name, rate, pax, and photo.</span>
                 </div>
 
@@ -760,7 +790,7 @@ function RoomManagement() {
                       onClick={() => { setFeatureInput(''); setActiveRoomIndex(i); }}
                     >
                       <div className="fm-room-card-media">
-                        {variantThumbSrc(i, v) ? <img src={variantThumbSrc(i, v)} alt="" /> : <i className="ti ti-photo"></i>}
+                        {variantThumbSrc(i, v) ? <img src={variantThumbSrc(i, v)} alt="" /> : <ImageIcon size={22} aria-hidden="true" />}
                         <span className={`pill ${ROOM_STATUS_PILL_CLASS[v.status] || 'pill-done'}`}>{v.status || 'Available'}</span>
                       </div>
                       <div className="fm-room-card-body">
@@ -774,19 +804,19 @@ function RoomManagement() {
                           type="button" title="Edit room"
                           onClick={(e) => { e.stopPropagation(); setFeatureInput(''); setActiveRoomIndex(i); }}
                         >
-                          <i className="ti ti-edit"></i>
+                          <Pencil size={15} aria-hidden="true" />
                         </button>
                         <button
                           type="button" className="del" title="Remove room"
                           onClick={(e) => { e.stopPropagation(); removeVariantRow(i); }}
                         >
-                          <i className="ti ti-trash"></i>
+                          <Trash2 size={15} aria-hidden="true" />
                         </button>
                       </div>
                     </div>
                   ))}
                   <button type="button" className="fm-room-add-card" onClick={addRoom}>
-                    <i className="ti ti-plus"></i>Add Room
+                    <Plus size={17} aria-hidden="true" />Add Room
                   </button>
                 </div>
               </div>
@@ -795,11 +825,11 @@ function RoomManagement() {
             {formStep === 'rooms' && activeRoom !== null && (
               <div className="fm-room-detail">
                 <button type="button" className="fm-room-back" onClick={() => setActiveRoomIndex(null)}>
-                  <i className="ti ti-arrow-left"></i> Back to Rooms
+                  <ArrowLeft size={16} aria-hidden="true" /> Back to Rooms
                 </button>
 
                 <div className="fm-section">
-                  <div className="fm-section-title"><i className="ti ti-info-circle"></i> Basic Details</div>
+                  <div className="fm-section-title"><Info size={16} aria-hidden="true" /> Basic Details</div>
                   <div className="ffield">
                     <label className="flabel">Room Name</label>
                     <input
@@ -880,7 +910,7 @@ function RoomManagement() {
                 </div>
 
                 <div className="fm-section">
-                  <div className="fm-section-title"><i className="ti ti-door"></i> Availability &amp; Status</div>
+                  <div className="fm-section-title"><DoorOpen size={16} aria-hidden="true" /> Availability &amp; Status</div>
                   <div className="ffield">
                     <label className="flabel">Starting Room No.</label>
                     <span className="flabel-hint">Combined with Available Units, defines the range of table/room numbers used in Room Monitoring (e.g. start 101 + 3 units = 101, 102, 103).</span>
@@ -901,7 +931,7 @@ function RoomManagement() {
                   </div>
 
                   <div className="fm-room-number-preview">
-                    <i className="ti ti-hash"></i> Generates: {roomNumberRangeLabel(activeRoom)}
+                    <Hash size={15} aria-hidden="true" /> Generates: {roomNumberRangeLabel(activeRoom)}
                   </div>
 
                   <div className="ffield">
@@ -922,11 +952,10 @@ function RoomManagement() {
                 </div>
 
                 <div className="fm-section">
-                  <div className="fm-section-title"><i className="ti ti-photo"></i> Room Image</div>
+                  <div className="fm-section-title"><ImageIcon size={16} aria-hidden="true" /> Room Image</div>
                   <div className="ffield">
                     <div className="fm-upload-zone">
                     <ImageUploadPreview
-                      icon="ti-photo"
                       title={variantThumbSrc(activeRoomIndex, activeRoom) ? 'Click to change image' : 'Click to upload image'}
                       subtitle="PNG, JPG up to 10MB"
                       accept="image/png,image/jpeg"
@@ -940,14 +969,14 @@ function RoomManagement() {
                 </div>
 
                 <div className="fm-section">
-                  <div className="fm-section-title"><i className="ti ti-sparkles"></i> Amenities</div>
+                  <div className="fm-section-title"><Sparkles size={16} aria-hidden="true" /> Amenities</div>
                   <div className="ffield">
                     <div className="chip-list">
                       {(activeRoom.features || []).map((f, fi) => (
                         <span className="chip" key={fi}>
                           {f}
                           <button type="button" title="Remove" onClick={() => removeVariantFeature(activeRoomIndex, fi)}>
-                            <i className="ti ti-x" style={{ fontSize: 11 }}></i>
+                            <X size={12} aria-hidden="true" />
                           </button>
                         </span>
                       ))}
@@ -966,7 +995,7 @@ function RoomManagement() {
                         }}
                       />
                       <button type="button" className="chip-add-btn" onClick={() => addVariantFeature(activeRoomIndex)}>
-                        <i className="ti ti-plus"></i>
+                        <Plus size={16} aria-hidden="true" />
                       </button>
                     </div>
                   </div>
@@ -977,7 +1006,7 @@ function RoomManagement() {
                   className="variant-remove-btn-full"
                   onClick={() => { removeVariantRow(activeRoomIndex); setActiveRoomIndex(null); }}
                 >
-                  <i className="ti ti-trash"></i> Remove this room
+                  <Trash2 size={16} aria-hidden="true" /> Remove this room
                 </button>
               </div>
             )}
@@ -989,7 +1018,7 @@ function RoomManagement() {
                 disabled={stepIndex === 0}
                 onClick={() => setFormStep(FORM_STEPS[stepIndex - 1].key)}
               >
-                <i className="ti ti-arrow-left"></i> Back
+                <ArrowLeft size={16} aria-hidden="true" /> Back
               </button>
               <button
                 type="button"
@@ -997,15 +1026,17 @@ function RoomManagement() {
                 disabled={stepIndex === FORM_STEPS.length - 1}
                 onClick={() => setFormStep(FORM_STEPS[stepIndex + 1].key)}
               >
-                Next <i className="ti ti-arrow-right"></i>
+                Next <ArrowRight size={16} aria-hidden="true" />
               </button>
             </div>
           </div>
 
-          <div className="fm-preview-col">
+          <details className="fm-preview-col" open>
+            <summary><Eye size={17} aria-hidden="true" /><span>Customer preview</span><small>See the result while you edit</small><ChevronDown size={16} aria-hidden="true" /></summary>
+            <div className="fm-preview-content">
             {formStep === 'rooms' && activeRoomIndex !== null ? (
               <>
-                <div className="fm-preview-label"><i className="ti ti-eye"></i>Live Preview — what guests see when picking a room</div>
+                <div className="fm-preview-label">Selected room card</div>
                 <div className="fm-preview-cards">
                   <RoomOptionCard
                     option={{ ...previewFacility.variants[activeRoomIndex] }}
@@ -1015,7 +1046,7 @@ function RoomManagement() {
               </>
             ) : formStep === 'rooms' ? (
               <>
-                <div className="fm-preview-label"><i className="ti ti-eye"></i>Live Preview — the rooms guests will choose from</div>
+                <div className="fm-preview-label">Reservable room choices</div>
                 <div className="fm-preview-cards">
                   {previewFacility.variants.filter((v) => v.label?.trim()).length === 0 ? (
                     <div className="fm-preview-empty">Add a room to see how it looks to guests.</div>
@@ -1028,26 +1059,25 @@ function RoomManagement() {
               </>
             ) : (
               <>
-                <div className="fm-preview-label"><i className="ti ti-eye"></i>Live Preview — what guests see before Reserve Now</div>
+                <div className="fm-preview-label">Facility card</div>
                 <div className="fm-preview-cards">
                   <FacilityBookingCard room={previewFacility} />
                 </div>
               </>
             )}
-          </div>
+            </div>
+          </details>
+        </div>
         </div>
 
         <div className="modal-actions-split">
-          <button className="btn-remove" onClick={handleRemove} style={{ display: editingId ? 'inline-flex' : 'none' }}>
-            <i className="ti ti-trash"></i> Remove
-          </button>
-          <button className="btn-save" disabled={saving || !SERVICE_CATEGORIES.includes(form.name)} onClick={handleSave}>
-            {saving ? (
-              <><i className="ti ti-loader-2 spin"></i> Saving…</>
-            ) : (
-              <><i className="ti ti-device-floppy"></i> {editingId ? 'Save Changes' : 'Add Facility'}</>
-            )}
-          </button>
+          <div>{editingId && <button className="btn-remove" onClick={handleRemove}><Trash2 size={16} aria-hidden="true" />Remove facility</button>}</div>
+          <div className="fm-primary-actions">
+            <button type="button" className="btn-cancel" onClick={closeModal}>Cancel</button>
+            <button className="btn-save" disabled={saving || !SERVICE_CATEGORIES.includes(form.name)} onClick={handleSave}>
+              {saving ? <><Loader2 size={16} className="spin" aria-hidden="true" />Saving…</> : <><Save size={16} aria-hidden="true" />{editingId ? 'Save changes' : 'Add facility'}</>}
+            </button>
+          </div>
         </div>
       </Modal>
     </div>

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Mail, User, ArrowRight, Shield, Lock, ShieldCheck } from 'lucide-react';
+import { Mail, User, ArrowRight, Shield, Lock, ShieldCheck, Copy, ExternalLink } from 'lucide-react';
 import PasswordInput from './PasswordInput';
 import PasswordRequirementsList from './PasswordRequirementsList';
 import Toast from './Toast';
@@ -82,13 +82,53 @@ function AuthForm({ mode, onSwitchMode, onForgotPassword, onAuthSuccess }) {
     }
   }
 
-  const { triggerSignIn } = useGoogleAuth(handleGoogleCredential);
+  const { triggerSignIn, embeddedBrowser } = useGoogleAuth(handleGoogleCredential);
+  const [linkCopied, setLinkCopied] = useState(false);
 
   function handleGoogleClick() {
+    if (embeddedBrowser) {
+      showToast(`Open this page in Chrome or Safari to continue with Google.`, 'error');
+      return;
+    }
     const ok = triggerSignIn();
     if (!ok) {
       showToast('Google sign-in is still loading — try again in a second.', 'error');
     }
+  }
+
+  async function copyPageLink() {
+    const pageUrl = window.location.href;
+    try {
+      await navigator.clipboard.writeText(pageUrl);
+    } catch {
+      const input = document.createElement('textarea');
+      input.value = pageUrl;
+      input.setAttribute('readonly', '');
+      input.style.position = 'fixed';
+      input.style.opacity = '0';
+      document.body.appendChild(input);
+      input.select();
+      document.execCommand('copy');
+      input.remove();
+    }
+    setLinkCopied(true);
+    showToast('Page link copied. Open it in Chrome or Safari.', 'success');
+  }
+
+  function EmbeddedBrowserNotice() {
+    if (!embeddedBrowser) return null;
+    return (
+      <div className="embedded-browser-notice" role="note" aria-label={`${embeddedBrowser.name} browser notice`}>
+        <ExternalLink size={18} aria-hidden="true" />
+        <div>
+          <strong>Google sign-in needs Chrome or Safari</strong>
+          <p>{embeddedBrowser.instruction} You can also continue as a guest below.</p>
+          <button type="button" onClick={copyPageLink}>
+            <Copy size={14} aria-hidden="true" /> {linkCopied ? 'Link copied' : 'Copy page link'}
+          </button>
+        </div>
+      </div>
+    );
   }
 
   const [email, setEmail] = useState('');
@@ -558,7 +598,7 @@ function AuthForm({ mode, onSwitchMode, onForgotPassword, onAuthSuccess }) {
 
           <button type="submit" className={`btn-submit${loading ? ' loading' : ''}`}>
             <span className="btn-text">
-              Continue
+              Sign in
               <ArrowRight size={17} />
             </span>
             <span className="btn-spinner">
@@ -568,6 +608,8 @@ function AuthForm({ mode, onSwitchMode, onForgotPassword, onAuthSuccess }) {
 
           <div className="divider">or</div>
 
+          <EmbeddedBrowserNotice />
+
           <button type="button" className="btn-social" onClick={handleGoogleClick}>
             <span className="btn-social-label">
               <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true" >
@@ -576,7 +618,7 @@ function AuthForm({ mode, onSwitchMode, onForgotPassword, onAuthSuccess }) {
                 <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
                 <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
               </svg>
-              <span>Continue with Google</span>
+              <span>{embeddedBrowser ? 'Open in browser for Google' : 'Continue with Google'}</span>
             </span>
             <ArrowRight size={16} className="btn-social-arrow" />
           </button>
@@ -586,7 +628,7 @@ function AuthForm({ mode, onSwitchMode, onForgotPassword, onAuthSuccess }) {
             onClick={openGuestModal}
             disabled={guestLoading}
           >
-            Continue as Guest
+            Book as a guest
           </button>
           <div className="signup-row">
             New here?{' '}
@@ -600,14 +642,14 @@ function AuthForm({ mode, onSwitchMode, onForgotPassword, onAuthSuccess }) {
         <Modal
           open={guestModalOpen}
           onClose={() => !guestLoading && setGuestModalOpen(false)}
-          title="Continue as Guest"
+          title="Book as a guest"
           actions={
             <>
               <button type="button" className="cancel-btn" onClick={() => setGuestModalOpen(false)} disabled={guestLoading}>
                 Cancel
               </button>
               <button type="button" className="save-btn" onClick={handleGuestSubmit} disabled={guestLoading}>
-                {guestLoading ? 'Starting…' : 'Continue'}
+                {guestLoading ? 'Starting…' : 'Continue to booking'}
               </button>
             </>
           }
@@ -830,6 +872,8 @@ function AuthForm({ mode, onSwitchMode, onForgotPassword, onAuthSuccess }) {
 
         <div className="divider">or</div>
 
+        <EmbeddedBrowserNotice />
+
         <button type="button" className="btn-social" onClick={handleGoogleClick}>
           <span className="btn-social-label">
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
@@ -850,7 +894,7 @@ function AuthForm({ mode, onSwitchMode, onForgotPassword, onAuthSuccess }) {
                 fill="#EA4335"
               />
             </svg>
-            <span>Sign up with Google</span>
+            <span>{embeddedBrowser ? 'Open in browser for Google' : 'Sign up with Google'}</span>
           </span>
           <ArrowRight size={16} className="btn-social-arrow" />
         </button>

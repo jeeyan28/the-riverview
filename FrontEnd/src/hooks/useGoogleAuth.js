@@ -1,10 +1,14 @@
 import { useEffect, useRef, useCallback } from 'react';
+import { getEmbeddedBrowserInfo } from '../utils/embeddedBrowser';
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+
+export { getEmbeddedBrowserInfo } from '../utils/embeddedBrowser';
 
 export function useGoogleAuth(onCredential) {
   const clientRef = useRef(null);
   const onCredentialRef = useRef(onCredential);
+  const embeddedBrowser = getEmbeddedBrowserInfo();
   onCredentialRef.current = onCredential;
 
   useEffect(() => {
@@ -13,6 +17,7 @@ export function useGoogleAuth(onCredential) {
 
     function init() {
       if (cancelled) return;
+      if (embeddedBrowser) return;
       if (!window.google || !window.google.accounts?.oauth2) {
         retryTimer = setTimeout(init, 300);
         return;
@@ -34,7 +39,7 @@ export function useGoogleAuth(onCredential) {
       clearTimeout(retryTimer);
       clientRef.current = null;
     };
-  }, []);
+  }, [embeddedBrowser?.name]);
 
   const triggerSignIn = useCallback(() => {
     if (!clientRef.current) {
@@ -44,5 +49,5 @@ export function useGoogleAuth(onCredential) {
     return true;
   }, []);
 
-  return { triggerSignIn };
+  return { triggerSignIn, embeddedBrowser };
 }

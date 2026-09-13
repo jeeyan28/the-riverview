@@ -6,14 +6,12 @@ import Modal from '../../components/Modal';
 import DataTable from '../../components/DataTable';
 import Pagination from '../../components/Pagination';
 import ConfirmDialog from '../../components/ConfirmDialog';
-import DateRangePicker from '../../components/DateRangePicker';
 import { useConfirm } from '../../hooks/useConfirm';
 import { useAuth } from '../../context/AuthContext';
 import { monitorRoomsService, roomSessionsService } from '../../services/monitoring';
 import { bookingsService } from '../../services/bookings';
 import { businessDate } from '../../utils/businessDate';
 import { CORKAGE_FEE, calculateBookingPrice, variantRateLabel } from '../../utils/roomPricing';
-import { BarChart3, Download, Radio } from 'lucide-react';
 import {
   useRoomMonitorData,
   sessionEnd,
@@ -126,42 +124,6 @@ function Monitor() {
   const [dueBookings, setDueBookings] = useState([]);
   const [gridPage, setGridPage] = useState(1);
   const [gridPageSize, setGridPageSize] = useState(10);
-  const [workspaceTab, setWorkspaceTab] = useState('live');
-  const [reportFrom, setReportFrom] = useState(() => businessDate());
-  const [reportTo, setReportTo] = useState(() => businessDate());
-  const [monitorReport, setMonitorReport] = useState(null);
-  const [reportLoading, setReportLoading] = useState(false);
-  const [reportError, setReportError] = useState('');
-  const [reportExporting, setReportExporting] = useState(false);
-
-  async function loadMonitorReport() {
-    setReportLoading(true);
-    setReportError('');
-    try {
-      setMonitorReport(await roomSessionsService.report(reportFrom, reportTo));
-    } catch (err) {
-      setReportError(err.message || 'Could not load the session report.');
-    } finally {
-      setReportLoading(false);
-    }
-  }
-
-  useEffect(() => {
-    if (workspaceTab === 'report') loadMonitorReport();
-  }, [workspaceTab, reportFrom, reportTo]);
-
-  async function exportMonitorReport() {
-    setReportExporting(true);
-    setReportError('');
-    try {
-      await roomSessionsService.exportReport(reportFrom, reportTo);
-    } catch (err) {
-      setReportError(err.message || 'Could not export the session report.');
-    } finally {
-      setReportExporting(false);
-    }
-  }
-
   async function fetchDueBookings() {
     if (!canStartFromBooking) return;
     try {
@@ -452,26 +414,6 @@ function Monitor() {
 
   return (
     <div className="panel active" id="panel-monitor">
-      <div className="monitor-section-tabs" role="tablist" aria-label="Live monitor sections">
-        <button type="button" role="tab" aria-selected={workspaceTab === 'live'} className={workspaceTab === 'live' ? 'active' : ''} onClick={() => setWorkspaceTab('live')}><Radio size={17} aria-hidden="true" /><span>Live floor</span><small>Rooms and active guests</small></button>
-        <button type="button" role="tab" aria-selected={workspaceTab === 'report'} className={workspaceTab === 'report' ? 'active' : ''} onClick={() => setWorkspaceTab('report')}><BarChart3 size={17} aria-hidden="true" /><span>Session report</span><small>Played hours and payments</small></button>
-      </div>
-
-      {workspaceTab === 'report' && (
-        <MonitorReportPanel
-          report={monitorReport}
-          from={reportFrom}
-          to={reportTo}
-          loading={reportLoading}
-          error={reportError}
-          exporting={reportExporting}
-          onRangeChange={(nextFrom, nextTo) => { setReportFrom(nextFrom); setReportTo(nextTo); }}
-          onReload={loadMonitorReport}
-          onExport={exportMonitorReport}
-        />
-      )}
-
-      <div className="monitor-live-workspace" hidden={workspaceTab !== 'live'}>
       <div className="rm-toolbar-head">
         <div className="rm-page-head">
           <span className="live-badge"><span className="dot"></span>{refreshError ? 'Reconnecting' : loading ? 'Connecting' : 'Live'}</span>
@@ -851,8 +793,6 @@ function Monitor() {
         </>
       )}
 
-      </div>
-
       <SessionModal modal={modal} onClose={() => setModal(null)} onSubmit={handleModalSubmit} />
       <FinishSessionModal session={finishingSession ? sessions.find((session) => session._id === finishingSession._id) || finishingSession : null} disabled={!!refreshError} onClose={() => setFinishingSession(null)} onSubmit={finishSession} />
       <RoomDetailModal
@@ -885,75 +825,6 @@ function Monitor() {
 
       <ConfirmDialog {...confirmProps} />
     </div>
-  );
-}
-
-function MonitorReportPanel({ report, from, to, loading, error, exporting, onRangeChange, onReload, onExport }) {
-  return (
-    <section className="monitor-report" aria-labelledby="monitor-report-title">
-      <div className="monitor-report-head">
-        <div>
-          <h2 id="monitor-report-title">Played session report</h2>
-          <p>One row per live-monitor session, grouped by its start date and exact room type.</p>
-        </div>
-        <button type="button" className="save-btn" onClick={onExport} disabled={loading || exporting}>
-          <Download size={16} aria-hidden="true" />{exporting ? 'Generating…' : 'Export Excel'}
-        </button>
-      </div>
-
-      <div className="monitor-report-filters">
-        <DateRangePicker from={from} to={to} onChange={onRangeChange} />
-        <button type="button" className="btn-cancel" onClick={onReload} disabled={loading}>{loading ? 'Loading…' : 'Refresh'}</button>
-      </div>
-
-      {error && <div className="finance-error" role="alert">{error}</div>}
-
-      <div className="monitor-report-summary" aria-label="Session totals">
-        <div><span>Played sessions</span><strong>{loading && !report ? '—' : report?.summary?.sessions ?? 0}</strong><small>{report?.summary?.hours ?? 0} occupied hours</small></div>
-        <div><span>Hourly charges</span><strong>{money(report?.summary?.charged)}</strong><small>Room and facility time</small></div>
-        <div><span>Collected</span><strong>{money(report?.summary?.collected)}</strong><small>{report?.summary?.paid ?? 0} fully paid</small></div>
-        <div className={(report?.summary?.outstanding || 0) > 0 ? 'has-balance' : ''}><span>Outstanding</span><strong>{money(report?.summary?.outstanding)}</strong><small>{report?.summary?.partial ?? 0} partial · {report?.summary?.unpaid ?? 0} unpaid</small></div>
-      </div>
-
-      <div className="monitor-report-layout">
-        <div className="card card-flush monitor-report-table-card">
-          <div className="monitor-report-card-head"><div><h3>Session activity</h3><p>Time in, scheduled time out, rate, charge, and payment balance.</p></div><span>{report?.rows?.length ?? 0} rows</span></div>
-          <div className="admin-table-scroll" tabIndex={0} role="region" aria-label="Live monitor session report">
-            <table className="tbl monitor-report-table">
-              <thead><tr><th>Date / time</th><th>Facility / room</th><th>Guest</th><th>Source</th><th>Hours</th><th>Rate</th><th>Charge</th><th>Paid</th><th>Balance</th><th>Payment</th></tr></thead>
-              <tbody>
-                {loading && !report ? <tr><td colSpan="10" className="finance-empty">Loading played sessions…</td></tr> : report?.rows?.length ? report.rows.map((row) => (
-                  <tr key={row.id}>
-                    <td><strong>{row.date}</strong><div className="finance-meta">{row.timeIn} – {row.timeOut}</div></td>
-                    <td>{row.facilityName}<div className="finance-meta">{row.roomType}{row.unitNumber ? ` · Unit ${row.unitNumber}` : ''}</div></td>
-                    <td>{row.guestName}</td>
-                    <td>{row.source === 'booking' ? 'Reservation' : 'Walk-in'}</td>
-                    <td className="finance-value">{row.duration}h</td>
-                    <td>{row.rateLabel}</td>
-                    <td className="finance-value">{money(row.amount)}</td>
-                    <td className="finance-value">{money(row.collected)}</td>
-                    <td className="finance-value">{money(row.balance)}</td>
-                    <td><span className={`monitor-payment-pill ${String(row.paymentStatus).toLowerCase()}`}>{row.paymentStatus}</span><div className="finance-meta">{row.paymentTiming === 'After' ? 'Pay after play' : 'Collected before play'}</div></td>
-                  </tr>
-                )) : <tr><td colSpan="10" className="finance-empty">No played sessions for these service dates.</td></tr>}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <aside className="card monitor-room-totals">
-          <div className="monitor-report-card-head"><div><h3>By room type</h3><p>Revenue stays tied to its hourly room rate.</p></div></div>
-          <div className="monitor-room-total-list">
-            {report?.byRoomType?.length ? report.byRoomType.map((group) => (
-              <div key={`${group.facilityName}-${group.roomType}`}>
-                <span><strong>{group.roomType}</strong><small>{group.facilityName} · {group.sessions} session{group.sessions === 1 ? '' : 's'} · {group.hours}h</small></span>
-                <span><strong>{money(group.collected)}</strong><small>{money(group.outstanding)} due</small></span>
-              </div>
-            )) : <p className="finance-empty">Room totals appear after a session is recorded.</p>}
-          </div>
-        </aside>
-      </div>
-    </section>
   );
 }
 

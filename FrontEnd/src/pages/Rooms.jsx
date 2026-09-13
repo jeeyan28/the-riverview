@@ -3,7 +3,6 @@ import { CalendarCheck, Clock3, CreditCard, Search } from 'lucide-react';
 import BookingModal from '../components/BookingModal';
 import FacilityBookingCard from '../components/FacilityBookingCard';
 import FacilityCardSkeleton from '../components/FacilityCardSkeleton';
-import RoomDetailsModal from '../components/RoomDetailsModal';
 import Toast from '../components/Toast';
 import { useSiteSettings } from '../hooks/useSiteSettings';
 import { useToast } from '../hooks/useToast';
@@ -28,7 +27,6 @@ function Rooms() {
   const [loadError, setLoadError] = useState(false);
   const [filter, setFilter] = useState('All');
   const [bookingRoom, setBookingRoom] = useState(null);
-  const [detailRoom, setDetailRoom] = useState(null);
 
   async function loadRooms() {
     setLoading(true);
@@ -138,12 +136,10 @@ function Rooms() {
           )}
 
           {!loading && !loadError && visibleRooms.map((room) => (
-            <FacilityBookingCard key={room._id} room={room} onSelect={openBooking} onDetails={setDetailRoom} />
+            <FacilityBookingCard key={room._id} room={room} onSelect={openBooking} />
           ))}
         </div>
       </section>
-
-      <RoomDetailsModal room={detailRoom} onClose={() => setDetailRoom(null)} onReserve={(room) => { setDetailRoom(null); openBooking(room); }} />
 
       <BookingModal
         room={bookingRoom}

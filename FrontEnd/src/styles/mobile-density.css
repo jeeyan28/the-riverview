@@ -1,0 +1,571 @@
+/* Final responsive density layer.
+   Touch targets stay at least 44px while typography, spacing and cards use a
+   compact app scale. 901px and wider deliberately keep the desktop shell so
+   Chrome's mobile "Desktop site" mode matches the real desktop layout. */
+
+/* Guest account conversion is a short task, so it reads as one compact panel. */
+.claim-modal-scope .claim-account-modal {
+  width: min(100%, 420px);
+  padding: 22px;
+  border-radius: 20px;
+}
+
+.claim-modal-scope .claim-account-heading {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr);
+  align-items: start;
+  gap: 12px;
+}
+
+.claim-modal-scope .claim-account-mark {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  color: var(--accent);
+  border: 1px solid rgba(25, 216, 195, .22);
+  border-radius: 13px;
+  background: rgba(25, 216, 195, .1);
+}
+
+.claim-modal-scope .claim-account-heading .login-card-header {
+  margin: 0;
+  padding: 0 28px 0 0;
+}
+
+.claim-modal-scope .claim-account-kicker {
+  display: block;
+  margin: 1px 0 4px;
+  color: var(--accent);
+  font-size: .62rem;
+  font-weight: 800;
+  letter-spacing: .12em;
+}
+
+.claim-modal-scope .claim-account-heading h2 {
+  margin: 0 0 3px;
+  font-size: 1.2rem;
+  line-height: 1.2;
+}
+
+.claim-modal-scope .claim-account-heading p {
+  margin: 0;
+  font-size: .78rem;
+  line-height: 1.45;
+}
+
+.claim-modal-scope .claim-account-note {
+  margin: 13px 0 11px;
+  padding: 9px 10px;
+  color: color-mix(in srgb, var(--muted) 90%, white);
+  border-left: 2px solid var(--accent);
+  border-radius: 0 9px 9px 0;
+  background: rgba(25, 216, 195, .065);
+  font-size: .72rem;
+  line-height: 1.45;
+}
+
+.claim-modal-scope .profile-tabs {
+  gap: 3px;
+  margin: 0 0 12px;
+  padding: 3px;
+  border: 1px solid var(--ovl-08);
+  border-radius: 12px;
+  background: var(--ovl-04);
+}
+
+.claim-modal-scope .profile-tab {
+  min-height: 38px;
+  padding: 6px 9px;
+  border: 0;
+  border-radius: 9px;
+  font-size: .75rem;
+}
+
+.claim-modal-scope .profile-tab.active {
+  background: var(--ovl-08);
+  box-shadow: inset 0 0 0 1px rgba(25, 216, 195, .25);
+}
+
+.claim-modal-scope .login-form { gap: 11px; }
+.claim-modal-scope .field { gap: 5px; }
+.claim-modal-scope .field label { font-size: .67rem; }
+.claim-modal-scope .field input { height: 44px; border-radius: 11px; }
+.claim-modal-scope .password-requirements { margin-top: 5px; gap: 2px 8px; }
+.claim-modal-scope .password-requirements li { font-size: .66rem; line-height: 1.3; }
+
+.claim-modal-scope .forgot-modal-actions {
+  display: grid;
+  grid-template-columns: minmax(92px, .75fr) minmax(0, 1.25fr);
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.claim-modal-scope .forgot-modal-actions :is(.btn-cancel, .btn-submit, .btn-social) {
+  width: 100%;
+  min-height: 44px;
+  height: 44px;
+  margin: 0;
+  border-radius: 11px;
+  font-size: .78rem;
+  white-space: normal;
+}
+
+.claim-modal-scope .claim-google-actions {
+  grid-template-columns: minmax(0, 1.45fr) minmax(84px, .55fr);
+}
+
+.claim-modal-scope .claim-google-actions .btn-social { grid-column: 1; grid-row: 1; }
+.claim-modal-scope .claim-google-actions .btn-cancel { grid-column: 2; grid-row: 1; }
+.claim-modal-scope .otp-input-group .otp-input { height: 44px; border-radius: 10px; font-size: 1.08rem; }
+.claim-modal-scope .signup-row { margin-top: 10px; font-size: .75rem; }
+
+@media (min-width: 641px) and (max-width: 900px) {
+  .public-site,
+  #app { --app-nav-height: 64px; }
+
+  .customer-app-nav,
+  .admin-app-nav {
+    bottom: max(8px, env(safe-area-inset-bottom));
+    min-height: var(--app-nav-height);
+    padding: 5px;
+  }
+
+  .customer-app-nav .app-nav-item,
+  .admin-app-nav .app-nav-item { min-height: 52px; font-size: .64rem; }
+
+  .public-site { --section-space: 44px; --page-gutter: 24px; }
+  .public-site :is(.how-it-works, .why-book, .spaces, #about) { padding-block: 44px; }
+  .public-site .hero h1 { font-size: clamp(2.7rem, 7vw, 4rem); }
+  .public-site :is(.steps-grid, .why-book-list, .about-right) { gap: 10px; }
+
+  #app .content { padding: 14px 14px calc(var(--app-nav-height) + 26px + env(safe-area-inset-bottom)); gap: 14px; }
+  #app .card { padding: 14px; }
+  #app .mc { min-height: 88px; padding: 11px; }
+}
+
+@media (max-width: 900px) {
+  /* More admin destinations scroll like a native tab rail instead of shrinking. */
+  .admin-app-nav {
+    grid-auto-columns: 72px;
+    justify-content: start;
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-inline: contain;
+    scroll-snap-type: inline proximity;
+    scrollbar-width: none;
+  }
+
+  .admin-app-nav::-webkit-scrollbar { display: none; }
+  .admin-app-nav .app-nav-item { scroll-snap-align: center; }
+
+  #app[data-theme='light'] .admin-app-nav {
+    border-color: rgba(22, 43, 56, .12);
+    background: rgba(255, 255, 255, .94);
+    box-shadow: 0 12px 32px rgba(22, 43, 56, .14);
+  }
+
+  #app[data-theme='light'] .admin-app-nav .app-nav-item { color: #667281; }
+  #app[data-theme='light'] .admin-app-nav .app-nav-item.active {
+    color: #087f6c;
+    background: rgba(0, 163, 137, .11);
+  }
+
+  html[data-theme='light'] .customer-app-nav {
+    border-color: rgba(22, 43, 56, .12);
+    background: rgba(255, 255, 255, .94);
+    box-shadow: 0 12px 32px rgba(22, 43, 56, .14);
+  }
+}
+
+@media (max-width: 640px) {
+  html { font-size: 15px; }
+
+  .public-site,
+  #app {
+    --app-nav-height: 60px;
+    --radius-lg: 14px;
+    --radius-md: 10px;
+  }
+
+  .customer-app-nav,
+  .admin-app-nav {
+    inset-inline: max(6px, env(safe-area-inset-left)) max(6px, env(safe-area-inset-right));
+    bottom: max(6px, env(safe-area-inset-bottom));
+    width: calc(100% - 12px);
+    min-height: var(--app-nav-height);
+    padding: 3px;
+    gap: 2px;
+    border-radius: 14px;
+    box-shadow: 0 10px 30px rgba(6, 12, 24, .2);
+  }
+
+  .customer-app-nav { grid-auto-columns: minmax(0, 1fr); }
+  .admin-app-nav { grid-auto-columns: 66px; }
+
+  .customer-app-nav .app-nav-item,
+  .admin-app-nav .app-nav-item {
+    min-height: 52px;
+    gap: 2px;
+    padding: 3px 2px;
+    border-radius: 10px;
+    font-size: .58rem;
+  }
+
+  .customer-app-nav .app-nav-item svg,
+  .admin-app-nav .app-nav-item svg { width: 18px; height: 18px; }
+
+  .customer-app-nav .app-nav-item::before,
+  .admin-app-nav .app-nav-item::before { inset-inline: 28%; }
+
+  .public-site {
+    --header-h: 56px;
+    --page-gutter: max(14px, env(safe-area-inset-left));
+    --section-space: 30px;
+  }
+
+  .public-site #site-header {
+    height: var(--header-h);
+    min-height: var(--header-h);
+    padding-inline: max(12px, env(safe-area-inset-left)) max(12px, env(safe-area-inset-right));
+  }
+
+  .public-site #site-header .logo { gap: 7px; }
+  .public-site #site-header .logo img { width: 32px; height: 32px; }
+  .public-site #site-header .logo-name { font-size: .88rem; }
+  .public-site #site-header :is(.hamburger, .announcements-bell-btn) { width: 44px; height: 44px; border-radius: 10px; }
+
+  .public-site .hero-inner {
+    min-height: min(650px, calc(100svh - var(--app-nav-height)));
+    padding: calc(var(--header-h) + var(--guest-banner-h) + 22px) 14px 24px;
+  }
+
+  .public-site .hero-content { max-width: 32rem; }
+  .public-site .hero .section-label,
+  .public-site .hero-eyebrow { margin-bottom: 9px; font-size: .59rem; }
+  .public-site .hero h1 { font-size: clamp(1.95rem, 9vw, 2.35rem); line-height: 1.01; }
+  .public-site .hero p { max-width: 31rem; margin-top: 12px; font-size: .79rem; line-height: 1.55; }
+  .public-site .hero-actions { gap: 8px; margin-top: 17px; }
+  .public-site .hero-actions a { min-height: 44px; padding-inline: 13px; border-radius: 10px; font-size: .72rem; }
+
+  .public-site :is(.how-it-works, .why-book, .spaces, #about) { padding: 30px 14px; }
+  .public-site .section-label { margin-bottom: 7px; font-size: .59rem; letter-spacing: .13em; }
+  .public-site :is(.how-it-works-inner, .spaces-header, .about-left) h2,
+  .public-site .why-book-intro h2 { font-size: clamp(1.45rem, 7vw, 1.68rem); line-height: 1.1; }
+  .public-site :is(.how-it-works-inner, .spaces-header, .why-book-intro) > p { font-size: .74rem; line-height: 1.5; }
+
+  .public-site .steps-grid,
+  .public-site .why-book-list,
+  .public-site .about-right { gap: 7px; }
+
+  .public-site .step-card,
+  .public-site .why-book-card,
+  .public-site .why-book-item {
+    min-height: 62px;
+    padding: 8px 9px;
+    gap: 2px 9px;
+    border-radius: 12px;
+  }
+
+  .public-site .step-card .step-num,
+  .public-site .why-book-card-icon,
+  .public-site .why-book-item-icon { width: 30px; height: 30px; }
+  .public-site :is(.step-card, .why-book-card, .why-book-item) :is(h3, h4) { font-size: .78rem; line-height: 1.25; }
+  .public-site :is(.step-card, .why-book-card, .why-book-item) p { font-size: .66rem; line-height: 1.36; }
+
+  .public-site .rooms-section { padding: 30px 14px; }
+  .public-site .rooms-grid { gap: 8px; }
+  .public-site .room-card {
+    display: grid;
+    grid-template-columns: 108px minmax(0, 1fr);
+    min-height: 178px;
+    overflow: hidden;
+    border-radius: 12px;
+  }
+  .public-site .room-card-img { width: 108px; min-height: 178px; height: 100%; }
+  .public-site .room-card-body { min-width: 0; padding: 9px; }
+  .public-site .room-card-body h3 { font-size: .9rem; }
+  .public-site .room-card-desc { margin-block: 5px 7px; font-size: .65rem; line-height: 1.4; }
+  .public-site .room-card-tags { gap: 4px; }
+  .public-site .room-card-tags span { padding: 2px 5px; font-size: .57rem; }
+  .public-site .room-card-actions { gap: 5px; }
+  .public-site .room-card-actions :is(a, button) { min-height: 44px; padding-inline: 7px; font-size: .65rem; }
+
+  .public-site .spaces-rows { gap: 22px; }
+  .public-site .space-row { gap: 9px; }
+  .public-site .space-text h3 { font-size: 1.16rem; }
+  .public-site .space-text p { font-size: .72rem; line-height: 1.5; }
+  .public-site .space-text :is(a, button) { min-height: 44px; font-size: .7rem; }
+  .public-site .facility-motion { min-height: 230px; margin-inline: auto; border-radius: 50%; }
+  .public-site .facility-motion-stage { transform: scale(.7); }
+
+  .public-site .about-inner { gap: 15px; }
+  .public-site .about-left p { font-size: .74rem; line-height: 1.5; }
+  .public-site .about-card { min-height: 88px; padding: 9px; border-radius: 12px; }
+  .public-site .about-card-icon { width: 30px; height: 30px; margin-bottom: 5px; }
+  .public-site .about-card h3 { font-size: .76rem; }
+  .public-site .about-card p { font-size: .63rem; line-height: 1.35; }
+
+  .public-site > footer {
+    padding: 18px 14px calc(var(--app-nav-height) + 12px + env(safe-area-inset-bottom));
+  }
+  .public-site .footer-top {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px 14px;
+    margin-bottom: 11px;
+    padding-bottom: 12px;
+  }
+  .public-site .footer-brand { grid-column: 1 / -1; }
+  .public-site .footer-brand .logo-name { margin-bottom: 6px; font-size: 1rem; }
+  .public-site .footer-brand > p,
+  .public-site .footer-cta > p { display: none; }
+  .public-site .footer-visit-facts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px 10px;
+  }
+  .public-site .footer-visit-facts span {
+    min-width: 0;
+    align-items: flex-start;
+    gap: 5px;
+    font-size: .63rem;
+    line-height: 1.35;
+  }
+  .public-site .footer-visit-facts svg { width: 13px; height: 13px; flex: 0 0 13px; }
+  .public-site .footer-col {
+    display: grid;
+    min-width: 0;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 2px 5px;
+  }
+  .public-site .footer-col h4 {
+    grid-column: 1 / -1;
+    margin-bottom: 2px;
+    font-size: .61rem;
+  }
+  .public-site .footer-col > a:not(.footer-reserve-link) {
+    width: 100%;
+    min-height: 44px;
+    margin: 0;
+    justify-content: flex-start;
+    font-size: .64rem;
+    line-height: 1.25;
+  }
+  .public-site .footer-cta {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+  }
+  .public-site .footer-cta h4 { grid-column: 1 / -1; }
+  .public-site .footer-cta > a:not(.footer-reserve-link) :last-child { display: none; }
+  .public-site .footer-bottom {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 4px 10px;
+    padding-top: 0;
+    text-align: left;
+    font-size: .63rem;
+  }
+  .public-site .footer-bottom-left { display: block; min-width: 0; }
+  .public-site .footer-bottom-left > span:last-child { display: none; }
+  .public-site .footer-legal-links { justify-content: flex-end; gap: 10px; }
+  .public-site .footer-legal-links a { min-height: 36px; display: inline-flex; align-items: center; font-size: .63rem; }
+  .public-site .footer-appearance { grid-column: 1; gap: 6px; min-height: 40px; }
+  .public-site .footer-appearance .theme-toggle { transform: scale(.8); transform-origin: center left; }
+  .public-site .footer-back-top {
+    grid-column: 2;
+    grid-row: 2;
+    min-height: 40px;
+    align-self: center;
+    font-size: .63rem;
+  }
+
+  .public-site #announcements-panel-mobile {
+    top: calc(var(--header-h) + var(--guest-banner-h) + 8px);
+    right: 10px;
+    width: min(286px, calc(100vw - 20px));
+    max-height: min(360px, calc(100dvh - var(--header-h) - var(--guest-banner-h) - var(--app-nav-height) - 18px));
+    border-radius: 12px;
+  }
+  .public-site #announcements-panel-mobile .announcements-panel-header { gap: 7px; padding: 8px 9px; }
+  .public-site #announcements-panel-mobile .announcements-panel-title { font-size: .76rem; }
+  .public-site #announcements-panel-mobile .announcements-panel-subtitle { font-size: .57rem; }
+  .public-site #announcements-panel-mobile .announcements-mark-all {
+    width: 44px;
+    min-width: 44px;
+    min-height: 44px;
+    justify-content: center;
+    margin: -5px;
+    padding: 0;
+    border-color: transparent;
+    background: transparent;
+  }
+  .public-site #announcements-panel-mobile .announcements-mark-all span { display: none; }
+  .public-site #announcements-panel-mobile .announcements-list { max-height: min(260px, 42dvh); padding: 3px; }
+  .public-site #announcements-panel-mobile .announcement-item { gap: 6px; padding: 7px 5px 7px 8px; border-radius: 8px; }
+  .public-site #announcements-panel-mobile .announcement-item-icon { width: 24px; height: 24px; }
+  .public-site #announcements-panel-mobile .announcement-item-icon svg { width: 13px; height: 13px; }
+  .public-site #announcements-panel-mobile .announcement-item-title { font-size: .69rem; }
+  .public-site #announcements-panel-mobile .announcement-item-time { font-size: .54rem; }
+  .public-site #announcements-panel-mobile .announcement-item-message { font-size: .62rem; line-height: 1.35; }
+  .public-site #announcements-panel-mobile .announcement-item-close { width: 44px; height: 44px; margin: -5px; }
+  .public-site #announcements-panel-mobile .announcements-empty { padding: 17px 12px; }
+  .public-site #announcements-panel-mobile .announcements-empty-icon { width: 32px; height: 32px; }
+  .public-site #announcements-panel-mobile .announcements-empty p { font-size: .65rem; }
+  .public-site #announcements-bell-btn-mobile > svg { width: 16px; height: 16px; }
+  .public-site #announcements-bell-badge-mobile { min-width: 14px; height: 14px; padding-inline: 3px; font-size: .52rem; }
+
+  .public-site .toast,
+  #app .toast {
+    width: auto;
+    max-width: min(286px, calc(100vw - 20px));
+    gap: 6px;
+    padding: 8px 9px;
+    border-radius: 10px;
+    font-size: .67rem;
+  }
+
+  /* Auth screens keep iOS-safe 16px inputs while reducing visual bulk. */
+  .login-page .login-header { height: 56px; padding-inline: max(12px, env(safe-area-inset-left)) max(12px, env(safe-area-inset-right)); }
+  .login-page .login-brand { gap: 8px; }
+  .login-page .login-brand-title { font-size: .88rem; }
+  .login-page .login-layout { padding-top: calc(64px + env(safe-area-inset-top)); }
+  .login-page .login-layout > .login-card {
+    min-height: calc(100dvh - 64px - env(safe-area-inset-top));
+    padding: 18px max(16px, env(safe-area-inset-right)) calc(22px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+    border-radius: 18px 18px 0 0;
+  }
+  .login-page .login-avatar { width: 34px; height: 34px; margin-bottom: 10px; }
+  .login-page .login-layout > .login-card .login-card-header { margin-bottom: 14px; }
+  .login-page .login-card-header h2 { font-size: 1.22rem; }
+  .login-page .login-card-header p { font-size: .74rem; }
+  .login-page :is(.login-form, .rf-scope .signup-form) { gap: 11px; }
+  .login-page .field { gap: 5px; }
+  .login-page .field label { font-size: .66rem; }
+  .login-page .field input,
+  .login-page .rf-scope .field input:not(.otp-input) { height: 44px; min-height: 44px; border-radius: 11px; font-size: 16px; }
+  .login-page :is(.btn-submit, .btn-social, .btn-guest),
+  .login-page .rf-scope :is(.btn-submit, .btn-social) { height: 44px; min-height: 44px; border-radius: 11px; font-size: .76rem; }
+  .login-page .divider,
+  .login-page :is(.signup-row, .login-row) { font-size: .72rem; }
+  .login-page .password-requirements li,
+  .login-page .rf-scope .password-requirements li { font-size: .65rem; }
+
+  /* Booking and profile behave as compact bottom sheets with clear hierarchy. */
+  .bk-overlay,
+  .pf-overlay { align-items: flex-end; padding: 8px 8px 0; }
+  .bk-modal,
+  .bk-modal.bk-modal--compact,
+  .pf-modal {
+    width: 100%;
+    max-width: none;
+    max-height: calc(100dvh - 8px);
+    border: 1px solid var(--border);
+    border-bottom: 0;
+    border-radius: 18px 18px 0 0;
+  }
+  .bk-modal,
+  .bk-modal.bk-modal--compact { height: calc(100dvh - 8px); }
+  .pf-modal { height: auto; padding: 13px; }
+  .bk-header { padding: 11px 56px 9px 12px; gap: 9px; }
+  .bk-header h2 { font-size: .98rem; }
+  .bk-room-icon { width: 34px; height: 34px; border-radius: 10px; }
+  .bk-close { top: calc(7px + env(safe-area-inset-top)); right: 8px; }
+  .bk-stepper { padding: 0 9px 9px; gap: 2px; }
+  .bk-step-dot { min-height: 45px; gap: 3px; }
+  .bk-step-dot-num { width: 25px; height: 25px; font-size: .68rem; }
+  .bk-step-dot-label { font-size: .57rem; }
+  .bk-body { padding: 0 11px calc(14px + env(safe-area-inset-bottom)); }
+  .bk-summary-toggle,
+  .bk-summary-panel-mobile,
+  .bk-lock-banner { margin: 0 11px 9px; padding: 9px; }
+  .bk-step h3 { margin-bottom: 8px; font-size: .9rem; }
+  .bk-step p,
+  .bk-info-bar { font-size: .69rem; }
+  .bk-room-option-collapsed { gap: 8px; padding: 9px; }
+  .bk-room-option-name { font-size: .8rem; }
+  .bk-room-option-meta,
+  .bk-room-option-amenity { font-size: .63rem; }
+  .bk-field { gap: 5px; margin-bottom: 9px; }
+  .bk-field label { font-size: .64rem; }
+  .bk-field-input,
+  .pf-field input { min-height: 44px; font-size: 16px; }
+  .bk-detail-actions,
+  .bk-success-actions-row { flex-direction: row; gap: 7px; }
+  .bk-detail-actions > button,
+  .bk-success-actions-row > button { width: auto; min-height: 44px; flex: 1 1 0; font-size: .72rem; }
+  .pf-modal-head { margin-bottom: 10px; }
+  .pf-modal-title { font-size: 1rem; }
+  .pf-modal-subtitle { font-size: .67rem; }
+  .pf-avatar-col { gap: 10px; }
+  .pf-tabs { margin-bottom: 12px; }
+  .pf-tab { min-height: 44px; padding: 7px; font-size: .7rem; }
+  .pf-profile-body { gap: 12px; }
+  .pf-field { margin-bottom: 8px; }
+  .pf-booking-row { gap: 7px; padding: 9px; }
+  .pf-booking-title { font-size: .76rem; }
+
+  /* The final admin layer keeps information dense without reducing tap size. */
+  #app .topbar {
+    min-height: 54px;
+    padding: max(5px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) 5px max(8px, env(safe-area-inset-left));
+    border-bottom-color: color-mix(in srgb, var(--border) 75%, transparent);
+  }
+  #app .admin-page-eyebrow { font-size: .53rem; letter-spacing: .09em; }
+  #app .page-title { font-size: .88rem; }
+  #app .topbar-right { gap: 2px; }
+  #app .topbar-right :is(button, a) { min-height: 44px; }
+  #app .theme-toggle { width: 54px; min-width: 54px; height: 44px; }
+  #app .theme-toggle[aria-checked='true'] .theme-toggle-thumb { transform: translateX(20px); }
+  #app .content { padding: 8px 8px calc(var(--app-nav-height) + 18px + env(safe-area-inset-bottom)); gap: 9px; }
+  #app .panel.active { gap: 9px; }
+  #app .card { padding: 10px; border-radius: 11px; }
+  #app .card-head { margin-bottom: 8px; }
+  #app .card-head :is(h2, h3) { font-size: .86rem; }
+  #app .card-head p { font-size: .64rem; line-height: 1.4; }
+  #app :is(.metric-row, .rm-stats-bar) { gap: 5px; }
+  #app .mc { min-height: 72px; padding: 8px; border-radius: 10px; }
+  #app .mc-label { font-size: .56rem; line-height: 1.2; }
+  #app .mc-val { font-size: 1rem; }
+  #app .mc-sub { font-size: .57rem; line-height: 1.25; }
+  #app :is(.settings-intro, .login-history-intro, .rm-toolbar-head) { padding: 9px 10px; }
+  #app :is(.settings-intro, .login-history-intro, .rm-toolbar-head) h2 { font-size: .86rem; }
+  #app :is(.settings-intro, .login-history-intro, .rm-toolbar-head) p { font-size: .62rem; line-height: 1.35; }
+  #app :is(.bk-toolbar-card, .um-toolbar-card, .fac-toolbar-card) { padding: 8px; }
+  #app :is(.bk-filters, .um-filters, .rep-log-filters, .users-filters, .rm-toolbar-actions, .monitor-report-filters) { gap: 6px; }
+  #app :is(.bk-filters, .um-filters, .rep-log-filters, .users-filters, .rm-toolbar-actions, .monitor-report-filters) > :is(button, select, input, a),
+  #app :is(.save-btn, .btn-teal, .btn-confirm, .btn-cancel) { min-height: 44px; font-size: .7rem; }
+  #app :is(.set-tab, .monitor-section-tabs button, .login-history-tabs button) { min-height: 44px; padding: 6px 7px; }
+  #app :is(.set-tab, .monitor-section-tabs button, .login-history-tabs button) strong,
+  #app :is(.set-tab, .monitor-section-tabs button, .login-history-tabs button) { font-size: .63rem; }
+  #app .fac-toolbar { padding: 7px; gap: 6px; }
+  #app .fac-chip { min-height: 36px; padding-inline: 9px; font-size: .65rem; }
+  #app .rm { min-height: 120px; padding: 10px; }
+  #app .rm-stat { min-height: 58px; padding: 7px 8px; }
+  #app .rm-stat-value { font-size: .94rem; }
+  #app :is(.rm-status-pill, .pay-timing-tag) { padding: 2px 6px; font-size: .59rem; }
+  #app :is(.modal-bg, .modal-backdrop) { padding: 8px; align-items: flex-end; }
+  #app .modal-box,
+  #app .modal-box.modal-lg,
+  #app .modal-box.modal-xl,
+  #app .modal-box.modal-2xl {
+    width: 100%;
+    max-height: calc(100dvh - 8px);
+    padding: 13px;
+    border-radius: 18px 18px 0 0;
+  }
+  #app .modal-heading { margin-bottom: 9px; }
+  #app .modal-title { font-size: .94rem; }
+  #app .modal-subtitle { font-size: .64rem; line-height: 1.35; }
+  #app .modal-body { font-size: .72rem; }
+  #app .form-group { margin-bottom: 8px; }
+  #app .form-group label { margin-bottom: 4px; font-size: .62rem; }
+  #app .form-control,
+  #app .form-select { min-height: 44px; font-size: 16px; }
+  #app .modal-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin-top: 10px; padding-top: 9px; }
+  #app .modal-actions > * { min-height: 44px; font-size: .7rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .customer-app-nav,
+  .admin-app-nav { scroll-behavior: auto; }
+}

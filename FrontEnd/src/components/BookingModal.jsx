@@ -27,8 +27,9 @@ import {
 } from '../utils/rooms';
 import { CORKAGE_FEE, calculateBookingPrice, variantRateLabel } from '../utils/roomPricing';
 import { API_BASE_URL } from '../services/api';
-import { X } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import ModalPortal from './ModalPortal';
+import { buildLoginPath, buildRoomReservationPath } from '../utils/auth';
 
 const PAYMONGO_API_BASE = import.meta.env.VITE_PAYMONGO_API_BASE || 'https://api.paymongo.com/v1';
 
@@ -42,10 +43,9 @@ const STEPS = [
   { key: 'price', label: 'Room' },
   { key: 'schedule', label: 'Date & Time' },
   { key: 'details', label: 'Details' },
-  { key: 'review', label: 'Review' },
-  { key: 'payment', label: 'Payment' },
+  { key: 'payment', label: 'Down payment' },
 ];
-const STEP_INDEX = { price: 1, schedule: 2, details: 3, review: 4, payment: 5 };
+const STEP_INDEX = { price: 1, schedule: 2, details: 3, payment: 4 };
 
 const PAYMENT_METHODS = [
   { key: 'gcash', label: 'GCash', icon: 'fa-solid fa-wallet' },
@@ -54,20 +54,20 @@ const PAYMENT_METHODS = [
   { key: 'card', label: 'Credit / Debit Card', icon: 'fa-solid fa-credit-card' },
 ];
 
-function BookingStepper({ step, onStepClick }) {
-  const activeIndex = STEP_INDEX[step] || 1;
-  const activeLabel = STEPS[activeIndex - 1]?.label || STEPS[0].label;
+function BookingStepper({ step, onStepClick, steps = STEPS }) {
+  const activeIndex = Math.max(0, steps.findIndex((item) => item.key === step)) + 1;
+  const activeLabel = steps[activeIndex - 1]?.label || steps[0]?.label || '';
   return (
     <div className="bk-stepper">
       <div className="bk-stepper-status" aria-live="polite">
-        <span>Step {activeIndex} of {STEPS.length}</span>
+        <span>Step {activeIndex} of {steps.length}</span>
         <strong>{activeLabel}</strong>
       </div>
       <div className="bk-stepper-progress" aria-hidden="true">
-        <span style={{ width: `${(activeIndex / STEPS.length) * 100}%` }} />
+        <span style={{ width: `${(activeIndex / steps.length) * 100}%` }} />
       </div>
       <div className="bk-stepper-steps">
-        {STEPS.map((s, i) => {
+        {steps.map((s, i) => {
           const num = i + 1;
           const state = num < activeIndex ? 'done' : num === activeIndex ? 'active' : 'upcoming';
           const clickable = state === 'done' && typeof onStepClick === 'function';
@@ -100,7 +100,7 @@ function BookingSummaryContents({
   room, selectedVariant, selectedDate, selectedHour, selectedDuration,
   guestName, guestContact, guestCount, guestNote, hasCorkage,
   selectedMethod, subtotal, downPayment, remainingBalance,
-  step, onContinue, continueDisabled,
+  step,
 }) {
   if (!room) return null;
 
@@ -173,10 +173,6 @@ function BookingSummaryContents({
             </div>
             <p className="bk-summary-panel-total-sub">({estimatedHours} hr)</p>
           </div>
-
-          <button className="bk-confirm bk-continue" disabled={continueDisabled} onClick={onContinue}>
-            Continue <i className="fa-solid fa-arrow-right"></i>
-          </button>
         </>
       ) : (
         <>
@@ -267,7 +263,7 @@ function BookingSummaryContents({
                   <span>₱{subtotal.toLocaleString()}</span>
                 </div>
                 <div className="bk-summary-panel-cost-row bk-summary-panel-cost-row--accent">
-                  <span>Pay online now</span>
+                  <span>Down payment</span>
                   <span>₱{downPayment.toLocaleString()}</span>
                 </div>
                 <div className="bk-summary-panel-cost-row bk-summary-panel-cost-row--total">
@@ -404,7 +400,7 @@ function BookingSuccess({ booking, room, selectedVariant, onDone, onViewBooking 
   );
 }
 
-function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, closeHour, settings }) {
+function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, closeHour, settings, initialVariantLabel = '' }) {
   const open = !!room || !!returnInfo;
   const { user: authUser, revalidate, logout } = useAuth();
 
@@ -483,11 +479,17 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
   useEffect(() => {
     if (!room) return;
 
-    setStep('price');
+    const roomOptions = priceOptionsFor(room);
+    const initialVariant = initialVariantLabel
+      ? roomOptions.find((option) => option.label === initialVariantLabel) || null
+      : roomOptions.length === 1
+        ? roomOptions[0]
+        : null;
+    setStep(initialVariant ? 'schedule' : 'price');
     setMobileSummaryOpen(false);
     setViewDate(new Date());
     setSelectedDate(null);
-    setSelectedVariant(null);
+    setSelectedVariant(initialVariant);
     setSelectedHour(null);
     setSelectedDuration(minDuration);
     setGuestNote('');
@@ -510,7 +512,22 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
     const user = authUser;
     setGuestName(user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : '');
     setGuestContact(user ? user.phone || (user.isGuest ? '' : user.email) || '' : '');
-  }, [room]);
+  }, [room, initialVariantLabel]);
+
+  useEffect(() => {
+    if (!room) return;
+    if (!authUser) {
+      window.location.href = buildLoginPath(buildRoomReservationPath(room._id, initialVariantLabel));
+      return;
+    }
+    let cancelled = false;
+    revalidate().then((freshUser) => {
+      if (!cancelled && !freshUser) {
+        window.location.href = buildLoginPath(buildRoomReservationPath(room._id, initialVariantLabel));
+      }
+    });
+    return () => { cancelled = true; };
+  }, [room?._id, initialVariantLabel]);
 
   useEffect(() => {
     if (!returnInfo) return;
@@ -720,10 +737,6 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
 
   function handleChooseOption(opt) {
     setSelectedVariant(opt);
-  }
-
-  function handleContinueFromPrice() {
-    if (!selectedVariant) return;
     setViewDate(new Date());
     setStep('schedule');
   }
@@ -732,6 +745,12 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
     const targetIndex = STEP_INDEX[targetKey] || 1;
     const currentIndex = STEP_INDEX[step] || 1;
     if (targetIndex >= currentIndex) return;
+    if (targetKey === 'price') {
+      releaseCurrentLock();
+      setLockError('');
+      setSelectedDate(null);
+      setSelectedHour(null);
+    }
     setStep(targetKey);
   }
 
@@ -773,7 +792,10 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
 
     setLockError('');
     setLockLoading(true);
+    // Give touch users immediate feedback while the server secures the slot.
+    setSelectedHour(hour);
     try {
+      await releaseCurrentLock();
       const { y, m, d } = selectedDate;
       const dateStr = dateKey(y, m, d);
       const timeStr = `${String(hour).padStart(2, '0')}:00`;
@@ -785,9 +807,9 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
         duration: selectedDuration,
       });
       setLock({ id: result.id, expiresAtMs: new Date(result.expiresAt).getTime() });
-      setSelectedHour(hour);
     } catch (err) {
       console.error(err);
+      setSelectedHour((current) => (current === hour ? null : current));
       setLockError(err.message || 'That time slot was just taken. Please choose another.');
       const key = dateKey(selectedDate.y, selectedDate.m, selectedDate.d);
       clearReservedHours(room._id, key);
@@ -802,7 +824,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
     setStep('details');
   }
 
-  async function confirmBooking() {
+  async function continueToPayment() {
     const trimmedName = guestName.trim();
     const trimmedContact = guestContact.trim();
 
@@ -826,11 +848,26 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
       window.location.href = '/login';
       return;
     }
-    setStep('review');
+    setStep('payment');
   }
 
-  function proceedToPayment() {
-    setStep('payment');
+  function handleBack() {
+    if (step === 'payment') {
+      setStep('details');
+      return;
+    }
+    if (step === 'details') {
+      setStep('schedule');
+      return;
+    }
+    if (step === 'schedule' && priceOptionsFor(room).length > 1 && !initialVariantLabel) {
+      releaseCurrentLock();
+      setSelectedDate(null);
+      setSelectedHour(null);
+      setStep('price');
+      return;
+    }
+    handleClose();
   }
 
   function stopPolling() {
@@ -1103,6 +1140,8 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
   }
 
   const priceItems = room ? priceOptionsFor(room) : [];
+  const hasRoomChoice = priceItems.length > 1 && !initialVariantLabel;
+  const visibleSteps = hasRoomChoice ? STEPS : STEPS.filter((item) => item.key !== 'price');
   const { firstDay, days: calendarDays } = step === 'schedule' ? buildCalendarDays() : { firstDay: 0, days: [] };
   const cap = getPaxCapacity(selectedVariant?.pax);
 
@@ -1114,9 +1153,6 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
   const endTimeLabel = selectedHour !== null ? formatHour(selectedHour + selectedDuration) : '—';
   const durationLabel = `${selectedDuration} hour${selectedDuration === 1 ? '' : 's'}`;
 
-  const reviewDateLabel = selectedDate
-    ? `${MONTHS[selectedDate.m]} ${selectedDate.d}, ${selectedDate.y} (${WEEKDAYS[new Date(selectedDate.y, selectedDate.m, selectedDate.d).getDay()]})`
-    : '—';
   const priceBreakdown = selectedVariant
     ? calculateBookingPrice({
         variant: selectedVariant,
@@ -1128,7 +1164,6 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
       })
     : { amount: 0, roomCharge: 0, corkageFee: 0, downPayment: 0, hourlyRates: [] };
   const subtotalAmount = priceBreakdown.amount;
-  const roomChargeAmount = priceBreakdown.roomCharge;
   const downPaymentAmount = priceBreakdown.downPayment;
   const remainingBalanceAmount = Math.max(0, subtotalAmount - downPaymentAmount);
   const downPaymentPresets = Array.from({ length: Math.max(1, selectedDuration || 1) }, (_, i) => i + 1);
@@ -1136,9 +1171,8 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
     ? PAYMENT_METHODS.filter((m) => allowedPaymentMethodKeys.includes(m.key))
     : PAYMENT_METHODS;
 
-  const showSummaryPanel = room && step !== 'paymongoReturn';
+  const showSummaryPanel = room && step !== 'paymongoReturn' && step !== 'price';
 
-  const payOnArrivalEnabled = !!settings?.paymentSettings?.payOnArrivalEnabled;
   const contactMessengerUrl = settings?.contact?.messengerUrl;
   const contactPhone = settings?.contact?.phone;
 
@@ -1146,23 +1180,27 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
     <ModalPortal>
       <div className={`bk-overlay${open ? ' open' : ''}`} id="booking-modal" role="dialog" aria-modal="true" aria-labelledby="booking-modal-title">
         <div className={'bk-modal' + (showSummaryPanel ? '' : ' bk-modal--compact')}>
-        <button type="button" className="bk-close" aria-label="Close reservation" onClick={handleClose}><X size={19} aria-hidden="true" /></button>
-
         <div className="bk-header">
-          <div className="bk-room-icon">
-            {step === 'paymongoReturn' ? (
-              <i className="fa-solid fa-credit-card"></i>
-            ) : (
-              <i className="fa-solid fa-circle-dot"></i>
-            )}
-          </div>
-          <div>
-            <p className="bk-eyebrow">Reserve a space</p>
-            <h2 id="booking-modal-title">{step === 'paymongoReturn' ? 'Online payment' : room?.name}</h2>
+          <button type="button" className="bk-modal-back" aria-label="Go back" onClick={handleBack}>
+            <ArrowLeft size={18} aria-hidden="true" />
+            <span>Back</span>
+          </button>
+          <div className="bk-header-identity">
+            <div className="bk-room-icon">
+              {step === 'paymongoReturn' ? (
+                <i className="fa-solid fa-credit-card"></i>
+              ) : (
+                <i className="fa-solid fa-circle-dot"></i>
+              )}
+            </div>
+            <div>
+              <p className="bk-eyebrow">Reservation</p>
+              <h2 id="booking-modal-title">{step === 'paymongoReturn' ? 'Online payment' : room?.name}</h2>
+            </div>
           </div>
         </div>
 
-        {step !== 'paymongoReturn' && <BookingStepper step={step} onStepClick={handleStepClick} />}
+        {step !== 'paymongoReturn' && <BookingStepper step={step} onStepClick={handleStepClick} steps={visibleSteps} />}
 
         {lock && step !== 'price' && step !== 'paymongoReturn' && (() => {
           const remainingMs = Math.max(0, lock.expiresAtMs - lockNow);
@@ -1211,8 +1249,6 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
               downPayment={downPaymentAmount}
               remainingBalance={remainingBalanceAmount}
               step={step}
-              onContinue={handleContinueFromPrice}
-              continueDisabled={!selectedVariant}
             />
           </div>
         )}
@@ -1234,35 +1270,22 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
                         option={opt}
                         room={room}
                         selected={isSelected}
+                        showSelectionIndicator={priceItems.length > 1}
                         onSelect={() => handleChooseOption(opt)}
                       />
                     );
                   })}
                 </div>
 
-                <p className="bk-info-bar">
+                <p className="bk-info-bar" role="note">
                   <i className="fa-solid fa-circle-info"></i>
-                  You can review your reservation details before completing the payment.
+                  Tap a room to continue directly to its date and time availability.
                 </p>
-                <div className="bk-mobile-room-actions">
-                  <button
-                    type="button"
-                    className="bk-confirm bk-continue"
-                    disabled={!selectedVariant}
-                    onClick={handleContinueFromPrice}
-                  >
-                    Continue to date &amp; time <i className="fa-solid fa-arrow-right" aria-hidden="true"></i>
-                  </button>
-                </div>
               </div>
             )}
 
             {step === 'schedule' && room && selectedVariant && (
               <div className="bk-step" id="bkStepSchedule">
-                <button className="bk-back" onClick={() => setStep('price')}>
-                  <i className="fa-solid fa-arrow-left"></i> Back to pricing
-                </button>
-
                 <p className="bk-selected-option-pill">{selectedOptionLabel}</p>
 
                 {!selectedDate && (
@@ -1586,147 +1609,8 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
                 </div>
 
                 <div className="bk-detail-actions">
-                  <button className="bk-back-btn" onClick={() => setStep('schedule')}>
-                    <i className="fa-solid fa-arrow-left"></i> Back
-                  </button>
-                  <button className="bk-confirm bk-continue" id="bkConfirm" disabled={confirming} onClick={confirmBooking}>
-                    Continue <i className="fa-solid fa-arrow-right"></i>
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {step === 'review' && room && selectedVariant && selectedDate && selectedHour !== null && (
-              <div className="bk-step" id="bkStepReview">
-                <button className="bk-back" onClick={() => setStep('details')}>
-                  <i className="fa-solid fa-arrow-left"></i> Back to details
-                </button>
-
-                <p className="bk-choose-label bk-choose-label--heading">Review your reservation</p>
-
-                <div className="bk-review-overview">
-                  <div className="bk-review-section">
-                    <p className="bk-review-section-title">Room Information</p>
-                    <div className="bk-review-card">
-                      <div className="bk-review-room">
-                        <div className="bk-review-room-img">
-                          <img
-                            src={selectedVariant.image ? resolveImageUrl(selectedVariant.image) : fallbackRoomImg}
-                            alt={selectedVariant.label}
-                          />
-                        </div>
-                        <div className="bk-review-room-body">
-                          <p className="bk-review-room-name">{selectedVariant.label}</p>
-                          <p className="bk-review-room-facility">{room.name}</p>
-                          {selectedVariant.pax && (
-                            <p className="bk-room-option-pax"><i className="fa-solid fa-users"></i> {selectedVariant.pax}</p>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="bk-review-section">
-                    <p className="bk-review-section-title">Reservation Schedule</p>
-                    <div className="bk-review-card">
-                      <div className="bk-summary-row">
-                        <span className="bk-sr-label"><i className="fa-solid fa-calendar-days"></i> Reservation Date</span>
-                        <span className="bk-sr-value">{reviewDateLabel}</span>
-                      </div>
-                      <div className="bk-summary-row">
-                        <span className="bk-sr-label"><i className="fa-solid fa-clock"></i> Time</span>
-                        <span className="bk-sr-value">{startTimeLabel}</span>
-                      </div>
-                      <div className="bk-summary-row">
-                        <span className="bk-sr-label"><i className="fa-solid fa-hourglass-half"></i> Duration</span>
-                        <span className="bk-sr-value">{durationLabel}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="bk-review-section">
-                    <p className="bk-review-section-title">Guest Information</p>
-                    <div className="bk-review-card">
-                      <div className="bk-summary-row">
-                        <span className="bk-sr-label"><i className="fa-solid fa-user"></i> Name</span>
-                        <span className="bk-sr-value">{guestName || '—'}</span>
-                      </div>
-                      <div className="bk-summary-row">
-                        <span className="bk-sr-label"><i className="fa-solid fa-phone"></i> Contact</span>
-                        <span className="bk-sr-value">{guestContact || '—'}</span>
-                      </div>
-                      <div className="bk-summary-row">
-                        <span className="bk-sr-label"><i className="fa-solid fa-users"></i> Guests (Pax)</span>
-                        <span className="bk-sr-value">{guestCount || 1}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {guestNote && (
-                    <div className="bk-review-section">
-                      <p className="bk-review-section-title">Special Requests</p>
-                      <div className="bk-review-card">
-                        <p className="bk-sr-value" style={{ textAlign: 'left' }}>{guestNote}</p>
-                      </div>
-                    </div>
-                  )}
-
-                  {hasCorkage && (
-                    <div className="bk-review-section">
-                      <p className="bk-review-section-title">Add-on</p>
-                      <div className="bk-review-card">
-                        <div className="bk-summary-row">
-                          <span className="bk-sr-label"><i className="fa-solid fa-bag-shopping"></i> Outside food or drinks</span>
-                          <span className="bk-sr-value">₱{CORKAGE_FEE.toLocaleString()}</span>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                <div className="bk-review-section">
-                  <p className="bk-review-section-title">Payment Breakdown</p>
-                  <div className="bk-review-cost">
-                    <div className="bk-review-cost-row">
-                      <span>Room charge ({durationLabel})</span>
-                      <span>₱{roomChargeAmount.toLocaleString()}</span>
-                    </div>
-                    {hasCorkage && (
-                      <div className="bk-review-cost-row">
-                        <span>Corkage fee</span>
-                        <span>₱{CORKAGE_FEE.toLocaleString()}</span>
-                      </div>
-                    )}
-                    <div className="bk-review-cost-row bk-review-cost-row--balance">
-                      <span>Total charge</span>
-                      <span>₱{subtotalAmount.toLocaleString()}</span>
-                    </div>
-                    <div className="bk-review-cost-row bk-review-cost-row--accent">
-                      <span>Pay online now ({downPaymentHours} hour{downPaymentHours === 1 ? '' : 's'})</span>
-                      <span>₱{downPaymentAmount.toLocaleString()}</span>
-                    </div>
-                    <div className="bk-review-cost-row bk-review-cost-row--balance">
-                      <span>Pay at the venue</span>
-                      <span>₱{remainingBalanceAmount.toLocaleString()}</span>
-                    </div>
-                    <p className="bk-review-note">Choose how many hours to cover online on the next step. Staff will see the remaining balance when your session begins.</p>
-                  </div>
-                </div>
-
-                <details className="bk-review-disclosure">
-                  <summary>Policies and cancellation</summary>
-                  <div className="bk-review-disclosure-body">
-                    <p>Only available times are shown. Contact us before paying if you need help.</p>
-                    <p>Please review your details carefully. Cancellations and rescheduling follow the reservation policy.</p>
-                  </div>
-                </details>
-
-                <div className="bk-detail-actions">
-                  <button className="bk-back-btn" onClick={() => setStep('details')}>
-                    <i className="fa-solid fa-arrow-left"></i> Back
-                  </button>
-                  <button className="bk-confirm bk-continue" onClick={proceedToPayment}>
-                    Proceed to Payment <i className="fa-solid fa-arrow-right"></i>
+                  <button className="bk-confirm bk-continue" disabled={confirming} onClick={continueToPayment}>
+                    Continue to down payment <i className="fa-solid fa-arrow-right"></i>
                   </button>
                 </div>
               </div>
@@ -1740,7 +1624,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
 
                 <div className="bk-downpayment-card">
                   <span className="bk-downpayment-card-dot" aria-hidden="true"></span>
-                  <p className="bk-summary-label">Pay online now</p>
+                  <p className="bk-summary-label">Down payment</p>
                   <p className="bk-downpayment-amount">
                     ₱{downPaymentAmount.toLocaleString()}
                   </p>
@@ -1867,11 +1751,6 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
                           <i className="fa-solid fa-phone"></i> Call the Business
                         </a>
                       )}
-                      {payOnArrivalEnabled && (
-                        <button type="button" className="bk-payment-fallback-btn bk-payment-fallback-btn--ghost" onClick={() => setStep('review')}>
-                          <i className="fa-solid fa-door-open"></i> Pay On Arrival
-                        </button>
-                      )}
                     </div>
                   </div>
                 )}
@@ -1907,9 +1786,6 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
                 )}
 
                 <div className="bk-detail-actions">
-                  <button className="bk-back-btn" onClick={() => setStep('review')}>
-                    <i className="fa-solid fa-arrow-left"></i> Back
-                  </button>
                   <button
                     type={selectedMethod === 'card' ? 'submit' : 'button'}
                     form={selectedMethod === 'card' ? 'bkCardForm' : undefined}
@@ -2009,8 +1885,6 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
                 downPayment={downPaymentAmount}
                 remainingBalance={remainingBalanceAmount}
                 step={step}
-                onContinue={handleContinueFromPrice}
-                continueDisabled={!selectedVariant}
               />
             </div>
           )}

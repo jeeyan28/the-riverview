@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { X, Mail, ArrowRight } from 'lucide-react';
+import { X, Mail, ArrowRight, ShieldCheck } from 'lucide-react';
 import Toast from './Toast';
 import OtpInput from './OtpInput';
 import PasswordInput from './PasswordInput';
@@ -200,7 +200,7 @@ function ClaimAccountModal({ open, onClose }) {
       <div className="claim-modal-scope">
         <div className="forgot-modal-backdrop">
           <div
-            className="forgot-modal login-card"
+            className="forgot-modal login-card claim-account-modal"
             ref={modalRef}
             role="dialog"
             aria-modal="true"
@@ -212,10 +212,16 @@ function ClaimAccountModal({ open, onClose }) {
 
         {!sent ? (
           <>
-            <div className="login-card-header">
-              <h2 id="claim-modal-title">Save your account</h2>
-              <p>Turn this guest session into a permanent account.</p>
+            <div className="claim-account-heading">
+              <span className="claim-account-mark"><ShieldCheck size={20} aria-hidden="true" /></span>
+              <div className="login-card-header">
+                <span className="claim-account-kicker">KEEP YOUR BOOKINGS</span>
+                <h2 id="claim-modal-title">Save your guest account</h2>
+                <p>Add a sign-in method before you log out.</p>
+              </div>
             </div>
+
+            <p className="claim-account-note">Your current reservations and booking history will stay connected to this account.</p>
 
             <div className="profile-tabs">
               <button
@@ -282,7 +288,7 @@ function ClaimAccountModal({ open, onClose }) {
                     Cancel
                   </button>
                   <button type="submit" className={`btn-submit${sending ? ' loading' : ''}`}>
-                    <span className="btn-text">Send verification code</span>
+                    <span className="btn-text">Email me a code</span>
                     <span className="btn-spinner">
                       <span className="spinner-ring"></span>
                     </span>
@@ -290,7 +296,7 @@ function ClaimAccountModal({ open, onClose }) {
                 </div>
               </form>
             ) : (
-              <div className="forgot-modal-actions" style={{ flexDirection: 'column', alignItems: 'stretch' }}>
+              <div className="forgot-modal-actions claim-google-actions">
                 <button type="button" className="btn-social" onClick={handleGoogleClick}>
                   <span className="btn-social-label">
                     <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
@@ -311,11 +317,11 @@ function ClaimAccountModal({ open, onClose }) {
                         fill="#EA4335"
                       />
                     </svg>
-                    <span>Continue with Google</span>
+                    <span>Save with Google</span>
                   </span>
                   <ArrowRight size={16} className="btn-social-arrow" />
                 </button>
-                <button type="button" className="btn-cancel" onClick={onClose} style={{ marginTop: '.75rem' }}>
+                <button type="button" className="btn-cancel" onClick={onClose}>
                   Cancel
                 </button>
               </div>
@@ -323,9 +329,13 @@ function ClaimAccountModal({ open, onClose }) {
           </>
         ) : (
           <>
-            <div className="login-card-header">
-              <h2 id="claim-modal-title">Enter verification code</h2>
-              <p>We've sent a code to <strong>{email.trim()}</strong></p>
+            <div className="claim-account-heading">
+              <span className="claim-account-mark"><Mail size={20} aria-hidden="true" /></span>
+              <div className="login-card-header">
+                <span className="claim-account-kicker">CHECK YOUR EMAIL</span>
+                <h2 id="claim-modal-title">Enter the verification code</h2>
+                <p>Sent to <strong>{email.trim()}</strong></p>
+              </div>
             </div>
 
             <form className="login-form" onSubmit={handleVerifySubmit} noValidate>

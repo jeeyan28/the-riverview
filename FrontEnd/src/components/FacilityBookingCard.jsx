@@ -1,6 +1,9 @@
 import { resolveImageUrl } from '../utils/resolveImageUrl';
 import fallbackRoomImg from '../assets/pictures/Billiard.jpg';
 import { CalendarCheck, Info, Layers3 } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import { buildLoginPath, buildRoomReservationPath } from '../utils/auth';
 
 function getFeatureIcon(feature = '') {
   const f = feature.toLowerCase();
@@ -13,7 +16,8 @@ function getFeatureIcon(feature = '') {
   return 'fa-circle-check';
 }
 
-function FacilityBookingCard({ room, liveStatus, onSelect, onDetails }) {
+function FacilityBookingCard({ room, liveStatus, onSelect }) {
+  const { user } = useAuth();
   const cardImage = room.image ? resolveImageUrl(room.image) : fallbackRoomImg;
   const hasVariants = room.variants && room.variants.length > 0;
   const startingPrice = hasVariants
@@ -26,7 +30,8 @@ function FacilityBookingCard({ room, liveStatus, onSelect, onDetails }) {
   const visibleFeatures = Array.isArray(room.features) ? room.features.slice(0, 2) : [];
   const remainingFeatureCount = Math.max(0, (room.features?.length || 0) - visibleFeatures.length);
 
-  const statusLabel = liveStatus || 'Available';
+  const statusLabel = liveStatus || '';
+  const showStatus = statusLabel && statusLabel !== 'Available';
   const statusClass =
     statusLabel === 'Fully Reserved'
       ? 'room-status-fullybooked'
@@ -37,7 +42,7 @@ function FacilityBookingCard({ room, liveStatus, onSelect, onDetails }) {
   return (
     <div className="room-card" data-room-id={room._id}>
       <div className="room-card-img">
-        <span className={`room-card-status ${statusClass}`}>{statusLabel}</span>
+        {showStatus && <span className={`room-card-status ${statusClass}`}>{statusLabel}</span>}
         <img src={cardImage} alt={room.name} />
       </div>
       <div className="room-card-body">
@@ -63,12 +68,18 @@ function FacilityBookingCard({ room, liveStatus, onSelect, onDetails }) {
 
         {interactive ? (
           <div className="room-card-actions">
-            <button type="button" className="btn-room-details" onClick={() => onDetails?.(room)}>
+            <Link className="btn-room-details" to={`/rooms/${encodeURIComponent(room._id)}`} aria-label={`View ${room.name} rooms and details`}>
               <Info size={16} aria-hidden="true" /> Details
-            </button>
-            <button type="button" className="btn-select" onClick={() => onSelect(room)}>
-              <CalendarCheck size={16} aria-hidden="true" /> Reserve
-            </button>
+            </Link>
+            {user ? (
+              <button type="button" className="btn-select" onClick={() => onSelect(room)}>
+                <CalendarCheck size={16} aria-hidden="true" /> Reserve
+              </button>
+            ) : (
+              <Link className="btn-select" to={buildLoginPath(buildRoomReservationPath(room._id))}>
+                <CalendarCheck size={16} aria-hidden="true" /> Reserve
+              </Link>
+            )}
           </div>
         ) : (
           <span className="btn-select btn-select--preview">

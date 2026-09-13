@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import ThemeToggle from './ThemeToggle';
 import AnnouncementsBell from './AnnouncementsBell';
 import LogoutConfirmDialog from './LogoutConfirmDialog';
+import { buildLoginPath } from '../utils/auth';
 
 function Navbar({
   announcements,
@@ -25,7 +26,7 @@ function Navbar({
   const navigate = useNavigate();
   const location = useLocation();
   const isHome = location.pathname === '/';
-  const isRooms = location.pathname === '/rooms';
+  const isRooms = location.pathname.startsWith('/rooms');
   const isContact = location.pathname === '/contact';
 
   const [activeSection, setActiveSection] = useState('home');
@@ -151,7 +152,7 @@ function Navbar({
             id="login-button"
             style={{ display: loggedIn ? 'none' : '' }}
           >
-            Log in
+            Sign in
           </Link>
 
           <div
@@ -261,7 +262,6 @@ function Navbar({
               <Link to="/contact" aria-current={isContact ? 'page' : undefined} onClick={onCloseMobileNav}>Contact <i className="fa-solid fa-arrow-right" aria-hidden="true"></i></Link>
             </nav>
             <div className="mobile-nav-account">
-              <Link className="mobile-nav-primary" id="mobile-book-btn" to="/rooms" onClick={onCloseMobileNav}>Reserve a space <i className="fa-solid fa-arrow-right" aria-hidden="true"></i></Link>
               {loggedIn ? (
                 <>
                   <button type="button" className="mobile-nav-secondary" onClick={() => { onCloseMobileNav(); onOpenProfile?.(); }}><i className="fa-regular fa-user" aria-hidden="true"></i> Account & reservations</button>
@@ -269,7 +269,10 @@ function Navbar({
                   <button type="button" className="mobile-nav-secondary" id="mobile-logout-button" onClick={() => { onCloseMobileNav(); handleLogout(); }}><i className="fa-solid fa-right-from-bracket" aria-hidden="true"></i> Log out</button>
                 </>
               ) : (
-                <Link className="mobile-nav-secondary" to="/login" onClick={onCloseMobileNav}><i className="fa-regular fa-user" aria-hidden="true"></i> Log in to your account</Link>
+                <>
+                  <Link className="mobile-nav-primary" to={buildLoginPath('/rooms', { createAccount: true })} onClick={onCloseMobileNav}><i className="fa-solid fa-user-plus" aria-hidden="true"></i> Create account</Link>
+                  <Link className="mobile-nav-secondary" to={buildLoginPath('/rooms')} onClick={onCloseMobileNav}><i className="fa-regular fa-user" aria-hidden="true"></i> Sign in or book as guest</Link>
+                </>
               )}
             </div>
             <div className="mobile-nav-preferences">
