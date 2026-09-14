@@ -1,0 +1,237 @@
+/* Role-aware admin shell and mobile navigation. */
+#app .admin-role-chip {
+  border-color: color-mix(in srgb, var(--teal) 26%, var(--border));
+  background: var(--teal-soft);
+  color: var(--teal);
+  font-weight: 720;
+}
+
+#app .admin-role-chip svg { flex: 0 0 auto; }
+
+#app #sidebar .sb-sub {
+  overflow: hidden;
+  max-width: 150px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#app .rm-refresh-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--amber) 36%, var(--border));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--amber) 8%, var(--navy2));
+}
+
+#app .rm-refresh-error-copy {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+}
+
+#app .rm-refresh-error-copy > i {
+  flex: 0 0 auto;
+  margin-top: 1px;
+  color: var(--amber);
+}
+
+#app .rm-refresh-error-copy > span { display: grid; gap: 2px; min-width: 0; }
+#app .rm-refresh-error-copy strong { font-size: .78rem; line-height: 1.3; }
+#app .rm-refresh-error-copy small { color: var(--muted); font-size: .68rem; line-height: 1.4; }
+#app .rm-refresh-error > .rm-btn { flex: 0 0 auto; }
+
+#app .rm-monitor-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 180px;
+  padding: 28px 18px;
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  background: var(--navy2);
+}
+
+#app .rm-monitor-empty i { color: var(--muted); font-size: 1.4rem; }
+#app .rm-monitor-empty strong { color: var(--text); font-size: .82rem; }
+#app .rm-monitor-empty span { max-width: 42ch; font-size: .72rem; line-height: 1.45; }
+
+@media (max-width: 900px) {
+  #app #sidebar {
+    width: min(300px, calc(100vw - 32px));
+    padding-inline: 14px;
+  }
+
+  #app #sidebar .sb-brand { padding-bottom: 18px; }
+  #app #sidebar .sb-nav { padding-bottom: 8px; }
+  #app #sidebar .sb-section { margin-top: 14px; }
+
+  #app .admin-app-nav {
+    grid-template-columns: minmax(0, 1fr) 66px;
+    grid-auto-flow: row;
+    grid-auto-columns: auto;
+    justify-content: stretch;
+    overflow: hidden;
+  }
+
+  #app .admin-app-nav-links {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(72px, 1fr);
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-inline: contain;
+    scroll-snap-type: inline proximity;
+    scrollbar-width: none;
+  }
+
+  #app .admin-app-nav-links::-webkit-scrollbar { display: none; }
+  #app .admin-app-nav-links .app-nav-item { scroll-snap-align: center; }
+
+  #app .admin-app-nav-more {
+    border-left: 1px solid var(--border);
+    border-radius: 0 var(--radius-md, 12px) var(--radius-md, 12px) 0;
+  }
+
+  #app #panel-dashboard .finance-queue {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  #app #panel-dashboard .finance-queue button {
+    min-height: 72px;
+    padding: 12px;
+  }
+
+  #app[data-theme='dark'] .admin-app-nav-more { border-left-color: rgba(255,255,255,.1); }
+}
+
+@media (max-width: 640px) {
+  #app .topbar {
+    min-height: 56px;
+    padding-block: max(6px, env(safe-area-inset-top)) 6px;
+  }
+
+  #app .page-title { font-size: .96rem; }
+  #app .admin-role-chip { min-width: 44px; width: auto; padding-inline: 9px; }
+  #app .admin-role-chip span { display: inline; max-width: 76px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #app .content { padding-top: 10px; }
+
+  #app .admin-app-nav {
+    grid-template-columns: minmax(0, 1fr) 60px;
+  }
+
+  #app .admin-app-nav-links { grid-auto-columns: minmax(66px, 1fr); }
+
+  #app #panel-dashboard .finance-queue {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+    margin-bottom: 10px;
+  }
+
+  #app #panel-dashboard .finance-queue button {
+    display: block;
+    min-height: 76px;
+    padding: 9px 8px;
+    border-radius: 10px;
+  }
+
+  #app #panel-dashboard .finance-queue strong { font-size: 1rem; }
+  #app #panel-dashboard .finance-queue i { display: none; }
+  #app #panel-dashboard .finance-meta {
+    display: inline-block;
+    margin-top: 4px;
+    font-size: .62rem;
+    line-height: 1.25;
+  }
+
+  #app #panel-dashboard .finance-activity {
+    gap: 6px 14px;
+    padding: 9px 10px;
+    margin-bottom: 10px;
+    font-size: .68rem;
+  }
+
+  #app #panel-dashboard .qa-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  #app #panel-dashboard .qa-btn {
+    min-width: 0;
+    min-height: 42px;
+    padding: 7px;
+    gap: 7px;
+    font-size: .7rem;
+  }
+
+  #app #panel-dashboard .qa-ico {
+    width: 26px;
+    height: 26px;
+    border-radius: 7px;
+    font-size: 13px;
+  }
+
+  #app #panel-dashboard .qa-label {
+    min-width: 0;
+    white-space: normal;
+    text-align: left;
+    line-height: 1.2;
+  }
+
+  #app .rm-refresh-error {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 10px;
+    border: 1px solid color-mix(in srgb, var(--amber) 36%, var(--border));
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--amber) 8%, var(--navy2));
+  }
+
+  #app .rm-refresh-error-copy {
+    display: flex;
+    align-items: flex-start;
+    gap: 9px;
+    min-width: 0;
+  }
+
+  #app .rm-refresh-error-copy > i {
+    flex: 0 0 auto;
+    margin-top: 1px;
+    color: var(--amber);
+  }
+
+  #app .rm-refresh-error-copy > span { display: grid; gap: 2px; min-width: 0; }
+  #app .rm-refresh-error-copy strong { font-size: .72rem; line-height: 1.25; }
+  #app .rm-refresh-error-copy small { color: var(--muted); font-size: .62rem; line-height: 1.35; }
+  #app .rm-refresh-error > .rm-btn { min-height: 38px; padding: 7px 9px; flex: 0 0 auto; }
+
+  #app .rm-monitor-empty {
+    min-height: 150px;
+    padding: 24px 16px;
+    border: 1px dashed var(--border);
+    border-radius: 12px;
+    background: var(--navy2);
+  }
+
+  #app .rm-monitor-empty i { color: var(--muted); font-size: 1.25rem; }
+  #app .rm-monitor-empty strong { color: var(--text); font-size: .78rem; }
+  #app .rm-monitor-empty span { max-width: 34ch; font-size: .68rem; line-height: 1.45; }
+}
+
+@media (max-width: 390px) {
+  #app .admin-role-chip span { display: none; }
+  #app .admin-role-chip { width: 44px; padding: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #app .admin-app-nav-links { scroll-behavior: auto; }
+}

@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
+  Activity,
   BarChart3,
   Building2,
   CalendarDays,
-  ExternalLink,
   FileBarChart,
   History,
   LayoutDashboard,
@@ -25,34 +25,28 @@ const MANAGER_UP = ['manager', 'super_admin'];
 
 const NAV_SECTIONS = [
   {
-    label: 'Main',
+    label: 'Overview',
     items: [
       { to: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard', roles: MANAGER_UP },
-      { to: '/admin/monitor', icon: BarChart3, label: 'Live Monitor' },
-      { to: '/admin/bookings', icon: CalendarDays, label: 'Reservations' },
+      { to: '/admin/analytics', icon: BarChart3, label: 'Analytics', roles: MANAGER_UP },
     ],
   },
   {
-    label: 'Insights',
+    label: 'Operations',
     items: [
-      { to: '/admin/analytics', icon: BarChart3, label: 'Analytics', roles: MANAGER_UP },
+      { to: '/admin/monitor', icon: Activity, label: 'Live Monitor' },
+      { to: '/admin/bookings', icon: CalendarDays, label: 'Reservations' },
       { to: '/admin/reports', icon: FileBarChart, label: 'Reports', permission: 'reports:view' },
       { to: '/admin/forecasting', icon: TrendingUp, label: 'Forecasting', permission: 'forecasting:view' },
     ],
   },
   {
-    label: 'Admin',
+    label: 'Management',
     items: [
       { to: '/admin/users', icon: Users, label: 'Team & Users', permission: 'admin:manage' },
       { to: '/admin/logs', icon: History, label: 'Login History', roles: MANAGER_UP },
       { to: '/admin/room-management', icon: Building2, label: 'Facilities', permission: 'room:manage' },
       { to: '/admin/settings', icon: Settings, label: 'Settings', permission: 'settings:view' },
-    ],
-  },
-  {
-    label: 'Customer',
-    items: [
-      { to: '/', icon: ExternalLink, label: 'Customer Site' },
     ],
   },
 ];
@@ -207,7 +201,7 @@ function AdminSidebar({ compact = false, mobileOpen = false, onClose, triggerRef
         {!isCollapsed && (
           <div>
             <div className="sb-title">Riverview</div>
-            <div className="sb-sub">Admin Panel</div>
+            <div className="sb-sub">{roleLabel || 'Admin'} workspace</div>
           </div>
         )}
       </div>
@@ -220,11 +214,7 @@ function AdminSidebar({ compact = false, mobileOpen = false, onClose, triggerRef
               (!item.roles || item.roles.includes(user?.role))
           );
           if (visibleItems.length === 0 && section.items.length > 0) {
-            return isCollapsed ? null : (
-              <div key={section.label}>
-                <div className="sb-section">{section.label}</div>
-              </div>
-            );
+            return null;
           }
           return (
             <div key={section.label}>

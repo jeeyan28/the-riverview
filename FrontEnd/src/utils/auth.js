@@ -6,6 +6,19 @@ export function safeReturnPath(value) {
   return path;
 }
 
+export function isAdminPath(value) {
+  const path = safeReturnPath(value);
+  const pathname = path.split(/[?#]/, 1)[0];
+  return Boolean(path && (pathname === '/admin' || pathname.startsWith('/admin/')));
+}
+
+export function isAdminReturnPath(value) {
+  const path = safeReturnPath(value);
+  const pathname = path.split(/[?#]/, 1)[0];
+  const isLoginPath = pathname === '/admin/login' || pathname.startsWith('/admin/login/');
+  return isAdminPath(path) && !isLoginPath;
+}
+
 export function buildLoginPath(returnTo = '/rooms', options = {}) {
   const params = new URLSearchParams();
   const safePath = safeReturnPath(returnTo);
@@ -15,6 +28,12 @@ export function buildLoginPath(returnTo = '/rooms', options = {}) {
   return query ? `/login?${query}` : '/login';
 }
 
+export function buildAdminLoginPath(returnTo = '/admin') {
+  const safePath = safeReturnPath(returnTo);
+  if (!isAdminReturnPath(safePath)) return '/admin/login';
+  return `/admin/login?${new URLSearchParams({ returnTo: safePath }).toString()}`;
+}
+
 export function buildRoomReservationPath(roomId, variantLabel = '') {
   const params = new URLSearchParams({ reserve: '1' });
   if (variantLabel) params.set('variant', variantLabel);
@@ -22,11 +41,12 @@ export function buildRoomReservationPath(roomId, variantLabel = '') {
 }
 
 export function redirectAfterLogin(user, requestedPath = '') {
-  if (user?.role === 'staff') {
-    window.location.href = '/admin/monitor';
-    return;
-  }
   const isAdmin = ADMIN_ROLES.includes(user?.role);
   const returnPath = safeReturnPath(requestedPath);
-  window.location.href = isAdmin ? '/admin/dashboard' : (returnPath || '/rooms');
+  if (isAdmin) {
+    const adminReturnPath = isAdminReturnPath(returnPath) ? returnPath : '';
+    window.location.href = adminReturnPath || (user.role === 'staff' ? '/admin/monitor' : '/admin/dashboard');
+    return;
+  }
+  window.location.href = isAdminPath(returnPath) ? '/rooms' : (returnPath || '/rooms');
 }

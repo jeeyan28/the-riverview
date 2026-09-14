@@ -5,7 +5,7 @@ const upload = require("../middleware/upload");
 const { requirePermission } = require("../middleware/adminAuth");
 const { validate } = require("../middleware/validate");
 const { PERMISSIONS } = require("../utils/permissions");
-const { SERVICE_NAMES, canonicalServiceName, escapeRegExp } = require("../utils/roomCatalog");
+const { canonicalServiceName, escapeRegExp } = require("../utils/roomCatalog");
 const { roomIdParamsSchema, emptyBodySchema, roomWriteSchema } = require("../validation/roomSchemas");
 const { logAudit } = require("../utils/auditLog");
 const { syncRoomInventory, deactivateRoomInventory } = require("../utils/syncRoomInventory");
@@ -78,7 +78,7 @@ async function findDuplicateService(name, excludingId) {
 
 router.get("/", async (req, res) => {
   try {
-    const rooms = await Room.find({ name: { $in: SERVICE_NAMES } }).sort({ name: 1 });
+    const rooms = await Room.find().sort({ name: 1 });
     res.json(rooms);
   } catch (err) {
     console.error(err);
@@ -98,7 +98,7 @@ router.get("/admin", requirePermission(PERMISSIONS.ROOM_MANAGE), async (req, res
 
 router.get("/:id", validate(roomIdParamsSchema, "params"), async (req, res) => {
   try {
-    const room = await Room.findOne({ _id: req.params.id, name: { $in: SERVICE_NAMES } });
+    const room = await Room.findById(req.params.id);
     if (!room) return res.status(404).json({ message: "Facility not found." });
     res.json(room);
   } catch (err) {

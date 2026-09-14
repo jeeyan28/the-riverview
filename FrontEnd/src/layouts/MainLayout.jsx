@@ -10,7 +10,6 @@ import Footer from '../components/Footer';
 import ProfileModal from '../components/ProfileModal';
 import GuestBanner from '../components/GuestBanner';
 import ClaimAccountModal from '../components/ClaimAccountModal';
-import PageSkeleton from '../components/PageSkeleton';
 import PageTransition from '../components/PageTransition';
 import { useTheme } from '../hooks/useTheme';
 import { useAuth } from '../context/AuthContext';
@@ -69,10 +68,6 @@ function MainLayout() {
     observer.observe(banner);
     return () => observer.disconnect();
   }, [initializing, user?.isGuest]);
-
-  if (initializing) {
-    return <PageSkeleton />;
-  }
 
   return (
     <div className="public-site" ref={siteRef}>

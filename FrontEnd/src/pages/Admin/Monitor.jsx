@@ -449,8 +449,14 @@ function Monitor() {
 
       {refreshError && (
         <div className="rm-refresh-error" role="status">
-          <span>Table status could not refresh. {lastUpdatedAt ? `Showing occupancy last checked at ${new Date(lastUpdatedAt).toLocaleTimeString([], { timeZone: 'Asia/Manila', hour: '2-digit', minute: '2-digit', second: '2-digit' })}.` : 'Availability is not yet known.'} Session controls resume after a successful refresh.</span>
-          <button type="button" className="rm-btn" onClick={fetchMonitorSessions}>Retry</button>
+          <div className="rm-refresh-error-copy">
+            <i className="bi bi-wifi-off" aria-hidden="true"></i>
+            <span>
+              <strong>Monitor is reconnecting</strong>
+              <small>{lastUpdatedAt ? `Last checked at ${new Date(lastUpdatedAt).toLocaleTimeString([], { timeZone: 'Asia/Manila', hour: '2-digit', minute: '2-digit', second: '2-digit' })}.` : 'Availability is temporarily unknown.'} Controls resume after a successful refresh.</small>
+            </span>
+          </div>
+          <button type="button" className="rm-btn" onClick={fetchMonitorSessions}><i className="bi bi-arrow-clockwise" aria-hidden="true"></i>Retry</button>
         </div>
       )}
 
@@ -557,7 +563,13 @@ function Monitor() {
       {loading ? (
         <div className="room-grid"><div className="room-grid-empty">Loading tables…</div></div>
       ) : rooms.length === 0 ? (
-        <div className="room-grid"><div className="room-grid-empty">{refreshError ? 'Waiting for table status…' : 'No tables configured yet.'}</div></div>
+        <div className="room-grid">
+          <div className="room-grid-empty rm-monitor-empty">
+            <i className={`bi ${refreshError ? 'bi-cloud-slash' : 'bi-grid-3x3-gap'}`} aria-hidden="true"></i>
+            <strong>{refreshError ? 'Waiting for table status' : 'No tables configured yet'}</strong>
+            <span>{refreshError ? 'The live floor will appear here when the connection returns.' : 'Add a facility and its rooms to begin monitoring.'}</span>
+          </div>
+        </div>
       ) : (
         <>
           <div className="rm-search-row">

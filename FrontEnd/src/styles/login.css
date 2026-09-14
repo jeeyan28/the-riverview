@@ -186,6 +186,44 @@
     flex-shrink:0;
 }
 
+.login-page .login-card-header.has-reservation-intent{
+    margin-bottom:12px;
+}
+
+.login-page .reservation-auth-notice{
+    display:grid;
+    grid-template-columns:auto minmax(0,1fr);
+    gap:9px;
+    margin-bottom:15px;
+    padding:10px 11px;
+    border:1px solid rgba(239,159,39,.34);
+    border-radius:11px;
+    background:rgba(239,159,39,.1);
+    color:var(--text);
+    text-align:left;
+}
+
+.login-page .reservation-auth-notice > svg{
+    margin-top:1px;
+    color:#f0aa3c;
+}
+
+.login-page .reservation-auth-notice div{
+    display:grid;
+    gap:2px;
+}
+
+.login-page .reservation-auth-notice strong{
+    font-size:.76rem;
+    line-height:1.3;
+}
+
+.login-page .reservation-auth-notice span{
+    color:var(--muted);
+    font-size:.66rem;
+    line-height:1.42;
+}
+
 :is(.login-page, .claim-modal-scope) .login-card-header h2 .wave{
     display:inline-block;
     font-size:.85em;

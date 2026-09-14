@@ -18,7 +18,7 @@ const variantSchema = new mongoose.Schema({
 }, { _id: false });
 
 const roomSchema = new mongoose.Schema({
-  name:        { type: String, required: true, trim: true },
+  name:        { type: String, required: true, trim: true, minlength: 2, maxlength: 80 },
   description: { type: String, default: "" },
   price:       { type: Number, default: 0, min: 0 },
   capacity:    { type: Number, default: 0, min: 0 },

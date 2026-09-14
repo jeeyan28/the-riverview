@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
-import { Clock3, ExternalLink, MapPin, Menu } from 'lucide-react';
+import { Clock3, MapPin, Menu, ShieldCheck } from 'lucide-react';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import '../styles/admin/shared.css';
 import AdminSidebar, { PAGE_CONTEXT, PAGE_TITLES } from '../components/AdminSidebar';
@@ -9,12 +9,13 @@ import PageTransition from '../components/PageTransition';
 import RiverviewLoader from '../components/RiverviewLoader';
 import { useAuth } from '../context/AuthContext';
 import { AdminAppNavigation } from '../components/MobileAppNavigation';
+import { buildAdminLoginPath } from '../utils/auth';
 
 const ADMIN_THEME_KEY = 'rv_admin_theme';
 const ADMIN_COMPACT_MEDIA = '(max-width: 900px)';
 
 function AdminLayout() {
-  const { initializing, isAdmin, hasPermission } = useAuth();
+  const { initializing, isAdmin, hasPermission, roleLabel, user } = useAuth();
   const location = useLocation();
   const pageKey = location.pathname.split('/').pop();
   const pageTitle = PAGE_TITLES[pageKey] || 'Dashboard';
@@ -79,7 +80,7 @@ function AdminLayout() {
       });
     }
     tick();
-    const id = setInterval(tick, 1000);
+    const id = setInterval(tick, 30000);
     return () => clearInterval(id);
   }, []);
 
@@ -88,11 +89,11 @@ function AdminLayout() {
   }
 
   if (!isAdmin) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to={buildAdminLoginPath(`${location.pathname}${location.search}`)} replace />;
   }
 
   return (
-    <div id="app" data-theme={theme}>
+    <div id="app" data-theme={theme} data-admin-role={user?.role || ''}>
       <AdminSidebar
         compact={compactNavigation}
         mobileOpen={mobileMenuOpen}
@@ -123,19 +124,12 @@ function AdminLayout() {
             </div>
           </div>
           <div className="topbar-right">
+            <div className="tb-chip admin-role-chip" title={`${roleLabel || 'Admin'} access`}>
+              <ShieldCheck size={14} aria-hidden="true" />
+              <span>{roleLabel || 'Admin'}</span>
+            </div>
             <div className="tb-chip admin-location-chip"><MapPin size={14} aria-hidden="true" />Caingin, San Rafael</div>
             <div className="tb-chip admin-clock-chip" title={`Philippine time · ${liveTime.date}`}><Clock3 size={14} aria-hidden="true" /><span id="live-time">{liveTime.time}</span></div>
-            <a
-              className="tb-chip admin-site-link"
-              id="view-user-site-btn"
-              href="/"
-              target="_blank"
-              rel="noreferrer"
-              title="Open the public-facing site in a new tab"
-              aria-label="View user site (opens in a new tab)"
-            >
-              <ExternalLink size={14} aria-hidden="true" /><span className="admin-site-link-label">Customer site</span>
-            </a>
             <ThemeToggle id="admin-theme-toggle" theme={theme} onToggle={toggleTheme} />
           </div>
         </div>

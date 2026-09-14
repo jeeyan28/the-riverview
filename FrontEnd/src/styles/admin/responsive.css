@@ -122,9 +122,7 @@
   #app .admin-topbar-heading{gap:10px;flex:1;}
   #app .page-title{font-size:1.05rem;}
   #app .topbar-right{gap:6px;}
-  #app :is(.admin-clock-chip,.admin-site-link-label,.notif-btn){display:none;}
-  #app #view-user-site-btn{width:44px;height:44px;padding:0;justify-content:center;border-radius:12px;}
-  #app #view-user-site-btn i{font-size:18px;}
+  #app :is(.admin-clock-chip,.notif-btn){display:none;}
   #app .content{padding:16px 14px max(28px,env(safe-area-inset-bottom));gap:16px;}
   #app .panel{gap:16px;}
   #app .card{padding:16px;border-radius:14px;}
@@ -198,7 +196,6 @@
 
 @media (max-width:359px){
   #app :is(.metric-row,.rm-stats-bar){grid-template-columns:minmax(0,1fr);}
-  #app .topbar-right #view-user-site-btn{width:40px;}
   #app .admin-menu-button{width:40px;}
   #app .admin-topbar-heading{gap:8px;}
 }

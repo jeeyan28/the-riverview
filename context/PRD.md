@@ -31,7 +31,7 @@ Admin and staff have no real system — booking, reporting, and status tracking 
 | KTV | Standard Room | ₱300/hr |
 | Add-on | Corkage fee (outside food/drinks) | ₱200 flat |
 
-Room/table/court **inventory (counts) is admin-configurable**, not hardcoded — admin can add, edit, or remove units and pricing as the business changes.
+Room/table/court **inventory (counts) is admin-configurable**, not hardcoded — admin can add, edit, or remove units and pricing as the business changes. Billiards, KTV, and Court remain the core presets, while an admin may create additional uniquely named hourly facilities that use the same booking, monitoring, and reporting flow.
 
 ## 5. Core Booking Rules
 - Bookings: **minimum 1 hour, maximum 5 hours, hourly increments only**
@@ -74,6 +74,7 @@ Room/table/court **inventory (counts) is admin-configurable**, not hardcoded —
 13. Responsive customer and admin flows for phone, tablet/iPad, and desktop, with touch-safe controls and contained table scrolling
 14. Customer account center with profile editing, reservation history, detailed payment balance, receipt access, reschedule, and cancellation request flows
 15. Facility detail views that explain each room type, capacity, price behavior, inventory, and availability before the customer starts checkout
+16. Dedicated credential-only admin sign-in that admits Staff, Supervisor, and Owner accounts, rejects customer accounts, and opens the workspace allowed by each role
 
 ## 7. Out of Scope (v1)
 - Any Riverview tenant business other than billiards, KTV, and court (e.g. the gaming hub)

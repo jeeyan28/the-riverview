@@ -6,6 +6,7 @@ import AdminLayout from './layouts/AdminLayout';
 import { useAuth } from './context/AuthContext';
 import RiverviewLoader from './components/RiverviewLoader';
 import Login from './pages/Login';
+import AdminLogin from './pages/AdminLogin';
 
 const Home = lazy(() => import('./pages/Home'));
 const Rooms = lazy(() => import('./pages/Rooms'));
@@ -61,6 +62,7 @@ function App() {
 
       <Route element={<AuthLayout />}>
         <Route path="/login" element={<Login />} />
+        <Route path="/admin/login" element={<AdminLogin />} />
       </Route>
 
       <Route path="/lobby-monitor" element={<RequirePermission permission="room:view"><LobbyMonitor /></RequirePermission>} />
