@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { Activity, BarChart3, CalendarDays, DoorOpen, House, LayoutDashboard, Menu, MessageCircle, UserRound } from 'lucide-react';
+import { Activity, BarChart3, CalendarDays, DoorOpen, ExternalLink, House, LayoutDashboard, Menu, MessageCircle, UserRound } from 'lucide-react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { buildLoginPath } from '../utils/auth';
 
@@ -61,10 +61,11 @@ function AdminAppNavigation({ hasPermission, menuOpen = false, onOpenMenu }) {
     { to: '/admin/monitor', label: 'Monitor', icon: Activity, permission: 'room:view' },
     { to: '/admin/bookings', label: 'Bookings', icon: CalendarDays, permission: 'booking:view' },
     { to: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard, permission: 'reports:view' },
+    { to: '/', label: 'Customer', icon: ExternalLink },
     { to: '/admin/reports', label: 'Reports', icon: BarChart3, permission: 'reports:view' },
     { to: '/admin/room-management', label: 'Facilities', icon: DoorOpen, permission: 'room:manage' },
   ];
-  const links = candidates.filter((item) => hasPermission(item.permission));
+  const links = candidates.filter((item) => !item.permission || hasPermission(item.permission));
   const moreActive = menuOpen || !links.some((item) => location.pathname === item.to);
 
   useEffect(() => {

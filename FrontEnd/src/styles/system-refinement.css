@@ -90,68 +90,8 @@
 :root[data-theme="light"] .public-site :is(.footer-brand .logo-name, .footer-col h4) { color: var(--text-main); }
 :root[data-theme="light"] .public-site .footer-appearance .theme-toggle { border-color: var(--border-strong); background: var(--surface-alt); color: var(--text-muted-light); }
 
-/* Authentication is part of the same appearance system. */
-.auth-theme-control {
-  position: fixed;
-  top: 18px;
-  right: max(20px, env(safe-area-inset-right));
-  z-index: 40;
-  display: inline-flex;
-  min-height: 38px;
-  align-items: center;
-  gap: 10px;
-  color: rgba(255,255,255,.72);
-  font-size: .72rem;
-  font-weight: 650;
-}
-
-:root[data-theme="light"] .login-page {
-  --bg: #eaf3f0;
-  --card: rgba(255,255,255,.9);
-  --text: #17312d;
-  --muted: #5b706c;
-  --border: rgba(18,68,60,.13);
-  --shadow: 0 28px 72px rgba(23,49,45,.17);
-  --ovl-04: rgba(18,68,60,.04);
-  --ovl-06: rgba(18,68,60,.06);
-  --ovl-07: rgba(18,68,60,.07);
-  --ovl-08: rgba(18,68,60,.09);
-  --ovl-14: rgba(18,68,60,.14);
-  --ovl-16: rgba(18,68,60,.17);
-  --muted-2: #667d78;
-}
-
-:root[data-theme="light"] :is(.auth-content, .login-page) { background: #f2f7f5; }
-
-:root[data-theme="light"] .login-page .login-background-image {
-  opacity: .2;
-  filter: saturate(.7) contrast(.9);
-}
-
-:root[data-theme="light"] .login-page .login-background-tint { mix-blend-mode: multiply; opacity: .3; }
-:root[data-theme="light"] .login-page .login-background-overlay {
-  background:
-    linear-gradient(90deg, rgba(234,243,240,.82), rgba(234,243,240,.75) 48%, rgba(242,247,245,.94) 72%, #f2f7f5 100%),
-    linear-gradient(to bottom, rgba(255,255,255,.34), transparent 50%, rgba(227,239,235,.72));
-}
-:root[data-theme="light"] .login-page .login-copy { text-shadow: none; }
-:root[data-theme="light"] .login-page .login-brand-title { color: var(--text); }
-:root[data-theme="light"] .auth-theme-control { color: var(--text-muted-light); }
-:root[data-theme="light"] .login-page .login-card {
-  border-color: var(--border);
-  background: var(--card);
-  color: var(--text);
-  box-shadow: var(--shadow);
-}
-:root[data-theme="light"] .login-page :is(.login-copy p, .login-proof span) { color: var(--muted); }
-:root[data-theme="light"] .login-page :is(.field input:not(.otp-input), .rf-scope .field input:not(.otp-input)) {
-  border-color: var(--border);
-  background: rgba(18,68,60,.035);
-  color: var(--text);
-}
-:root[data-theme="light"] .login-page :is(.btn-social, .btn-guest) { color: #17211f; }
-:root[data-theme="light"] .login-page .btn-social { border-color: var(--border); background: #ffffff; }
-:root[data-theme="light"] .login-page .btn-guest:hover { background: rgba(18,68,60,.06); color: #101418; }
+/* Authentication always uses the dark reservation theme. */
+.auth-content { color-scheme: dark; }
 
 :is(.login-page, .claim-modal-scope) .btn-social:hover,
 :is(.login-page, .claim-modal-scope) .btn-social:hover :is(.btn-social-label, .btn-social-arrow) {
@@ -353,8 +293,6 @@
 }
 
 @media (max-width: 640px) {
-  .auth-theme-control { top: 13px; right: max(12px, env(safe-area-inset-right)); }
-  .auth-theme-control > span { display: none; }
   .public-site .footer-bottom { padding-right: 0; }
   .public-site .footer-appearance { order: 3; }
   #app #panel-reports .reports-view-tabs { grid-template-columns: 1fr; }

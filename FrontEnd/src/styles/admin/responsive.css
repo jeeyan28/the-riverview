@@ -68,8 +68,10 @@
   #app .content{padding-inline:22px;}
 }
 
-/* Use the same breakpoint as AdminLayout's compactNavigation query. */
-@media (max-width:1200px){
+/* Use the same breakpoint as AdminLayout's compactNavigation query. Keeping
+   901px+ in the desktop shell also makes Chrome's mobile "Desktop site"
+   viewport behave like a desktop page instead of an unopened drawer. */
+@media (max-width:900px){
   #app #sidebar{
     display:flex;position:fixed;inset:0 auto 0 0;z-index:41;
     width:min(320px,calc(100vw - 40px));height:100dvh;

@@ -11,6 +11,7 @@ import { useAuth } from '../context/AuthContext';
 import { AdminAppNavigation } from '../components/MobileAppNavigation';
 
 const ADMIN_THEME_KEY = 'rv_admin_theme';
+const ADMIN_COMPACT_MEDIA = '(max-width: 900px)';
 
 function AdminLayout() {
   const { initializing, isAdmin, hasPermission } = useAuth();
@@ -19,7 +20,7 @@ function AdminLayout() {
   const pageTitle = PAGE_TITLES[pageKey] || 'Dashboard';
   const pageContext = PAGE_CONTEXT[pageKey] || 'Operations workspace';
   const [liveTime, setLiveTime] = useState({ time: '', date: '' });
-  const [compactNavigation, setCompactNavigation] = useState(() => window.matchMedia('(max-width: 1200px)').matches);
+  const [compactNavigation, setCompactNavigation] = useState(() => window.matchMedia(ADMIN_COMPACT_MEDIA).matches);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const menuButtonRef = useRef(null);
   const menuTriggerRef = useRef(null);
@@ -44,7 +45,7 @@ function AdminLayout() {
   }, [theme]);
 
   useEffect(() => {
-    const query = window.matchMedia('(max-width: 1200px)');
+    const query = window.matchMedia(ADMIN_COMPACT_MEDIA);
     function updateNavigation(event) {
       setCompactNavigation(event.matches);
       if (!event.matches) setMobileMenuOpen(false);

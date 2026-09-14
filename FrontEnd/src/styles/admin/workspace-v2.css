@@ -192,7 +192,7 @@
   #app .qa-btn:hover { border-color: color-mix(in srgb, var(--teal) 42%, var(--border)); }
 }
 
-@media (max-width: 1200px) {
+@media (max-width: 900px) {
   #app #sidebar {
     display: flex;
     width: min(88vw, 320px);

@@ -54,7 +54,17 @@ function AnnouncementsBell({ items = [], unreadCount = 0, markRead, variant = 'd
       <div className={`announcements-panel${open ? ' open' : ''}`} id={idFor('panel')} role="dialog" aria-label="Venue announcements">
         <div className="announcements-panel-header">
           <div><span className="announcements-panel-title">Venue updates</span><span className="announcements-panel-subtitle">{unreadCount > 0 ? `${unreadCount > 99 ? '99+' : unreadCount} unread` : 'You’re up to date'}</span></div>
-          {unreadCount > 0 && <button type="button" className="announcements-mark-all" onClick={() => items.filter((item) => !item.isRead).forEach((item) => markRead(item._id))}><Check size={14} /> Mark all read</button>}
+          {unreadCount > 0 && (
+            <button
+              type="button"
+              className="announcements-mark-all"
+              aria-label="Mark all announcements as read"
+              onClick={() => items.filter((item) => !item.isRead).forEach((item) => markRead(item._id))}
+            >
+              <Check size={14} />
+              <span>Mark all read</span>
+            </button>
+          )}
         </div>
 
         {items.length === 0 ? (

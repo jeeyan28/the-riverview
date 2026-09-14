@@ -16,6 +16,7 @@ import './styles/motion-system.css'
 import './styles/mobile-app.css'
 import './styles/responsive-content.css'
 import './styles/system-refinement.css'
+import './styles/mobile-density.css'
 
 
 ReactDOM.createRoot(document.getElementById('root')).render(

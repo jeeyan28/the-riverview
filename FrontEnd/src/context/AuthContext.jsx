@@ -8,8 +8,8 @@ const ROLE_LABELS = { user: 'User', staff: 'Staff', manager: 'Supervisor', super
 const ROLE_LEVEL = { user: 0, staff: 1, manager: 2, super_admin: 3 };
 const ADMIN_ROLES = ['staff', 'manager', 'super_admin'];
 
-function readStoredUser() {
-  const raw = localStorage.getItem(STORAGE_KEY) || sessionStorage.getItem(STORAGE_KEY);
+function parseStoredUser(storage) {
+  const raw = storage.getItem(STORAGE_KEY);
   if (!raw) return null;
   try {
     return JSON.parse(raw);
@@ -18,9 +18,25 @@ function readStoredUser() {
   }
 }
 
+function readStoredUser() {
+  // A tab-scoped login is the newest explicit choice for this tab. Older
+  // versions could leave a guest in localStorage and an account in
+  // sessionStorage, so reading localStorage first incorrectly restored Guest.
+  return parseStoredUser(sessionStorage) || parseStoredUser(localStorage);
+}
+
+function replaceStoredUser(user, storage) {
+  clearStoredUser();
+  if (user) storage.setItem(STORAGE_KEY, JSON.stringify(user));
+}
+
 function writeStoredUser(user) {
-  const area = localStorage.getItem(STORAGE_KEY) ? localStorage : sessionStorage;
-  if (user) area.setItem(STORAGE_KEY, JSON.stringify(user));
+  const storage = sessionStorage.getItem(STORAGE_KEY)
+    ? sessionStorage
+    : localStorage.getItem(STORAGE_KEY)
+      ? localStorage
+      : sessionStorage;
+  replaceStoredUser(user, storage);
 }
 
 function clearStoredUser() {
@@ -76,7 +92,7 @@ export function AuthProvider({ children }) {
     }
     setUser(data.user);
     const storage = rememberMe ? localStorage : sessionStorage;
-    storage.setItem(STORAGE_KEY, JSON.stringify(data.user));
+    replaceStoredUser(data.user, storage);
     return data.user;
   }, []);
 
@@ -91,7 +107,7 @@ export function AuthProvider({ children }) {
     if (!res.ok) throw new Error(data.message || 'Google sign-in failed.');
     setUser(data.user);
     const storage = rememberMe ? localStorage : sessionStorage;
-    storage.setItem(STORAGE_KEY, JSON.stringify(data.user));
+    replaceStoredUser(data.user, storage);
     return data.user;
   }, []);
 
@@ -109,7 +125,7 @@ export function AuthProvider({ children }) {
       throw err;
     }
     setUser(data.user);
-    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(data.user));
+    replaceStoredUser(data.user, sessionStorage);
     return data.user;
   }, []);
 
