@@ -5,7 +5,7 @@ const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
 export { getEmbeddedBrowserInfo } from '../utils/embeddedBrowser';
 
-export function useGoogleAuth(onCredential) {
+export function useGoogleAuth(onCredential, { enabled = true } = {}) {
   const clientRef = useRef(null);
   const onCredentialRef = useRef(onCredential);
   const embeddedBrowser = getEmbeddedBrowserInfo();
@@ -17,6 +17,7 @@ export function useGoogleAuth(onCredential) {
 
     function init() {
       if (cancelled) return;
+      if (!enabled) return;
       if (embeddedBrowser) return;
       if (!window.google || !window.google.accounts?.oauth2) {
         retryTimer = setTimeout(init, 300);
@@ -39,15 +40,15 @@ export function useGoogleAuth(onCredential) {
       clearTimeout(retryTimer);
       clientRef.current = null;
     };
-  }, [embeddedBrowser?.name]);
+  }, [embeddedBrowser?.name, enabled]);
 
   const triggerSignIn = useCallback(() => {
-    if (!clientRef.current) {
+    if (!enabled || !clientRef.current) {
       return false;
     }
     clientRef.current.requestCode();
     return true;
-  }, []);
+  }, [enabled]);
 
   return { triggerSignIn, embeddedBrowser };
 }

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { CheckCircle2, User } from 'lucide-react';
+import { CheckCircle2, CircleAlert, User } from 'lucide-react';
 import AuthForm from '../components/AuthForm';
 import ForgotPasswordModal from '../components/ForgotPasswordModal';
 import AuthMorphOverlay from '../components/AuthMorphOverlay';
@@ -52,11 +52,13 @@ function Login() {
             One account for billiards, KTV, and court reservations — with secure
             payment, automatic confirmation, and your booking history in one place.
           </p>
-          <div className="login-proof" aria-label="Account benefits">
-            <span><CheckCircle2 size={16} aria-hidden="true" /> Live availability</span>
-            <span><CheckCircle2 size={16} aria-hidden="true" /> Secure checkout</span>
-            <span><CheckCircle2 size={16} aria-hidden="true" /> Reservation history</span>
-          </div>
+          {!isMorphing && (
+            <div className="login-proof" aria-label="Account benefits">
+              <span><CheckCircle2 size={16} aria-hidden="true" /> Live availability</span>
+              <span><CheckCircle2 size={16} aria-hidden="true" /> Secure checkout</span>
+              <span><CheckCircle2 size={16} aria-hidden="true" /> Reservation history</span>
+            </div>
+          )}
         </div>
 
         <aside className={`login-card${isMorphing ? ' is-morph-source' : ''}`}>
@@ -64,7 +66,7 @@ function Login() {
             className={`auth-card-inner ${isLogin ? 'slide-to-login' : 'slide-to-register'}`}
             key={isLogin ? 'login' : 'register'}
           >
-            <div className="login-card-header">
+            <div className={`login-card-header${hasReservationIntent ? ' has-reservation-intent' : ''}`}>
               {isLogin ? (
                 <>
                   <div className="login-avatar"><User size={18} /></div>
@@ -82,6 +84,16 @@ function Login() {
                 </>
               )}
             </div>
+
+            {hasReservationIntent && (
+              <div className="reservation-auth-notice" role="alert">
+                <CircleAlert size={17} aria-hidden="true" />
+                <div>
+                  <strong>Sign in before reserving</strong>
+                  <span>Nothing has been booked yet. Sign in, create an account, or continue as a guest below; then we’ll return you to your reservation.</span>
+                </div>
+              </div>
+            )}
 
             <div className="auth-card-body">
               <AuthForm

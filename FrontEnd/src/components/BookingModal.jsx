@@ -790,12 +790,15 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
     const available = getAvailableRoomCount(reserved, Number(selectedVariant?.roomCount) || 1, hour);
     if (available <= 0 || lockLoading) return;
 
+    const previousHour = selectedHour;
+    const previousLock = lockRef.current;
     setLockError('');
     setLockLoading(true);
-    // Give touch users immediate feedback while the server secures the slot.
+    // The lock endpoint replaces this user's prior hold transactionally. Select
+    // locally first so a mobile tap responds without waiting on a release call.
     setSelectedHour(hour);
+    setLock(null);
     try {
-      await releaseCurrentLock();
       const { y, m, d } = selectedDate;
       const dateStr = dateKey(y, m, d);
       const timeStr = `${String(hour).padStart(2, '0')}:00`;
@@ -806,10 +809,14 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
         timeIn: timeStr,
         duration: selectedDuration,
       });
-      setLock({ id: result.id, expiresAtMs: new Date(result.expiresAt).getTime() });
+      const nextLock = { id: result.id, expiresAtMs: new Date(result.expiresAt).getTime() };
+      setLock(nextLock);
+      lockRef.current = nextLock;
     } catch (err) {
       console.error(err);
-      setSelectedHour((current) => (current === hour ? null : current));
+      setSelectedHour((current) => (current === hour ? previousHour : current));
+      setLock(previousLock);
+      lockRef.current = previousLock;
       setLockError(err.message || 'That time slot was just taken. Please choose another.');
       const key = dateKey(selectedDate.y, selectedDate.m, selectedDate.d);
       clearReservedHours(room._id, key);
@@ -1186,13 +1193,6 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
             <span>Back</span>
           </button>
           <div className="bk-header-identity">
-            <div className="bk-room-icon">
-              {step === 'paymongoReturn' ? (
-                <i className="fa-solid fa-credit-card"></i>
-              ) : (
-                <i className="fa-solid fa-circle-dot"></i>
-              )}
-            </div>
             <div>
               <p className="bk-eyebrow">Reservation</p>
               <h2 id="booking-modal-title">{step === 'paymongoReturn' ? 'Online payment' : room?.name}</h2>
@@ -1506,8 +1506,8 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
                     </div>
 
                     <div className="bk-detail-actions">
-                      <button className="bk-confirm bk-continue" disabled={selectedHour === null} onClick={handleContinueFromSchedule}>
-                        Continue <i className="fa-solid fa-arrow-right"></i>
+                      <button className="bk-confirm bk-continue" disabled={selectedHour === null || lockLoading || !lock} onClick={handleContinueFromSchedule}>
+                        {lockLoading ? 'Holding time…' : 'Continue'} {!lockLoading && <i className="fa-solid fa-arrow-right"></i>}
                       </button>
                     </div>
                   </>

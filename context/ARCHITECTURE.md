@@ -57,6 +57,7 @@ scripts/      → one-off/cron-invoked maintenance jobs, not part of the request
 - **Session-based**, not JWT: `express-session` + `connect-mongo`, 8-hour TTL, `httpOnly`/`secure`/`sameSite:lax` cookie.
 - **CSRF protection**: custom origin-verification middleware (`middleware/csrf.js`) checks request origin against an explicit allow-list — not a token-based CSRF scheme.
 - **RBAC**: role hierarchy `user (0) → staff (1) → manager/"Supervisor" → super_admin/"Owner"`, defined in `utils/permissions.js`. Authorization is **permission-string based** (`booking:manage`, `reports:view`, etc.), not raw role checks — routes call `requirePermission(PERMISSIONS.X)`, so a role's access can change by editing the permission map, not the routes.
+- **Staff entry point:** `/admin/login` is a credential-only portal for Staff, Supervisor, and Owner accounts. It posts to `POST /api/auth/admin-login`, which uses the normal validated password/session flow but rejects customer accounts before creating a successful staff login. Staff lands on Live Monitor; Supervisor and Owner land on Dashboard; a safe requested admin path is preserved.
 - **Rule:** new protected routes must use `requirePermission()` or `ensureAuthenticated`, never hand-roll a role check inline in a route handler.
 
 ## 4. Data Flow: Customer Booking + Payment
@@ -112,7 +113,7 @@ sequenceDiagram
 
 ## 5. Data Flow: Room/Court Status Monitoring
 
-- Room Management is the inventory source of truth. Saving Billiards, KTV, or Court calls `syncRoomInventory()`, which creates/updates the physical `MonitorRoom` units represented by each variant's start number and count and marks removed idle units inactive.
+- Room Management is the inventory source of truth. Saving any admin-defined facility calls `syncRoomInventory()`, which creates/updates the physical `MonitorRoom` units represented by each variant's start number and count and marks removed idle units inactive. Billiards, KTV, and Court are quick-start presets; additional facility names follow the same data flow.
 - Existing deployments can run `npm run align:prd` for a read-only migration preview, then `npm run align:prd:apply` to back up and transactionally align legacy room names/rates, monitor inventory, and the 07:00–00:00 daily schedule without rewriting historical booking charge snapshots, closures, announcements, or payment settings. The apply step is idempotent; `npm run restore:prd` previews the latest local backup and `npm run restore:prd:apply` restores it while preserving occupied monitor units.
 - Client polls `GET /monitor-rooms` and `GET /room-sessions` every **2 seconds** (`LOBBY_POLL_MS`) while the lobby/monitor view is open.
 - A local 1-second tick drives visual countdowns (e.g. time remaining) between polls without hitting the server every second.
@@ -139,9 +140,10 @@ flowchart LR
 ## 7. Concurrency & Data Integrity
 
 - **BookingLock** (Section 4) is the primary double-booking defense — a MongoDB TTL-indexed document, not an in-memory lock (which wouldn't survive serverless cold starts/multiple instances).
+- Changing a booking hour gives immediate local selection feedback and sends one lock request. The lock endpoint transactionally removes the user's previous lock before creating the replacement, so the client must not add a separate blocking release request between taps.
 - **Reschedule limits** (max 2, 3-hour cutoff) and **cancellation approval gating** are enforced server-side in the booking routes/model, not just in the frontend UI — the frontend should treat these as UX conveniences, not the source of truth.
 - **Roles:** Owner and Supervisor have full admin access; Staff can operate the live room monitor and manage booking operations without finance/settings authority. The permission map is the source of truth for both API routes and responsive admin UI affordances.
-- **Responsive admin surface:** the dashboard, booking queue, monitor, analytics, reports, users, logs, room management, and settings pages share mobile/tablet breakpoints. The sidebar becomes a focus-trapped drawer on narrow screens, tables scroll within their panels, and finance filters/metrics collapse into touch-sized controls.
+- **Responsive admin surface:** the dashboard, booking queue, monitor, analytics, reports, users, logs, room management, and settings pages share mobile/tablet breakpoints. The sidebar becomes a focus-trapped, permission-filtered drawer on narrow screens; the bottom navigation keeps **More** pinned while permitted destinations can scroll; tables scroll within their panels; dashboard queues and actions use compact tablet/phone layouts.
 - Reservation management accepts exact-date or inclusive `from`/`to` API filters; the admin toolbar exposes the date range alongside status, cancellation, facility, and search filters.
 
 ## 8. Third-Party Integrations

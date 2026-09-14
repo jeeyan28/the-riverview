@@ -7,6 +7,7 @@ const STORAGE_KEY = 'riverview_user';
 const ROLE_LABELS = { user: 'User', staff: 'Staff', manager: 'Supervisor', super_admin: 'Owner' };
 const ROLE_LEVEL = { user: 0, staff: 1, manager: 2, super_admin: 3 };
 const ADMIN_ROLES = ['staff', 'manager', 'super_admin'];
+const SESSION_CHECK_TIMEOUT_MS = 8000;
 
 function parseStoredUser(storage) {
   const raw = storage.getItem(STORAGE_KEY);
@@ -51,8 +52,13 @@ export function AuthProvider({ children }) {
   const [initializing, setInitializing] = useState(true);
 
   const revalidate = useCallback(async () => {
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), SESSION_CHECK_TIMEOUT_MS);
     try {
-      const res = await fetch(`${API_BASE_URL}/api/auth/me`, { credentials: 'include' });
+      const res = await fetch(`${API_BASE_URL}/api/auth/me`, {
+        credentials: 'include',
+        signal: controller.signal,
+      });
       if (res.status === 401 || res.status === 403) {
         setUser(null);
         clearStoredUser();
@@ -68,6 +74,7 @@ export function AuthProvider({ children }) {
       setUser(cachedUser);
       return cachedUser;
     } finally {
+      window.clearTimeout(timeoutId);
       setInitializing(false);
     }
   }, []);
@@ -76,8 +83,8 @@ export function AuthProvider({ children }) {
     revalidate();
   }, [revalidate]);
 
-  const login = useCallback(async (email, password, rememberMe) => {
-    const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
+  const authenticateWithPassword = useCallback(async (endpoint, email, password, rememberMe) => {
+    const res = await fetch(`${API_BASE_URL}/api/auth/${endpoint}`, {
       method: 'POST',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
@@ -95,6 +102,16 @@ export function AuthProvider({ children }) {
     replaceStoredUser(data.user, storage);
     return data.user;
   }, []);
+
+  const login = useCallback(
+    (email, password, rememberMe) => authenticateWithPassword('login', email, password, rememberMe),
+    [authenticateWithPassword]
+  );
+
+  const adminLogin = useCallback(
+    (email, password, rememberMe) => authenticateWithPassword('admin-login', email, password, rememberMe),
+    [authenticateWithPassword]
+  );
 
   const loginWithGoogle = useCallback(async (code, rememberMe) => {
     const res = await fetch(`${API_BASE_URL}/api/auth/google`, {
@@ -320,6 +337,7 @@ export function AuthProvider({ children }) {
       hasPermission,
       guardPermission,
       login,
+      adminLogin,
       loginWithGoogle,
       continueAsGuest,
       register,
@@ -342,6 +360,7 @@ export function AuthProvider({ children }) {
       hasPermission,
       guardPermission,
       login,
+      adminLogin,
       loginWithGoogle,
       continueAsGuest,
       register,

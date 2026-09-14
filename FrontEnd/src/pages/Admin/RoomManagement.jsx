@@ -36,7 +36,7 @@ import { useAuth } from '../../context/AuthContext';
 import { roomsService } from '../../services/rooms';
 import { variantRateLabel } from '../../utils/roomPricing';
 
-const SERVICE_CATEGORIES = ['Billiards', 'KTV', 'Court'];
+const FACILITY_PRESETS = ['Billiards', 'KTV', 'Court'];
 
 const SERVICE_DEFAULTS = {
   Billiards: {
@@ -91,10 +91,11 @@ function emptyVariant() {
 
 function emptyFacilityForm(name = '') {
   const preset = SERVICE_DEFAULTS[name];
+  const variants = preset?.variants || [emptyVariant()];
   return {
     name,
     description: preset?.description || '',
-    variants: (preset?.variants || []).map((variant, index) => ({
+    variants: variants.map((variant, index) => ({
       ...emptyVariant(),
       ...variant,
       startingRoomNumber: index + 1,
@@ -145,7 +146,6 @@ function RoomManagement() {
   const [search, setSearch] = useState('');
 
   const [modalOpen, setModalOpen] = useState(false);
-  const [catalogActionOpen, setCatalogActionOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [formStep, setFormStep] = useState('facility');
   const [activeRoomIndex, setActiveRoomIndex] = useState(null);
@@ -200,10 +200,10 @@ function RoomManagement() {
 
   function openAddModal() {
     if (!guardPermission('room:manage')) return;
-    setCatalogActionOpen(true);
+    startNewFacility();
   }
 
-  function startNewFacility(name) {
+  function startNewFacility(name = '') {
     setEditingId(null);
     setFormStep('facility');
     setActiveRoomIndex(null);
@@ -211,8 +211,19 @@ function RoomManagement() {
     resetImageState();
     setFeatureInput('');
     setFormError('');
-    setCatalogActionOpen(false);
     setModalOpen(true);
+  }
+
+  function applyFacilityPreset(name) {
+    setForm(emptyFacilityForm(name));
+    setActiveRoomIndex(null);
+    setFeatureInput('');
+    setFormError('');
+    setVariantImageFiles({});
+    setVariantImagePreviews((current) => {
+      Object.values(current).forEach((url) => URL.revokeObjectURL(url));
+      return {};
+    });
   }
 
   function openEditModal(room, { addRoom = false } = {}) {
@@ -248,7 +259,6 @@ function RoomManagement() {
     });
     setFeatureInput('');
     setFormError('');
-    setCatalogActionOpen(false);
     setModalOpen(true);
   }
 
@@ -353,12 +363,7 @@ function RoomManagement() {
     setFormError('');
     if (!form.name.trim()) {
       setFormStep('facility');
-      setFormError('Choose a facility category before continuing.');
-      return;
-    }
-    if (!SERVICE_CATEGORIES.includes(form.name.trim())) {
-      setFormStep('facility');
-      setFormError('Choose Billiards, KTV, or Court. These are the reservable facilities configured for Riverview.');
+      setFormError('Enter a facility name before continuing.');
       return;
     }
     const normalized = form.name.trim().toLowerCase();
@@ -477,7 +482,7 @@ function RoomManagement() {
   }
 
   const categories = useMemo(
-    () => [...SERVICE_CATEGORIES.filter((name) => rooms.some((room) => room.name === name)), ...Array.from(new Set(rooms.map((room) => room.name).filter((name) => name && !SERVICE_CATEGORIES.includes(name)))).sort()],
+    () => [...FACILITY_PRESETS.filter((name) => rooms.some((room) => room.name === name)), ...Array.from(new Set(rooms.map((room) => room.name).filter((name) => name && !FACILITY_PRESETS.includes(name)))).sort()],
     [rooms]
   );
 
@@ -637,35 +642,6 @@ function RoomManagement() {
         </div>
       </section>
 
-      <Modal open={catalogActionOpen} onClose={() => setCatalogActionOpen(false)} ariaLabel="Add to facility catalog" size="lg" className="facility-action-modal">
-        <div className="facility-action-header">
-          <div className="facility-action-icon"><Plus size={22} aria-hidden="true" /></div>
-          <div>
-            <span className="facility-kicker">ADD TO CATALOG</span>
-            <h2>What would you like to add?</h2>
-            <p>Choose a facility below. New services get a ready-to-edit template; configured services open a blank room form.</p>
-          </div>
-          <button type="button" className="fm-close-btn" aria-label="Close" onClick={() => setCatalogActionOpen(false)}><X size={18} /></button>
-        </div>
-        <div className="facility-action-options">
-          {SERVICE_CATEGORIES.map((name) => {
-            const existing = rooms.find((room) => room.name === name);
-            return (
-              <button key={name} type="button" className="facility-action-option" onClick={() => existing ? openEditModal(existing, { addRoom: true }) : startNewFacility(name)}>
-                <span className="facility-action-option-icon"><FacilityIcon name={name} size={24} /></span>
-                <span className="facility-action-option-copy">
-                  <span className={`facility-action-state ${existing ? 'is-configured' : 'is-new'}`}>{existing ? 'Facility configured' : 'Not set up yet'}</span>
-                  <strong>{name}</strong>
-                  <small>{existing ? `Add another room type to ${name}.` : `Create the ${name} facility with suggested rooms and rates.`}</small>
-                </span>
-                <span className="facility-action-option-cta"><Plus size={16} />{existing ? 'Add room' : 'Create'}</span>
-              </button>
-            );
-          })}
-        </div>
-        <div className="facility-action-note"><CheckCircle2 size={17} /><span>Billiards, KTV, and Court are the guest booking categories defined for Riverview.</span></div>
-      </Modal>
-
       <Modal open={modalOpen} onClose={closeModal} ariaLabel={editingId ? `Edit ${form.name || 'facility'}` : 'Add facility'} size="2xl" className="fm-editor-modal">
         <div className="fm-modal-header">
           <div>
@@ -720,23 +696,39 @@ function RoomManagement() {
               <>
                 <div className="fm-section">
                 <div className="ffield">
-                  <label className="flabel"><Tags size={15} aria-hidden="true" /> Facility category</label>
-                  <span className="flabel-hint">This controls where the facility appears in the guest booking catalog.</span>
-                  <select
-                    value={SERVICE_CATEGORIES.includes(form.name) ? form.name : ''}
-                    onChange={(event) => {
-                      const name = event.target.value;
-                      setForm((current) => editingId ? { ...current, name } : emptyFacilityForm(name));
-                    }}
-                  >
-                    {!SERVICE_CATEGORIES.includes(form.name) && <option value="">Choose a supported service…</option>}
-                    {SERVICE_CATEGORIES.map((name) => {
-                      const usedByAnother = rooms.some((room) => room.name === name && room._id !== editingId);
-                      return <option key={name} value={name} disabled={usedByAnother}>{name}{usedByAnother ? ' — already configured' : ''}</option>;
-                    })}
-                  </select>
-                  {!SERVICE_CATEGORIES.includes(form.name) && editingId && (
-                    <div className="fm-field-warning">This legacy category is outside project scope. Choose Billiards, KTV, or Court, or remove it.</div>
+                  <label className="flabel" htmlFor="facility-name"><Tags size={15} aria-hidden="true" /> Facility name</label>
+                  <span className="flabel-hint">Use any unique guest-facing name, such as Pickleball, Function Hall, or Darts. It will also appear in Live Monitor and reports.</span>
+                  <input
+                    id="facility-name"
+                    type="text"
+                    maxLength={80}
+                    autoComplete="off"
+                    placeholder="e.g. Pickleball"
+                    value={form.name}
+                    onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
+                  />
+                  {!editingId && (
+                    <div className="fm-preset-picker" aria-label="Optional facility templates">
+                      <span>Or start with a preset</span>
+                      <div>
+                        {FACILITY_PRESETS.map((name) => {
+                          const configured = rooms.some((room) => room.name.toLowerCase() === name.toLowerCase());
+                          return (
+                            <button
+                              key={name}
+                              type="button"
+                              disabled={configured}
+                              title={configured ? `${name} is already configured` : `Use the ${name} template`}
+                              onClick={() => applyFacilityPreset(name)}
+                            >
+                              <FacilityIcon name={name} size={15} />
+                              {name}
+                              {configured && <small>Added</small>}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
                   )}
                 </div>
                 </div>
@@ -1074,7 +1066,7 @@ function RoomManagement() {
           <div>{editingId && <button className="btn-remove" onClick={handleRemove}><Trash2 size={16} aria-hidden="true" />Remove facility</button>}</div>
           <div className="fm-primary-actions">
             <button type="button" className="btn-cancel" onClick={closeModal}>Cancel</button>
-            <button className="btn-save" disabled={saving || !SERVICE_CATEGORIES.includes(form.name)} onClick={handleSave}>
+            <button className="btn-save" disabled={saving || !form.name.trim()} onClick={handleSave}>
               {saving ? <><Loader2 size={16} className="spin" aria-hidden="true" />Saving…</> : <><Save size={16} aria-hidden="true" />{editingId ? 'Save changes' : 'Add facility'}</>}
             </button>
           </div>

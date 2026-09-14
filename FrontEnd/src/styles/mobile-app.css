@@ -309,10 +309,6 @@
     gap: var(--space-1, 4px);
   }
 
-  #app #view-user-site-btn {
-    display: none;
-  }
-
   #app .theme-toggle {
     width: 58px;
     min-width: 58px;

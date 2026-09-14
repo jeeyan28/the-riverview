@@ -1138,7 +1138,7 @@ body.has-guest-banner {
     font-size: .76rem; font-weight: 500; cursor: pointer;
     background: var(--ovl-04); border: 1px solid var(--border);
     color: var(--text-main); transition: background .15s ease, border-color .15s ease, transform .18s ease, box-shadow .18s ease;
-    min-height: 40px; justify-content: center;
+    min-height: 40px; justify-content: center; touch-action: manipulation;
 }
 .bk-slot-time { font-weight: 700; }
 .bk-slot-status { font-size: .67rem; font-weight: 600; color: var(--teal); }

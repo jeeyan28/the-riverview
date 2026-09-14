@@ -181,7 +181,7 @@ Defines a bookable facility and its priced variants (e.g. Billiards' Shared/Solo
 | `variants[].pricingMode` | enum | `flat` or `time-based`; time-based variants use `eveningPrice` from `eveningStartTime` |
 | `variants[].includedGuests`, `variants[].extraGuestFee` | Number | optional per-guest hourly surcharge; `includedGuests = 0` applies it to every guest |
 
-Only `Billiards`, `KTV`, and `Court` are accepted as facility names. Mutating room routes parse multipart JSON and validate the complete payload with Joi before saving.
+Facility names are admin-defined, 2–80 characters, and unique without regard to letter case. `Billiards`, `KTV`, and `Court` are editor presets rather than schema restrictions. Mutating room routes parse multipart JSON and validate the complete payload with Joi before saving.
 
 ### BookingLock
 Short-lived hold on a slot during checkout — prevents double-booking. See ARCHITECTURE.md Section 4/7.

@@ -1,5 +1,4 @@
 const { Joi } = require("../middleware/validate");
-const { SERVICE_NAMES } = require("../utils/roomCatalog");
 
 const hourlyTime = Joi.string().pattern(/^(?:[01]\d|2[0-3]):00$/);
 const roomIdParamsSchema = Joi.object({
@@ -29,7 +28,7 @@ const roomVariantSchema = Joi.object({
 });
 
 const roomWriteSchema = Joi.object({
-  name: Joi.string().trim().valid(...SERVICE_NAMES).required(),
+  name: Joi.string().trim().min(2).max(80).pattern(/^[^\r\n<>]+$/).required(),
   description: Joi.string().trim().allow("").max(1000).default(""),
   price: Joi.number().min(0).precision(2).default(0),
   capacity: Joi.number().integer().min(0).max(100).default(0),

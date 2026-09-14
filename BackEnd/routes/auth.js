@@ -682,7 +682,7 @@ router.post("/guest/claim/google", ensureAuthenticated, requireGuest, validate(g
   }
 });
 
-router.post("/login", loginLimiter, validate(loginSchema), async (req, res) => {
+async function handlePasswordLogin(req, res, { adminOnly = false } = {}) {
   try {
     const { email, password } = req.body;
 
@@ -725,6 +725,11 @@ router.post("/login", loginLimiter, validate(loginSchema), async (req, res) => {
       return res.status(401).json({ message: "Invalid email or password." });
     }
 
+    if (adminOnly && !isAdminRole(user.role)) {
+      await logLoginAttempt(req, { user, status: "failed", reason: "Staff portal access denied" });
+      return res.status(403).json({ message: "This account does not have staff access." });
+    }
+
     await user.registerSuccessfulLogin();
     await logLoginAttempt(req, { user, status: "success" });
 
@@ -739,7 +744,13 @@ router.post("/login", loginLimiter, validate(loginSchema), async (req, res) => {
     console.error(err);
     res.status(500).json({ message: "Server error." });
   }
-});
+}
+
+router.post("/login", loginLimiter, validate(loginSchema), (req, res) => handlePasswordLogin(req, res));
+
+router.post("/admin-login", loginLimiter, validate(loginSchema), (req, res) => (
+  handlePasswordLogin(req, res, { adminOnly: true })
+));
 
 router.post("/google", validate(googleCodeSchema), async (req, res) => {
   try {

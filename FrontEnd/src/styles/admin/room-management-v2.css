@@ -551,8 +551,7 @@
   box-shadow: inset 0 1px rgba(255,255,255,.08);
 }
 
-#app #panel-room-management .facility-kicker,
-#app .facility-action-modal .facility-kicker {
+#app #panel-room-management .facility-kicker {
   margin-bottom: 4px;
   color: var(--teal);
   font-size: .67rem;
@@ -1146,168 +1145,6 @@
 
 @keyframes facility-loader { to { transform: rotate(360deg); } }
 
-/* Add facility / add room chooser */
-#app .facility-action-modal.modal-lg {
-  width: min(760px, calc(100vw - 32px));
-  max-width: 760px;
-  padding: 0;
-  overflow: hidden;
-  border-radius: 20px;
-}
-
-#app .facility-action-modal .facility-action-header {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  gap: 13px;
-  align-items: start;
-  padding: 21px 22px 18px;
-  border-bottom: 1px solid var(--border);
-  background:
-    radial-gradient(circle at 0 0, color-mix(in srgb, var(--teal) 15%, transparent), transparent 45%),
-    var(--navy2);
-}
-
-#app .facility-action-modal .facility-action-icon {
-  display: grid;
-  width: 44px;
-  height: 44px;
-  place-items: center;
-  border-radius: 13px;
-  background: var(--teal-soft);
-  color: var(--teal);
-}
-
-#app .facility-action-modal h2 {
-  margin: 0;
-  color: var(--text);
-  font-size: 1.23rem;
-  font-weight: 780;
-  letter-spacing: -.03em;
-}
-
-#app .facility-action-modal .facility-action-header p {
-  max-width: 570px;
-  margin: 5px 0 0;
-  color: var(--muted);
-  font-size: .75rem;
-  line-height: 1.5;
-}
-
-#app .facility-action-modal .fm-close-btn {
-  display: grid;
-  width: 38px;
-  height: 38px;
-  place-items: center;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--navy3);
-  color: var(--muted);
-}
-
-#app .facility-action-modal .fm-close-btn:hover {
-  color: var(--text);
-}
-
-#app .facility-action-modal .facility-action-options {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 11px;
-  padding: 18px 20px;
-  background: var(--navy2);
-}
-
-#app .facility-action-modal .facility-action-option {
-  display: flex;
-  min-width: 0;
-  min-height: 210px;
-  flex-direction: column;
-  align-items: flex-start;
-  padding: 16px;
-  border: 1px solid var(--border);
-  border-radius: 15px;
-  background: var(--navy3);
-  color: var(--text);
-  text-align: left;
-  cursor: pointer;
-  transition: border-color 170ms ease, background-color 170ms ease, transform 170ms ease, box-shadow 170ms ease;
-}
-
-#app .facility-action-modal .facility-action-option:hover {
-  border-color: color-mix(in srgb, var(--teal) 42%, var(--border));
-  background: color-mix(in srgb, var(--teal) 7%, var(--navy3));
-  box-shadow: 0 10px 24px rgba(2,10,20,.11);
-  transform: translateY(-2px);
-}
-
-#app .facility-action-modal .facility-action-option-icon {
-  display: grid;
-  width: 43px;
-  height: 43px;
-  margin-bottom: 14px;
-  place-items: center;
-  border-radius: 13px;
-  background: var(--teal-soft);
-  color: var(--teal);
-}
-
-#app .facility-action-modal .facility-action-option-copy {
-  display: grid;
-  gap: 4px;
-}
-
-#app .facility-action-modal .facility-action-state {
-  width: max-content;
-  padding: 3px 6px;
-  border-radius: 999px;
-  background: var(--teal-soft);
-  color: var(--teal);
-  font-size: .58rem;
-  font-weight: 760;
-  letter-spacing: .02em;
-}
-
-#app .facility-action-modal .facility-action-state.is-new {
-  background: color-mix(in srgb, var(--amber) 12%, transparent);
-  color: var(--amber);
-}
-
-#app .facility-action-modal .facility-action-option-copy strong {
-  color: var(--text);
-  font-size: .91rem;
-}
-
-#app .facility-action-modal .facility-action-option-copy small {
-  color: var(--muted);
-  font-size: .68rem;
-  line-height: 1.46;
-}
-
-#app .facility-action-modal .facility-action-option-cta {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  margin-top: auto;
-  color: var(--teal);
-  font-size: .7rem;
-  font-weight: 760;
-}
-
-#app .facility-action-modal .facility-action-note {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  padding: 13px 20px 16px;
-  border-top: 1px solid var(--border-soft);
-  background: var(--navy2);
-  color: var(--muted);
-  font-size: .69rem;
-}
-
-#app .facility-action-modal .facility-action-note svg {
-  flex: 0 0 auto;
-  color: var(--teal);
-}
-
 /* Editor typography and validation */
 #app .fm-editor-modal .modal-lg-title {
   font-size: 1.25rem;
@@ -1452,6 +1289,64 @@
   transition: transform 180ms ease;
 }
 #app .fm-editor-modal .fm-preview-col[open] > summary > svg:last-child { transform: rotate(180deg); }
+
+#app .fm-editor-modal .fm-preset-picker {
+  display: grid;
+  gap: 7px;
+  margin-top: 10px;
+  padding: 10px;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  background: var(--navy2);
+}
+
+#app .fm-editor-modal .fm-preset-picker > span {
+  color: var(--muted);
+  font-size: .64rem;
+  font-weight: 680;
+}
+
+#app .fm-editor-modal .fm-preset-picker > div {
+  display: grid;
+  grid-template-columns: repeat(3,minmax(0,1fr));
+  gap: 6px;
+}
+
+#app .fm-editor-modal .fm-preset-picker button {
+  display: inline-flex;
+  min-width: 0;
+  min-height: 38px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 7px 9px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--navy3);
+  color: var(--text);
+  font-size: .68rem;
+  font-weight: 720;
+}
+
+#app .fm-editor-modal .fm-preset-picker button:hover:not(:disabled) {
+  border-color: color-mix(in srgb,var(--teal) 55%,var(--border));
+  background: var(--teal-soft);
+  color: var(--teal);
+}
+
+#app .fm-editor-modal .fm-preset-picker button:disabled {
+  color: var(--muted);
+  cursor: not-allowed;
+  opacity: .58;
+}
+
+#app .fm-editor-modal .fm-preset-picker button small {
+  padding: 2px 4px;
+  border-radius: 999px;
+  background: var(--navy4);
+  font-size: .53rem;
+  font-weight: 720;
+}
 
 @media (max-width: 1180px) {
   #app #panel-room-management .facility-catalog-tools {
@@ -1634,64 +1529,6 @@
     min-width: 94px;
   }
 
-  #app .modal-bg:has(.facility-action-modal) {
-    align-items: flex-end;
-    padding: 0;
-  }
-
-  #app .facility-action-modal.modal-lg {
-    width: 100%;
-    max-width: none;
-    max-height: calc(100dvh - max(8px, env(safe-area-inset-top)));
-    overflow-y: auto;
-    border-radius: 20px 20px 0 0;
-  }
-
-  #app .facility-action-modal .facility-action-header {
-    grid-template-columns: auto minmax(0, 1fr) auto;
-    padding: 17px 15px 15px;
-  }
-
-  #app .facility-action-modal .facility-action-icon {
-    width: 40px;
-    height: 40px;
-  }
-
-  #app .facility-action-modal h2 {
-    font-size: 1.05rem;
-  }
-
-  #app .facility-action-modal .facility-action-header p {
-    font-size: .69rem;
-  }
-
-  #app .facility-action-modal .facility-action-options {
-    grid-template-columns: 1fr;
-    padding: 13px 14px;
-  }
-
-  #app .facility-action-modal .facility-action-option {
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto;
-    min-height: 0;
-    gap: 11px;
-    align-items: center;
-    padding: 13px;
-  }
-
-  #app .facility-action-modal .facility-action-option-icon {
-    width: 42px;
-    height: 42px;
-    margin: 0;
-  }
-
-  #app .facility-action-modal .facility-action-option-cta {
-    margin: 0;
-  }
-
-  #app .facility-action-modal .facility-action-note {
-    padding: 12px 15px max(16px, env(safe-area-inset-bottom));
-  }
 }
 
 @media (max-width: 430px) {
@@ -1735,28 +1572,15 @@
     min-width: 82px;
   }
 
-  #app .facility-action-modal .facility-action-icon {
-    display: none;
-  }
-
-  #app .facility-action-modal .facility-action-header {
-    grid-template-columns: minmax(0, 1fr) auto;
-  }
-
-  #app .facility-action-modal .facility-action-option {
-    grid-template-columns: auto minmax(0, 1fr);
-  }
-
-  #app .facility-action-modal .facility-action-option-cta {
-    grid-column: 2;
-  }
+  #app .fm-editor-modal .fm-preset-picker { padding: 8px; }
+  #app .fm-editor-modal .fm-preset-picker button { gap: 4px; padding-inline: 5px; font-size: .64rem; }
+  #app .fm-editor-modal .fm-preset-picker button small { display: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   #app #panel-room-management .facility-catalog-row,
   #app #panel-room-management .facility-catalog-media img,
-  #app #panel-room-management .facility-add-button,
-  #app .facility-action-modal .facility-action-option {
+  #app #panel-room-management .facility-add-button {
     transition: none;
   }
 }
