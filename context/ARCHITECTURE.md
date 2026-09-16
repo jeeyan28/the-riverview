@@ -57,7 +57,7 @@ scripts/      → one-off/cron-invoked maintenance jobs, not part of the request
 - **Session-based**, not JWT: `express-session` + `connect-mongo`, 8-hour TTL, `httpOnly`/`secure`/`sameSite:lax` cookie.
 - **CSRF protection**: custom origin-verification middleware (`middleware/csrf.js`) checks request origin against an explicit allow-list — not a token-based CSRF scheme.
 - **RBAC**: role hierarchy `user (0) → staff (1) → manager/"Supervisor" → super_admin/"Owner"`, defined in `utils/permissions.js`. Authorization is **permission-string based** (`booking:manage`, `reports:view`, etc.), not raw role checks — routes call `requirePermission(PERMISSIONS.X)`, so a role's access can change by editing the permission map, not the routes.
-- **Staff entry point:** `/admin/login` is a credential-only portal for Staff, Supervisor, and Owner accounts. It posts to `POST /api/auth/admin-login`, which uses the normal validated password/session flow but rejects customer accounts before creating a successful staff login. Staff lands on Live Monitor; Supervisor and Owner land on Dashboard; a safe requested admin path is preserved.
+- **Shared account entry point:** customers and staff use the same `/login` screen and `POST /api/auth/login` session flow. Customer registration remains available on that page. After sign-in, Staff lands on Live Monitor, Supervisor and Owner land on Dashboard, and customers return to their requested customer path; a safe requested admin path is preserved only for staff roles.
 - **Rule:** new protected routes must use `requirePermission()` or `ensureAuthenticated`, never hand-roll a role check inline in a route handler.
 
 ## 4. Data Flow: Customer Booking + Payment

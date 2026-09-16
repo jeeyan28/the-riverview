@@ -6,7 +6,7 @@ import AdminLayout from './layouts/AdminLayout';
 import { useAuth } from './context/AuthContext';
 import RiverviewLoader from './components/RiverviewLoader';
 import Login from './pages/Login';
-import AdminLogin from './pages/AdminLogin';
+import { isAdminReturnPath } from './utils/auth';
 
 const Home = lazy(() => import('./pages/Home'));
 const Rooms = lazy(() => import('./pages/Rooms'));
@@ -47,6 +47,11 @@ function RouteFallback() {
   return <RiverviewLoader message="Loading your next view…" />;
 }
 
+function LegacyAdminLoginRedirect() {
+  const returnTo = new URLSearchParams(window.location.search).get('returnTo') || '';
+  return <Navigate to={isAdminReturnPath(returnTo) ? returnTo : '/admin'} replace />;
+}
+
 function App() {
   return (
     <Suspense fallback={<RouteFallback />}>
@@ -62,7 +67,7 @@ function App() {
 
       <Route element={<AuthLayout />}>
         <Route path="/login" element={<Login />} />
-        <Route path="/admin/login" element={<AdminLogin />} />
+        <Route path="/admin/login" element={<LegacyAdminLoginRedirect />} />
       </Route>
 
       <Route path="/lobby-monitor" element={<RequirePermission permission="room:view"><LobbyMonitor /></RequirePermission>} />

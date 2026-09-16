@@ -63,7 +63,7 @@
   font-weight: 700;
 }
 .public-site .announcement-item { cursor: default; }
-.public-site .announcement-item:not(.is-read) { background: color-mix(in srgb, var(--teal) 8%, var(--surface)); }
+.public-site .announcement-item:not(.is-read) { background: color-mix(in srgb, var(--teal) 8%, var(--surface)); cursor: pointer; }
 .public-site .announcement-item-icon { display: grid; place-items: center; color: var(--teal-strong); }
 .public-site .announcement-item-close { display: grid; place-items: center; color: var(--teal-strong); }
 

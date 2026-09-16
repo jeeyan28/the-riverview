@@ -83,8 +83,8 @@ export function AuthProvider({ children }) {
     revalidate();
   }, [revalidate]);
 
-  const authenticateWithPassword = useCallback(async (endpoint, email, password, rememberMe) => {
-    const res = await fetch(`${API_BASE_URL}/api/auth/${endpoint}`, {
+  const login = useCallback(async (email, password, rememberMe) => {
+    const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
       method: 'POST',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
@@ -102,16 +102,6 @@ export function AuthProvider({ children }) {
     replaceStoredUser(data.user, storage);
     return data.user;
   }, []);
-
-  const login = useCallback(
-    (email, password, rememberMe) => authenticateWithPassword('login', email, password, rememberMe),
-    [authenticateWithPassword]
-  );
-
-  const adminLogin = useCallback(
-    (email, password, rememberMe) => authenticateWithPassword('admin-login', email, password, rememberMe),
-    [authenticateWithPassword]
-  );
 
   const loginWithGoogle = useCallback(async (code, rememberMe) => {
     const res = await fetch(`${API_BASE_URL}/api/auth/google`, {
@@ -337,7 +327,6 @@ export function AuthProvider({ children }) {
       hasPermission,
       guardPermission,
       login,
-      adminLogin,
       loginWithGoogle,
       continueAsGuest,
       register,
@@ -360,7 +349,6 @@ export function AuthProvider({ children }) {
       hasPermission,
       guardPermission,
       login,
-      adminLogin,
       loginWithGoogle,
       continueAsGuest,
       register,

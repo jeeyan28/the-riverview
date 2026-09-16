@@ -5,6 +5,7 @@ import {
   BarChart3,
   Building2,
   CalendarDays,
+  ExternalLink,
   FileBarChart,
   History,
   LayoutDashboard,
@@ -47,6 +48,12 @@ const NAV_SECTIONS = [
       { to: '/admin/logs', icon: History, label: 'Login History', roles: MANAGER_UP },
       { to: '/admin/room-management', icon: Building2, label: 'Facilities', permission: 'room:manage' },
       { to: '/admin/settings', icon: Settings, label: 'Settings', permission: 'settings:view' },
+    ],
+  },
+  {
+    label: 'Customer',
+    items: [
+      { to: '/', icon: ExternalLink, label: 'Customer Site' },
     ],
   },
 ];

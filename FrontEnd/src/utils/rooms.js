@@ -124,6 +124,25 @@ export function getAvailableRoomCount(
   );
 }
 
+export function getAvailableRoomCountForDuration(
+  reservedCounts,
+  roomCount,
+  startHour,
+  duration = 1
+) {
+  const hours = Math.max(1, Number(duration) || 1);
+  let available = Number(roomCount) || 1;
+
+  for (let hour = startHour; hour < startHour + hours; hour++) {
+    available = Math.min(
+      available,
+      getAvailableRoomCount(reservedCounts, roomCount, hour)
+    );
+  }
+
+  return Math.max(0, available);
+}
+
 export function isHolidayDate(dateStr, holidays) {
   return (holidays || []).some((h) => h.date === dateStr && h.fullDay);
 }

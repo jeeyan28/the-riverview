@@ -80,6 +80,17 @@ function AnnouncementsBell({ items = [], unreadCount = 0, markRead, variant = 'd
               <li
                 key={a._id}
                 className={`announcement-item${a.isRead ? ' is-read' : ''}`}
+                role={a.isRead ? undefined : 'button'}
+                tabIndex={a.isRead ? undefined : 0}
+                aria-label={a.isRead ? undefined : `Mark ${a.title} as read`}
+                onClick={() => {
+                  if (!a.isRead) markRead(a._id);
+                }}
+                onKeyDown={(event) => {
+                  if (a.isRead || (event.key !== 'Enter' && event.key !== ' ')) return;
+                  event.preventDefault();
+                  markRead(a._id);
+                }}
               >
                 <span className="announcement-item-icon">
                   <Megaphone size={17} aria-hidden="true" />
@@ -92,17 +103,12 @@ function AnnouncementsBell({ items = [], unreadCount = 0, markRead, variant = 'd
                   <p className="announcement-item-message">{a.message}</p>
                 </div>
                 {!a.isRead && (
-                  <button
-                    type="button"
+                  <span
                     className="announcement-item-close"
-                    aria-label="Mark announcement as read"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      markRead(a._id);
-                    }}
+                    aria-hidden="true"
                   >
                     <Check size={14} aria-hidden="true" />
-                  </button>
+                  </span>
                 )}
               </li>
             ))}

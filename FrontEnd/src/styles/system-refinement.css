@@ -79,10 +79,6 @@
   color: var(--text-main);
 }
 
-:root[data-theme="light"] .public-site > footer::before {
-  background: linear-gradient(90deg, transparent, rgba(0, 143, 120, .45), transparent);
-}
-
 :root[data-theme="light"] .public-site :is(.footer-brand p, .footer-col p, .footer-col > a:not(.footer-reserve-link), .footer-bottom, .footer-legal-links a, .footer-back-top, .footer-visit-facts span, .footer-appearance) {
   color: var(--text-muted-light);
 }

@@ -203,11 +203,14 @@ nav a:hover::after, nav a.active::after { width: 20px; }
 .bk-close, .pf-close { transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out) !important; }
 .bk-close:hover, .pf-close:hover { transform: rotate(90deg); }
 
-.bk-room-option, .bk-day, .bk-slot {
+.bk-room-option, .bk-day {
     transition: background .15s var(--ease-out), border-color .15s var(--ease-out),
                 transform .15s var(--ease-out), box-shadow .15s var(--ease-out) !important;
 }
-.bk-slot:hover:not(.bk-slot--reserved) { box-shadow: 0 4px 12px rgba(0,201,167,.15); }
+.bk-slot {
+    transition: background .1s var(--ease-out), border-color .1s var(--ease-out), color .1s var(--ease-out) !important;
+}
+.bk-slot:hover:not(.bk-slot--reserved):not(.bk-slot--insufficient) { box-shadow: none; }
 .bk-day--selected, .bk-slot--selected { animation: none; }
 
 .bk-back-btn {

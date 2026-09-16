@@ -19,12 +19,10 @@ function maskEmail(email) {
   return `${local[0]}***@${domain}`;
 }
 
-function AuthForm({ mode, onSwitchMode, onForgotPassword, onAuthSuccess, portal = 'customer' }) {
+function AuthForm({ mode, onSwitchMode, onForgotPassword, onAuthSuccess }) {
   const isLogin = mode === 'login';
-  const isAdminPortal = portal === 'admin';
   const {
     login,
-    adminLogin,
     register,
     loginWithGoogle,
     continueAsGuest,
@@ -84,7 +82,7 @@ function AuthForm({ mode, onSwitchMode, onForgotPassword, onAuthSuccess, portal 
     }
   }
 
-  const { triggerSignIn, embeddedBrowser } = useGoogleAuth(handleGoogleCredential, { enabled: !isAdminPortal });
+  const { triggerSignIn, embeddedBrowser } = useGoogleAuth(handleGoogleCredential);
   const [linkCopied, setLinkCopied] = useState(false);
 
   function handleGoogleClick() {
@@ -164,7 +162,7 @@ function AuthForm({ mode, onSwitchMode, onForgotPassword, onAuthSuccess, portal 
 
     setLoading(true);
     try {
-      const user = await (isAdminPortal ? adminLogin : login)(trimmedEmail, password, remember);
+      const user = await login(trimmedEmail, password, remember);
       onAuthSuccess?.(user);
     } catch (err) {
       if (typeof err.status === 'number') {
@@ -270,6 +268,11 @@ function AuthForm({ mode, onSwitchMode, onForgotPassword, onAuthSuccess, portal 
 
   function clearError(field) {
     setErrors((prev) => (prev[field] ? { ...prev, [field]: '' } : prev));
+  }
+
+  function preventConfirmPasswordTransfer(event) {
+    event.preventDefault();
+    setErrors((prev) => ({ ...prev, confirm: 'Please type your password again.' }));
   }
 
   const passwordValid = isPasswordStrongEnough(regPassword);
@@ -594,13 +597,13 @@ function AuthForm({ mode, onSwitchMode, onForgotPassword, onAuthSuccess, portal 
               </svg>
             </div>
             <label htmlFor="remember-input" className="remember-label">
-              {isAdminPortal ? 'Remember this device' : 'Remember me for 30 days'}
+              Remember me for 30 days
             </label>
           </div>
 
           <button type="submit" className={`btn-submit${loading ? ' loading' : ''}`}>
             <span className="btn-text">
-              {isAdminPortal ? 'Open workspace' : 'Sign in'}
+              Sign in
               <ArrowRight size={17} />
             </span>
             <span className="btn-spinner">
@@ -608,106 +611,100 @@ function AuthForm({ mode, onSwitchMode, onForgotPassword, onAuthSuccess, portal 
             </span>
           </button>
 
-          {!isAdminPortal && (
-            <>
-              <div className="divider">or</div>
+          <div className="divider">or</div>
 
-              <EmbeddedBrowserNotice />
+          <EmbeddedBrowserNotice />
 
-              <button type="button" className="btn-social" onClick={handleGoogleClick}>
-                <span className="btn-social-label">
-                  <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true" >
-                    <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
-                    <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
-                    <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
-                    <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
-                  </svg>
-                  <span>{embeddedBrowser ? 'Open in browser for Google' : 'Continue with Google'}</span>
-                </span>
-                <ArrowRight size={16} className="btn-social-arrow" />
-              </button>
-              <button
-                type="button"
-                className="btn-guest"
-                onClick={openGuestModal}
-                disabled={guestLoading}
-              >
-                Book as a guest
-              </button>
-              <div className="signup-row">
-                New here?{' '}
-                <button type="button" className="link-button" onClick={onSwitchMode}>
-                  Create a free account
-                </button>
-              </div>
-            </>
-          )}
+          <button type="button" className="btn-social" onClick={handleGoogleClick}>
+            <span className="btn-social-label">
+              <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true" >
+                <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+                <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+                <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+                <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+              </svg>
+              <span>{embeddedBrowser ? 'Open in browser for Google' : 'Continue with Google'}</span>
+            </span>
+            <ArrowRight size={16} className="btn-social-arrow" />
+          </button>
+          <button
+            type="button"
+            className="btn-guest"
+            onClick={openGuestModal}
+            disabled={guestLoading}
+          >
+            Book as a guest
+          </button>
+          <div className="signup-row">
+            New here?{' '}
+            <button type="button" className="link-button" onClick={onSwitchMode}>
+              Create a free account
+            </button>
+          </div>
 
         </form>
 
-        {!isAdminPortal && (
-          <Modal
-            open={guestModalOpen}
-            onClose={() => !guestLoading && setGuestModalOpen(false)}
-            title="Book as a guest"
-            actions={
-              <>
-                <button type="button" className="cancel-btn" onClick={() => setGuestModalOpen(false)} disabled={guestLoading}>
-                  Cancel
-                </button>
-                <button type="button" className="save-btn" onClick={handleGuestSubmit} disabled={guestLoading}>
-                  {guestLoading ? 'Starting…' : 'Continue to booking'}
-                </button>
-              </>
-            }
-          >
-            <div className="rf-scope">
-              <div className={`field${guestErrors.firstName ? ' has-error' : ''}`} id="field-guest-firstname">
-                <label htmlFor="guest-firstname">First name</label>
-                <div className="input-wrap">
-                  <input
-                    type="text"
-                    id="guest-firstname"
-                    name="firstname"
-                    placeholder="Juan"
-                    autoComplete="given-name"
-                    value={guestFirstName}
-                    onChange={(e) => {
-                      setGuestFirstName(e.target.value);
-                      setGuestErrors((prev) => (prev.firstName ? { ...prev, firstName: '' } : prev));
-                    }}
-                  />
-                  <User size={18} className="input-icon" />
-                </div>
-                <span className="field-error" style={{ display: guestErrors.firstName ? 'block' : 'none' }}>
-                  {guestErrors.firstName}
-                </span>
+        <Modal
+          open={guestModalOpen}
+          onClose={() => !guestLoading && setGuestModalOpen(false)}
+          title="Book as a guest"
+          actions={
+            <>
+              <button type="button" className="cancel-btn" onClick={() => setGuestModalOpen(false)} disabled={guestLoading}>
+                Cancel
+              </button>
+              <button type="button" className="save-btn" onClick={handleGuestSubmit} disabled={guestLoading}>
+                {guestLoading ? 'Starting…' : 'Continue to booking'}
+              </button>
+            </>
+          }
+        >
+          <div className="rf-scope">
+            <div className={`field${guestErrors.firstName ? ' has-error' : ''}`} id="field-guest-firstname">
+              <label htmlFor="guest-firstname">First name</label>
+              <div className="input-wrap">
+                <input
+                  type="text"
+                  id="guest-firstname"
+                  name="firstname"
+                  placeholder="Juan"
+                  autoComplete="given-name"
+                  value={guestFirstName}
+                  onChange={(e) => {
+                    setGuestFirstName(e.target.value);
+                    setGuestErrors((prev) => (prev.firstName ? { ...prev, firstName: '' } : prev));
+                  }}
+                />
+                <User size={18} className="input-icon" />
               </div>
-
-              <div className={`field${guestErrors.lastName ? ' has-error' : ''}`} id="field-guest-lastname">
-                <label htmlFor="guest-lastname">Last name</label>
-                <div className="input-wrap">
-                  <input
-                    type="text"
-                    id="guest-lastname"
-                    name="lastname"
-                    placeholder="dela Cruz"
-                    autoComplete="family-name"
-                    value={guestLastName}
-                    onChange={(e) => {
-                      setGuestLastName(e.target.value);
-                      setGuestErrors((prev) => (prev.lastName ? { ...prev, lastName: '' } : prev));
-                    }}
-                  />
-                  <User size={18} className="input-icon" />
-                </div>
-                <span className="field-error" style={{ display: guestErrors.lastName ? 'block' : 'none' }}>
-                  {guestErrors.lastName}
-                </span>
-              </div>
+              <span className="field-error" style={{ display: guestErrors.firstName ? 'block' : 'none' }}>
+                {guestErrors.firstName}
+              </span>
             </div>
-          </Modal>
-        )}
+
+            <div className={`field${guestErrors.lastName ? ' has-error' : ''}`} id="field-guest-lastname">
+              <label htmlFor="guest-lastname">Last name</label>
+              <div className="input-wrap">
+                <input
+                  type="text"
+                  id="guest-lastname"
+                  name="lastname"
+                  placeholder="dela Cruz"
+                  autoComplete="family-name"
+                  value={guestLastName}
+                  onChange={(e) => {
+                    setGuestLastName(e.target.value);
+                    setGuestErrors((prev) => (prev.lastName ? { ...prev, lastName: '' } : prev));
+                  }}
+                />
+                <User size={18} className="input-icon" />
+              </div>
+              <span className="field-error" style={{ display: guestErrors.lastName ? 'block' : 'none' }}>
+                {guestErrors.lastName}
+              </span>
+            </div>
+          </div>
+        </Modal>
 
         <Toast {...toast} />
       </>
@@ -814,6 +811,8 @@ function AuthForm({ mode, onSwitchMode, onForgotPassword, onAuthSuccess, portal 
               setConfirm(e.target.value);
               clearError('confirm');
             }}
+            onPaste={preventConfirmPasswordTransfer}
+            onDrop={preventConfirmPasswordTransfer}
             error={errors.confirm}
           />
         </div>

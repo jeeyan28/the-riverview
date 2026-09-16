@@ -9,7 +9,7 @@ import PageTransition from '../components/PageTransition';
 import RiverviewLoader from '../components/RiverviewLoader';
 import { useAuth } from '../context/AuthContext';
 import { AdminAppNavigation } from '../components/MobileAppNavigation';
-import { buildAdminLoginPath } from '../utils/auth';
+import { buildLoginPath } from '../utils/auth';
 
 const ADMIN_THEME_KEY = 'rv_admin_theme';
 const ADMIN_COMPACT_MEDIA = '(max-width: 900px)';
@@ -89,7 +89,7 @@ function AdminLayout() {
   }
 
   if (!isAdmin) {
-    return <Navigate to={buildAdminLoginPath(`${location.pathname}${location.search}`)} replace />;
+    return <Navigate to={buildLoginPath(`${location.pathname}${location.search}`)} replace />;
   }
 
   return (
