@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Lock, Eye, EyeOff } from 'lucide-react';
 
-function PasswordInput({ id, name, placeholder, autoComplete, value, onChange, error, children }) {
+function PasswordInput({ id, name, placeholder, autoComplete, value, onChange, onPaste, onDrop, error, children }) {
   const [visible, setVisible] = useState(false);
 
   return (
@@ -15,6 +15,8 @@ function PasswordInput({ id, name, placeholder, autoComplete, value, onChange, e
           autoComplete={autoComplete}
           value={value}
           onChange={onChange}
+          onPaste={onPaste}
+          onDrop={onDrop}
         />
         <Lock size={18} className="input-icon" />
         <button
@@ -23,7 +25,7 @@ function PasswordInput({ id, name, placeholder, autoComplete, value, onChange, e
           aria-label={visible ? 'Hide password' : 'Show password'}
           onClick={() => setVisible((v) => !v)}
         >
-          {visible ? <EyeOff size={18} /> : <Eye size={18} />}
+          {visible ? <Eye size={18} /> : <EyeOff size={18} />}
         </button>
       </div>
       {children}

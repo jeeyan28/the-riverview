@@ -28,12 +28,6 @@ export function buildLoginPath(returnTo = '/rooms', options = {}) {
   return query ? `/login?${query}` : '/login';
 }
 
-export function buildAdminLoginPath(returnTo = '/admin') {
-  const safePath = safeReturnPath(returnTo);
-  if (!isAdminReturnPath(safePath)) return '/admin/login';
-  return `/admin/login?${new URLSearchParams({ returnTo: safePath }).toString()}`;
-}
-
 export function buildRoomReservationPath(roomId, variantLabel = '') {
   const params = new URLSearchParams({ reserve: '1' });
   if (variantLabel) params.set('variant', variantLabel);

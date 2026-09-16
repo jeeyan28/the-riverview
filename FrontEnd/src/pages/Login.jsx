@@ -49,8 +49,8 @@ function Login() {
             <span>Enjoy the rest.</span>
           </h1>
           <p>
-            One account for billiards, KTV, and court reservations — with secure
-            payment, automatic confirmation, and your booking history in one place.
+            One secure sign-in for reservations and assigned staff access — with
+            payments, confirmations, and booking history in one place.
           </p>
           {!isMorphing && (
             <div className="login-proof" aria-label="Account benefits">
@@ -74,12 +74,12 @@ function Login() {
                   <p>
                     {hasReservationIntent
                       ? 'Choose an option below to continue your reservation.'
-                      : 'Sign in, create an account, or book as a guest.'}
+                      : 'Sign in to a customer or staff account, create a customer account, or book as a guest.'}
                   </p>
                 </>
               ) : (
                 <>
-                  <h2>Create your account</h2>
+                  <h2>Create your customer account</h2>
                   <p>Save reservations, receipts, and schedule changes in one place.</p>
                 </>
               )}

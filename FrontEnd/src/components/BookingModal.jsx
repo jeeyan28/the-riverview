@@ -13,7 +13,7 @@ import {
   clearReservedHours,
   loadMonthAvailability,
   clearMonthAvailability,
-  getAvailableRoomCount,
+  getAvailableRoomCountForDuration,
   isHolidayDate,
   isOperatingDay,
   priceOptionsFor,
@@ -112,6 +112,7 @@ function BookingSummaryContents({
   const durationLabel = `${selectedDuration} hour${selectedDuration === 1 ? '' : 's'}`;
   const methodLabel = PAYMENT_METHODS.find((m) => m.key === selectedMethod)?.label;
   const isPriceStep = step === 'price';
+  const showGuestInformation = step === 'details' || step === 'payment';
   const estimatedTotal = isPriceStep && selectedHour !== null ? subtotal : 0;
   const estimatedHours = isPriceStep && selectedHour !== null ? selectedDuration : 0;
 
@@ -206,35 +207,37 @@ function BookingSummaryContents({
             )}
           </div>
 
-          <div className="bk-summary-panel-section">
-            <span className="bk-summary-panel-section-label">Guest Information</span>
-            <div className="bk-summary-panel-list">
-              <div className="bk-summary-panel-row">
-                <span className="bk-summary-panel-row-label"><i className="fa-solid fa-user"></i> Name</span>
-                <span className="bk-summary-panel-row-value">{guestName || 'Not provided yet'}</span>
-              </div>
-              <div className="bk-summary-panel-row">
-                <span className="bk-summary-panel-row-label"><i className="fa-solid fa-phone"></i> Contact</span>
-                <span className="bk-summary-panel-row-value">{guestContact || 'Not provided yet'}</span>
-              </div>
-              <div className="bk-summary-panel-row">
-                <span className="bk-summary-panel-row-label"><i className="fa-solid fa-users"></i> Guests</span>
-                <span className="bk-summary-panel-row-value">{guestCount || 1}</span>
-              </div>
-              {guestNote && (
+          {showGuestInformation && (
+            <div className="bk-summary-panel-section">
+              <span className="bk-summary-panel-section-label">Guest Information</span>
+              <div className="bk-summary-panel-list">
                 <div className="bk-summary-panel-row">
-                  <span className="bk-summary-panel-row-label"><i className="fa-solid fa-note-sticky"></i> Special Request</span>
-                  <span className="bk-summary-panel-row-value">{guestNote}</span>
+                  <span className="bk-summary-panel-row-label"><i className="fa-solid fa-user"></i> Name</span>
+                  <span className="bk-summary-panel-row-value">{guestName || 'Not provided yet'}</span>
                 </div>
-              )}
-              {hasCorkage && (
                 <div className="bk-summary-panel-row">
-                  <span className="bk-summary-panel-row-label"><i className="fa-solid fa-bag-shopping"></i> Add-on</span>
-                  <span className="bk-summary-panel-row-value">Outside food/drinks · ₱{CORKAGE_FEE}</span>
+                  <span className="bk-summary-panel-row-label"><i className="fa-solid fa-phone"></i> Contact</span>
+                  <span className="bk-summary-panel-row-value">{guestContact || 'Not provided yet'}</span>
                 </div>
-              )}
+                <div className="bk-summary-panel-row">
+                  <span className="bk-summary-panel-row-label"><i className="fa-solid fa-users"></i> Guests</span>
+                  <span className="bk-summary-panel-row-value">{guestCount || 1}</span>
+                </div>
+                {guestNote && (
+                  <div className="bk-summary-panel-row">
+                    <span className="bk-summary-panel-row-label"><i className="fa-solid fa-note-sticky"></i> Special Request</span>
+                    <span className="bk-summary-panel-row-value">{guestNote}</span>
+                  </div>
+                )}
+                {hasCorkage && (
+                  <div className="bk-summary-panel-row">
+                    <span className="bk-summary-panel-row-label"><i className="fa-solid fa-bag-shopping"></i> Add-on</span>
+                    <span className="bk-summary-panel-row-value">Outside food/drinks · ₱{CORKAGE_FEE}</span>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
+          )}
 
           {selectedVariant && (
             <div className="bk-summary-panel-section">
@@ -252,26 +255,34 @@ function BookingSummaryContents({
                   <span>Rate</span>
                   <span>{variantRateLabel(selectedVariant)}</span>
                 </div>
-                {hasCorkage && (
+                {timeLabel && hasCorkage && (
                   <div className="bk-summary-panel-cost-row">
                     <span>Corkage</span>
                     <span>₱{CORKAGE_FEE.toLocaleString()}</span>
                   </div>
                 )}
-                <div className="bk-summary-panel-cost-row">
-                  <span>Total charge ({durationLabel})</span>
-                  <span>₱{subtotal.toLocaleString()}</span>
-                </div>
-                <div className="bk-summary-panel-cost-row bk-summary-panel-cost-row--accent">
-                  <span>Down payment</span>
-                  <span>₱{downPayment.toLocaleString()}</span>
-                </div>
-                <div className="bk-summary-panel-cost-row bk-summary-panel-cost-row--total">
-                  <span>Pay at the venue</span>
-                  <span>₱{remainingBalance.toLocaleString()}</span>
-                </div>
+                {timeLabel && (
+                  <>
+                    <div className="bk-summary-panel-cost-row">
+                      <span>Total charge ({durationLabel})</span>
+                      <span>₱{subtotal.toLocaleString()}</span>
+                    </div>
+                    <div className="bk-summary-panel-cost-row bk-summary-panel-cost-row--accent">
+                      <span>Down payment due now</span>
+                      <span>₱{downPayment.toLocaleString()}</span>
+                    </div>
+                    <div className="bk-summary-panel-cost-row bk-summary-panel-cost-row--total">
+                      <span>Balance due at venue</span>
+                      <span>₱{remainingBalance.toLocaleString()}</span>
+                    </div>
+                  </>
+                )}
               </div>
-              <p className="bk-summary-panel-note">The online payment secures your time. Staff will see the remaining balance when your session starts.</p>
+              {timeLabel ? (
+                <p className="bk-summary-panel-note">Your down payment confirms the booking. Pay the venue balance when you arrive.</p>
+              ) : (
+                <p className="bk-summary-panel-note">Choose a start time to see the total and payment breakdown.</p>
+              )}
             </div>
           )}
         </>
@@ -376,7 +387,7 @@ function BookingSuccess({ booking, room, selectedVariant, onDone, onViewBooking 
             <span className="bk-success-paid">₱{downPayment.toLocaleString()}</span>
           </div>
           <div className="bk-success-item">
-            <span className="bk-summary-label">Pay at the venue</span>
+            <span className="bk-summary-label">Balance due at venue</span>
             <span className="bk-success-balance">₱{remaining.toLocaleString()}</span>
           </div>
         </div>
@@ -452,6 +463,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
   const [lockError, setLockError] = useState('');
   const [lockLoading, setLockLoading] = useState(false);
   const lockRef = useRef(null);
+  const lockRequestVersionRef = useRef(0);
   const lockNow = useCountdownClock(!!lock);
 
   useEffect(() => {
@@ -459,6 +471,8 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
   }, [lock]);
 
   async function releaseCurrentLock() {
+    lockRequestVersionRef.current += 1;
+    setLockLoading(false);
     const current = lockRef.current;
     if (!current) return;
     setLock(null);
@@ -786,22 +800,40 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
     setSelectedHour(null);
   }
 
-  async function handleSelectHour(hour) {
-    const available = getAvailableRoomCount(reserved, Number(selectedVariant?.roomCount) || 1, hour);
-    if (available <= 0 || lockLoading) return;
+  function handleSelectHour(hour) {
+    const state = getSlotState(hour, selectedDuration, closeHour, reserved, totalRooms);
+    if (state !== 'available') return;
 
-    const previousHour = selectedHour;
-    const previousLock = lockRef.current;
+    setLockError('');
+    if (hour === selectedHour) return;
+    releaseCurrentLock();
+    setSelectedHour(hour);
+  }
+
+  async function handleContinueFromSchedule() {
+    if (selectedHour === null || lockLoading) return;
+
+    const state = getSlotState(selectedHour, selectedDuration, closeHour, reserved, totalRooms);
+    if (state !== 'available') {
+      setSelectedHour(null);
+      setLockError('That start time is no longer available. Choose another time.');
+      return;
+    }
+
+    const currentLock = lockRef.current;
+    if (currentLock && currentLock.expiresAtMs > Date.now()) {
+      setStep('details');
+      return;
+    }
+
+    const requestVersion = lockRequestVersionRef.current + 1;
+    lockRequestVersionRef.current = requestVersion;
     setLockError('');
     setLockLoading(true);
-    // The lock endpoint replaces this user's prior hold transactionally. Select
-    // locally first so a mobile tap responds without waiting on a release call.
-    setSelectedHour(hour);
-    setLock(null);
     try {
       const { y, m, d } = selectedDate;
       const dateStr = dateKey(y, m, d);
-      const timeStr = `${String(hour).padStart(2, '0')}:00`;
+      const timeStr = `${String(selectedHour).padStart(2, '0')}:00`;
       const result = await bookingsService.lockSlot({
         roomId: room._id,
         variantLabel: selectedVariant?.label,
@@ -809,26 +841,31 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
         timeIn: timeStr,
         duration: selectedDuration,
       });
+
+      if (requestVersion !== lockRequestVersionRef.current) {
+        bookingsService.releaseLock(result.id).catch((err) => console.error(err));
+        return;
+      }
+
       const nextLock = { id: result.id, expiresAtMs: new Date(result.expiresAt).getTime() };
       setLock(nextLock);
       lockRef.current = nextLock;
+      setStep('details');
     } catch (err) {
       console.error(err);
-      setSelectedHour((current) => (current === hour ? previousHour : current));
-      setLock(previousLock);
-      lockRef.current = previousLock;
-      setLockError(err.message || 'That time slot was just taken. Please choose another.');
+      if (requestVersion !== lockRequestVersionRef.current) return;
+      if (err.status === 409) {
+        setSelectedHour(null);
+        setLockError('That start time was just booked. Choose another time.');
+      } else {
+        setLockError(err.message || 'We could not verify that time. Please try again.');
+      }
       const key = dateKey(selectedDate.y, selectedDate.m, selectedDate.d);
       clearReservedHours(room._id, key);
       fetchReservedHours(room._id, key, selectedVariant?.label).then((hours) => setReserved(hours));
     } finally {
-      setLockLoading(false);
+      if (requestVersion === lockRequestVersionRef.current) setLockLoading(false);
     }
-  }
-
-  function handleContinueFromSchedule() {
-    if (selectedHour === null) return;
-    setStep('details');
   }
 
   async function continueToPayment() {
@@ -1132,7 +1169,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
           title = holiday ? 'Closed for a holiday/closure' : 'Closed on this day of the week';
         } else if (fullyBooked) {
           variant = 'full';
-          title = 'Fully reserved for this room';
+          title = 'Fully booked for this room';
         } else if (nearlyFull) {
           variant = 'few';
           title = `Only ${freeHours} open hour${freeHours === 1 ? '' : 's'} left today`;
@@ -1354,7 +1391,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
                     <div className="bk-legend">
                       <span><i className="bk-dot bk-dot--available"></i> Available</span>
                       <span><i className="bk-dot bk-dot--few"></i> Few slots</span>
-                      <span><i className="bk-dot bk-dot--full"></i> Fully reserved</span>
+                      <span><i className="bk-dot bk-dot--full"></i> Fully booked</span>
                       <span><i className="bk-dot bk-dot--unavailable"></i> Unavailable</span>
                     </div>
                   </>
@@ -1389,7 +1426,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
                       </div>
                     </div>
 
-                    <p className="bk-choose-label">Available Time — only open, unreserved times are shown.</p>
+                    <p className="bk-choose-label bk-choose-label--heading">Choose a start time</p>
 
                     {lockError && (
                       <p className="bk-lock-error">
@@ -1400,8 +1437,8 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
                     {(() => {
                       const latestStart = getLatestStartTime(openHour, closeHour, selectedDuration);
                       const helperText = latestStart !== null
-                        ? `For a ${selectedDuration}-hour reservation, the latest available start time is ${formatHour(latestStart)}. Later start times would extend beyond our ${formatHour(closeHour)} closing time.`
-                        : `A ${selectedDuration}-hour reservation doesn't fit within today's operating hours (closes at ${formatHour(closeHour)}).`;
+                        ? `Booking for ${selectedDuration} hour${selectedDuration === 1 ? '' : 's'}. Latest start: ${formatHour(latestStart)}.`
+                        : `This duration is longer than today's operating hours. Choose a shorter duration.`;
                       return <p className="bk-slot-helper-msg">{helperText}</p>;
                     })()}
 
@@ -1426,22 +1463,29 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
                           if (isToday && h <= currentHour) continue;
 
                           const state = getSlotState(h, selectedDuration, closeHour, reserved, totalRooms);
-                          const fits = state === 'available' && !lockLoading;
+                          const fits = state === 'available';
+                          const isSelected = h === selectedHour;
                           if (state === 'available') anyAvailable = true;
 
                           let slotStatusLabel;
                           let slotStatusTone = '';
                           if (state === 'booked') {
-                            slotStatusLabel = 'Reserved';
+                            slotStatusLabel = 'Unavailable';
                           } else if (state === 'insufficient') {
-                            const remaining = closeHour - h;
-                            slotStatusLabel = `Only ${remaining} Hour${remaining === 1 ? '' : 's'} Remaining`;
+                            slotStatusLabel = 'Ends after closing';
+                          } else if (isSelected) {
+                            slotStatusLabel = `Selected · ends ${formatHour(h + selectedDuration)}`;
                           } else {
-                            const availableCount = getAvailableRoomCount(reserved, totalRooms, h);
+                            const availableCount = getAvailableRoomCountForDuration(
+                              reserved,
+                              totalRooms,
+                              h,
+                              selectedDuration
+                            );
                             const isFewLeft = availableCount <= 2 && availableCount < totalRooms;
-                            slotStatusLabel = isFewLeft
-                              ? `Only ${availableCount} of ${totalRooms} Left`
-                              : `${availableCount} of ${totalRooms} Available`;
+                            slotStatusLabel = totalRooms === 1
+                              ? 'Available'
+                              : `${availableCount} room${availableCount === 1 ? '' : 's'} available`;
                             slotStatusTone = isFewLeft ? ' is-limited' : ' is-open';
                           }
 
@@ -1453,12 +1497,12 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
                                 'bk-slot' +
                                 (state === 'booked' ? ' bk-slot--reserved' : '') +
                                 (state === 'insufficient' ? ' bk-slot--insufficient' : '') +
-                                (selectedHour !== null && h >= selectedHour && h < selectedHour + selectedDuration
-                                  ? ' bk-slot--selected'
-                                  : '')
+                                (isSelected ? ' bk-slot--selected' : '')
                               }
                               onClick={fits ? () => handleSelectHour(h) : undefined}
                               disabled={!fits}
+                              aria-pressed={fits ? isSelected : undefined}
+                              aria-label={`${formatHour(h)}, ${slotStatusLabel}`}
                             >
                               <span className="bk-slot-time">{formatHour(h)}</span>
                               <span className={`bk-slot-status${slotStatusTone}`}>{slotStatusLabel}</span>
@@ -1506,8 +1550,13 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
                     </div>
 
                     <div className="bk-detail-actions">
-                      <button className="bk-confirm bk-continue" disabled={selectedHour === null || lockLoading || !lock} onClick={handleContinueFromSchedule}>
-                        {lockLoading ? 'Holding time…' : 'Continue'} {!lockLoading && <i className="fa-solid fa-arrow-right"></i>}
+                      <button
+                        className="bk-confirm bk-continue"
+                        disabled={selectedHour === null || lockLoading}
+                        aria-busy={lockLoading}
+                        onClick={handleContinueFromSchedule}
+                      >
+                        {lockLoading ? 'Checking availability…' : 'Continue'} {!lockLoading && <i className="fa-solid fa-arrow-right"></i>}
                       </button>
                     </div>
                   </>
@@ -1628,7 +1677,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
                   <p className="bk-downpayment-amount">
                     ₱{downPaymentAmount.toLocaleString()}
                   </p>
-                  <p className="bk-downpayment-duration">Covers {downPaymentHours} hour{downPaymentHours === 1 ? '' : 's'} and confirms your reservation. ₱{remainingBalanceAmount.toLocaleString()} remains payable at the venue.</p>
+                  <p className="bk-downpayment-duration">Pays for {downPaymentHours} of {selectedDuration} hour{selectedDuration === 1 ? '' : 's'} and confirms your reservation. Balance due at venue: ₱{remainingBalanceAmount.toLocaleString()}.</p>
                 </div>
 
                 <div className="bk-payment-methods">

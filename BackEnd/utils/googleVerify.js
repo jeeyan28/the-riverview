@@ -2,8 +2,7 @@ const { OAuth2Client } = require("google-auth-library");
 
 const client = new OAuth2Client(
   process.env.GOOGLE_CLIENT_ID,
-  process.env.GOOGLE_CLIENT_SECRET,
-  "postmessage"
+  process.env.GOOGLE_CLIENT_SECRET
 );
 
 function mapGoogleProfile(payload) {
@@ -25,8 +24,15 @@ async function verifyGoogleIdToken(idToken) {
   return mapGoogleProfile(ticket.getPayload());
 }
 
-async function exchangeGoogleAuthCode(code) {
-  const { tokens } = await client.getToken(code);
+async function exchangeGoogleAuthCode(code, redirectUri) {
+  if (!redirectUri) {
+    throw new Error("Google sign-in origin is missing.");
+  }
+
+  const { tokens } = await client.getToken({
+    code,
+    redirect_uri: redirectUri,
+  });
   if (!tokens.id_token) {
     throw new Error("Google did not return an ID token.");
   }

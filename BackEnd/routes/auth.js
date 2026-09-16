@@ -67,6 +67,33 @@ function saveSession(req) {
   });
 }
 
+function getRequestOrigin(req) {
+  const origin = req.get("origin");
+  if (origin) return origin;
+
+  const referer = req.get("referer");
+  if (!referer) return "";
+
+  try {
+    return new URL(referer).origin;
+  } catch {
+    return "";
+  }
+}
+
+function handleGoogleAuthError(err, res) {
+  const oauthError = err?.response?.data?.error;
+  console.error("Google sign-in failed:", oauthError || err.message);
+
+  if (oauthError === "unauthorized_client" || oauthError === "invalid_client") {
+    return res.status(503).json({
+      message: "Google sign-in is temporarily unavailable. Please use email sign-in.",
+    });
+  }
+
+  return res.status(401).json({ message: "Google sign-in failed." });
+}
+
 async function logLoginAttempt(req, { user, email, status, reason = "", method = "password" }) {
   try {
     await LoginHistory.create({
@@ -652,7 +679,10 @@ router.post("/guest/claim/google", ensureAuthenticated, requireGuest, validate(g
     const { code } = req.body;
     if (!code) return res.status(400).json({ message: "Missing Google credential." });
 
-    const profile = await exchangeGoogleAuthCode(code);
+    const redirectUri = getRequestOrigin(req);
+    if (!redirectUri) return res.status(400).json({ message: "Missing Google sign-in origin." });
+
+    const profile = await exchangeGoogleAuthCode(code, redirectUri);
     if (!profile.email || !profile.emailVerified) {
       return res.status(401).json({ message: "Google account email is not verified." });
     }
@@ -677,12 +707,11 @@ router.post("/guest/claim/google", ensureAuthenticated, requireGuest, validate(g
 
     res.json({ message: "Your account has been saved.", user: sanitizeUser(user) });
   } catch (err) {
-    console.error(err);
-    res.status(401).json({ message: "Google sign-in failed." });
+    return handleGoogleAuthError(err, res);
   }
 });
 
-async function handlePasswordLogin(req, res, { adminOnly = false } = {}) {
+async function handlePasswordLogin(req, res) {
   try {
     const { email, password } = req.body;
 
@@ -725,11 +754,6 @@ async function handlePasswordLogin(req, res, { adminOnly = false } = {}) {
       return res.status(401).json({ message: "Invalid email or password." });
     }
 
-    if (adminOnly && !isAdminRole(user.role)) {
-      await logLoginAttempt(req, { user, status: "failed", reason: "Staff portal access denied" });
-      return res.status(403).json({ message: "This account does not have staff access." });
-    }
-
     await user.registerSuccessfulLogin();
     await logLoginAttempt(req, { user, status: "success" });
 
@@ -748,16 +772,15 @@ async function handlePasswordLogin(req, res, { adminOnly = false } = {}) {
 
 router.post("/login", loginLimiter, validate(loginSchema), (req, res) => handlePasswordLogin(req, res));
 
-router.post("/admin-login", loginLimiter, validate(loginSchema), (req, res) => (
-  handlePasswordLogin(req, res, { adminOnly: true })
-));
-
 router.post("/google", validate(googleCodeSchema), async (req, res) => {
   try {
     const { code } = req.body;
     if (!code) return res.status(400).json({ message: "Missing Google credential." });
 
-    const profile = await exchangeGoogleAuthCode(code);
+    const redirectUri = getRequestOrigin(req);
+    if (!redirectUri) return res.status(400).json({ message: "Missing Google sign-in origin." });
+
+    const profile = await exchangeGoogleAuthCode(code, redirectUri);
     if (!profile.email || !profile.emailVerified) {
       return res.status(401).json({ message: "Google account email is not verified." });
     }
@@ -798,8 +821,7 @@ router.post("/google", validate(googleCodeSchema), async (req, res) => {
 
     res.json({ message: "Login successful.", user: sanitizeUser(user) });
   } catch (err) {
-    console.error(err);
-    res.status(401).json({ message: "Google sign-in failed." });
+    return handleGoogleAuthError(err, res);
   }
 });
 
