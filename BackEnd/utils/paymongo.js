@@ -1,7 +1,39 @@
 const crypto = require("crypto");
 const PAYMONGO_API_BASE = process.env.PAYMONGO_API_BASE || "https://api.paymongo.com/v1";
 const PAYMONGO_ALLOWED_METHODS = ["card", "gcash", "paymaya", "qrph"];
+const PAYMONGO_PAYMENT_METHOD_LABELS = Object.freeze({
+  card: "Credit / Debit Card",
+  gcash: "GCash",
+  paymaya: "Maya",
+  qrph: "QR Ph",
+});
 const PAYMONGO_STATEMENT_DESCRIPTOR_MAX_LENGTH = 22;
+
+function normalizePaymongoPaymentMethodType(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  const aliases = { maya: "paymaya", qr_ph: "qrph" };
+  const canonical = aliases[normalized] || normalized;
+  return PAYMONGO_ALLOWED_METHODS.includes(canonical) ? canonical : "";
+}
+
+function resolvePaymongoPaymentMethodType(payment, fallback = "") {
+  const attributes = payment?.attributes || {};
+  const candidates = [
+    attributes.source?.type,
+    attributes.payment_method?.type,
+    attributes.payment_method_type,
+    fallback,
+  ];
+  for (const candidate of candidates) {
+    const type = normalizePaymongoPaymentMethodType(candidate);
+    if (type) return type;
+  }
+  return "";
+}
+
+function getPaymongoPaymentMethodLabel(type) {
+  return PAYMONGO_PAYMENT_METHOD_LABELS[normalizePaymongoPaymentMethodType(type)] || "Online payment";
+}
 
 function getSecretKey() {
   const key = process.env.PAYMONGO_SECRET_KEY;
@@ -189,6 +221,10 @@ function verifyWebhookSignature(rawBody, signatureHeader) {
 module.exports = {
   PAYMONGO_API_BASE,
   PAYMONGO_ALLOWED_METHODS,
+  PAYMONGO_PAYMENT_METHOD_LABELS,
+  normalizePaymongoPaymentMethodType,
+  resolvePaymongoPaymentMethodType,
+  getPaymongoPaymentMethodLabel,
   getPublicKey,
   createPaymentIntent,
   retrievePaymentIntent,

@@ -7,6 +7,7 @@ const { sendReceiptEmail } = require("./mailer");
 const { TIME_ZONE } = require("./constants");
 const { bookingStartMs, financialFields } = require("./bookingLifecycle");
 const { calculateBookingPrice, computeDownPayment, parsePaxCapacity } = require("./roomPricing");
+const { getPaymongoPaymentMethodLabel } = require("./paymongo");
 
 async function voidExpiredBookings() {
   const now = Date.now();
@@ -230,7 +231,7 @@ async function saveWithReservationCode(booking, facilityName, attempts = 5, sess
   }
 }
 
-async function finalizeBookingFromPayment({ paymentIntentId, metadata, paidPaymentId }) {
+async function finalizeBookingFromPayment({ paymentIntentId, metadata, paidPaymentId, paymentMethodType }) {
   const existing = await Booking.findOne({ paymongoPaymentIntentId: paymentIntentId });
   if (existing) return existing;
 
@@ -285,7 +286,7 @@ async function finalizeBookingFromPayment({ paymentIntentId, metadata, paidPayme
           }
         })(),
         corkageFee: Number(metadata.corkageFee) || 0,
-        paymentMethod: "PayMongo",
+        paymentMethod: getPaymongoPaymentMethodLabel(paymentMethodType),
         paymentProvider: "paymongo",
         bookedBy: metadata.bookedBy || undefined,
         source: "online",

@@ -11,6 +11,7 @@ const {
   retrievePaymentIntent,
   createWalletPaymentMethod,
   attachPaymentIntent,
+  resolvePaymongoPaymentMethodType,
   verifyWebhookSignature,
 } = require("../utils/paymongo");
 const { isAdminRole } = require("../utils/permissions");
@@ -195,11 +196,16 @@ router.post("/intent/:paymentIntentId/attach", ensureAuthenticated, paymentAttac
 
     if (isPaidPaymentIntent(attrs)) {
       const paidPayment = attrs.payments?.find(p => p?.attributes?.status === "paid");
+      const resolvedPaymentMethodType = resolvePaymongoPaymentMethodType(
+        paidPayment,
+        paymentMethodType || (paymentMethodId ? "card" : "")
+      );
       try {
         const booking = await finalizeBookingFromPayment({
           paymentIntentId,
           metadata: attrs.metadata || metadata,
           paidPaymentId: paidPayment?.id || "",
+          paymentMethodType: resolvedPaymentMethodType,
         });
         return res.json({ status: "succeeded", bookingId: booking._id, reservationCode: booking.reservationCode });
       } catch (e) {
@@ -256,7 +262,12 @@ router.get("/status/:paymentIntentId", ensureAuthenticated, validate(paymentInte
 
     try {
       const paidPayment = attrs.payments?.find(p => p?.attributes?.status === "paid");
-      const created = await finalizeBookingFromPayment({ paymentIntentId, metadata, paidPaymentId: paidPayment?.id || "" });
+      const created = await finalizeBookingFromPayment({
+        paymentIntentId,
+        metadata,
+        paidPaymentId: paidPayment?.id || "",
+        paymentMethodType: resolvePaymongoPaymentMethodType(paidPayment),
+      });
       return res.json({ status: created.status, paymentStatus: created.paymentStatus, bookingId: created._id, reservationCode: created.reservationCode });
     } catch (e) {
       if (e.slotUnavailable) {
@@ -301,6 +312,7 @@ async function webhookHandler(req, res) {
         paymentIntentId,
         metadata: attrs.metadata || {},
         paidPaymentId: paidPayment?.id || (eventType === "payment.paid" ? resource?.id : ""),
+        paymentMethodType: resolvePaymongoPaymentMethodType(paidPayment || resource),
       }).catch((e) => {
         if (e.slotUnavailable) {
           console.error(`PayMongo webhook: payment ${paymentIntentId} succeeded but the slot is no longer available — needs manual review/refund.`);

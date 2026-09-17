@@ -1247,31 +1247,40 @@ body.has-guest-banner {
 .bk-pax-input { text-align: center; flex: 1; }
 
 .bk-downpayment-card {
-    position: relative;
     border: 1px solid var(--border); border-radius: 14px;
     padding: 11px 13px; margin-top: 3px;
     background: var(--ovl-03);
 }
-.bk-downpayment-card-dot { position: absolute; top: 11px; right: 13px; width: 7px; height: 7px; border-radius: 50%; background: #e2554b; }
 .bk-downpayment-amount { font-size: 1.2rem; font-weight: 700; color: var(--text-main); margin: .15rem 0 0; }
 .bk-downpayment-duration { font-size: .74rem; color: var(--text-muted-light); margin: .1rem 0 0; }
 
-.bk-payment-methods { margin-top: 10px; }
-.bk-payment-methods-label { font-size: .78rem; color: var(--text-muted-light); font-weight: 600; display: block; margin-bottom: 6px; }
-.bk-payment-methods-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+.bk-payment-methods { margin-top: 16px; }
+.bk-payment-methods-label { display: block; margin-bottom: 4px; color: var(--text-main); font-size: .84rem; font-weight: 700; }
+.bk-payment-methods-help { margin: 0 0 8px; color: var(--text-muted-light); font-size: .74rem; line-height: 1.45; }
+.bk-payment-methods-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .bk-payment-method-tile {
-    display: flex; align-items: center; gap: 8px;
-    padding: .55rem .7rem; border-radius: 12px; text-align: left;
+    display: flex; align-items: center; gap: 12px;
+    min-width: 0; min-height: 56px; padding: 12px; border-radius: 12px; text-align: left;
     background: var(--ovl-03); border: 1px solid var(--border);
-    color: var(--text-main); font-size: .8rem; font-weight: 500; cursor: pointer;
-    transition: background .15s, border-color .15s, box-shadow .15s;
-    min-height: 38px;
+    color: var(--text-main); font-family: inherit; font-size: .8rem; cursor: pointer;
+    transition: background .15s var(--ease-out), border-color .15s var(--ease-out);
 }
-.bk-payment-method-tile i { font-size: .94rem; color: var(--text-muted-light); transition: color .15s; }
-.bk-payment-method-tile:hover { border-color: rgba(0,201,167,.4); }
-.bk-payment-method-tile--selected { background: rgba(0,201,167,.08); border-color: var(--teal); color: var(--text-main); box-shadow: 0 0 0 1px var(--teal) inset; }
-.bk-payment-method-tile--selected i { color: var(--teal); }
-.bk-payment-method-tile--disabled { opacity: .35; pointer-events: none; }
+.bk-payment-choice-icon { display: grid; width: 24px; height: 24px; flex: 0 0 24px; place-items: center; color: var(--text-muted-light); }
+.bk-payment-choice-icon i { font-size: 1rem; }
+.bk-payment-choice-copy { display: grid; flex: 1 1 auto; gap: 2px; min-width: 0; }
+.bk-payment-choice-copy strong { color: var(--text-main); font-size: .82rem; font-weight: 700; line-height: 1.3; }
+.bk-payment-choice-copy small { color: var(--text-muted-light); font-size: .68rem; line-height: 1.35; }
+.bk-payment-choice-check { display: grid; width: 20px; height: 20px; flex: 0 0 20px; place-items: center; border: 1px solid var(--border); border-radius: 50%; color: transparent; }
+.bk-payment-choice-check i { font-size: .62rem; }
+.bk-payment-duration-tile { justify-content: space-between; }
+.bk-payment-method-tile--selected { background: rgba(0,201,167,.08); border-color: var(--teal); color: var(--text-main); }
+.bk-payment-method-tile--selected .bk-payment-choice-icon { color: var(--teal); }
+.bk-payment-method-tile--selected .bk-payment-choice-copy small { color: var(--text-main); }
+.bk-payment-method-tile--selected .bk-payment-choice-check { border-color: var(--teal); background: var(--teal); color: #06251f; }
+.bk-payment-method-tile--disabled { opacity: .45; cursor: wait; }
+@media (hover: hover) and (pointer: fine) {
+    .bk-payment-method-tile:not(:disabled):hover { border-color: rgba(0,201,167,.55); background: rgba(0,201,167,.05); }
+}
 .bk-payment-redirect-note { font-size: .78rem; color: var(--text-muted-light); margin: 10px 0 0; }
 .bk-online-pay-sub { font-size: .78rem; color: var(--text-muted-light); margin: 10px 0 0; }
 

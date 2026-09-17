@@ -10,6 +10,8 @@
     "align:catalog:apply": "npm run align:prd:apply",
     "restore:prd": "node scripts/restorePrdBackup.js",
     "restore:prd:apply": "node scripts/restorePrdBackup.js --apply",
+    "backfill:payment-methods": "node scripts/backfillPaymentMethods.js",
+    "backfill:payment-methods:apply": "node scripts/backfillPaymentMethods.js --apply",
     "audit": "npm audit --omit=dev"
   },
   "dependencies": {

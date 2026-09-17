@@ -385,8 +385,10 @@
 .public-site .bk-summary-panel-cost-row--accent { color: var(--teal-strong); }
 .public-site .bk-review-cost-row--balance:last-of-type,
 .public-site .bk-summary-panel-cost-row--total { color: var(--warning); }
-.public-site .bk-payment-method-tile { min-height: 48px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text-main); }
+.public-site .bk-payment-method-tile { min-height: 56px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text-main); }
 .public-site .bk-payment-method-tile--selected { border-color: var(--teal-strong); background: color-mix(in srgb,var(--teal) 11%,var(--surface)); }
+.public-site .bk-payment-method-tile--selected .bk-payment-choice-icon { color: var(--teal-strong); }
+.public-site .bk-payment-method-tile--selected .bk-payment-choice-check { border-color: var(--teal-strong); background: var(--teal-strong); color: var(--surface-alt); }
 .public-site .bk-detail-actions { position: sticky; bottom: -110px; z-index: 5; margin: 28px -28px -110px; padding: 16px 28px max(16px,env(safe-area-inset-bottom)); border-top: 1px solid var(--border); background: var(--surface-alt); }
 .public-site .bk-confirm { background: var(--teal); color: var(--teal-ink); }
 
