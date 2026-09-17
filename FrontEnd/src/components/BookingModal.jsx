@@ -48,10 +48,10 @@ const STEPS = [
 const STEP_INDEX = { price: 1, schedule: 2, details: 3, payment: 4 };
 
 const PAYMENT_METHODS = [
-  { key: 'gcash', label: 'GCash', icon: 'fa-solid fa-wallet' },
-  { key: 'paymaya', label: 'Maya', icon: 'fa-solid fa-money-bill-wave' },
-  { key: 'qrph', label: 'QR Ph', icon: 'fa-solid fa-qrcode' },
-  { key: 'card', label: 'Credit / Debit Card', icon: 'fa-solid fa-credit-card' },
+  { key: 'gcash', label: 'GCash', description: 'Mobile wallet', icon: 'fa-solid fa-wallet' },
+  { key: 'paymaya', label: 'Maya', description: 'Mobile wallet', icon: 'fa-solid fa-money-bill-wave' },
+  { key: 'qrph', label: 'QR Ph', description: 'Scan with a QR Ph app', icon: 'fa-solid fa-qrcode' },
+  { key: 'card', label: 'Credit / Debit Card', description: 'Visa or Mastercard', icon: 'fa-solid fa-credit-card' },
 ];
 
 function BookingStepper({ step, onStepClick, steps = STEPS }) {
@@ -1116,7 +1116,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
         setPayErrorKind('declined');
         throw new Error(data?.errors?.[0]?.detail || 'Card could not be verified. Please check the details and try again.');
       }
-      await attachAndHandle({ paymentMethodId: data.data.id });
+      await attachAndHandle({ paymentMethodId: data.data.id, paymentMethodType: 'card' });
     } catch (err) {
       console.error(err);
       if (!payErrorKind) setPayErrorKind('connectivity');
@@ -1210,7 +1210,13 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
   const subtotalAmount = priceBreakdown.amount;
   const downPaymentAmount = priceBreakdown.downPayment;
   const remainingBalanceAmount = Math.max(0, subtotalAmount - downPaymentAmount);
-  const downPaymentPresets = Array.from({ length: Math.max(1, selectedDuration || 1) }, (_, i) => i + 1);
+  const downPaymentOptions = Array.from({ length: Math.max(1, selectedDuration || 1) }, (_, i) => {
+    const hours = i + 1;
+    const amount = priceBreakdown.hourlyRates
+      .slice(0, hours)
+      .reduce((sum, rate) => sum + Number(rate || 0), 0);
+    return { hours, amount };
+  });
   const visiblePaymentMethods = allowedPaymentMethodKeys
     ? PAYMENT_METHODS.filter((m) => allowedPaymentMethodKeys.includes(m.key))
     : PAYMENT_METHODS;
@@ -1672,7 +1678,6 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
                 </div>
 
                 <div className="bk-downpayment-card">
-                  <span className="bk-downpayment-card-dot" aria-hidden="true"></span>
                   <p className="bk-summary-label">Down payment</p>
                   <p className="bk-downpayment-amount">
                     ₱{downPaymentAmount.toLocaleString()}
@@ -1681,21 +1686,29 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
                 </div>
 
                 <div className="bk-payment-methods">
-                  <span className="bk-payment-methods-label">Choose how many hours to pay now</span>
-                  <div className="bk-payment-methods-grid">
-                    {downPaymentPresets.map((h) => (
+                  <span className="bk-payment-methods-label" id="bk-payment-hours-label">Pay now</span>
+                  <p className="bk-payment-methods-help">Choose how many reservation hours to cover today.</p>
+                  <div className="bk-payment-methods-grid bk-payment-duration-grid" role="group" aria-labelledby="bk-payment-hours-label">
+                    {downPaymentOptions.map(({ hours, amount }) => (
                       <button
-                        key={h}
+                        key={hours}
                         type="button"
                         className={
-                          'bk-payment-method-tile' +
-                          (downPaymentHours === h ? ' bk-payment-method-tile--selected' : '') +
+                          'bk-payment-method-tile bk-payment-duration-tile' +
+                          (downPaymentHours === hours ? ' bk-payment-method-tile--selected' : '') +
                           (payLoading ? ' bk-payment-method-tile--disabled' : '')
                         }
                         disabled={payLoading}
-                        onClick={() => setDownPaymentHours(h)}
+                        aria-pressed={downPaymentHours === hours}
+                        onClick={() => setDownPaymentHours(hours)}
                       >
-                        <span>{h} hr{h === 1 ? '' : 's'}</span>
+                        <span className="bk-payment-choice-copy">
+                          <strong>{hours} hour{hours === 1 ? '' : 's'}</strong>
+                          <small>₱{amount.toLocaleString()}</small>
+                        </span>
+                        <span className="bk-payment-choice-check" aria-hidden="true">
+                          <i className="fa-solid fa-check"></i>
+                        </span>
                       </button>
                     ))}
                   </div>
@@ -1712,8 +1725,9 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
                   </div>
                 ) : (
                   <div className="bk-payment-methods">
-                    <span className="bk-payment-methods-label">Select Payment Method</span>
-                    <div className="bk-payment-methods-grid">
+                    <span className="bk-payment-methods-label" id="bk-payment-method-label">Payment method</span>
+                    <p className="bk-payment-methods-help">Choose how you want to complete the secure payment.</p>
+                    <div className="bk-payment-methods-grid bk-payment-method-grid" role="group" aria-labelledby="bk-payment-method-label">
                       {visiblePaymentMethods.map((m) => (
                         <button
                           key={m.key}
@@ -1724,10 +1738,17 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
                             (!pmIntent || payLoading ? ' bk-payment-method-tile--disabled' : '')
                           }
                           disabled={!pmIntent || payLoading}
+                          aria-pressed={selectedMethod === m.key}
                           onClick={() => handleSelectMethod(m.key)}
                         >
-                          <i className={m.icon}></i>
-                          <span>{m.label}</span>
+                          <span className="bk-payment-choice-icon" aria-hidden="true"><i className={m.icon}></i></span>
+                          <span className="bk-payment-choice-copy">
+                            <strong>{m.label}</strong>
+                            <small>{m.description}</small>
+                          </span>
+                          <span className="bk-payment-choice-check" aria-hidden="true">
+                            <i className="fa-solid fa-check"></i>
+                          </span>
                         </button>
                       ))}
                     </div>

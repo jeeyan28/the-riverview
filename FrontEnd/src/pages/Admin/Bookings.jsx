@@ -32,7 +32,7 @@ const STATUS_PILL_CLASS = {
 };
 const BOOKING_STATUSES = ['Pending Payment Verification', 'Awaiting Online Payment', 'Confirmed', 'Rejected', 'Ongoing', 'Pending', 'Done', 'Overdue', 'Cancelled', 'No Show'];
 const EDITABLE_BOOKING_STATUSES = BOOKING_STATUSES.filter((s) => !['Done', 'No Show', 'Rejected', 'Cancelled', 'Ongoing', 'Overdue'].includes(s));
-const PAYMENT_METHODS = ['Cash', 'GCash', 'Maya'];
+const PAYMENT_METHODS = ['Cash', 'GCash', 'Maya', 'QR Ph', 'Credit / Debit Card'];
 const SEARCH_DEBOUNCE_MS = 350;
 const BOOKINGS_POLL_MS = 15000;
 const MAX_GUEST_HISTORY_ROWS = 5;

@@ -160,6 +160,7 @@ The core transactional record — one per reservation, online or walk-in.
 | `status` | enum | `Pending`, `Pending Payment Verification`, `Awaiting Online Payment`, `Confirmed`, `Rejected`, `Ongoing`, `Done`, `Overdue`, `Cancelled`, `No Show` |
 | `paymentStatus` | enum | `Unpaid`, `Partial`, `Paid`, `Rejected` |
 | `source` | enum | `online` \| `walk-in` — distinguishes the two booking paths from ARCHITECTURE.md |
+| `paymentMethod` | String | customer-facing method used for the transaction (`GCash`, `Maya`, `QR Ph`, `Credit / Debit Card`, or a manual method such as `Cash`) |
 | `paymentProvider` | enum | `manual` \| `paymongo` |
 | `paymongoPaymentIntentId` | String | unique+sparse — links to the PayMongo payment flow |
 | `downPayment`, `downPaymentHours` | Number | verified online deposit and the number of hourly charges it covers |
