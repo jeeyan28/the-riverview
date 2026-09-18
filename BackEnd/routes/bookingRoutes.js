@@ -9,7 +9,7 @@ const { LOCK_DURATION_MINUTES } = BookingLock;
 const { requirePermission, ensureAuthenticated } = require("../middleware/adminAuth");
 const { paymentProofUpload } = require("../middleware/upload");
 const { PERMISSIONS, isAdminRole } = require("../utils/permissions");
-const { validateAndPriceBooking, computeDownPayment, saveWithReservationCode, runInTransaction, voidExpiredBookings, updateBookingLifecycleStatuses, bookingStartMs } = require("../utils/bookingHelper");
+const { validateAndPriceBooking, computeDownPayment, saveWithReservationCode, runInTransaction, bookingStartMs } = require("../utils/bookingHelper");
 const { validate } = require("../middleware/validate");
 const {
   bookingIdParamsSchema,
@@ -23,22 +23,12 @@ const {
 } = require("../validation/bookingSchemas");
 const { logAudit } = require("../utils/auditLog");
 const { bookingActionLimiter } = require("../middleware/rateLimiter");
+const AppError = require("../utils/appError");
 
 const DATE_KEY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
 router.get("/", requirePermission(PERMISSIONS.BOOKING_VIEW), async (req, res) => {
   try {
-    try {
-      await voidExpiredBookings();
-    } catch (e) {
-      console.error("voidExpiredBookings failed:", e.message);
-    }
-    try {
-      await updateBookingLifecycleStatuses();
-    } catch (e) {
-      console.error("updateBookingLifecycleStatuses failed:", e.message);
-    }
-
     const filter = {};
     if (req.query.status) filter.status = String(req.query.status);
     if (req.query.paymentStatus) filter.paymentStatus = String(req.query.paymentStatus);
@@ -219,7 +209,7 @@ router.post("/", requirePermission(PERMISSIONS.BOOKING_MANAGE), paymentProofUplo
       booking = await runInTransaction(async (session) => {
         const { room, amount, roomCharge, corkageFee, hourlyRates } = await validateAndPriceBooking({ roomId, variantLabel, date, timeIn, duration, isAdminBooking, guestCount, hasCorkage, session });
         if (Number(req.body.paidAmount || 0) > amount) {
-          throw { status: 400, message: "Amount received cannot exceed the reservation charge." };
+          throw new AppError(400, "Amount received cannot exceed the reservation charge.");
         }
 
         const b = new Booking({
@@ -263,7 +253,6 @@ router.post("/", requirePermission(PERMISSIONS.BOOKING_MANAGE), paymentProofUplo
 
 router.get("/mine", ensureAuthenticated, async (req, res) => {
   try {
-    await voidExpiredBookings();
     const bookings = await Booking.find({ bookedBy: req.user._id }).sort({ createdAt: -1 }).populate("room", "name");
     res.json(bookings);
   } catch (err) {
@@ -295,19 +284,19 @@ router.put("/:id/reschedule", ensureAuthenticated, bookingActionLimiter, validat
     try {
       booking = await runInTransaction(async (session) => {
         const existing = await Booking.findById(req.params.id).session(session);
-        if (!existing) throw { status: 404, message: "Booking not found." };
+        if (!existing) throw new AppError(404, "Booking not found.");
         if (String(existing.bookedBy) !== String(req.user._id)) {
-          throw { status: 403, message: "Not allowed." };
+          throw new AppError(403, "Not allowed.");
         }
         if (existing.status !== Booking.BOOKING_STATUS.CONFIRMED) {
-          throw { status: 409, message: "Only confirmed bookings can be rescheduled." };
+          throw new AppError(409, "Only confirmed bookings can be rescheduled.");
         }
-        if (existing.cancellationStatus === "Requested") throw { status: 409, message: "Wait for the cancellation review before rescheduling." };
+        if (existing.cancellationStatus === "Requested") throw new AppError(409, "Wait for the cancellation review before rescheduling.");
         if (existing.rescheduleCount >= Booking.MAX_RESCHEDULES) {
-          throw { status: 409, message: "This booking has already been rescheduled the maximum number of times." };
+          throw new AppError(409, "This booking has already been rescheduled the maximum number of times.");
         }
         if (bookingStartMs(existing.date, existing.timeIn) - Date.now() < Booking.RESCHEDULE_CUTOFF_HOURS * 3600000) {
-          throw { status: 409, message: `Reschedule is no longer available within ${Booking.RESCHEDULE_CUTOFF_HOURS} hours of your reservation.` };
+          throw new AppError(409, `Reschedule is no longer available within ${Booking.RESCHEDULE_CUTOFF_HOURS} hours of your reservation.`);
         }
 
         const pricing = await validateAndPriceBooking({
@@ -431,13 +420,13 @@ router.put("/:id", requirePermission(PERMISSIONS.BOOKING_MANAGE), validate(booki
       booking = await runInTransaction(async (session) => {
         const existing = await Booking.findById(req.params.id).session(session);
         if (!existing) {
-          throw { status: 404, message: "Booking not found." };
+          throw new AppError(404, "Booking not found.");
         }
 
         const update = {};
         if (status !== undefined && status !== existing.status) {
-          if (!["Pending", "Confirmed"].includes(existing.status) || !["Confirmed", "Rejected", "Cancelled", "Done"].includes(status)) throw { status: 409, message: "Use the monitoring controls for session start and completion." };
-          if (status === "Rejected" && bookingCollected(existing) > 0) throw { status: 409, message: "Use cancellation review to preserve the payment and record any refund." };
+          if (!["Pending", "Confirmed"].includes(existing.status) || !["Confirmed", "Rejected", "Cancelled", "Done"].includes(status)) throw new AppError(409, "Use the monitoring controls for session start and completion.");
+          if (status === "Rejected" && bookingCollected(existing) > 0) throw new AppError(409, "Use cancellation review to preserve the payment and record any refund.");
           update.status = status;
           if (status === "Cancelled") Object.assign(update, reviewCancellationFields(existing, { decision: "approve" }, req.user._id));
         }
@@ -446,10 +435,10 @@ router.put("/:id", requirePermission(PERMISSIONS.BOOKING_MANAGE), validate(booki
         if (guestEmail !== undefined) update.guestEmail = guestEmail;
         if (guestContact !== undefined) update.guestContact = guestContact;
         if (guestCount !== undefined) update.guestCount = guestCount;
-        if (downPayment !== undefined && downPayment !== Number(existing.downPayment || 0)) throw { status: 400, message: "The original deposit cannot be edited. Record money received or a manual refund." };
+        if (downPayment !== undefined && downPayment !== Number(existing.downPayment || 0)) throw new AppError(400, "The original deposit cannot be edited. Record money received or a manual refund.");
         const received = bookingCollected(existing);
-        if (paidAmount !== undefined && paidAmount < received) throw { status: 400, message: "Received payments cannot be removed; record a refund through cancellation review." };
-        if (paymentStatus !== undefined && paidAmount === undefined && paymentStatus !== existing.paymentStatus) throw { status: 400, message: "Record the actual amount received to change payment status." };
+        if (paidAmount !== undefined && paidAmount < received) throw new AppError(400, "Received payments cannot be removed; record a refund through cancellation review.");
+        if (paymentStatus !== undefined && paidAmount === undefined && paymentStatus !== existing.paymentStatus) throw new AppError(400, "Record the actual amount received to change payment status.");
         if (specialRequests !== undefined) update.specialRequests = specialRequests;
 
         const roomChanging = room !== undefined && String(room) !== String(existing.room);
@@ -461,8 +450,8 @@ router.put("/:id", requirePermission(PERMISSIONS.BOOKING_MANAGE), validate(booki
         const pricingChanging = scheduleChanging || guestCount !== undefined || hasCorkage !== undefined;
         const financialChanging = pricingChanging || paidAmount !== undefined;
         if (financialChanging || (status !== undefined && status !== existing.status)) {
-          if (["Done", "Ongoing", "No Show", "Rejected", "Cancelled"].includes(existing.status)) throw { status: 409, message: "This reservation is closed or has started. Correct its monitoring record instead." };
-          if (await RoomSession.exists({ booking: existing._id, status: { $in: ["Active", "Finished"] } }).session(session)) throw { status: 409, message: "Change charges and payments through the linked monitoring session." };
+          if (["Done", "Ongoing", "No Show", "Rejected", "Cancelled"].includes(existing.status)) throw new AppError(409, "This reservation is closed or has started. Correct its monitoring record instead.");
+          if (await RoomSession.exists({ booking: existing._id, status: { $in: ["Active", "Finished"] } }).session(session)) throw new AppError(409, "Change charges and payments through the linked monitoring session.");
         }
 
         if (pricingChanging) {
@@ -499,7 +488,7 @@ router.put("/:id", requirePermission(PERMISSIONS.BOOKING_MANAGE), validate(booki
           update.corkageFee = pricing.corkageFee;
         }
         const financial = financialFields(update.amount ?? existing.amount, paidAmount ?? received, existing.refundedAmount || 0);
-        if (financial.paidAmount - financial.refundedAmount > financial.amount) throw { status: 400, message: "The charge cannot be lower than the collected balance." };
+        if (financial.paidAmount - financial.refundedAmount > financial.amount) throw new AppError(400, "The charge cannot be lower than the collected balance.");
         Object.assign(update, financial);
         if (paidAmount !== undefined && paidAmount !== received) update.paymentUpdatedAt = new Date();
 
@@ -523,8 +512,8 @@ router.delete("/:id", requirePermission(PERMISSIONS.BOOKING_MANAGE), validate(bo
   try {
     const booking = await runInTransaction(async (session) => {
       const existing = await Booking.findById(req.params.id).session(session);
-      if (!existing) throw { status: 404, message: "Booking not found." };
-      if (bookingCollected(existing) > 0 || !["Pending", "Rejected"].includes(existing.status) || await RoomSession.exists({ booking: existing._id }).session(session)) throw { status: 409, message: "Keep financial history: cancel this reservation instead of deleting it." };
+      if (!existing) throw new AppError(404, "Booking not found.");
+      if (bookingCollected(existing) > 0 || !["Pending", "Rejected"].includes(existing.status) || await RoomSession.exists({ booking: existing._id }).session(session)) throw new AppError(409, "Keep financial history: cancel this reservation instead of deleting it.");
       await Booking.deleteOne({ _id: existing._id }).session(session);
       return existing;
     });

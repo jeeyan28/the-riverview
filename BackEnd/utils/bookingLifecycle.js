@@ -1,6 +1,8 @@
+const AppError = require("./appError");
+
 function money(value) {
   const number = Number(value);
-  if (!Number.isFinite(number) || number < 0) throw { status: 400, message: "Amounts must be finite and non-negative." };
+  if (!Number.isFinite(number) || number < 0) throw new AppError(400, "Amounts must be finite and non-negative.");
   return Math.round((number + Number.EPSILON) * 100) / 100;
 }
 
@@ -16,7 +18,7 @@ function financialFields(amount, paidAmount, refundedAmount = 0) {
   amount = money(amount);
   paidAmount = money(paidAmount);
   refundedAmount = money(refundedAmount);
-  if (refundedAmount > paidAmount) throw { status: 400, message: "Refund cannot exceed the amount received." };
+  if (refundedAmount > paidAmount) throw new AppError(400, "Refund cannot exceed the amount received.");
   const netPaid = money(paidAmount - refundedAmount);
   const paymentStatus = amount > 0 && netPaid >= amount ? "Paid" : netPaid > 0 ? "Partial" : "Unpaid";
   return { amount, paidAmount, refundedAmount, paymentStatus };
@@ -30,31 +32,31 @@ function bookingStartMs(date, time) {
 }
 
 function extendSessionFields(session, addedHours, nextAmount) {
-  if (session.status !== "Active") throw { status: 409, message: "Only active sessions can be extended." };
+  if (session.status !== "Active") throw new AppError(409, "Only active sessions can be extended.");
   const hours = Number(addedHours);
-  if (!Number.isInteger(hours) || hours <= 0) throw { status: 400, message: "Hours to add must be a positive whole number." };
+  if (!Number.isInteger(hours) || hours <= 0) throw new AppError(400, "Hours to add must be a positive whole number.");
   const duration = Number(session.duration) + hours;
-  if (duration > 24) throw { status: 400, message: "Total session duration cannot exceed 24 hours." };
+  if (duration > 24) throw new AppError(400, "Total session duration cannot exceed 24 hours.");
   const amount = nextAmount === undefined ? money(session.amount) + money(session.rate) * hours : money(nextAmount);
   return { duration, ...financialFields(amount, session.paidAmount || 0, session.refundedAmount || 0) };
 }
 
 function endSessionFields(session, { paid = false, paidAmount } = {}, now = new Date()) {
-  if (session.status !== "Active") throw { status: 409, message: "Only active sessions can be ended." };
+  if (session.status !== "Active") throw new AppError(409, "Only active sessions can be ended.");
   const received = paidAmount === undefined ? (paid ? money(session.amount) + money(session.refundedAmount || 0) : session.paidAmount || 0) : money(paidAmount);
-  if (received < Number(session.paidAmount || 0)) throw { status: 400, message: "Received payments cannot be removed; record a refund separately." };
+  if (received < Number(session.paidAmount || 0)) throw new AppError(400, "Received payments cannot be removed; record a refund separately.");
   const fields = financialFields(session.amount, received, session.refundedAmount || 0);
-  if (paid && fields.paymentStatus !== "Paid") throw { status: 400, message: "The outstanding balance has not been fully received." };
+  if (paid && fields.paymentStatus !== "Paid") throw new AppError(400, "The outstanding balance has not been fully received.");
   return { ...fields, status: "Finished", endedAt: now };
 }
 
 function reviewCancellationFields(booking, { decision, refundedAmount = booking.refundedAmount || 0, note = "" }, reviewer, now = new Date()) {
-  if (!['Pending', 'Confirmed', 'Cancelled'].includes(booking.status)) throw { status: 409, message: "This reservation can no longer be cancelled." };
-  if (decision === "reject" && booking.cancellationStatus !== "Requested") throw { status: 409, message: "There is no cancellation request to reject." };
+  if (!['Pending', 'Confirmed', 'Cancelled'].includes(booking.status)) throw new AppError(409, "This reservation can no longer be cancelled.");
+  if (decision === "reject" && booking.cancellationStatus !== "Requested") throw new AppError(409, "There is no cancellation request to reject.");
   const paidAmount = bookingCollected(booking);
   const refunded = money(refundedAmount);
-  if (refunded < Number(booking.refundedAmount || 0)) throw { status: 400, message: "Previously recorded refunds cannot be removed." };
-  if (decision === "reject" && refunded !== Number(booking.refundedAmount || 0)) throw { status: 400, message: "Rejecting a cancellation cannot record a refund." };
+  if (refunded < Number(booking.refundedAmount || 0)) throw new AppError(400, "Previously recorded refunds cannot be removed.");
+  if (decision === "reject" && refunded !== Number(booking.refundedAmount || 0)) throw new AppError(400, "Rejecting a cancellation cannot record a refund.");
   return {
     ...financialFields(booking.amount, paidAmount, refunded),
     status: decision === "approve" ? "Cancelled" : booking.status,

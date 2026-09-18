@@ -22,7 +22,7 @@ const { exchangeGoogleAuthCode } = require("../utils/googleVerify");
 const { normalizeName, validateName } = require("../utils/nameValidation");
 const { isAdminRole, getEffectivePermissions, roleLabel } = require("../utils/permissions");
 const { isPasswordStrongEnough, PASSWORD_POLICY_MESSAGE } = require("../utils/passwordPolicy");
-const { GUEST_EMAIL_DOMAIN } = require("../utils/constants");
+const { GUEST_EMAIL_DOMAIN, EMAIL_RE } = require("../utils/constants");
 const { validate } = require("../middleware/validate");
 const {
   registerSchema,
@@ -135,7 +135,7 @@ router.post("/register", registerOtpLimiter, validate(registerSchema), async (re
     if (!emailRaw) {
       return res.status(400).json({ message: "Email is required.", field: "email" });
     }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailRaw)) {
+    if (!EMAIL_RE.test(emailRaw)) {
       return res.status(400).json({ message: "Enter a valid email address.", field: "email" });
     }
     if (!password) {
@@ -295,11 +295,10 @@ router.post("/register/verify-otp", registerOtpLimiter, validate(emailOtpSchema)
       firstName: pending.firstName,
       lastName: pending.lastName,
       email: pending.email,
-      password: pending.passwordHash,
       role: "user",
       isVerified: true,
     });
-    user.$locals.skipPasswordHash = true;
+    user.setPasswordHash(pending.passwordHash);
     await user.save();
 
     await PendingRegistration.deleteOne({ _id: pending._id });
@@ -512,7 +511,7 @@ router.post("/guest/claim/email/start", registerOtpLimiter, ensureAuthenticated,
     if (!emailRaw) {
       return res.status(400).json({ message: "Email is required.", field: "email" });
     }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailRaw)) {
+    if (!EMAIL_RE.test(emailRaw)) {
       return res.status(400).json({ message: "Enter a valid email address.", field: "email" });
     }
     if (!password) {
@@ -657,14 +656,13 @@ router.post("/guest/claim/email/verify-otp", registerOtpLimiter, ensureAuthentic
     }
 
     user.email = user.pendingClaimEmail;
-    user.password = user.pendingClaimPasswordHash;
+    user.setPasswordHash(user.pendingClaimPasswordHash);
     user.isGuest = false;
     user.pendingClaimEmail = undefined;
     user.pendingClaimPasswordHash = undefined;
     user.verifyOtpHash = undefined;
     user.verifyOtpExpires = undefined;
     user.verifyOtpAttempts = 0;
-    user.$locals.skipPasswordHash = true;
     await user.save();
 
     res.json({ message: "Your account has been saved.", user: sanitizeUser(user) });
@@ -826,108 +824,123 @@ router.post("/google", validate(googleCodeSchema), async (req, res) => {
 });
 
 router.post("/forgot-password", forgotPasswordLimiter, validate(emailSchema), async (req, res) => {
-  const { email } = req.body;
-  if (!email) return res.status(400).json({ message: "Email is required." });
-
-  const user = await User.findOne({ email: String(email).toLowerCase() });
-
-  const generic = { message: "If an account exists for that email, a verification code has been sent." };
-  if (!user || !user.isActive || !user.isVerified) return res.json(generic);
-
-  const otp = generateOtp();
-
-  user.resetOtpHash = hashOtp(otp);
-  user.resetOtpExpires = Date.now() + OTP_TTL_MS;
-  user.resetOtpAttempts = 0;
-  await user.save();
-
   try {
-    await sendOtpEmail(user, otp, "reset");
-  } catch (err) {
-    console.error("Failed to send OTP email:", err);
-  }
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ message: "Email is required." });
 
-  res.json(generic);
+    const user = await User.findOne({ email: String(email).toLowerCase() });
+
+    const generic = { message: "If an account exists for that email, a verification code has been sent." };
+    if (!user || !user.isActive || !user.isVerified) return res.json(generic);
+
+    const otp = generateOtp();
+
+    user.resetOtpHash = hashOtp(otp);
+    user.resetOtpExpires = Date.now() + OTP_TTL_MS;
+    user.resetOtpAttempts = 0;
+    await user.save();
+
+    try {
+      await sendOtpEmail(user, otp, "reset");
+    } catch (err) {
+      console.error("Failed to send OTP email:", err);
+    }
+
+    res.json(generic);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error." });
+  }
 });
 
 router.post("/verify-otp", forgotPasswordLimiter, validate(emailOtpSchema), async (req, res) => {
-  const { email, otp } = req.body;
-  if (!email || !otp) {
-    return res.status(400).json({ message: "Email and code are required." });
-  }
+  try {
+    const { email, otp } = req.body;
+    if (!email || !otp) {
+      return res.status(400).json({ message: "Email and code are required." });
+    }
 
-  const user = await User.findOne({
-    email: String(email).toLowerCase(),
-    isActive: true,
-  }).select("+resetOtpHash +resetOtpExpires +resetOtpAttempts");
+    const user = await User.findOne({
+      email: String(email).toLowerCase(),
+      isActive: true,
+    }).select("+resetOtpHash +resetOtpExpires +resetOtpAttempts");
 
-  const incorrect = { message: "Incorrect verification code." };
-  const expired = { message: "That code has expired. Request a new one." };
-  const tooManyAttempts = { message: "Too many incorrect attempts. Please request a new code." };
+    const incorrect = { message: "Incorrect verification code." };
+    const expired = { message: "That code has expired. Request a new one." };
+    const tooManyAttempts = { message: "Too many incorrect attempts. Please request a new code." };
 
-  if (!user || !user.resetOtpHash || !user.resetOtpExpires) {
-    return res.status(400).json(incorrect);
-  }
-  if (user.resetOtpExpires.getTime() < Date.now()) {
-    return res.status(400).json(expired);
-  }
-  if (user.resetOtpAttempts >= MAX_OTP_VERIFY_ATTEMPTS) {
-    return res.status(429).json(tooManyAttempts);
-  }
-
-  const candidateHash = hashOtp(otp);
-  if (!hashesMatch(candidateHash, user.resetOtpHash)) {
-    user.resetOtpAttempts += 1;
-    await user.save();
+    if (!user || !user.resetOtpHash || !user.resetOtpExpires) {
+      return res.status(400).json(incorrect);
+    }
+    if (user.resetOtpExpires.getTime() < Date.now()) {
+      return res.status(400).json(expired);
+    }
     if (user.resetOtpAttempts >= MAX_OTP_VERIFY_ATTEMPTS) {
       return res.status(429).json(tooManyAttempts);
     }
-    return res.status(400).json(incorrect);
+
+    const candidateHash = hashOtp(otp);
+    if (!hashesMatch(candidateHash, user.resetOtpHash)) {
+      user.resetOtpAttempts += 1;
+      await user.save();
+      if (user.resetOtpAttempts >= MAX_OTP_VERIFY_ATTEMPTS) {
+        return res.status(429).json(tooManyAttempts);
+      }
+      return res.status(400).json(incorrect);
+    }
+
+    const rawSessionToken = crypto.randomBytes(32).toString("hex");
+    user.resetOtpHash = undefined;
+    user.resetOtpExpires = undefined;
+    user.resetOtpAttempts = 0;
+    user.resetSessionTokenHash = crypto.createHash("sha256").update(rawSessionToken).digest("hex");
+    user.resetSessionTokenExpires = Date.now() + 10 * 60 * 1000;
+    await user.save();
+
+    res.json({ message: "Code verified.", resetSessionToken: rawSessionToken });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error." });
   }
-
-  const rawSessionToken = crypto.randomBytes(32).toString("hex");
-  user.resetOtpHash = undefined;
-  user.resetOtpExpires = undefined;
-  user.resetOtpAttempts = 0;
-  user.resetSessionTokenHash = crypto.createHash("sha256").update(rawSessionToken).digest("hex");
-  user.resetSessionTokenExpires = Date.now() + 10 * 60 * 1000;
-  await user.save();
-
-  res.json({ message: "Code verified.", resetSessionToken: rawSessionToken });
 });
 
 router.post("/reset-password", forgotPasswordLimiter, validate(resetPasswordSchema), async (req, res) => {
-  const { resetSessionToken, password } = req.body;
+  try {
+    const { resetSessionToken, password } = req.body;
 
-  if (!resetSessionToken || !password) {
-    return res.status(400).json({ message: "Missing reset session or password." });
+    if (!resetSessionToken || !password) {
+      return res.status(400).json({ message: "Missing reset session or password." });
+    }
+
+    if (!isPasswordStrongEnough(password)) {
+      return res.status(400).json({
+        message: PASSWORD_POLICY_MESSAGE,
+      });
+    }
+
+    const hashedToken = crypto.createHash("sha256").update(resetSessionToken).digest("hex");
+    const user = await User.findOne({
+      resetSessionTokenHash: hashedToken,
+      resetSessionTokenExpires: { $gt: Date.now() },
+      isActive: true,
+    }).select("+resetSessionTokenHash +resetSessionTokenExpires");
+
+    if (!user) {
+      return res.status(400).json({ message: "Reset session has expired. Please verify your email again." });
+    }
+
+    await user.setPassword(password);
+    user.resetSessionTokenHash = undefined;
+    user.resetSessionTokenExpires = undefined;
+    user.lockUntil = undefined;
+    user.failedLoginAttempts = 0;
+    await user.save();
+
+    res.json({ message: "Password updated. You can now log in." });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error." });
   }
-
-  if (!isPasswordStrongEnough(password)) {
-    return res.status(400).json({
-      message: PASSWORD_POLICY_MESSAGE,
-    });
-  }
-
-  const hashedToken = crypto.createHash("sha256").update(resetSessionToken).digest("hex");
-  const user = await User.findOne({
-    resetSessionTokenHash: hashedToken,
-    resetSessionTokenExpires: { $gt: Date.now() },
-    isActive: true,
-  }).select("+resetSessionTokenHash +resetSessionTokenExpires");
-
-  if (!user) {
-    return res.status(400).json({ message: "Reset session has expired. Please verify your email again." });
-  }
-
-  user.password = password;
-  user.resetSessionTokenHash = undefined;
-  user.resetSessionTokenExpires = undefined;
-  user.lockUntil = undefined;
-  user.failedLoginAttempts = 0;
-  await user.save();
-
-  res.json({ message: "Password updated. You can now log in." });
 });
 
 router.get("/me", ensureAuthenticated, async (req, res) => {

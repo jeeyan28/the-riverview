@@ -123,14 +123,27 @@ app.use("/api/payments/paymongo", require("./routes/paymongoRoutes").router);
 app.use((err, req, res, next) => {
   if (err) {
     console.error(err);
-    return res.status(400).json({ message: err.message || "Something went wrong." });
+    const status = err.status || 500;
+    return res.status(status).json({ message: err.message || "Something went wrong." });
   }
   next();
 });
 
+function startBookingLifecycleScheduler() {
+  const { voidExpiredBookings, updateBookingLifecycleStatuses } = require("./utils/bookingHelper");
+  const INTERVAL_MS = 5 * 60 * 1000;
+  async function tick() {
+    try { await voidExpiredBookings(); } catch (e) { console.error("scheduler: voidExpiredBookings failed:", e.message); }
+    try { await updateBookingLifecycleStatuses(); } catch (e) { console.error("scheduler: updateBookingLifecycleStatuses failed:", e.message); }
+  }
+  setInterval(tick, INTERVAL_MS);
+  tick();
+}
+
 if (require.main === module) {
   connectDB()
     .then(() => {
+      startBookingLifecycleScheduler();
       app.listen(PORT, () => {
         console.log(`Server running on port ${PORT}`);
       });

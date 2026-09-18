@@ -1,5 +1,6 @@
 const nodemailer = require("nodemailer");
 const { OTP_TTL_MS } = require("./otp");
+const { EMAIL_RE } = require("./constants");
 
 const OTP_TTL_MINUTES = Math.round(OTP_TTL_MS / 60000);
 
@@ -16,8 +17,6 @@ function escapeHtml(str) {
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
   }[c]));
 }
-
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function formatHour(h) {
   const hh = ((Number(h) % 24) + 24) % 24;
