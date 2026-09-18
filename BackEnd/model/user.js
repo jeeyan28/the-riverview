@@ -60,6 +60,15 @@ userSchema.methods.comparePassword = async function (candidate) {
   return bcrypt.compare(candidate, this.password);
 };
 
+userSchema.methods.setPassword = async function (plainText) {
+  this.password = await bcrypt.hash(plainText, SALT_ROUNDS);
+};
+
+userSchema.methods.setPasswordHash = function (preHashed) {
+  this.password = preHashed;
+  this.$locals.skipPasswordHash = true;
+};
+
 const MAX_ATTEMPTS = LOGIN_LOCKOUT_MAX_ATTEMPTS;
 const LOCK_TIME_MS = LOGIN_LOCKOUT_DURATION_MS;
 const SALT_ROUNDS = 10;

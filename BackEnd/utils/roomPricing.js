@@ -1,4 +1,5 @@
-const CORKAGE_FEE = 200;
+const { CORKAGE_FEE } = require("./constants");
+const AppError = require("./appError");
 
 function roundMoney(value) {
   return Math.round((Number(value) + Number.EPSILON) * 100) / 100;
@@ -21,7 +22,7 @@ function parseHour(value, fallback = 0) {
 function rateForHour(variant, hour, guestCount = 1) {
   const baseRate = Number(variant?.price);
   if (!Number.isFinite(baseRate) || baseRate < 0) {
-    throw { status: 400, message: "Could not determine a valid rate for this room." };
+    throw new AppError(400, "Could not determine a valid rate for this room.");
   }
 
   const hasEveningRate = variant?.eveningPrice !== null && variant?.eveningPrice !== undefined && variant?.eveningPrice !== "";
@@ -42,7 +43,7 @@ function calculateBookingPrice({ variant, basePrice, timeIn, duration, guestCoun
   const hours = Number(duration);
   const startHour = parseHour(timeIn, NaN);
   if (!Number.isFinite(hours) || hours <= 0 || !Number.isInteger(startHour)) {
-    throw { status: 400, message: "A valid hourly schedule is required to calculate the price." };
+    throw new AppError(400, "A valid hourly schedule is required to calculate the price.");
   }
 
   const pricingVariant = variant || { price: basePrice };

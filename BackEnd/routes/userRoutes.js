@@ -126,14 +126,15 @@ router.post("/", requirePermission(PERMISSIONS.ADMIN_MANAGE), validate(createUse
     const existing = await User.findOne({ email: String(email).toLowerCase() });
     if (existing) return res.status(409).json({ message: "Email already in use." });
 
-    const user = await User.create({
+    const user = new User({
       firstName: normalizeName(firstName),
       lastName: normalizeName(lastName),
       phone: phone || "",
       email: String(email).toLowerCase(),
-      password,
       role,
     });
+    await user.setPassword(password);
+    await user.save();
 
     await logAudit({ category: "Manage Users", action: "created", description: `created user account for ${user.firstName} ${user.lastName} (${roleLabel(user.role)})`, user: req.user });
     res.status(201).json({ user: shapeUser(user) });
@@ -315,7 +316,7 @@ router.put("/:id/password", ensureAuthenticated, validate(userIdParamsSchema, "p
       }
     }
 
-    user.password = newPassword;
+    await user.setPassword(newPassword);
     await user.save();
 
     res.json({ message: "Password updated." });

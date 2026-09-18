@@ -3,6 +3,8 @@ const Room = require("../model/room");
 const Booking = require("../model/booking");
 const Settings = require("../model/settings");
 const BookingLock = require("../model/bookingLock");
+const ReservationCounter = require("../model/reservationCounter");
+const AppError = require("./appError");
 const { sendReceiptEmail } = require("./mailer");
 const { TIME_ZONE } = require("./constants");
 const { bookingStartMs, financialFields } = require("./bookingLifecycle");
@@ -63,12 +65,12 @@ async function runInTransaction(fn) {
 
 async function validateAndPriceBooking({ roomId, variantLabel, date, timeIn, duration, isAdminBooking, guestCount, hasCorkage = false, excludeLockUserId, excludeBookingId, session }) {
   if (!roomId || !date || !timeIn || !duration) {
-    throw { status: 400, message: "roomId, date, timeIn and duration are required." };
+    throw new AppError(400, "roomId, date, timeIn and duration are required.");
   }
   if (!Number.isInteger(duration) || duration < 1 || duration > 5) {
-    throw { status: 400, message: "Reservations must be 1–5 hours in whole-hour increments." };
+    throw new AppError(400, "Reservations must be 1–5 hours in whole-hour increments.");
   }
-  if (!Number.isFinite(bookingStartMs(date, timeIn)) || !/:00$/.test(timeIn)) throw { status: 400, message: "Choose a valid date and an hourly start time." };
+  if (!Number.isFinite(bookingStartMs(date, timeIn)) || !/:00$/.test(timeIn)) throw new AppError(400, "Choose a valid date and an hourly start time.");
   
   const settings = isAdminBooking ? null : await Settings.getSingleton();
 
@@ -76,40 +78,40 @@ async function validateAndPriceBooking({ roomId, variantLabel, date, timeIn, dur
     const minDuration = Number(settings?.operatingHours?.minOnlineDurationHours) || 1;
     const maxDuration = Number(settings?.operatingHours?.maxOnlineDurationHours) || 5;
     if (duration < minDuration || duration > maxDuration) {
-      throw { status: 400, message: `Duration must be between ${minDuration} and ${maxDuration} hours.` };
+      throw new AppError(400, `Duration must be between ${minDuration} and ${maxDuration} hours.`);
     }
   }
   if (isAdminBooking && duration > Booking.MAX_DURATION_HOURS) {
-    throw { status: 400, message: `Duration cannot exceed ${Booking.MAX_DURATION_HOURS} hours.` };
+    throw new AppError(400, `Duration cannot exceed ${Booking.MAX_DURATION_HOURS} hours.`);
   }
 
   // Serialize capacity checks for this facility inside booking transactions.
   const room = session
     ? await Room.findOneAndUpdate({ _id: roomId }, { $inc: { __v: 1 } }, { returnDocument: "after", session })
     : await Room.findById(roomId);
-  if (!room) throw { status: 404, message: "Selected room does not exist." };
+  if (!room) throw new AppError(404, "Selected room does not exist.");
 
   let selectedVariant = null;
   if (room.variants && room.variants.length) {
     if (variantLabel) {
       selectedVariant = room.variants.find(v => v.label === variantLabel);
-      if (!selectedVariant) throw { status: 400, message: "Selected pricing option not found." };
+      if (!selectedVariant) throw new AppError(400, "Selected pricing option not found.");
       if (!isAdminBooking && selectedVariant.status && selectedVariant.status !== "Available") {
-        throw { status: 409, message: `This room is currently ${selectedVariant.status.toLowerCase()} and cannot be booked.` };
+        throw new AppError(409, `This room is currently ${selectedVariant.status.toLowerCase()} and cannot be booked.`);
       }
     } else {
-      throw { status: 400, message: "Choose a room type or pricing option." };
+      throw new AppError(400, "Choose a room type or pricing option.");
     }
   }
 
   if (guestCount !== undefined && guestCount !== null) {
     const pax = Number(guestCount);
     if (!Number.isFinite(pax) || pax < 1) {
-      throw { status: 400, message: "Number of guests (pax) must be at least 1." };
+      throw new AppError(400, "Number of guests (pax) must be at least 1.");
     }
     const capacity = parsePaxCapacity(selectedVariant?.pax) || (Number(room.capacity) > 0 ? Number(room.capacity) : null);
     if (capacity && pax > capacity) {
-      throw { status: 400, message: `This room accommodates up to ${capacity} guest(s). Please reduce your pax or choose a bigger room.` };
+      throw new AppError(400, `This room accommodates up to ${capacity} guest(s). Please reduce your pax or choose a bigger room.`);
     }
   }
 
@@ -142,7 +144,7 @@ async function validateAndPriceBooking({ roomId, variantLabel, date, timeIn, dur
       return hour >= bStart && hour < bStart + b.duration;
     }).length;
     if (bookedCount >= capacity) {
-      throw { status: 409, message: "That time slot is fully booked. Please pick another." };
+      throw new AppError(409, "That time slot is fully booked. Please pick another.");
     }
   }
 
@@ -163,7 +165,7 @@ async function validateAndPriceBooking({ roomId, variantLabel, date, timeIn, dur
     const isClosedDay = Array.isArray(openDays) && openDays.length > 0 && !openDays.includes(dayOfWeek);
 
     if (isHoliday || isClosedDay) {
-      throw { status: 409, message: "We're closed on the selected date. Please choose another day." };
+      throw new AppError(409, "We're closed on the selected date. Please choose another day.");
     }
 
     const parseHour = (str, fallback) => {
@@ -175,7 +177,7 @@ async function validateAndPriceBooking({ roomId, variantLabel, date, timeIn, dur
     if (closeHour <= openHour) closeHour += 24;
     const endHour = startHour + duration;
     if (startHour < openHour || endHour > closeHour) {
-      throw { status: 409, message: "That time is outside our operating hours. Please choose another slot." };
+      throw new AppError(409, "That time is outside our operating hours. Please choose another slot.");
     }
   }
 
@@ -209,11 +211,11 @@ async function nextReservationCode(facilityName, session) {
   const mm = String(now.getMonth() + 1).padStart(2, "0");
   const dd = String(now.getDate()).padStart(2, "0");
   const codePrefix = `${prefix}-${yy}${mm}${dd}-`;
+  const counterKey = `${codePrefix}counter`;
 
-  const query = Booking.countDocuments({ reservationCode: { $regex: `^${codePrefix}` } });
-  const count = await (session ? query.session(session) : query);
-  const seq = String(count + 1).padStart(5, "0");
-  return `${codePrefix}${seq}`;
+  const seq = await ReservationCounter.nextSequence(counterKey, session);
+  const code = `${codePrefix}${String(seq).padStart(5, "0")}`;
+  return code;
 }
 
 async function saveWithReservationCode(booking, facilityName, attempts = 5, session) {
@@ -257,10 +259,7 @@ async function finalizeBookingFromPayment({ paymentIntentId, metadata, paidPayme
         });
         room = pricing.room;
       } catch (e) {
-        const err = new Error(e.message || "This time slot is no longer available.");
-        err.status = e.status || 409;
-        err.slotUnavailable = true;
-        throw err;
+        throw new AppError(e.message || "This time slot is no longer available.", e.status || 409, { slotUnavailable: true });
       }
 
       const newBooking = new Booking({

@@ -9,6 +9,7 @@ const { canonicalServiceName, escapeRegExp } = require("../utils/roomCatalog");
 const { roomIdParamsSchema, emptyBodySchema, roomWriteSchema } = require("../validation/roomSchemas");
 const { logAudit } = require("../utils/auditLog");
 const { syncRoomInventory, deactivateRoomInventory } = require("../utils/syncRoomInventory");
+const AppError = require("../utils/appError");
 
 const roomUploads = upload.fields([
   { name: "image", maxCount: 1 },
@@ -23,7 +24,7 @@ function parseJsonField(value, fallback, label) {
     if (!Array.isArray(parsed)) throw new Error();
     return parsed;
   } catch {
-    throw { status: 400, message: `${label} must be a valid JSON array.` };
+    throw new AppError(400, `${label} must be a valid JSON array.`);
   }
 }
 
@@ -49,11 +50,11 @@ function attachUploadedImages(req) {
   const indexes = req.body.variantImageIndexes || [];
 
   if (files.length !== indexes.length) {
-    throw { status: 400, message: "Each uploaded room image must have a matching room index." };
+    throw new AppError(400, "Each uploaded room image must have a matching room index.");
   }
   indexes.forEach((variantIndex, fileIndex) => {
     if (!variants[variantIndex]) {
-      throw { status: 400, message: "A room image references a room that does not exist." };
+      throw new AppError(400, "A room image references a room that does not exist.");
     }
     variants[variantIndex].image = files[fileIndex].path;
   });

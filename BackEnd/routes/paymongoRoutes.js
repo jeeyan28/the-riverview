@@ -15,7 +15,7 @@ const {
   verifyWebhookSignature,
 } = require("../utils/paymongo");
 const { isAdminRole } = require("../utils/permissions");
-const { GUEST_EMAIL_DOMAIN } = require("../utils/constants");
+const { GUEST_EMAIL_DOMAIN, EMAIL_RE } = require("../utils/constants");
 const { validate } = require("../middleware/validate");
 const { paymentIntentIdParamsSchema, createIntentSchema, attachIntentSchema } = require("../validation/paymentSchemas");
 const { paymentIntentLimiter, paymentAttachLimiter } = require("../middleware/rateLimiter");
@@ -34,7 +34,6 @@ function isPaidPaymentIntent(intentAttrs) {
   return Array.isArray(intentAttrs.payments) && intentAttrs.payments.some(p => p?.attributes?.status === "paid");
 }
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 function resolveGuestEmail({ guestEmail, guestContact, accountEmail, isGuest }) {
   if (guestEmail && EMAIL_RE.test(guestEmail)) return guestEmail;
   if (guestContact && EMAIL_RE.test(guestContact)) return guestContact;
