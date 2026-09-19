@@ -28,7 +28,6 @@ export function useGoogleAuth(onCredential, { enabled = true } = {}) {
         client_id: GOOGLE_CLIENT_ID,
         scope: 'openid email profile',
         ux_mode: 'popup',
-        prompt: 'consent',
         callback: (response) => onCredentialRef.current(response),
       });
     }

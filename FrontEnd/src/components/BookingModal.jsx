@@ -1028,6 +1028,11 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
           window.location.href = '/login';
           return;
         }
+        if (res.status === 400 && data.field === 'guestEmail') {
+          setPayErrorKind('declined');
+          setPayError(data.message || 'A valid email is required for wallet payments. Please go back and enter your email.');
+          return;
+        }
         throw new Error(data.message || 'Payment could not be processed. Please try again.');
       }
 

@@ -192,6 +192,8 @@
 .public-site .pool-apron { position: absolute; z-index: -1; background: linear-gradient(#704129,#3c2116); }
 .public-site .pool-apron--front { inset: 59px 0 7px; clip-path: polygon(3% 0,50% 56%,50% 100%,3% 43%); }
 .public-site .pool-apron--right { inset: 59px 0 7px; background: linear-gradient(115deg,#6d4028,#2c1811); clip-path: polygon(97% 0,50% 56%,50% 100%,97% 43%); }
+.public-site .pool-apron--back { inset: 7px 0 59px; background: linear-gradient(180deg,#704129,#3c2116); clip-path: polygon(3% 0,50% 56%,50% 100%,3% 43%); }
+.public-site .pool-apron--left { inset: 59px 7px 7px 0; background: linear-gradient(245deg,#6d4028,#2c1811); clip-path: polygon(3% 0,97% 0,50% 56%,50% 100%); }
 .public-site .pool-leg { position: absolute; z-index: -2; top: 142px; width: 22px; height: 78px; border-radius: 0 0 7px 7px; background: linear-gradient(90deg,#3a2118,#8b5636 44%,#321b13); box-shadow: 8px 12px 14px rgba(0,0,0,.25); clip-path: polygon(9% 0,100% 0,72% 100%,23% 100%); }
 .public-site .pool-leg::after { position: absolute; left: 3px; right: 4px; bottom: 1px; height: 9px; border-radius: 4px; background: #18151a; content: ""; }
 .public-site .pool-leg--left { left: 67px; }
@@ -208,10 +210,10 @@
 .public-site .pool-ball i { display: grid; width: 8px; height: 8px; place-items: center; border-radius: 50%; background: #f7f4e9; color: #111827; font: 700 5px/1 var(--font-body); }
 .public-site .pool-ball--cue { left: 91px; top: 73px; background: radial-gradient(circle at 34% 28%,#fff,#d8d6cb 72%); }
 .public-site .pool-ball--cue i { display: none; }
-.public-site .pool-ball--one { left: 184px; top: 66px; background: radial-gradient(circle at 32% 27%,#fff09a,#e5a900 67%); }
 .public-site .pool-ball--eight { left: 206px; top: 79px; background: radial-gradient(circle at 32% 27%,#707070,#08090a 62%); }
-.public-site .pool-ball--nine { left: 184px; top: 92px; background: linear-gradient(#f8eecf 0 26%,#e4b111 27% 72%,#f8eecf 73%); }
 .public-site .pool-cue { position: absolute; z-index: 5; left: 50px; top: 92px; width: 204px; height: 5px; border-radius: 5px; background: linear-gradient(90deg,#e8c68f 0 65%,#724228 65% 93%,#2d3341 93%); box-shadow: 0 5px 5px rgba(0,0,0,.28); transform: rotate(-30deg); transform-origin: left center; }
+.public-site .pool-cue::before { position: absolute; left: -2px; top: -3px; width: 10px; height: 10px; border-radius: 50%; background: radial-gradient(circle at 30% 30%,#fff6d0,#d4a843); box-shadow: inset -1px -1px 2px rgba(0,0,0,.3); content: ""; }
+.public-site .pool-chalk { position: absolute; z-index: 4; right: 40px; top: 125px; width: 16px; height: 16px; border-radius: 3px; background: linear-gradient(145deg,#4a90d9,#1e5aa0); box-shadow: 0 3px 4px rgba(0,0,0,.3); }
 .public-site .pool-light-cord { position: absolute; z-index: 6; top: -7px; left: 166px; width: 2px; height: 47px; background: linear-gradient(#080d16,#8591a4); }
 .public-site .pool-light { position: absolute; z-index: 7; top: 31px; left: 126px; width: 82px; height: 26px; border-radius: 46% 46% 16px 16px; background: linear-gradient(160deg,#52647e,#182438 75%); box-shadow: 0 7px 14px rgba(0,0,0,.34),0 13px 35px rgba(113,255,224,.16); }
 .public-site .pool-light::after { position: absolute; inset: 14px 8px -28px; background: linear-gradient(rgba(190,255,235,.16),transparent); clip-path: polygon(16% 0,84% 0,100% 100%,0 100%); content: ""; }
@@ -225,11 +227,16 @@
 .public-site .court-side { position: absolute; z-index: -1; inset: 58px 0 8px; }
 .public-site .court-side--front { background: linear-gradient(#8c4629,#4b261b); clip-path: polygon(3% 0,50% 55%,50% 100%,3% 44%); }
 .public-site .court-side--right { background: linear-gradient(115deg,#9f522e,#3c2018); clip-path: polygon(97% 0,50% 55%,50% 100%,97% 44%); }
+.public-site .court-side--back { background: linear-gradient(180deg,#8c4629,#4b261b); clip-path: polygon(3% 0,50% 55%,50% 100%,3% 44%); }
+.public-site .court-side--left { background: linear-gradient(245deg,#9f522e,#3c2018); clip-path: polygon(3% 0,97% 0,50% 55%,50% 100%); }
 .public-site .court-mark { position: absolute; z-index: 2; border-color: rgba(255,248,230,.82); }
+.public-site .court-mark--boundary { inset: 9px 17px 40px; border: 2px solid rgba(255,247,228,.82); clip-path: polygon(50% 3%,98% 31%,50% 64%,2% 31%); }
 .public-site .court-mark--midline { left: 164px; top: 81px; width: 2px; height: 83px; background: rgba(255,248,230,.76); transform: rotate(31deg); }
 .public-site .court-mark--circle { left: 132px; top: 93px; width: 61px; height: 33px; border: 2px solid rgba(255,248,230,.8); border-radius: 50%; transform: rotate(-1deg); }
 .public-site .court-mark--key { right: 50px; top: 78px; width: 60px; height: 50px; border: 2px solid rgba(255,248,230,.76); transform: skewY(-29deg) scaleY(.56); }
 .public-site .court-mark--arc { right: 78px; top: 96px; width: 61px; height: 38px; border: 2px solid rgba(255,248,230,.76); border-radius: 50%; }
+.public-site .court-mark--freethrow { right: 50px; top: 128px; width: 60px; height: 50px; border: 2px solid rgba(255,248,230,.76); transform: skewY(-29deg) scaleY(.56); }
+.public-site .court-mark--threepoint { right: 78px; top: 56px; width: 80px; height: 45px; border: 2px solid rgba(255,248,230,.76); border-radius: 50%; clip-path: polygon(0 0, 100% 0, 100% 60%, 50% 100%, 0 60%); }
 .public-site .court-hoop-model { position: absolute; z-index: 6; right: 43px; top: 31px; width: 64px; height: 139px; }
 .public-site .court-pole { position: absolute; right: 9px; top: 38px; width: 8px; height: 103px; border-radius: 5px; background: linear-gradient(90deg,#718096,#eef4fb 48%,#657187); box-shadow: 7px 9px 12px rgba(0,0,0,.28); transform: skewY(-6deg); }
 .public-site .court-pole-base { position: absolute; right: -2px; bottom: -4px; width: 34px; height: 15px; border-radius: 50%; background: linear-gradient(#8390a2,#303b4c); box-shadow: 0 7px 8px rgba(0,0,0,.3); }
@@ -237,36 +244,45 @@
 .public-site .court-backboard i { position: absolute; left: 19px; bottom: 4px; width: 21px; height: 15px; border: 2px solid rgba(255,255,255,.72); }
 .public-site .court-rim { position: absolute; z-index: 2; left: 5px; top: 41px; width: 39px; height: 13px; border: 4px solid #f36f3f; border-radius: 50%; box-shadow: 0 4px 6px rgba(0,0,0,.28); }
 .public-site .court-rim i { position: absolute; left: 3px; top: 7px; width: 25px; height: 30px; background: repeating-linear-gradient(72deg,transparent 0 5px,rgba(238,244,249,.64) 6px 7px),repeating-linear-gradient(-72deg,transparent 0 5px,rgba(238,244,249,.56) 6px 7px); clip-path: polygon(0 0,100% 0,76% 100%,24% 100%); }
+.public-site .court-net { position: absolute; z-index: 1; left: 8px; top: 52px; width: 35px; height: 28px; background: repeating-linear-gradient(65deg,transparent 0 2px,rgba(238,244,249,.4) 2px 3px),repeating-linear-gradient(-65deg,transparent 0 2px,rgba(238,244,249,.35) 2px 3px); clip-path: polygon(0 0,100% 0,80% 100%,20% 100%); opacity: .8; }
 .public-site .court-ball { position: absolute; z-index: 8; left: 94px; top: 111px; width: 39px; height: 39px; overflow: hidden; border: 2px solid #542919; border-radius: 50%; background: radial-gradient(circle at 31% 25%,#ffc079,#f38338 44%,#b94720 77%); box-shadow: inset -8px -9px 10px rgba(57,20,8,.36),0 9px 12px rgba(0,0,0,.27); animation: court-ball-float 2.8s var(--ease-in-out) infinite alternate; }
 .public-site .court-ball i,.public-site .court-ball b { position: absolute; inset: -4px 17px; border: 1.5px solid #52291c; border-radius: 50%; content: ""; }
 .public-site .court-ball b { inset: 17px -4px; }
 .public-site .court-ball::after { position: absolute; left: 5px; top: -5px; width: 27px; height: 47px; border: 1.5px solid #52291c; border-radius: 50%; content: ""; transform: rotate(48deg); }
 .public-site .court-ball-shadow { position: absolute; left: 94px; top: 158px; width: 40px; height: 12px; border-radius: 50%; background: rgba(0,0,0,.42); filter: blur(5px); animation: court-shadow-breathe 2.8s var(--ease-in-out) infinite alternate; }
 
-/* KTV: a small lounge stage with screen, speakers, seating, and microphone. */
+/* KTV: a small lounge stage with screen, speakers, and microphone. */
 .public-site .facility-motion--ktv { --motion-glow: rgba(192,132,252,.53); }
 .public-site .ktv-stage { position: absolute; inset: 91px 25px 31px; background: linear-gradient(145deg,#674185,#2e2348); clip-path: polygon(50% 1%,98% 31%,50% 65%,2% 31%); filter: drop-shadow(0 24px 18px rgba(0,0,0,.38)); }
-.public-site .ktv-stage-front,.public-site .ktv-stage-right { position: absolute; inset: 45% 0 4%; background: linear-gradient(#332342,#171424); }
+.public-site .ktv-stage-front,.public-site .ktv-stage-right,.public-site .ktv-stage-back,.public-site .ktv-stage-left { position: absolute; inset: 45% 0 4%; background: linear-gradient(#332342,#171424); }
 .public-site .ktv-stage-front { clip-path: polygon(2% 0,50% 55%,50% 100%,2% 46%); }
 .public-site .ktv-stage-right { background: linear-gradient(115deg,#422853,#13111f); clip-path: polygon(98% 0,50% 55%,50% 100%,98% 46%); }
+.public-site .ktv-stage-back { clip-path: polygon(2% 0,50% 55%,50% 100%,2% 46%); transform: rotate(180deg); }
+.public-site .ktv-stage-left { background: linear-gradient(245deg,#422853,#13111f); clip-path: polygon(2% 0,98% 0,50% 55%,50% 100%); }
 .public-site .ktv-screen { position: absolute; z-index: 4; left: 98px; top: 32px; width: 138px; height: 88px; overflow: hidden; border: 7px solid #202940; border-radius: 9px; background: radial-gradient(circle at 68% 24%,rgba(255,255,255,.25),transparent 22%),linear-gradient(145deg,#392b76,#b049a2 54%,#2e78a7); box-shadow: 12px 15px 22px rgba(0,0,0,.34),inset 0 0 24px rgba(255,255,255,.1); transform: perspective(400px) rotateY(-7deg); }
 .public-site .ktv-screen::after { position: absolute; inset: 0; background: linear-gradient(115deg,rgba(255,255,255,.16),transparent 36%); content: ""; }
+.public-site .ktv-screen-frame { position: absolute; inset: -7px; border: 7px solid #1a2238; border-radius: 9px; box-shadow: inset 0 0 16px rgba(0,0,0,.5); }
+.public-site .ktv-screen-display { position: absolute; inset: 4px; border-radius: 4px; background: linear-gradient(135deg,#0d1428 0%,#1a0d2e 50%,#0d1428 100%); box-shadow: inset 0 0 20px rgba(0,0,0,.6); }
 .public-site .ktv-screen-wave { position: absolute; bottom: 21px; width: 12px; border-radius: 8px; background: linear-gradient(#ffd770,#f264c7); box-shadow: 0 0 12px rgba(244,100,199,.42); transform-origin: center bottom; animation: ktv-equalizer 1.8s var(--ease-in-out) infinite alternate; }
-.public-site .ktv-screen-wave--one { left: 43px; height: 24px; }
-.public-site .ktv-screen-wave--two { left: 62px; height: 42px; animation-delay: -.9s; }
-.public-site .ktv-screen-wave--three { left: 81px; height: 31px; animation-delay: -.45s; }
+.public-site .ktv-screen-wave--one { left: 38px; height: 24px; }
+.public-site .ktv-screen-wave--two { left: 58px; height: 42px; animation-delay: -.9s; }
+.public-site .ktv-screen-wave--three { left: 78px; height: 31px; animation-delay: -.45s; }
+.public-site .ktv-screen-wave--four { left: 98px; height: 36px; animation-delay: -1.35s; }
 .public-site .ktv-sofa { position: absolute; z-index: 6; left: 47px; top: 139px; width: 155px; height: 53px; border-radius: 12px 12px 7px 7px; background: linear-gradient(160deg,#79549a,#3b2b5b 78%); box-shadow: 9px 13px 17px rgba(0,0,0,.32),inset 0 3px rgba(255,255,255,.13); transform: skewY(4deg); }
 .public-site .ktv-sofa::before { position: absolute; left: 8px; right: 8px; top: -23px; height: 36px; border-radius: 12px 12px 4px 4px; background: linear-gradient(150deg,#946bb7,#4a356d); box-shadow: inset 0 2px rgba(255,255,255,.14); content: ""; }
 .public-site .ktv-sofa span,.public-site .ktv-sofa i { position: absolute; z-index: 2; top: -19px; width: 2px; height: 27px; background: rgba(27,18,45,.38); }
 .public-site .ktv-sofa span { left: 51px; }.public-site .ktv-sofa i { right: 51px; }
 .public-site .ktv-speaker { position: absolute; z-index: 7; top: 111px; width: 43px; height: 79px; border-radius: 6px; background: linear-gradient(145deg,#35415a,#111827 72%); box-shadow: 7px 11px 13px rgba(0,0,0,.34),inset 0 2px rgba(255,255,255,.08); }
 .public-site .ktv-speaker--left { left: 31px; }.public-site .ktv-speaker--right { right: 34px; }
-.public-site .ktv-speaker span,.public-site .ktv-speaker i { position: absolute; left: 50%; border: 4px solid #596681; border-radius: 50%; background: radial-gradient(circle,#263149 0 24%,#0a0f1b 26% 56%,#424e68 58%); transform: translateX(-50%); }
+.public-site .ktv-speaker span,.public-site .ktv-speaker i,.public-site .ktv-speaker b { position: absolute; left: 50%; border: 4px solid #596681; border-radius: 50%; background: radial-gradient(circle,#263149 0 24%,#0a0f1b 26% 56%,#424e68 58%); transform: translateX(-50%); }
 .public-site .ktv-speaker span { top: 10px; width: 23px; height: 23px; }.public-site .ktv-speaker i { bottom: 9px; width: 31px; height: 31px; }
+.public-site .ktv-speaker b { top: 50%; width: 16px; height: 16px; border-width: 2px; background: radial-gradient(circle,#3a465d 0 30%,#1a2238 40% 70%,#5a6888); margin-top: -8px; }
 .public-site .ktv-microphone { position: absolute; z-index: 9; right: 75px; top: 131px; width: 34px; height: 96px; filter: drop-shadow(8px 12px 9px rgba(0,0,0,.35)); transform: rotate(27deg); transform-origin: center bottom; animation: ktv-mic-sway 4.2s var(--ease-in-out) infinite alternate; }
 .public-site .ktv-mic-head { position: absolute; left: 1px; top: 0; width: 32px; height: 35px; border: 2px solid #a7b3c8; border-radius: 48% 48% 44% 44%; background: repeating-linear-gradient(45deg,#d9e0ea 0 2px,#657289 2px 4px); box-shadow: inset -6px -7px 8px rgba(0,0,0,.25); }
 .public-site .ktv-mic-handle { position: absolute; left: 10px; top: 29px; width: 15px; height: 67px; border-radius: 4px 4px 9px 9px; background: linear-gradient(90deg,#303c51,#a2aec0 42%,#263246); }
+.public-site .ktv-mic-cord { position: absolute; left: 16px; top: 96px; width: 2px; height: 40px; background: linear-gradient(#1a1a2e,#4a4a6a); border-radius: 1px; }
 .public-site .ktv-mic-shadow { position: absolute; z-index: 3; right: 58px; bottom: 39px; width: 73px; height: 18px; border-radius: 50%; background: rgba(0,0,0,.45); filter: blur(7px); transform: rotate(15deg); }
+.public-site .ktv-stand { position: absolute; z-index: 8; right: 68px; top: 200px; width: 48px; height: 12px; border-radius: 6px; background: linear-gradient(145deg,#2a3548,#141b28); box-shadow: 6px 8px 12px rgba(0,0,0,.3); }
 .public-site .ktv-beam { position: absolute; z-index: 1; top: 11px; width: 83px; height: 189px; opacity: .26; clip-path: polygon(43% 0,57% 0,100% 100%,0 100%); animation: ktv-light-sweep 6s var(--ease-in-out) infinite alternate; }
 .public-site .ktv-beam--one { left: 48px; background: linear-gradient(rgba(0,217,255,.7),transparent); transform: rotate(-10deg); transform-origin: center top; }
 .public-site .ktv-beam--two { right: 38px; background: linear-gradient(rgba(255,84,207,.7),transparent); transform: rotate(12deg); transform-origin: center top; animation-delay: -3s; }

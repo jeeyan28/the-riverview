@@ -81,6 +81,14 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     revalidate();
+
+    function handlePageShow(event) {
+      if (event.persisted) {
+        revalidate();
+      }
+    }
+    window.addEventListener('pageshow', handlePageShow);
+    return () => window.removeEventListener('pageshow', handlePageShow);
   }, [revalidate]);
 
   const login = useCallback(async (email, password, rememberMe) => {

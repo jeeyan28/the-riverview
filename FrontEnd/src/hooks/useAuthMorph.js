@@ -9,6 +9,14 @@ export function useAuthMorph() {
   const userRef = useRef(null);
 
   useEffect(() => {
+    function handlePageShow(event) {
+      if (event.persisted) setStage('idle');
+    }
+    window.addEventListener('pageshow', handlePageShow);
+    return () => window.removeEventListener('pageshow', handlePageShow);
+  }, []);
+
+  useEffect(() => {
     if (stage !== 'loading') return undefined;
     const timer = setTimeout(() => setStage('success'), READY_DELAY_MS);
     return () => clearTimeout(timer);

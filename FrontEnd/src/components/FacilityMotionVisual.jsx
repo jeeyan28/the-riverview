@@ -14,15 +14,16 @@ function BilliardsModel() {
       <div className="pool-cabinet">
         <span className="pool-apron pool-apron--front" />
         <span className="pool-apron pool-apron--right" />
+        <span className="pool-apron pool-apron--back" />
+        <span className="pool-apron pool-apron--left" />
         <div className="pool-tabletop">
           <span className="pool-wood" />
           <span className="pool-felt" />
           {POCKETS.map((pocket) => <span key={pocket} className={`pool-pocket pool-pocket--${pocket}`} />)}
           <span className="pool-ball pool-ball--cue"><i /></span>
-          <span className="pool-ball pool-ball--one"><i>1</i></span>
           <span className="pool-ball pool-ball--eight"><i>8</i></span>
-          <span className="pool-ball pool-ball--nine"><i>9</i></span>
           <span className="pool-cue" />
+          <span className="pool-chalk" />
         </div>
       </div>
       <span className="pool-light-cord" />
@@ -38,12 +39,16 @@ function CourtModel() {
       <div className="court-slab">
         <span className="court-side court-side--front" />
         <span className="court-side court-side--right" />
+        <span className="court-side court-side--back" />
+        <span className="court-side court-side--left" />
         <div className="court-surface">
           <span className="court-mark court-mark--boundary" />
           <span className="court-mark court-mark--midline" />
           <span className="court-mark court-mark--circle" />
           <span className="court-mark court-mark--key" />
           <span className="court-mark court-mark--arc" />
+          <span className="court-mark court-mark--freethrow" />
+          <span className="court-mark court-mark--threepoint" />
         </div>
       </div>
       <div className="court-hoop-model">
@@ -51,6 +56,7 @@ function CourtModel() {
         <span className="court-pole-base" />
         <span className="court-backboard"><i /></span>
         <span className="court-rim"><i /></span>
+        <span className="court-net" />
       </div>
       <span className="court-ball"><i /><b /></span>
       <span className="court-ball-shadow" />
@@ -67,17 +73,23 @@ function KtvModel() {
       <div className="ktv-stage">
         <span className="ktv-stage-front" />
         <span className="ktv-stage-right" />
+        <span className="ktv-stage-back" />
+        <span className="ktv-stage-left" />
       </div>
       <div className="ktv-screen">
+        <span className="ktv-screen-frame" />
+        <span className="ktv-screen-display" />
         <span className="ktv-screen-wave ktv-screen-wave--one" />
         <span className="ktv-screen-wave ktv-screen-wave--two" />
         <span className="ktv-screen-wave ktv-screen-wave--three" />
+        <span className="ktv-screen-wave ktv-screen-wave--four" />
       </div>
       <div className="ktv-sofa"><span /><i /></div>
-      <div className="ktv-speaker ktv-speaker--left"><span /><i /></div>
-      <div className="ktv-speaker ktv-speaker--right"><span /><i /></div>
-      <div className="ktv-microphone"><span className="ktv-mic-head" /><span className="ktv-mic-handle" /></div>
+      <div className="ktv-speaker ktv-speaker--left"><span /><i /><b /></div>
+      <div className="ktv-speaker ktv-speaker--right"><span /><i /><b /></div>
+      <div className="ktv-microphone"><span className="ktv-mic-head" /><span className="ktv-mic-handle" /><span className="ktv-mic-cord" /></div>
       <span className="ktv-mic-shadow" />
+      <div className="ktv-stand" />
     </div>
   );
 }
