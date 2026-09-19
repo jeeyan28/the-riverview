@@ -166,11 +166,19 @@ router.post("/intent/:paymentIntentId/attach", ensureAuthenticated, paymentAttac
 
     let methodId = paymentMethodId;
     if (!methodId) {
+      const billingEmail = metadata.guestEmail || (req.user.isGuest ? "" : req.user.email);
+      if (!billingEmail || !EMAIL_RE.test(billingEmail)) {
+        return res.status(400).json({
+          message: "A valid email address is required for wallet payments. Please go back and enter your email in the guest details.",
+          field: "guestEmail",
+        });
+      }
+
       let walletMethod;
       try {
         walletMethod = await createWalletPaymentMethod({
           type: paymentMethodType,
-          billing: { name: metadata.guestName, email: metadata.guestEmail || (req.user.isGuest ? undefined : req.user.email) },
+          billing: { name: metadata.guestName, email: billingEmail },
         });
       } catch (e) {
         return res.status(e.status || 502).json({ message: e.message || "Could not start that payment method. Please try again." });
