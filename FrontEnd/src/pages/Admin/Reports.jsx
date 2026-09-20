@@ -5,7 +5,7 @@ import { Activity, WalletCards } from 'lucide-react';
 import RevenueFilters from '../../components/RevenueFilters';
 import RevenueSummary from '../../components/RevenueSummary';
 import SessionReportPanel from '../../components/SessionReportPanel';
-import { businessDate, daysBefore, useRevenueReport } from '../../hooks/useRevenueReport';
+import { useRevenueReport } from '../../hooks/useRevenueReport';
 import { reportsService } from '../../services/reports';
 import { formatPeso } from '../../utils/currency';
 
@@ -24,9 +24,8 @@ function statusClass(status) {
 
 function Reports() {
   const [reportView, setReportView] = useState('revenue');
-  const today = useMemo(() => businessDate(), []);
-  const [from, setFrom] = useState(() => daysBefore(today, 6));
-  const [to, setTo] = useState(today);
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
   const [source, setSource] = useState('all');
   const [search, setSearch] = useState('');
   const [exporting, setExporting] = useState(false);
@@ -40,6 +39,7 @@ function Reports() {
   }, [data, search]);
 
   async function handleExport() {
+    if (!from || !to) return;
     setExporting(true);
     setExportError('');
     try {
@@ -74,7 +74,7 @@ function Reports() {
         reload={reload}
         loading={loading}
       >
-        <button type="button" className="save-btn" onClick={handleExport} disabled={exporting || loading}>
+        <button type="button" className="save-btn" onClick={handleExport} disabled={exporting || loading || !from || !to}>
           <i className="ti ti-file-spreadsheet" aria-hidden="true" /> {exporting ? 'Generating…' : 'Export Excel'}
         </button>
         <button type="button" className="btn-cancel" onClick={() => window.print()} disabled={!data || loading}>

@@ -11,6 +11,167 @@ const COLORS = {
   line: 'D9E1EA',
 };
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+const MANILA_OFFSET_MS = 8 * 60 * 60 * 1000;
+const EXCEL_EPOCH_OFFSET = 25569;
+
+function unitKey({ facilityName, roomType, unitNumber }) {
+  return `${facilityName || 'Other'}\u0000${roomType || 'Standard'}\u0000${unitNumber ?? ''}`;
+}
+
+function unitNumberCompare(a, b) {
+  return String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: 'base' });
+}
+
+function uniqueSheetName(value, usedNames) {
+  const base = String(value || 'Monitoring').replace(/[\\/*?:[\]]/g, ' ').trim().slice(0, 31) || 'Monitoring';
+  let candidate = base;
+  let suffix = 2;
+  while (usedNames.has(candidate.toLowerCase())) {
+    const marker = ` ${suffix}`;
+    candidate = `${base.slice(0, 31 - marker.length)}${marker}`;
+    suffix += 1;
+  }
+  usedNames.add(candidate.toLowerCase());
+  return candidate;
+}
+
+function excelManilaSerial(value) {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return null;
+  const local = new Date(parsed.getTime() + MANILA_OFFSET_MS);
+  return Date.UTC(
+    local.getUTCFullYear(),
+    local.getUTCMonth(),
+    local.getUTCDate(),
+    local.getUTCHours(),
+    local.getUTCMinutes(),
+    local.getUTCSeconds(),
+  ) / DAY_MS + EXCEL_EPOCH_OFFSET;
+}
+
+function addMonitoringGridSheets(workbook, rows = [], inventory = [], range = {}) {
+  const units = new Map();
+  const addUnit = (item) => {
+    const normalized = {
+      facilityName: item.facilityName || 'Other',
+      roomType: item.roomType || item.roomName || 'Standard',
+      unitNumber: item.unitNumber ?? '',
+    };
+    const key = unitKey(normalized);
+    if (!units.has(key)) units.set(key, { ...normalized, rows: [] });
+    return units.get(key);
+  };
+
+  inventory.forEach(addUnit);
+  rows.forEach((row) => addUnit(row).rows.push(row));
+
+  const facilities = new Map();
+  for (const unit of units.values()) {
+    if (!facilities.has(unit.facilityName)) facilities.set(unit.facilityName, []);
+    facilities.get(unit.facilityName).push(unit);
+  }
+
+  const usedNames = new Set(workbook.worksheets.map((sheet) => sheet.name.toLowerCase()));
+  const singleDay = range.from && range.from === range.to;
+  const gridBorder = {
+    top: { style: 'thin', color: { argb: '666666' } },
+    left: { style: 'thin', color: { argb: '666666' } },
+    bottom: { style: 'thin', color: { argb: '666666' } },
+    right: { style: 'thin', color: { argb: '666666' } },
+  };
+
+  for (const [facilityName, facilityUnits] of [...facilities.entries()].sort(([a], [b]) => a.localeCompare(b))) {
+    facilityUnits.sort((a, b) => a.roomType.localeCompare(b.roomType) || unitNumberCompare(a.unitNumber, b.unitNumber));
+    const unitColumns = facilityUnits.length * 3;
+    const totalColumns = Math.max(21, unitColumns);
+    const maxSessionRows = Math.max(0, ...facilityUnits.map((unit) => unit.rows.length));
+    const lastRow = Math.max(27, 4 + maxSessionRows);
+    const sheet = workbook.addWorksheet(uniqueSheetName(facilityName, usedNames), { views: [{ showGridLines: true }] });
+
+    for (let column = 1; column <= totalColumns; column += 1) sheet.getColumn(column).width = 15;
+    sheet.getRow(1).height = 34.5;
+    sheet.getRow(2).height = 33.75;
+    sheet.mergeCells(1, 1, 1, totalColumns);
+    const title = sheet.getCell(1, 1);
+    title.value = facilityName;
+    title.alignment = { horizontal: 'center', vertical: 'middle' };
+    title.font = { name: 'Arial', size: 14, bold: true, color: { argb: COLORS.ink } };
+
+    let unitIndex = 0;
+    let roomTypeStart = 0;
+    while (roomTypeStart < facilityUnits.length) {
+      const roomType = facilityUnits[roomTypeStart].roomType;
+      let roomTypeEnd = roomTypeStart;
+      while (roomTypeEnd + 1 < facilityUnits.length && facilityUnits[roomTypeEnd + 1].roomType === roomType) roomTypeEnd += 1;
+      const startColumn = roomTypeStart * 3 + 1;
+      const endColumn = (roomTypeEnd + 1) * 3;
+      sheet.mergeCells(2, startColumn, 2, endColumn);
+      const groupCell = sheet.getCell(2, startColumn);
+      groupCell.value = roomType;
+      groupCell.alignment = { horizontal: 'center', vertical: 'middle' };
+      groupCell.font = { name: 'Arial', size: 11, bold: true, color: { argb: COLORS.ink } };
+      roomTypeStart = roomTypeEnd + 1;
+    }
+
+    for (const unit of facilityUnits) {
+      const startColumn = unitIndex * 3 + 1;
+      const revenueColumn = startColumn + 2;
+      sheet.mergeCells(3, startColumn, 3, startColumn + 1);
+      const unitCell = sheet.getCell(3, startColumn);
+      unitCell.value = `Table ${unit.unitNumber}`;
+      unitCell.alignment = { horizontal: 'center', vertical: 'middle' };
+      unitCell.font = { name: 'Arial', size: 10, bold: true, color: { argb: COLORS.ink } };
+
+      const totalCharge = unit.rows.reduce((sum, row) => sum + (Number(row.amount) || 0), 0);
+      const revenueCell = sheet.getCell(3, revenueColumn);
+      revenueCell.value = totalCharge || null;
+      revenueCell.numFmt = '"₱"#,##0.##;[Red]-"₱"#,##0.##';
+      revenueCell.alignment = { horizontal: 'center', vertical: 'middle' };
+
+      ['Time In', 'Time out', 'No. of Hrs'].forEach((label, offset) => {
+        const cell = sheet.getCell(4, startColumn + offset);
+        cell.value = label;
+        cell.font = { name: 'Arial', size: 10, bold: true, color: { argb: COLORS.ink } };
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+      });
+
+      unit.rows.sort((a, b) => new Date(a.startTime) - new Date(b.startTime)).forEach((row, rowIndex) => {
+        const outputRow = 5 + rowIndex;
+        const startSerial = excelManilaSerial(row.startTime);
+        const endSerial = excelManilaSerial(new Date(new Date(row.startTime).getTime() + (Number(row.duration) || 0) * 60 * 60 * 1000));
+        const timeFormat = singleDay ? 'h:mm AM/PM' : 'm/d/yyyy h:mm AM/PM';
+        const startCell = sheet.getCell(outputRow, startColumn);
+        const endCell = sheet.getCell(outputRow, startColumn + 1);
+        startCell.value = singleDay && startSerial != null ? startSerial % 1 : startSerial;
+        endCell.value = singleDay && endSerial != null ? endSerial % 1 : endSerial;
+        startCell.numFmt = timeFormat;
+        endCell.numFmt = timeFormat;
+        sheet.getCell(outputRow, revenueColumn).value = Number(row.duration) || 0;
+      });
+      unitIndex += 1;
+    }
+
+    for (let row = 2; row <= lastRow; row += 1) {
+      for (let column = 1; column <= unitColumns; column += 1) {
+        const cell = sheet.getCell(row, column);
+        cell.border = gridBorder;
+        cell.alignment = { ...cell.alignment, vertical: 'middle', horizontal: cell.alignment?.horizontal || 'center' };
+        cell.font = { name: 'Arial', size: cell.font?.size || 10, bold: cell.font?.bold || false, color: { argb: COLORS.ink } };
+      }
+    }
+
+    sheet.pageSetup = {
+      orientation: 'landscape',
+      paperSize: 9,
+      fitToPage: true,
+      fitToWidth: 1,
+      fitToHeight: 0,
+      margins: { left: 0.2, right: 0.2, top: 0.35, bottom: 0.35, header: 0.15, footer: 0.15 },
+    };
+  }
+}
+
 function styleHeading(row, fill = COLORS.navy) {
   row.height = 25;
   row.font = { bold: true, color: { argb: COLORS.white } };
@@ -127,4 +288,4 @@ function createWorkbook() {
   return workbook;
 }
 
-module.exports = { createWorkbook, addSummarySheet, addActivitySheet, addRoomTypeSheet, styleHeading };
+module.exports = { createWorkbook, addMonitoringGridSheets, addSummarySheet, addActivitySheet, addRoomTypeSheet, styleHeading };

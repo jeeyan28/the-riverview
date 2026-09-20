@@ -12,6 +12,8 @@ const {
   createWalletPaymentMethod,
   attachPaymentIntent,
   resolvePaymongoPaymentMethodType,
+  classifyPaymongoPaymentFailure,
+  getPaymentIntentFailure,
   verifyWebhookSignature,
 } = require("../utils/paymongo");
 const { isAdminRole } = require("../utils/permissions");
@@ -196,6 +198,10 @@ router.post("/intent/:paymentIntentId/attach", ensureAuthenticated, paymentAttac
         returnUrl: `${base}/index.html?paymongo=success&paymentIntentId=${paymentIntentId}`,
       });
     } catch (e) {
+      const failure = classifyPaymongoPaymentFailure(e.paymongoErrors || e.message);
+      if (failure) {
+        return res.status(failure.status === "expired" ? 410 : 402).json({ ...failure, paymentStatus: "Unpaid" });
+      }
       return res.status(e.status || 502).json({ message: e.message || "Payment could not be processed. Please try again." });
     }
 
@@ -232,6 +238,11 @@ router.post("/intent/:paymentIntentId/attach", ensureAuthenticated, paymentAttac
       return res.json({ status: "processing" });
     }
 
+    const paymentFailure = getPaymentIntentFailure(attrs);
+    if (paymentFailure) {
+      return res.status(paymentFailure.status === "expired" ? 410 : 402).json({ ...paymentFailure, paymentStatus: "Unpaid" });
+    }
+
     return res.status(402).json({ status: "failed", message: "That payment method was declined. Please try another." });
   } catch (err) {
     console.error(err);
@@ -255,6 +266,10 @@ router.get("/status/:paymentIntentId", ensureAuthenticated, validate(paymentInte
     try {
       intent = await retrievePaymentIntent(paymentIntentId);
     } catch (e) {
+      const failure = classifyPaymongoPaymentFailure(e.paymongoErrors || e.message);
+      if (failure) {
+        return res.status(failure.status === "expired" ? 410 : 402).json({ ...failure, paymentStatus: "Unpaid" });
+      }
       return res.status(e.status || 502).json({ message: e.message || "Could not check payment status." });
     }
     const attrs = intent?.data?.attributes;
@@ -264,7 +279,11 @@ router.get("/status/:paymentIntentId", ensureAuthenticated, validate(paymentInte
     }
 
     if (!isPaidPaymentIntent(attrs)) {
-      return res.json({ status: "Awaiting Online Payment", paymentStatus: "Unpaid" });
+      const paymentFailure = getPaymentIntentFailure(attrs);
+      if (paymentFailure) {
+        return res.status(paymentFailure.status === "expired" ? 410 : 402).json({ ...paymentFailure, paymentStatus: "Unpaid" });
+      }
+      return res.json({ status: attrs?.status || "awaiting_payment_method", paymentStatus: "Unpaid" });
     }
 
     try {

@@ -1033,6 +1033,7 @@ function RoomManagement() {
                   <RoomOptionCard
                     option={{ ...previewFacility.variants[activeRoomIndex] }}
                     room={previewFacility}
+                    preview
                   />
                 </div>
               </>
@@ -1045,7 +1046,7 @@ function RoomManagement() {
                   ) : (
                     previewFacility.variants
                       .filter((v) => v.label?.trim())
-                      .map((v, i) => <RoomOptionCard key={i} option={v} room={previewFacility} />)
+                      .map((v, i) => <RoomOptionCard key={i} option={v} room={previewFacility} preview />)
                   )}
                 </div>
               </>

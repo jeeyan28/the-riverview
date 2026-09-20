@@ -7,7 +7,7 @@ const { bookingCollected, financialFields, extendSessionFields, endSessionFields
 const { calculateBookingPrice, parsePaxCapacity } = require("../utils/roomPricing");
 const { TIME_ZONE } = require("../utils/constants");
 const { getMonitorReport } = require("../utils/monitorReport");
-const { createWorkbook, addSummarySheet, addActivitySheet, addRoomTypeSheet } = require("../utils/reportWorkbook");
+const { createWorkbook, addMonitoringGridSheets, addSummarySheet, addActivitySheet, addRoomTypeSheet } = require("../utils/reportWorkbook");
 const { validate } = require("../middleware/validate");
 const {
   idParamsSchema,
@@ -141,6 +141,7 @@ sessionsRouter.get("/report/export", ensureAdmin, async (req, res) => {
   try {
     const report = await getMonitorReport({ from: req.query.from, to: req.query.to });
     const workbook = createWorkbook();
+    addMonitoringGridSheets(workbook, report.rows, report.inventory, report.range);
     addSummarySheet(workbook, {
       title: "The Riverview — Live monitor report",
       range: report.range,

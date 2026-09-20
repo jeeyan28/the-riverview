@@ -15,13 +15,11 @@ const PRESETS = [
 
 function DateRangePicker({ from, to, onChange }) {
   function updateFrom(value) {
-    if (!value) return;
-    onChange(value, value > to ? value : to);
+    onChange(value, value && to && value > to ? value : to);
   }
 
   function updateTo(value) {
-    if (!value) return;
-    onChange(value < from ? value : from, value);
+    onChange(value && from && value < from ? value : from, value);
   }
 
   return (
@@ -35,9 +33,9 @@ function DateRangePicker({ from, to, onChange }) {
         })}
       </div>
       <div className="drp-fields">
-        <label><span>From</span><input type="date" value={from} max={to} onChange={(event) => updateFrom(event.target.value)} /></label>
+        <label><span>From</span><input type="date" value={from} max={to || undefined} onChange={(event) => updateFrom(event.target.value)} /></label>
         <span className="drp-separator" aria-hidden="true">to</span>
-        <label><span>To</span><input type="date" value={to} min={from} onChange={(event) => updateTo(event.target.value)} /></label>
+        <label><span>To</span><input type="date" value={to} min={from || undefined} onChange={(event) => updateTo(event.target.value)} /></label>
       </div>
     </div>
   );

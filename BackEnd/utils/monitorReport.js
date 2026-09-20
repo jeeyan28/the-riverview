@@ -1,4 +1,4 @@
-const { RoomSession } = require('../model/monitoring');
+const { MonitorRoom, RoomSession } = require('../model/monitoring');
 const { businessDate, dateRange } = require('./businessDate');
 const { TIME_ZONE } = require('./constants');
 
@@ -117,10 +117,20 @@ function buildMonitorReport(sessions, { from, to, maxDays = 366 }) {
 
 async function getMonitorReport({ from, to, maxDays = 366 }) {
   const { start, end } = dateRange(from, to, maxDays);
-  const sessions = await RoomSession.find({ startTime: { $gte: start, $lt: end } })
-    .populate('booking', 'reservationCode source guestName')
-    .lean();
-  return buildMonitorReport(sessions, { from, to, maxDays });
+  const [sessions, inventory] = await Promise.all([
+    RoomSession.find({ startTime: { $gte: start, $lt: end } })
+      .populate('booking', 'reservationCode source guestName')
+      .lean(),
+    MonitorRoom.find({}).select('facilityName roomName roomNumber').sort({ facilityName: 1, roomName: 1, roomNumber: 1 }).lean(),
+  ]);
+  return {
+    ...buildMonitorReport(sessions, { from, to, maxDays }),
+    inventory: inventory.map((room) => ({
+      facilityName: room.facilityName || 'Other',
+      roomType: room.roomName || 'Standard',
+      unitNumber: room.roomNumber || '',
+    })),
+  };
 }
 
 module.exports = { buildMonitorReport, getMonitorReport };

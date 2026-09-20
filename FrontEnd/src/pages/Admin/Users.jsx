@@ -378,7 +378,7 @@ function Users() {
               </button>
             )}
             {activeTab === 'guests' && (
-              <button className="um-add-btn" disabled={cleaningUp} onClick={runCleanupNow}>
+              <button type="button" className="btn-teal um-add-btn" disabled={cleaningUp} onClick={runCleanupNow}>
                 <i className="ti ti-trash-x"></i> {cleaningUp ? 'Running…' : 'Run cleanup now'}
               </button>
             )}

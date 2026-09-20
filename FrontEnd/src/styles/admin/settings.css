@@ -100,6 +100,14 @@
 .audit-dot.del{background:var(--red);}
 .audit-text{font-size:.82rem;color:var(--text);}
 .audit-time{font-size:.7rem;color:var(--muted);margin-top:2px;}
+.audit-summary{font-size:.72rem;color:var(--muted);}
+.audit-pagination{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-top:16px;margin-top:8px;border-top:1px solid var(--border);color:var(--muted);font-size:.72rem;}
+.audit-pagination .card-action{display:inline-flex;align-items:center;gap:4px;}
+
+@media (max-width:640px){
+  .audit-pagination{display:grid;grid-template-columns:1fr auto 1fr;}
+  .audit-pagination .card-action:last-child{justify-self:end;}
+}
 
 .profile-hero{display:flex;align-items:center;gap:16px;background:var(--navy2);border:1px solid var(--border);border-radius:14px;padding:20px;}
 .profile-av{

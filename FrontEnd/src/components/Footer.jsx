@@ -1,12 +1,11 @@
 import { ArrowUp, ArrowUpRight, Clock3, Facebook, MapPin } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { operatingHoursSummary } from '../utils/operatingHours';
-import ThemeToggle from './ThemeToggle';
 
 const FACEBOOK_URL = 'https://www.facebook.com/profile.php?id=61550783505442';
 const MAPS_URL = 'https://maps.app.goo.gl/2VqEJXFJifUz2KF76';
 
-function Footer({ settings, theme, onToggleTheme }) {
+function Footer({ settings }) {
   const navigate = useNavigate();
   const location = useLocation();
   const isHome = location.pathname === '/';
@@ -63,10 +62,6 @@ function Footer({ settings, theme, onToggleTheme }) {
           <div className="footer-legal-links">
             <Link to="/terms">Terms</Link>
             <Link to="/privacy">Privacy</Link>
-          </div>
-          <div className="footer-appearance">
-            <span>Appearance</span>
-            <ThemeToggle id="footer-theme-toggle" theme={theme} onToggle={onToggleTheme} />
           </div>
           <a href="/#home" className="footer-back-top" onClick={(event) => handleSectionLink(event, 'home')}>
             Back to top <ArrowUp size={14} aria-hidden="true" />

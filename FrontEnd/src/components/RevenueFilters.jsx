@@ -4,7 +4,6 @@ export default function RevenueFilters({ from, to, source, onRangeChange, onSour
   return (
     <div className="finance-toolbar no-print">
       <div className="field-stack">
-        <span className="field-label">Service dates</span>
         <DateRangePicker from={from} to={to} onChange={onRangeChange} />
       </div>
       <label className="field-stack">
@@ -15,7 +14,7 @@ export default function RevenueFilters({ from, to, source, onRangeChange, onSour
           <option value="walkin">Walk-ins / manual bookings</option>
         </select>
       </label>
-      <button type="button" className="btn-cancel" disabled={loading} onClick={reload}>Refresh</button>
+      <button type="button" className="btn-cancel" disabled={loading || !from || !to} onClick={reload}>Refresh</button>
       {children}
     </div>
   );

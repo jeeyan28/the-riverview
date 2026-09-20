@@ -42,24 +42,54 @@
 #app .fac-toolbar { padding: 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--navy2); }
 #app .rm-due-wrap { overflow: hidden; }
 #app .rm-due-head { padding: 14px 16px; }
-#app .rm-payment-summary { align-items: flex-start; }
-#app .pay-timing-tag { border: 1px solid var(--border); background: var(--navy3); color: var(--muted); }
+#app .rm-payment-summary { align-items: center; }
+#app .pay-timing-tag { margin-left: 0; border: 1px solid var(--border); background: var(--navy3); color: var(--muted); white-space: nowrap; }
 #app .pay-timing-tag.paid { border-color: color-mix(in srgb,var(--green) 34%,var(--border)); background: color-mix(in srgb,var(--green) 10%,var(--navy2)); color: var(--green); }
 #app .pay-timing-tag.partial { border-color: color-mix(in srgb,var(--amber) 38%,var(--border)); background: color-mix(in srgb,var(--amber) 10%,var(--navy2)); color: var(--amber); }
 #app .pay-timing-tag.unpaid { border-color: color-mix(in srgb,var(--red) 34%,var(--border)); background: color-mix(in srgb,var(--red) 8%,var(--navy2)); color: var(--red); }
+#app .rm-payment-detail { color: var(--muted); font-size: .68rem; font-variant-numeric: tabular-nums; line-height: 1.35; }
+#app .rm-payment-detail.partial { color: var(--amber); }
+#app .rm-payment-detail.unpaid { color: var(--red); font-weight: 700; }
 
-#app .session-hour-picker { display: grid; grid-template-columns: repeat(5,minmax(48px,1fr)) minmax(82px,1.2fr); gap: 7px; }
+#app .session-hour-picker { display: grid; grid-template-columns: repeat(5,minmax(56px,1fr)) minmax(144px,1.8fr); gap: 8px; }
 #app .session-hour-option { display: grid; min-height: 52px; place-items: center; align-content: center; border: 1px solid var(--border); border-radius: 10px; background: var(--navy3); color: var(--text); font-size: .95rem; font-weight: 750; }
 #app .session-hour-option small { color: var(--muted); font-size: .6rem; font-weight: 600; }
 #app .session-hour-option.active { border-color: var(--teal); background: var(--teal-soft); color: var(--teal); }
-#app .session-hour-custom { display: grid; grid-template-columns: 1fr 48px; align-items: center; gap: 5px; min-height: 52px; padding: 4px 5px 4px 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--navy3); color: var(--muted); font-size: .66rem; }
-#app .session-hour-custom input { width: 48px; min-height: 40px; padding: 5px; text-align: center; }
+#app .session-hour-custom { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 8px; min-height: 52px; padding: 4px 8px 4px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--navy3); color: var(--muted); font-size: .68rem; font-weight: 700; }
+#app .session-hour-custom.active { border-color: var(--teal); background: var(--teal-soft); color: var(--teal); }
+#app .session-hour-custom-control { display: flex; align-items: center; gap: 4px; }
+#app .session-hour-custom-control input { width: 64px; min-height: 40px; padding: 4px 8px; text-align: center; }
+#app .session-hour-custom-control small { color: var(--muted); font-size: .62rem; }
 #app .session-payment-ledger { display: grid; grid-template-columns: repeat(3,1fr); gap: 1px; overflow: hidden; margin-bottom: 14px; border: 1px solid var(--border); border-radius: 11px; background: var(--border); }
 #app .session-payment-ledger > div { display: grid; gap: 3px; padding: 12px; background: var(--navy3); }
 #app .session-payment-ledger span { color: var(--muted); font-size: .65rem; }
 #app .session-payment-ledger strong { color: var(--text); font-size: .87rem; }
 #app .session-payment-ledger .balance-due strong { color: var(--amber); }
 #app .session-payment-ledger .balance-paid strong { color: var(--green); }
+#app .session-payment-complete,
+#app .finish-session-notice { display: flex; align-items: flex-start; gap: 12px; border: 1px solid var(--border); border-radius: 12px; }
+#app .session-payment-complete { margin-bottom: 16px; padding: 12px 16px; border-color: color-mix(in srgb,var(--green) 35%,var(--border)); background: color-mix(in srgb,var(--green) 10%,var(--navy2)); }
+#app .session-payment-complete > i,
+#app .finish-session-notice > i { flex: 0 0 auto; margin-top: 2px; }
+#app .session-payment-complete > i { color: var(--green); }
+#app .session-payment-complete span,
+#app .finish-session-notice span { display: grid; gap: 4px; }
+#app .session-payment-complete strong,
+#app .finish-session-notice strong { color: var(--text); font-size: .8rem; }
+#app .session-payment-complete small,
+#app .finish-session-notice small { color: var(--muted); font-size: .7rem; line-height: 1.45; }
+#app .finish-session-notice { margin: 16px 0; padding: 12px 16px; }
+#app .finish-session-notice--paid { border-color: color-mix(in srgb,var(--green) 35%,var(--border)); background: color-mix(in srgb,var(--green) 8%,var(--navy2)); }
+#app .finish-session-notice--paid > i { color: var(--green); }
+#app .finish-session-notice--unpaid { padding: 16px; border-color: color-mix(in srgb,var(--red) 55%,var(--border)); background: color-mix(in srgb,var(--red) 12%,var(--navy2)); }
+#app .finish-session-notice--unpaid > i,
+#app .finish-session-notice--unpaid strong { color: var(--red); }
+#app .finish-session-notice--unpaid > i { font-size: 1.2rem; }
+#app .finish-payment-ledger { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 1px; overflow: hidden; margin: 16px 0; border: 1px solid var(--border); border-radius: 12px; background: var(--border); }
+#app .finish-payment-ledger > div { display: grid; gap: 4px; padding: 12px 16px; background: var(--navy3); }
+#app .finish-payment-ledger span { color: var(--muted); font-size: .68rem; }
+#app .finish-payment-ledger strong { color: var(--text); font-size: .9rem; font-variant-numeric: tabular-nums; }
+#app .finish-payment-ledger > div:last-child strong { color: var(--amber); }
 #app .session-collection-options { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; margin-bottom: 14px; }
 #app .session-collection-options button { display: grid; gap: 3px; min-height: 70px; padding: 11px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--navy3); color: var(--text); text-align: left; }
 #app .session-collection-options button strong { font-size: .75rem; }
@@ -171,6 +201,7 @@
   #app .session-hour-picker { grid-template-columns: repeat(3,minmax(0,1fr)); }
   #app .session-hour-custom { grid-column: span 2; }
   #app .session-payment-ledger { grid-template-columns: 1fr; }
+  #app .finish-payment-ledger { grid-template-columns: 1fr; }
   #app .session-collection-options { grid-template-columns: 1fr; }
   #app .monitor-report-head { align-items: stretch; flex-direction: column; }
   #app .monitor-report-head .save-btn { width: 100%; justify-content: center; }

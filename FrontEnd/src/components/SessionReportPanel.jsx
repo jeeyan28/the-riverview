@@ -2,19 +2,20 @@ import { useEffect, useState } from 'react';
 import { Download } from 'lucide-react';
 import DateRangePicker from './DateRangePicker';
 import { roomSessionsService } from '../services/monitoring';
-import { businessDate } from '../utils/businessDate';
 
 const money = (value) => `₱${Number(value || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 function SessionReportPanel() {
-  const [from, setFrom] = useState(() => businessDate());
-  const [to, setTo] = useState(() => businessDate());
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [exporting, setExporting] = useState(false);
+  const hasRange = Boolean(from && to);
 
   async function loadReport() {
+    if (!hasRange) return;
     setLoading(true);
     setError('');
     try {
@@ -27,10 +28,17 @@ function SessionReportPanel() {
   }
 
   useEffect(() => {
+    if (!hasRange) {
+      setReport(null);
+      setError('');
+      setLoading(false);
+      return;
+    }
     loadReport();
   }, [from, to]);
 
   async function exportReport() {
+    if (!hasRange) return;
     setExporting(true);
     setError('');
     try {
@@ -50,23 +58,23 @@ function SessionReportPanel() {
           <h2 id="session-report-title">Played session report</h2>
           <p>Every hourly session from the live floor, including walk-ins, reservation starts, and payment balance.</p>
         </div>
-        <button type="button" className="save-btn" onClick={exportReport} disabled={loading || exporting}>
+        <button type="button" className="save-btn" onClick={exportReport} disabled={!hasRange || loading || exporting}>
           <Download size={16} aria-hidden="true" />{exporting ? 'Generating…' : 'Export Excel'}
         </button>
       </div>
 
       <div className="monitor-report-filters">
         <DateRangePicker from={from} to={to} onChange={(nextFrom, nextTo) => { setFrom(nextFrom); setTo(nextTo); }} />
-        <button type="button" className="btn-cancel" onClick={loadReport} disabled={loading}>{loading ? 'Loading…' : 'Refresh'}</button>
+        <button type="button" className="btn-cancel" onClick={loadReport} disabled={!hasRange || loading}>{loading ? 'Loading…' : 'Refresh'}</button>
       </div>
 
       {error && <div className="finance-error" role="alert">{error}</div>}
 
       <div className="monitor-report-summary" aria-label="Session totals">
-        <div><span>Played sessions</span><strong>{loading && !report ? '—' : report?.summary?.sessions ?? 0}</strong><small>{report?.summary?.hours ?? 0} occupied hours</small></div>
-        <div><span>Hourly charges</span><strong>{money(report?.summary?.charged)}</strong><small>Room and facility time</small></div>
-        <div><span>Collected</span><strong>{money(report?.summary?.collected)}</strong><small>{report?.summary?.paid ?? 0} fully paid</small></div>
-        <div className={(report?.summary?.outstanding || 0) > 0 ? 'has-balance' : ''}><span>Outstanding</span><strong>{money(report?.summary?.outstanding)}</strong><small>{report?.summary?.partial ?? 0} partial · {report?.summary?.unpaid ?? 0} unpaid</small></div>
+        <div><span>Played sessions</span><strong>{!hasRange || (loading && !report) ? '—' : report?.summary?.sessions ?? 0}</strong><small>{hasRange ? `${report?.summary?.hours ?? 0} occupied hours` : 'Choose service dates'}</small></div>
+        <div><span>Hourly charges</span><strong>{hasRange && report ? money(report.summary?.charged) : '—'}</strong><small>Room and facility time</small></div>
+        <div><span>Collected</span><strong>{hasRange && report ? money(report.summary?.collected) : '—'}</strong><small>{hasRange ? `${report?.summary?.paid ?? 0} fully paid` : 'Choose service dates'}</small></div>
+        <div className={(report?.summary?.outstanding || 0) > 0 ? 'has-balance' : ''}><span>Outstanding</span><strong>{hasRange && report ? money(report.summary?.outstanding) : '—'}</strong><small>{hasRange ? `${report?.summary?.partial ?? 0} partial · ${report?.summary?.unpaid ?? 0} unpaid` : 'Choose service dates'}</small></div>
       </div>
 
       <div className="monitor-report-layout">
@@ -76,7 +84,7 @@ function SessionReportPanel() {
             <table className="tbl monitor-report-table">
               <thead><tr><th>Date / time</th><th>Facility / room</th><th>Guest</th><th>Source</th><th>Hours</th><th>Rate</th><th>Charge</th><th>Paid</th><th>Balance</th><th>Payment</th></tr></thead>
               <tbody>
-                {loading && !report ? <tr><td colSpan="10" className="finance-empty">Loading played sessions…</td></tr> : report?.rows?.length ? report.rows.map((row) => (
+                {!hasRange ? <tr><td colSpan="10" className="finance-empty">Choose From and To service dates to load played sessions.</td></tr> : loading && !report ? <tr><td colSpan="10" className="finance-empty">Loading played sessions…</td></tr> : report?.rows?.length ? report.rows.map((row) => (
                   <tr key={row.id}>
                     <td><strong>{row.date}</strong><div className="finance-meta">{row.timeIn} – {row.timeOut}</div></td>
                     <td>{row.facilityName}<div className="finance-meta">{row.roomType}{row.unitNumber ? ` · Unit ${row.unitNumber}` : ''}</div></td>
