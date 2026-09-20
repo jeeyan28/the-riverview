@@ -326,7 +326,6 @@ function Home() {
 
         <div className="hero-inner">
           <div className="hero-content">
-            <p className="hero-eyebrow">Caingin, San Rafael · {hoursLabel}</p>
             <h1>Your next game<br />starts <em>here.</em></h1>
             <p className="hero-sub">
               Reserve billiards, KTV, or the court from one live schedule. Choose your time,
@@ -366,7 +365,7 @@ function Home() {
             <h2>Choose your facility</h2>
           </div>
           <div className="rooms-header-right">
-            <p>Live, admin-managed inventory.<br />Walk-ins can still be recorded by staff.</p>
+            <p>Compare spaces, rates, and amenities.<br />Choose a facility to view details and reserve a time.</p>
             <Link to="/rooms" className="btn-view-all">
               Browse all facilities <i className="fa-solid fa-chevron-right"></i>
             </Link>

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Chart } from 'chart.js/auto';
 import RevenueFilters from '../../components/RevenueFilters';
 import RevenueSummary from '../../components/RevenueSummary';
-import { businessDate, daysBefore, useRevenueReport } from '../../hooks/useRevenueReport';
+import { useRevenueReport } from '../../hooks/useRevenueReport';
 import { formatPeso } from '../../utils/currency';
 
 function displayDate(value) {
@@ -14,9 +14,8 @@ function displayDate(value) {
 }
 
 function Analytics() {
-  const today = useMemo(() => businessDate(), []);
-  const [from, setFrom] = useState(() => daysBefore(today, 6));
-  const [to, setTo] = useState(today);
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
   const [source, setSource] = useState('all');
   const [printRequested, setPrintRequested] = useState(false);
   const { data, loading, error, reload } = useRevenueReport(from, to, source);

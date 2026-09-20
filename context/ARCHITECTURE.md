@@ -121,7 +121,7 @@ sequenceDiagram
 - Staff starts a walk-in with `POST /api/room-sessions`, choosing 1–24 whole hours, guest/corkage details, amount collected, and whether payment is before or after play. The API calculates the exact hourly charge from the chosen `MonitorRoom` pricing snapshot.
 - Starting a due reservation uses the same endpoint with `bookingId`. The API assigns an available physical unit, copies the reservation charge, preserves the verified deposit, derives `Paid`/`Partial`/`Unpaid`, and changes the booking to `Ongoing`.
 - Extending, finishing, cancelling, and correcting sessions preserve the financial trail. Finish records the money actually received; it can leave a valid balance instead of forcing a paid state.
-- `GET /api/room-sessions/report?from=YYYY-MM-DD&to=YYYY-MM-DD` returns the independent played-session report. `/report/export` creates its Excel workbook with Summary, Played sessions, and Room totals sheets.
+- `GET /api/room-sessions/report?from=YYYY-MM-DD&to=YYYY-MM-DD` returns the independent played-session report. `/report/export` opens with facility monitoring-grid sheets that mirror the venue's familiar per-table Time In / Time Out / No. of Hrs workbook, followed by Summary, Played sessions, and Room totals sheets.
 - **This is the final approach, not a placeholder.** 2-second polling meets the "near-live" requirement without the added complexity of a WebSocket/SSE layer. Do not introduce a push-based layer without a documented reason — it's not a "todo."
 
 ## 6. Data Flow: Revenue Forecasting

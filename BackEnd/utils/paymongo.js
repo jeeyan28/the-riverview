@@ -9,6 +9,58 @@ const PAYMONGO_PAYMENT_METHOD_LABELS = Object.freeze({
 });
 const PAYMONGO_STATEMENT_DESCRIPTOR_MAX_LENGTH = 22;
 
+function paymentFailureText(value) {
+  if (!value) return "";
+  if (typeof value === "string") return value;
+  if (Array.isArray(value)) return value.map(paymentFailureText).filter(Boolean).join(" ");
+  if (typeof value !== "object") return String(value);
+  return [
+    value.code,
+    value.failed_code,
+    value.failed_message,
+    value.message,
+    value.detail,
+    value.sub_code,
+  ].filter(Boolean).join(" ");
+}
+
+function classifyPaymongoPaymentFailure(value) {
+  const text = paymentFailureText(value).toLowerCase();
+  if (!text) return null;
+
+  if (/expir|session[_\s-]?timeout/.test(text)) {
+    return {
+      status: "expired",
+      message: "This payment session expired before it was completed. No charge was made. Start a new payment to continue.",
+    };
+  }
+
+  if (/cancel|cancell|abandon|closed by (?:the )?(?:customer|user)/.test(text)) {
+    return {
+      status: "cancelled",
+      message: "This payment was cancelled. No charge was made. Choose a payment method to try again.",
+    };
+  }
+
+  return null;
+}
+
+function getPaymentIntentFailure(intentAttrs) {
+  if (!intentAttrs) return null;
+
+  const directFailure = classifyPaymongoPaymentFailure(intentAttrs.status);
+  if (directFailure) return directFailure;
+
+  if (intentAttrs.status !== "awaiting_payment_method" || !intentAttrs.last_payment_error) {
+    return null;
+  }
+
+  return classifyPaymongoPaymentFailure(intentAttrs.last_payment_error) || {
+    status: "failed",
+    message: "The payment could not be completed. No charge was made. Try another payment method.",
+  };
+}
+
 function normalizePaymongoPaymentMethodType(value) {
   const normalized = String(value || "").trim().toLowerCase();
   const aliases = { maya: "paymaya", qr_ph: "qrph" };
@@ -225,6 +277,8 @@ module.exports = {
   normalizePaymongoPaymentMethodType,
   resolvePaymongoPaymentMethodType,
   getPaymongoPaymentMethodLabel,
+  classifyPaymongoPaymentFailure,
+  getPaymentIntentFailure,
   getPublicKey,
   createPaymentIntent,
   retrievePaymentIntent,

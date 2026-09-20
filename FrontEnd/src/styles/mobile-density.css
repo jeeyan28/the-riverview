@@ -369,13 +369,12 @@
   .public-site .footer-bottom-left > span:last-child { display: none; }
   .public-site .footer-legal-links { justify-content: flex-end; gap: 10px; }
   .public-site .footer-legal-links a { min-height: 36px; display: inline-flex; align-items: center; font-size: .63rem; }
-  .public-site .footer-appearance { grid-column: 1; gap: 6px; min-height: 40px; }
-  .public-site .footer-appearance .theme-toggle { transform: scale(.8); transform-origin: center left; }
   .public-site .footer-back-top {
-    grid-column: 2;
+    grid-column: 1 / -1;
     grid-row: 2;
     min-height: 40px;
     align-self: center;
+    justify-self: end;
     font-size: .63rem;
   }
 

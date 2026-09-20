@@ -12,12 +12,18 @@ export function daysBefore(date, days) {
 
 export function useRevenueReport(from, to, source) {
   const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [revision, setRevision] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
+    if (!from || !to) {
+      setData(null);
+      setError('');
+      setLoading(false);
+      return () => { cancelled = true; };
+    }
     setLoading(true);
     setError('');
     setData(null);

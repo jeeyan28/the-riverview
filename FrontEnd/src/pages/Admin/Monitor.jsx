@@ -44,10 +44,15 @@ const money = (value) => `₱${Number(value || 0).toLocaleString('en-PH', { mini
 function SessionPayment({ session }) {
   const payment = paymentSummary(session);
   const state = payment.balance === 0 ? 'paid' : payment.collected > 0 ? 'partial' : 'unpaid';
+  const detail = state === 'paid'
+    ? `${money(payment.collected)} collected`
+    : state === 'partial'
+      ? `${money(payment.collected)} paid · ${money(payment.balance)} due`
+      : `${money(payment.balance)} due`;
   return (
     <div className="rm-payment-summary">
       <span className={`pay-timing-tag ${state}`}>{payment.status}</span>
-      <span>{money(payment.balance)} balance</span>
+      <span className={`rm-payment-detail ${state}`}>{detail}</span>
     </div>
   );
 }
@@ -850,13 +855,18 @@ function FinishSessionModal({ session, disabled, onClose, onSubmit }) {
   const [paidAmount, setPaidAmount] = useState('0');
   const [submitting, setSubmitting] = useState(false);
 
+  const payment = paymentSummary(session);
+  const isFullyPaid = !!session && payment.total > 0 && payment.balance === 0;
+  const isPartial = payment.collected > 0 && payment.balance > 0;
+  const isUnpaid = payment.collected === 0 && payment.balance > 0;
+
   useEffect(() => {
     if (session) setPaidAmount(String(session.paidAmount ?? 0));
   }, [session]);
 
   async function handleSubmit(event) {
     event.preventDefault();
-    const received = Number(paidAmount);
+    const received = isFullyPaid ? Number(session?.paidAmount || session?.amount || 0) : Number(paidAmount);
     if (!Number.isFinite(received) || received < 0) {
       alert('Amount collected must be a valid non-negative number.');
       return;
@@ -880,7 +890,32 @@ function FinishSessionModal({ session, disabled, onClose, onSubmit }) {
       {session && (
         <form onSubmit={handleSubmit}>
           <p className="mfield-note">{session.guestName || 'Walk-in guest'} · {session.roomName || `Table ${session.roomNumber}`} · charge {money(session.amount)}</p>
-          <div className="mfield"><label htmlFor="finish-paid-amount">Amount collected (₱)</label><input id="finish-paid-amount" type="number" min="0" max={session.amount || 0} step="0.01" value={paidAmount} onChange={(event) => setPaidAmount(event.target.value)} disabled={disabled} autoFocus /><p className="mfield-note">Enter the money actually received. A partial or zero amount keeps the balance outstanding while preserving the session history.</p></div>
+          {isFullyPaid ? (
+            <div className="finish-session-notice finish-session-notice--paid" role="status">
+              <i className="bi bi-check-circle-fill" aria-hidden="true"></i>
+              <span><strong>Payment complete</strong><small>Finishing will close this session and make the table available.</small></span>
+            </div>
+          ) : (
+            <>
+              {isUnpaid && (
+                <div className="finish-session-notice finish-session-notice--unpaid" role="alert">
+                  <i className="bi bi-exclamation-triangle-fill" aria-hidden="true"></i>
+                  <span><strong>This session has not been paid</strong><small>{money(payment.balance)} is still due. Record any payment received before finishing.</small></span>
+                </div>
+              )}
+              {isPartial && (
+                <div className="finish-payment-ledger" aria-label="Current payment balance">
+                  <div><span>Currently paid</span><strong>{money(payment.collected)}</strong></div>
+                  <div><span>Remaining balance</span><strong>{money(payment.balance)}</strong></div>
+                </div>
+              )}
+              <div className="mfield">
+                <label htmlFor="finish-paid-amount">Total amount collected (₱)</label>
+                <input id="finish-paid-amount" type="number" min={session.paidAmount || 0} max={session.amount || 0} step="0.01" value={paidAmount} onChange={(event) => setPaidAmount(event.target.value)} disabled={disabled} autoFocus />
+                <p className="mfield-note">Enter the total money received for this session. You can finish with a partial or unpaid balance, and it will remain in the session history.</p>
+              </div>
+            </>
+          )}
           <div className="modal-actions"><button type="button" className="btn-cancel" onClick={onClose}>Keep active</button><button type="submit" className="btn-confirm" disabled={disabled || submitting}>{submitting ? 'Saving…' : 'Finish session'}</button></div>
         </form>
       )}
@@ -1227,6 +1262,7 @@ function SessionModal({ modal, onClose, onSubmit }) {
   const totalCharge = fromBooking ? Number(modal?.downPaymentInfo?.total) || 0 : Number(walkInPricing?.amount) || 0;
   const alreadyCollected = fromBooking ? Number(modal?.downPaymentInfo?.collected) || 0 : 0;
   const outstanding = Math.max(0, totalCharge - alreadyCollected);
+  const reservationPaidInFull = fromBooking && totalCharge > 0 && outstanding === 0;
   const paidAmount = fromBooking
     ? collectionMode === 'full' ? totalCharge : alreadyCollected
     : collectionMode === 'full' ? totalCharge : collectionMode === 'partial' ? Math.max(0, Number(partialAmount) || 0) : 0;
@@ -1255,7 +1291,7 @@ function SessionModal({ modal, onClose, onSubmit }) {
         roomTarget: modal.roomTarget,
         sessionId: modal.session?._id,
         totalHours,
-        paymentMethod,
+        paymentMethod: reservationPaidInFull || collectionMode === 'later' ? undefined : paymentMethod,
         paymentTiming: paidAmount >= totalCharge && totalCharge > 0 ? 'Before' : 'After',
         paidAmount,
         guestName,
@@ -1278,6 +1314,7 @@ function SessionModal({ modal, onClose, onSubmit }) {
       : '';
   const fixedRoomRate = modal?.fixedRoom ? variantRateLabel(modal.fixedRoom) : modal?.roomTarget ? 'From reservation' : '';
   const title = isExtend ? `Extend Session — ${modal?.fixedRoom?.roomName || ''}` : fromBooking ? 'Start Session from Reservation' : 'Start Session';
+  const isPresetDuration = HOUR_PRESETS.includes(duration);
 
   return (
     <Modal open={!!modal} onClose={onClose} title={title} size="lg">
@@ -1297,7 +1334,15 @@ function SessionModal({ modal, onClose, onSubmit }) {
               {HOUR_PRESETS.filter((value) => value <= maxHours).map((value) => (
                 <button key={value} type="button" className={`session-hour-option${duration === value ? ' active' : ''}`} aria-pressed={duration === value} disabled={fromBooking} onClick={() => setHours(value)}>{value}<small>hr</small></button>
               ))}
-              {!fromBooking && <label className="session-hour-custom"><span>Other</span><input type="number" min="1" max={maxHours} step="1" value={hours} onChange={(event) => setHours(event.target.value)} aria-label="Custom whole hours" /></label>}
+              {!fromBooking && (
+                <label className={`session-hour-custom${isPresetDuration ? '' : ' active'}`}>
+                  <span>Other time</span>
+                  <span className="session-hour-custom-control">
+                    <input type="number" min="1" max={maxHours} step="1" value={isPresetDuration ? '' : hours} placeholder={`1–${maxHours}`} onChange={(event) => setHours(event.target.value)} aria-label="Custom whole hours" />
+                    <small>hrs</small>
+                  </span>
+                </label>
+              )}
             </div>
             {fromBooking && (
               <p className="mfield-note">This {duration}-hour length comes from the confirmed reservation.</p>
@@ -1325,17 +1370,25 @@ function SessionModal({ modal, onClose, onSubmit }) {
             </>
           )}
 
-          <div className="mfield-section-label">Payment</div>
+          {!isExtend && <div className="mfield-section-label">Payment</div>}
 
-          {fromBooking && (
-            <div className="session-payment-ledger">
-              <div><span>Total charge</span><strong>{money(totalCharge)}</strong></div>
-              <div><span>Downpayment received</span><strong>{money(alreadyCollected)}</strong></div>
-              <div className={outstanding > 0 ? 'balance-due' : 'balance-paid'}><span>Balance due</span><strong>{money(outstanding)}</strong></div>
-            </div>
+          {fromBooking && !isExtend && (
+            <>
+              <div className="session-payment-ledger">
+                <div><span>Total charge</span><strong>{money(totalCharge)}</strong></div>
+                <div><span>Payment received</span><strong>{money(alreadyCollected)}</strong></div>
+                <div className={outstanding > 0 ? 'balance-due' : 'balance-paid'}><span>Balance due</span><strong>{money(outstanding)}</strong></div>
+              </div>
+              {reservationPaidInFull && (
+                <div className="session-payment-complete" role="status">
+                  <i className="bi bi-check-circle-fill" aria-hidden="true"></i>
+                  <span><strong>Reservation fully paid</strong><small>No balance or payment method is needed to start this session.</small></span>
+                </div>
+              )}
+            </>
           )}
 
-          {!isExtend && (
+          {!isExtend && !reservationPaidInFull && (
             <div className="session-collection-options" role="group" aria-label="Payment collection">
               <button type="button" className={collectionMode === 'later' ? 'active' : ''} aria-pressed={collectionMode === 'later'} onClick={() => setCollectionMode('later')}><strong>{fromBooking ? 'Keep balance due' : 'Pay after play'}</strong><small>{fromBooking ? `${money(outstanding)} stays visible to staff` : 'Start now with no payment collected'}</small></button>
               <button type="button" className={collectionMode === 'full' ? 'active' : ''} aria-pressed={collectionMode === 'full'} onClick={() => setCollectionMode('full')}><strong>{fromBooking ? 'Collect balance now' : 'Collect full amount'}</strong><small>{fromBooking ? `Record ${money(outstanding)} more` : `Record ${money(totalCharge)} before play`}</small></button>
@@ -1350,7 +1403,7 @@ function SessionModal({ modal, onClose, onSubmit }) {
             </div>
           )}
 
-          {!isExtend && collectionMode !== 'later' && (
+          {!isExtend && !reservationPaidInFull && collectionMode !== 'later' && (
             <div className="mfield">
               <label>Payment Method</label>
               <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)}>

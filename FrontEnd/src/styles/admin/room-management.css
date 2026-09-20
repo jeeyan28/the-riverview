@@ -179,13 +179,22 @@
 .fm-preview-cards .room-card h3{color:var(--text);}
 .fm-preview-cards .room-card-desc{color:var(--muted);}
 .fm-preview-cards .room-tag{background:var(--navy3);border-color:var(--border);color:var(--muted);}
-.fm-preview-cards .btn-select--preview{display:none;}
+.fm-preview-cards .btn-select--preview{
+  display:inline-flex;width:100%;min-height:40px;align-items:center;justify-content:center;gap:7px;
+  border-radius:9px;background:var(--teal);color:#073b35;font-size:.76rem;font-weight:700;
+  pointer-events:none;
+}
 .fm-preview-cards .bk-room-option{background:var(--navy4);border-color:var(--border);cursor:default;}
 .fm-preview-cards .bk-room-option-name{color:var(--text);}
 .fm-preview-cards .bk-room-option-pax{color:var(--muted);}
 .fm-preview-cards .bk-room-option-desc{color:var(--muted);}
 .fm-preview-cards .bk-room-option-amenities li{color:var(--muted);}
+.fm-preview-cards .bk-room-option-amenity{background:var(--navy3);border-color:var(--border);color:var(--text);}
 .fm-preview-cards .bk-room-option-price{color:var(--teal);}
+.fm-preview-cards .bk-room-option-details-btn{background:var(--navy3);border-color:var(--border);color:var(--text);}
+.fm-preview-cards .bk-room-option-expanded{border-color:var(--border);color:var(--muted);}
+.fm-preview-cards .bk-room-option-detail-facts span{color:var(--muted);}
+.fm-preview-cards .bk-room-option-detail-facts strong{color:var(--text);}
 .fm-preview-empty{
   font-size:.78rem;color:var(--muted);padding:28px 10px;text-align:center;
   border:1px dashed var(--border);border-radius:12px;

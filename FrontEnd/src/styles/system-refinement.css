@@ -57,35 +57,17 @@
   transition: background-color 220ms var(--ease-out), color 220ms var(--ease-out);
 }
 
-.public-site .footer-appearance {
-  display: inline-flex;
-  min-height: 38px;
-  align-items: center;
-  gap: 10px;
-  color: #a9b3c4;
-  font-size: .72rem;
-  font-weight: 650;
-}
-
-.public-site .footer-appearance .theme-toggle {
-  border-color: rgba(255,255,255,.16);
-  background: rgba(255,255,255,.07);
-  color: #c5ceda;
-}
-
 :root[data-theme="light"] .public-site > footer {
   border-top: 1px solid var(--border-strong);
   background: #e3efeb;
   color: var(--text-main);
 }
 
-:root[data-theme="light"] .public-site :is(.footer-brand p, .footer-col p, .footer-col > a:not(.footer-reserve-link), .footer-bottom, .footer-legal-links a, .footer-back-top, .footer-visit-facts span, .footer-appearance) {
+:root[data-theme="light"] .public-site :is(.footer-brand p, .footer-col p, .footer-col > a:not(.footer-reserve-link), .footer-bottom, .footer-legal-links a, .footer-back-top, .footer-visit-facts span) {
   color: var(--text-muted-light);
 }
 
 :root[data-theme="light"] .public-site :is(.footer-brand .logo-name, .footer-col h4) { color: var(--text-main); }
-:root[data-theme="light"] .public-site .footer-appearance .theme-toggle { border-color: var(--border-strong); background: var(--surface-alt); color: var(--text-muted-light); }
-
 /* Authentication always uses the dark reservation theme. */
 .auth-content { color-scheme: dark; }
 
@@ -290,7 +272,6 @@
 
 @media (max-width: 640px) {
   .public-site .footer-bottom { padding-right: 0; }
-  .public-site .footer-appearance { order: 3; }
   #app #panel-reports .reports-view-tabs { grid-template-columns: 1fr; }
   #app #panel-reports .reports-view-tabs button { min-height: 48px; }
 }

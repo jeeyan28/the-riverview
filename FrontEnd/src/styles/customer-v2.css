@@ -182,7 +182,8 @@
 .public-site .btn-primary-hero { background: var(--teal); color: var(--teal-ink); }
 .public-site .btn-ghost-hero { border: 1px solid rgba(255,255,255,.34); background: rgba(255,255,255,.06); color: #fff; }
 
-.public-site .hero-carousel { height: 430px; }
+.public-site .hero-carousel { width: min(100%, 620px); height: 390px; justify-self: center; }
+.public-site .hero-carousel-card { width: 68%; max-width: 310px; }
 .public-site .hero-carousel-frame {
   border: 1px solid rgba(255,255,255,.34);
   border-radius: var(--radius-lg);
@@ -553,7 +554,7 @@
 @media (max-width: 1200px) {
   .public-site { --header-h: 68px; }
   .public-site .hero-inner { grid-template-columns: minmax(0, 1fr) minmax(340px, .9fr); gap: var(--space-8); }
-  .public-site .hero-carousel { height: 340px; }
+  .public-site .hero-carousel { height: 315px; }
   .public-site .rooms-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .public-site .footer-top { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .public-site .footer-brand { grid-column: 1 / -1; }
@@ -563,7 +564,7 @@
   .public-site .hero { min-height: 0; }
   .public-site .hero-inner { grid-template-columns: 1fr; min-height: 760px; padding-block: calc(var(--header-h) + var(--guest-banner-h) + 64px) 56px; }
   .public-site .hero-content { max-width: 680px; }
-  .public-site .hero-carousel { width: min(100%, 560px); height: 280px; margin-inline: auto; }
+  .public-site .hero-carousel { width: min(100%, 520px); height: 260px; margin-inline: auto; }
   .public-site .rp-hero-inner { grid-template-columns: 1fr; }
   .public-site .contact-grid { grid-template-columns: 1fr; }
   .public-site .map-embed { min-height: 360px; }

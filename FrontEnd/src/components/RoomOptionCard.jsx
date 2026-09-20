@@ -17,7 +17,7 @@ function featureIcon(feature) {
   return 'fa-solid fa-circle-check';
 }
 
-function RoomOptionCard({ option, room, selected = false, disabled = false, onSelect, availableCount, showSelectionIndicator = true }) {
+function RoomOptionCard({ option, room, selected = false, disabled = false, onSelect, availableCount, showSelectionIndicator = true, preview = false }) {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const cardImage = toDisplaySrc(option.image);
   const description = option.description || room?.description;
@@ -27,7 +27,8 @@ function RoomOptionCard({ option, room, selected = false, disabled = false, onSe
   const totalRooms = Number(option.roomCount) || 1;
   const showAvailability = interactive && Number.isFinite(availableCount) && !disabled;
   const hasDetails = !!description || showAvailability;
-  const expanded = (interactive ? detailsOpen : true) && (hasDetails || !interactive);
+  const canToggleDetails = interactive || preview;
+  const expanded = (canToggleDetails ? detailsOpen : true) && (hasDetails || !canToggleDetails);
 
   function handleKeyDown(e) {
     if (!interactive || disabled) return;
@@ -69,7 +70,7 @@ function RoomOptionCard({ option, room, selected = false, disabled = false, onSe
               <p className="bk-room-option-name">{option.label || 'Untitled'}</p>
               {bestFor && <span className="bk-room-option-badge">{bestFor}</span>}
             </div>
-            {interactive && showSelectionIndicator && (
+            {(interactive || preview) && showSelectionIndicator && (
               <span className={'bk-radio' + (selected ? ' bk-radio--selected' : '')}>
                 {selected && <i className="fa-solid fa-check"></i>}
               </span>
@@ -89,7 +90,7 @@ function RoomOptionCard({ option, room, selected = false, disabled = false, onSe
           )}
           <div className="bk-room-option-bottom-row">
             <span className="bk-room-option-price">{variantRateLabel(option)}</span>
-            {interactive && hasDetails && (
+            {canToggleDetails && hasDetails && (
               <button
                 type="button"
                 className="bk-room-option-details-btn"
