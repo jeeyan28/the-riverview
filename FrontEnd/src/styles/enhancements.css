@@ -30,7 +30,7 @@ button:focus-visible,
 input:focus-visible,
 textarea:focus-visible,
 [tabindex]:focus-visible {
-    outline: 2px solid var(--teal);
+    outline: 2px solid var(--teal-text);
     outline-offset: 3px;
     border-radius: 4px;
     transition: outline-offset .15s var(--ease-out);
@@ -262,13 +262,13 @@ nav a:hover::after, nav a.active::after { width: 20px; }
   position:absolute;right:10px;top:50%;transform:translateY(-50%);
   background:none;border:none;color:var(--muted);cursor:pointer;font-size:.85rem;padding:2px;line-height:1;
 }
-.pf-field .input-wrap .toggle-pw:hover{color:var(--teal);}
+.pf-field .input-wrap .toggle-pw:hover{color:var(--teal-text);}
 .pf-field .field-error{font-size:.72rem;color:#ff6b6b;display:none;margin-top:4px;}
 .pf-field .password-requirements{
   list-style:none;margin:6px 0 0;padding:0;display:flex;flex-direction:column;gap:4px;
 }
 .pf-field .password-requirements li{display:flex;align-items:center;gap:6px;font-size:.72rem;color:#ff6b6b;line-height:1.3;transition:color .15s ease;}
-.pf-field .password-requirements li.met{color:var(--teal);}
+.pf-field .password-requirements li.met{color:var(--teal-text);}
 .pf-field .password-requirements .requirement-icon{font-size:.66rem;line-height:1;min-width:1em;}
 .pf-tab.active { box-shadow: var(--shadow-soft); }
 .pf-panel.active { animation: pfPanelIn .18s var(--ease-out); }

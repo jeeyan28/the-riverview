@@ -6,6 +6,7 @@
   --text-main: #f1f3f7;
   --text-muted-light: #a9b3c4;
   --teal: #00c9a7;
+  --teal-text: var(--teal);
   --teal-strong: #00ad90;
   --teal-ink: #073b35;
   --warning: #e0a13a;
@@ -44,7 +45,8 @@
   --card-light: #eef1f5;
   --text-main: #16243d;
   --text-muted-light: #5b6b82;
-  --teal-strong: #008a73;
+  --teal-text: #007361;
+  --teal-strong: #007361;
   --teal-ink: #053c34;
   --danger: #bd3046;
   --success: #147a59;
@@ -100,7 +102,7 @@ img { max-width: 100%; }
 }
 
 :where(a, button, input, select, textarea, [tabindex]):focus-visible {
-  outline: 3px solid var(--teal);
+  outline: 3px solid var(--teal-text);
   outline-offset: 3px;
 }
 

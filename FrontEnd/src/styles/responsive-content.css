@@ -165,9 +165,9 @@
 
 @media (max-width: 900px) {
   /* Customer landing content becomes shorter, scan-friendly app sections. */
-  .public-site :is(.how-it-works, .why-book, .spaces, #about) { padding-block: 40px; }
-  .public-site :is(.how-it-works-inner, .why-book-inner, .spaces-header, .rooms-header) { margin-bottom: 22px; }
-  .public-site :is(.step-card, .why-book-card, .about-card) { padding: 14px; }
+  .public-site :is(.how-it-works, .spaces, #about) { padding-block: 40px; }
+  .public-site :is(.how-it-works-inner, .spaces-header, .rooms-header) { margin-bottom: 22px; }
+  .public-site :is(.step-card, .about-card) { padding: 14px; }
   .public-site .spaces-rows { gap: 18px; }
   .public-site .space-row { gap: 18px; }
   .public-site .facility-motion { min-height: 260px; }
@@ -291,11 +291,9 @@
 
 @media (max-width: 640px) {
   .public-site { --section-space: 36px; }
-  .public-site :is(.how-it-works, .why-book, .spaces, #about) { padding: 34px 16px; }
-  .public-site .steps-grid,
-  .public-site .why-book-grid { grid-template-columns: 1fr; gap: 8px; }
-  .public-site .step-card,
-  .public-site .why-book-card {
+  .public-site :is(.how-it-works, .spaces, #about) { padding: 34px 16px; }
+  .public-site .steps-grid { grid-template-columns: 1fr; gap: 8px; }
+  .public-site .step-card {
     display: grid;
     grid-template-columns: 34px minmax(0, 1fr);
     align-items: center;
@@ -306,9 +304,8 @@
   }
   .public-site .step-card .step-num { position: static; grid-row: 1 / 3; width: 32px; height: 32px; transform: none; }
   .public-site .step-card-icon { display: none; }
-  .public-site .why-book-card-icon { grid-row: 1 / 3; width: 34px; height: 34px; margin: 0; }
-  .public-site :is(.step-card, .why-book-card) :is(h4, p) { grid-column: 2; margin: 0; }
-  .public-site :is(.step-card, .why-book-card) p { font-size: .73rem; line-height: 1.42; }
+  .public-site .step-card :is(h4, p) { grid-column: 2; margin: 0; }
+  .public-site .step-card p { font-size: .73rem; line-height: 1.42; }
   .public-site .about-inner { gap: 20px; }
   .public-site .about-left h2 { margin-bottom: 10px; }
   .public-site .about-left p { font-size: .82rem; line-height: 1.6; }

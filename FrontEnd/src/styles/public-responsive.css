@@ -8,7 +8,7 @@
 
 .public-site > main { min-width: 0; }
 .public-site section[id] { scroll-margin-top: calc(var(--header-h) + var(--guest-banner-h) + 1rem); }
-.public-site :is(a, button, input, select, textarea):focus-visible { outline: 3px solid var(--teal); outline-offset: 4px; }
+.public-site :is(a, button, input, select, textarea):focus-visible { outline: 3px solid var(--teal-text); outline-offset: 4px; }
 .public-site :is(.hero-inner, .rooms-header, .room-card, .room-card-body, .space-text, .contact-card, .footer-top > *, .rp-facility-card, .rp-modal-info) { min-width: 0; }
 .public-site :is(.room-card-body, .rp-facility-body, .contact-card, .legal-inner, .footer-col) { overflow-wrap: anywhere; }
 
@@ -55,7 +55,7 @@
     border-left: 1px solid var(--border); box-shadow: -12px 0 60px rgba(0, 0, 0, .15);
 }
 .public-site .mobile-nav-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
-.public-site .mobile-nav-eyebrow { font-size: .65rem; font-weight: 700; letter-spacing: .16em; color: var(--teal); }
+.public-site .mobile-nav-eyebrow { font-size: .65rem; font-weight: 700; letter-spacing: .16em; color: var(--teal-text); }
 .public-site .mobile-nav-heading h2 { font-family: 'Playfair Display', serif; font-size: 1.55rem; color: var(--text-main); margin: .35rem 0 0; }
 .public-site .mobile-nav-close {
     position: static; display: grid; place-items: center; width: 44px; height: 44px; flex-shrink: 0;
@@ -68,7 +68,7 @@
     font-family: 'Inter', sans-serif; font-size: 1rem; font-weight: 600;
 }
 .public-site .mobile-nav-links a[aria-current], .public-site .mobile-nav-links a:hover { background: var(--card-light); color: var(--text-main); }
-.public-site .mobile-nav-links a i { font-size: .8rem; color: var(--teal); }
+.public-site .mobile-nav-links a i { font-size: .8rem; color: var(--teal-text); }
 .public-site .mobile-nav-account { display: flex; flex-direction: column; gap: .65rem; padding-top: 1.25rem; border-top: 1px solid var(--border); }
 .public-site .mobile-nav :is(.mobile-nav-primary, .mobile-nav-secondary) {
     display: flex; justify-content: center; align-items: center; gap: .7rem;
@@ -95,7 +95,7 @@
 .public-site .hero-actions a { display: inline-flex; justify-content: center; align-items: center; min-height: 48px; text-align: center; }
 .public-site .hero-carousel-arrow { width: 44px; height: 44px; color: #fff; opacity: .85; }
 .public-site :is(#rooms, #about) { padding: var(--section-space) var(--page-gutter); }
-.public-site :is(.how-it-works, .why-book, .spaces) { padding: var(--section-space) var(--page-gutter); }
+.public-site :is(.how-it-works, .spaces) { padding: var(--section-space) var(--page-gutter); }
 .public-site .rooms-header { gap: 1.5rem; }
 .public-site .rooms-header-right { flex-wrap: wrap; justify-content: flex-end; gap: 1rem; }
 .public-site .rooms-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1.25rem; }
@@ -151,7 +151,6 @@
     .public-site .rooms-header { align-items: flex-start; }
     .public-site .rooms-header-right { flex-direction: column; align-items: flex-end; }
     .public-site .steps-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-    .public-site .why-book-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .public-site .about-inner { grid-template-columns: 1fr; gap: 2rem; }
     .public-site .contact-grid { grid-template-columns: 1fr; }
     .public-site .contact-page .map-embed { height: 340px; }
@@ -235,10 +234,8 @@
     .public-site .mobile-header-actions { gap: .2rem; }
     .public-site .hero-actions { flex-direction: column; align-items: stretch; }
     .public-site .hero-actions a { width: 100%; }
-    .public-site :is(.rp-facilities-grid, .why-book-grid, .about-right) { grid-template-columns: 1fr; }
+    .public-site :is(.rp-facilities-grid, .about-right) { grid-template-columns: 1fr; }
     .public-site .rp-facility-img { height: 160px; }
-    .public-site .why-book-card { padding: 1.4rem; }
-    .public-site .why-book-card p { margin-bottom: 0; }
     .public-site .help-panel { padding: 1rem; }
     .public-site .footer-top { grid-template-columns: 1fr; }
     .public-site .footer-brand, .public-site .footer-newsletter { grid-column: auto; }
