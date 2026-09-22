@@ -8,11 +8,12 @@ import {
   dateKey,
   fetchReservedHours,
   loadMonthAvailability,
-  isDayFullyBooked,
   isHolidayDate,
   isOperatingDay,
   getSlotState,
   getTimePeriod,
+  getFreeHourCount,
+  getAvailableRoomCountForDuration,
 } from '../utils/rooms';
 
 const MONTHS = [
@@ -152,14 +153,27 @@ function RescheduleModal({ booking, onClose, onRescheduled }) {
     const holiday = isHolidayDate(dStr, settings.holidays);
     const closedDay = !isOperatingDay(dateObj, settings.operatingHours);
     const dayList = excludeOwnSlotFromDayList(monthBookings[dStr], booking);
-    const fullyBooked = isDayFullyBooked(dayList, openHour, closeHour, totalRooms);
-    const disabled = isPast || holiday || closedDay || fullyBooked;
+    const freeHours = getFreeHourCount(dayList, openHour, closeHour, totalRooms);
+    const fullyBooked = freeHours === 0;
+    const unavailable = holiday || closedDay;
+    const disabled = isPast || unavailable || fullyBooked;
+
+    let variant = null;
     let title;
     if (isPast) title = 'This date has already passed';
-    else if (holiday) title = 'Closed for a holiday';
-    else if (closedDay) title = 'Closed on this day';
-    else if (fullyBooked) title = 'Fully booked';
-    return { d, dStr, isToday, holiday, disabled, title };
+    else if (unavailable) {
+      variant = 'unavailable';
+      title = holiday ? 'Closed for a holiday' : 'Closed on this day';
+    } else if (fullyBooked) {
+      variant = 'full';
+      title = 'Fully booked';
+    } else if (freeHours <= 2) {
+      variant = 'few';
+      title = `Only ${freeHours} open hour${freeHours === 1 ? '' : 's'} left`;
+    } else {
+      variant = 'available';
+    }
+    return { d, dStr, isToday, holiday, disabled, title, variant };
   });
 
   function goPrevMonth() {
@@ -300,10 +314,14 @@ function RescheduleModal({ booking, onClose, onRescheduled }) {
                             'bk-day' +
                             (day.disabled ? ' bk-day--disabled' : ' bk-day--open') +
                             (day.isToday ? ' bk-day--today' : '') +
+                            (day.variant === 'available' ? ' bk-day--available' : '') +
+                            (day.variant === 'few' ? ' bk-day--few' : '') +
+                            (day.variant === 'full' ? ' bk-day--full' : '') +
+                            (day.variant === 'unavailable' ? ' bk-day--unavailable' : '') +
                             (day.holiday ? ' bk-day--holiday' : '') +
                             (selectedDateKey === day.dStr ? ' bk-day--selected' : '')
                           }
-                          title={day.title}
+                          title={day.title || undefined}
                           tabIndex={day.disabled ? undefined : 0}
                           role="button"
                           aria-disabled={day.disabled || undefined}
@@ -320,6 +338,7 @@ function RescheduleModal({ booking, onClose, onRescheduled }) {
 
                 <div className="bk-legend">
                   <span><i className="bk-dot bk-dot--available"></i> Available</span>
+                  <span><i className="bk-dot bk-dot--few"></i> Few slots</span>
                   <span><i className="bk-dot bk-dot--full"></i> Fully booked</span>
                   <span><i className="bk-dot bk-dot--unavailable"></i> Closed</span>
                 </div>
@@ -360,23 +379,28 @@ function RescheduleModal({ booking, onClose, onRescheduled }) {
                       <div className="bk-slot-group" key={period}>
                         <span className="bk-slot-group-label">{period}</span>
                         <div className="bk-slots-grid">
-                          {slots.map(({ hour, state }) => (
-                            <div
-                              key={hour}
-                              className={
-                                'bk-slot' +
-                                (state !== 'available' ? ' bk-slot--reserved' : '') +
-                                (selectedHour === hour ? ' bk-slot--selected' : '')
-                              }
-                              onClick={state === 'available' ? () => handleSelectHour(hour) : undefined}
-                              tabIndex={state === 'available' ? 0 : undefined}
-                              role="button"
-                              onKeyDown={state === 'available' ? (e) => { if (e.key === 'Enter' || e.key === ' ') handleSelectHour(hour); } : undefined}
-                            >
-                              <span className="bk-slot-time">{formatHour(hour)}</span>
-                              <span className="bk-slot-status">{state === 'available' ? 'Available' : 'Reserved'}</span>
-                            </div>
-                          ))}
+                          {slots.map(({ hour, state }) => {
+                            const availableCount = getAvailableRoomCountForDuration(reserved, totalRooms, hour, duration);
+                            const isFewLeft = availableCount <= 2 && availableCount < totalRooms;
+                            const statusTone = state === 'available' ? (isFewLeft ? ' is-limited' : ' is-open') : '';
+                            return (
+                              <div
+                                key={hour}
+                                className={
+                                  'bk-slot' +
+                                  (state !== 'available' ? ' bk-slot--reserved' : '') +
+                                  (selectedHour === hour ? ' bk-slot--selected' : '')
+                                }
+                                onClick={state === 'available' ? () => handleSelectHour(hour) : undefined}
+                                tabIndex={state === 'available' ? 0 : undefined}
+                                role="button"
+                                onKeyDown={state === 'available' ? (e) => { if (e.key === 'Enter' || e.key === ' ') handleSelectHour(hour); } : undefined}
+                              >
+                                <span className="bk-slot-time">{formatHour(hour)}</span>
+                                <span className={`bk-slot-status${statusTone}`}>{state === 'available' ? 'Available' : 'Reserved'}</span>
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
                     )

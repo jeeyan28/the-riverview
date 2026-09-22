@@ -9,7 +9,7 @@
 }
 
 .public-site .spaces-showcase .spaces {
-  width: min(100%, var(--content-max));
+  width: min(100%, 1440px);
   margin-inline: auto;
   padding: 0;
 }
@@ -139,34 +139,42 @@
   line-height: 1.7;
 }
 
-/* ---------- Teal action ---------- */
+/* ---------- Primary action ---------- */
 .public-site .space-carousel-link {
   display: inline-flex;
-  min-height: 50px;
+  min-height: 46px;
   align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-1) var(--space-1) var(--space-1) var(--space-5);
+  gap: 8px;
+  padding: 0 16px 0 20px;
+  border: 0;
   border-radius: var(--radius-pill);
   background: var(--teal);
   color: var(--teal-ink);
   font-size: .875rem;
   font-weight: 750;
+  letter-spacing: .01em;
   text-decoration: none;
-  transition: background-color .18s var(--ease-out), transform .18s var(--ease-out);
+  transition: background-color .16s var(--ease-out), transform .16s var(--ease-out);
+}
+
+.public-site .space-carousel-link-text {
+  line-height: 1;
 }
 
 .public-site .space-carousel-link-icon {
   display: grid;
-  width: 38px;
-  height: 38px;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
   place-items: center;
-  border-radius: 50%;
-  background: var(--space-panel);
-  color: var(--teal-text);
+  background: transparent;
+  color: inherit;
 }
 
 .public-site .space-carousel-link-icon svg {
-  transition: transform .18s var(--ease-out);
+  width: 16px;
+  height: 16px;
+  transition: transform .16s var(--ease-out);
 }
 
 /* ---------- Controls ---------- */
@@ -268,12 +276,16 @@
 /* ---------- Hover (pointer devices only) ---------- */
 @media (hover: hover) and (pointer: fine) {
   .public-site .space-carousel-link:hover {
-    background: #35dcbd;
-    transform: translateY(-2px);
+    background: #0ad9b5;
+    transform: translateY(-1px);
   }
 
   .public-site .space-carousel-link:hover .space-carousel-link-icon svg {
     transform: translateX(3px);
+  }
+
+  .public-site .space-carousel-link:active {
+    transform: translateY(0);
   }
 
   .public-site .space-carousel-control:hover {
@@ -284,11 +296,22 @@
 
 /* ---------- Tablet ---------- */
 @media (max-width: 900px) {
+  .public-site .spaces-showcase .spaces-header {
+    display: block;
+    margin-bottom: var(--space-5);
+  }
+
+  .public-site .spaces-showcase .spaces-header p {
+    max-width: 58ch;
+    margin-top: var(--space-3);
+    font-size: .92rem;
+  }
+
   .public-site .space-carousel-slide {
-    grid-template-columns: minmax(0, 1fr) minmax(240px, .85fr);
+    grid-template-columns: minmax(0, 1fr) minmax(220px, .85fr);
     gap: var(--space-5) var(--space-6);
     min-height: 0;
-    padding: var(--space-8) var(--space-6) var(--space-6);
+    padding: 28px var(--space-6) var(--space-6);
   }
 
   .public-site .space-carousel-media { width: min(100%, 300px); }
@@ -299,49 +322,68 @@
 
 /* ---------- Phone ---------- */
 @media (max-width: 640px) {
+  .public-site section.spaces-showcase {
+    padding: max(var(--space-6), calc(var(--section-space) * .55)) var(--page-gutter);
+  }
+
   .public-site .spaces-showcase .spaces-header {
     display: block;
-    margin-bottom: var(--space-5);
+    margin-bottom: var(--space-4);
+  }
+
+  .public-site .spaces-showcase .spaces-header h2 {
+    font-size: clamp(1.55rem, 7vw, 1.85rem);
+    line-height: 1.1;
   }
 
   .public-site .spaces-showcase .spaces-header p {
-    margin-top: var(--space-3);
-    font-size: .92rem;
+    max-width: none;
+    margin-top: var(--space-2);
+    font-size: .84rem;
+    line-height: 1.55;
   }
 
   .public-site .space-carousel-slide {
     display: flex;
     flex-direction: column;
     align-items: stretch;
-    gap: var(--space-5);
-    padding: var(--space-6) var(--space-5);
+    gap: var(--space-4);
+    padding: var(--space-5) var(--space-4) var(--space-4);
   }
 
   .public-site .space-carousel-title h3 {
-    font-size: clamp(1.65rem, 7.5vw, 2rem);
+    font-size: clamp(1.5rem, 7.5vw, 1.9rem);
   }
 
   .public-site .space-carousel-media {
-    width: min(100%, 300px);
+    order: 2;
+    width: min(78vw, 260px);
     align-self: center;
+    margin-block: var(--space-1);
   }
 
   .public-site .space-carousel-copy {
+    order: 3;
     max-width: none;
-    gap: var(--space-5);
+    gap: var(--space-4);
   }
 
   .public-site .space-carousel-copy p {
-    font-size: .95rem;
+    font-size: .9rem;
     line-height: 1.6;
   }
 
   .public-site .space-carousel-link {
     width: 100%;
-    min-height: 52px;
+    min-height: 50px;
     justify-content: space-between;
-    padding-left: var(--space-5);
+    padding-inline: 20px 18px;
     font-size: .9rem;
+  }
+
+  .public-site .space-carousel-link-icon {
+    width: 20px;
+    height: 20px;
   }
 
   .public-site .space-carousel-controls {
@@ -349,16 +391,49 @@
       'dots dots'
       'prev next';
     grid-template-columns: 1fr 1fr;
-    gap: var(--space-3);
-    padding: var(--space-3) var(--space-5) var(--space-5);
+    gap: var(--space-2);
+    padding: var(--space-3) var(--space-4) var(--space-4);
   }
 
   .public-site .space-carousel-control {
     justify-self: stretch;
     justify-content: center;
     width: 100%;
+    min-width: 0;
     min-height: 48px;
-    font-size: .84rem;
+    font-size: .8rem;
+  }
+
+  .public-site .space-carousel-control span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .public-site .space-carousel-dots button {
+    width: 36px;
+    height: 40px;
+  }
+}
+
+/* ---------- Small phone ---------- */
+@media (max-width: 380px) {
+  .public-site section.spaces-showcase {
+    padding-inline: var(--space-3);
+  }
+
+  .public-site .space-carousel-slide {
+    gap: var(--space-3);
+    padding: var(--space-4) var(--space-3);
+  }
+
+  .public-site .space-carousel-media {
+    width: min(74vw, 220px);
+  }
+
+  .public-site .space-carousel-control {
+    font-size: .74rem;
+    padding-inline: var(--space-3);
   }
 }
 

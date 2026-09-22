@@ -902,6 +902,8 @@ body.has-guest-banner {
 .bk-day--disabled {
     color: var(--text-muted-light); cursor: not-allowed; background: transparent; opacity: .5;
 }
+.bk-day--disabled.bk-day--full,
+.bk-day--disabled.bk-day--unavailable { opacity: 1; }
 .bk-day--few:hover:not(.bk-day--disabled) { background: rgba(224,161,58,.1); border-color: rgba(224,161,58,.3); }
 .bk-day--full { color: var(--text-muted-light); }
 .bk-day--unavailable {
