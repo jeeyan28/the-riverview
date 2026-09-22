@@ -11,12 +11,14 @@ Source of truth for visual and interaction design. This documents the system tha
 | `--card-light` | `#1c2c4a` | `#E7F0ED` | Card backgrounds |
 | `--text-main` | `#F1F3F7` | `#17312D` | Primary text |
 | `--text-muted-light` | `#9aa4b8` | `#58706B` | Secondary text |
-| `--teal` | `#00C9A7` | `#00C9A7` | Primary accent / CTA / brand color |
-| `--space-panel` | `#315d4c` | `#315d4c` | Deep-green “Our Spaces” feature panel in both themes |
+| `--teal` | `#00C9A7` | `#00C9A7` | Primary accent / CTA / brand color (backgrounds, dark-surface text) |
+| `--teal-text` | `#00C9A7` (= `--teal`) | `#007361` | Teal for text, icons, and focus outlines (AA-safe on light) |
+| `--teal-strong` | `#00AD90` | `#007361` | Emphasized accent text (prices, eyebrows) |
+| `--space-panel` | `#16243f` | `#FFFFFF` | Theme-aware “Our Spaces” feature panel |
 | `--warning` | `#e0a13a` | `#e0a13a` | Warnings, alerts |
-| `--border` | `rgba(255,255,255,.12)` | `rgba(10,22,40,.1)` | Dividers, outlines |
+| `--border` | `rgba(255,255,255,.12)` | `rgba(18,68,60,.16)` | Dividers, outlines |
 
-**Rule — teal contrast:** Teal on dark background = 7.96:1 (safe for text). Teal on light background = **2.01:1 — fails WCAG AA**. On the light theme, teal is accent/icon/border only — never body text. If teal text is needed on light backgrounds, use a darkened variant, not raw `--teal`.
+**Rule — teal contrast:** Teal on dark background = 7.96:1 (safe for text). Teal on light background = **2.01:1 — fails WCAG AA**. On the light theme, raw `--teal` is accent/background only — never text, icons, or focus outlines on light surfaces. Use `--teal-text` (light: `#007361`) for any teal-colored text, icon, or outline; it resolves to `--teal` in dark, so call sites need no theme branching.
 
 Theme switching is handled via `[data-theme="light"]` CSS variable overrides and applies to customer pages, authentication, footer, and the complete admin shell. Light mode uses a pale green-gray canvas, white raised surfaces, dark green-gray text, and a light sidebar so the selected appearance is immediately recognizable.
 
@@ -145,8 +147,7 @@ The `motion` (Motion/Framer Motion) library is the standard for anything beyond 
 - At phone and tablet widths up to 900px, the customer shell keeps Home, Reserve, Contact, and Account in a bottom tab bar that accounts for device safe areas. The full-screen menu carries secondary navigation and preferences, and temporarily disables the tab bar while open.
 - Facility cards provide separate **Details** and **Reserve** actions. Details open the dedicated `/rooms/:roomId` page, where customers can compare every type/variant, capacity, exact hourly rate, amenities, status, and available-unit count before checkout. Reserving a listed room type carries that choice into the booking flow.
 - On phones, facility cards become compact image-and-content rows. They show only the two most useful amenities; the Details action opens the dedicated facility page with every room type and its complete information.
-- “Our Spaces” shows one featured facility at a time in a deep-green panel: its name, two circular facility photos, description, and a direct link to its managed room and rates. Previous and next controls name the adjacent facilities, and horizontal touch swipes change the feature on phones. The panel retains white text and controls in both site themes.
-- The reserve-online explanation is a compact full-width editorial section with a short benefit list and one route to live facilities. Avoid placing a small card grid inside an oversized floating slab.
+- “Our Spaces” shows one featured facility at a time in a navy panel set on the page surface: facility name, description, teal pill action to its managed room and rates, and two overlapping circular photos (text left, photos right on desktop; stacked on phones). A panel footer keeps Previous/Next pill controls that name the adjacent facilities, centered dot pagination, arrow-key navigation, and horizontal touch swipes on phones. The panel retains light text and controls in both site themes.
 - Route, session, and post-login waits use the same compact Riverview billiards loader. The mobile version avoids costly blur effects, fits dynamic viewport and safe-area bounds, and keeps its motion transform-only. The public shell renders while its session check runs; authentication redirects as soon as the account handoff is ready and never holds the user behind a fake percentage sequence.
 - Profile, reservation details, booking, reschedule, cancellation, and authentication dialogs use the shared modal behavior: labelled dialog, focus containment, Escape/close affordance, internal scrolling, and stacked full-width actions on phones.
 - Phone booking dialogs show one current step and a short progress bar. Review information is grouped into one flat summary, while policies and secondary account-security controls use progressive disclosure.

@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams, useLocation } from 'react-router-dom';
 import {
   Clock3, CalendarCheck, PartyPopper, Trophy,
-  Zap, LayoutGrid, ShieldCheck,
   DoorOpen, CalendarDays, Wallet, FileText, MessageCircle,
   Timer, Hourglass, CheckCircle2,
   HelpCircle, X, ArrowLeft, ArrowRight,
@@ -50,13 +49,6 @@ function getOffset(index, current, total) {
   if (diff < -total / 2) diff += total;
   return diff;
 }
-
-const WHY_BOOK_CARDS = [
-  { icon: CalendarCheck, title: 'Reserve in Advance', desc: "Lock in your preferred room before it's gone." },
-  { icon: Zap, title: 'Faster Check-In', desc: 'Skip the wait — your room is ready when you arrive.' },
-  { icon: LayoutGrid, title: 'See What\u2019s Available', desc: 'Browse room types and real-time availability first.' },
-  { icon: ShieldCheck, title: 'Secure Reservation', desc: 'Your reservation and payment details stay protected.' },
-];
 
 const SPACE_ITEMS = [
   {
@@ -230,6 +222,16 @@ function Home() {
 
   function showSpace(direction) {
     setActiveSpaceIndex((current) => (current + direction + SPACE_ITEMS.length) % SPACE_ITEMS.length);
+  }
+
+  function handleSpaceKeyDown(event) {
+    if (event.key === 'ArrowLeft') {
+      event.preventDefault();
+      showSpace(-1);
+    } else if (event.key === 'ArrowRight') {
+      event.preventDefault();
+      showSpace(1);
+    }
   }
 
   function handleSpaceTouchStart(event) {
@@ -461,38 +463,32 @@ function Home() {
         </div>
       </section>
 
-      <section className="why-book">
-        <div className="why-book-shell">
-          <div className="why-book-intro reveal">
-            <h2>Plan ahead without waiting for a reply.</h2>
-            <p>See managed room types, choose a whole-hour schedule, and keep your reservation and balance together in one account.</p>
-            <Link to="/rooms" className="why-book-link">
-              Browse live facilities <ArrowRight size={17} aria-hidden="true" />
-            </Link>
-          </div>
-          <div className="why-book-list reveal-stagger">
-            {WHY_BOOK_CARDS.map((c) => (
-              <div className="why-book-item" key={c.title}>
-                <span className="why-book-item-icon"><c.icon size={19} aria-hidden="true" /></span>
-                <div>
-                  <h3>{c.title}</h3>
-                  <p>{c.desc}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
       <section className="spaces-showcase" aria-labelledby="spaces-heading">
         <div className="spaces">
           <div className="spaces-header reveal">
-            <h2 id="spaces-heading">Our spaces</h2>
-            <p>Billiards, basketball, or KTV. Find the space for your plans.</p>
+            <div>
+              <div className="section-label">Our Spaces</div>
+              <h2 id="spaces-heading">Find the space for your plans.</h2>
+            </div>
+            <p>Billiards, basketball, or KTV. Preview each space, then jump straight to its rooms and rates.</p>
           </div>
 
-          <div className="space-carousel" onTouchStart={handleSpaceTouchStart} onTouchEnd={handleSpaceTouchEnd}>
-            <article className="space-carousel-slide" key={activeSpace.type}>
+          <div
+            className="space-carousel"
+            role="region"
+            aria-roledescription="carousel"
+            aria-label="Our spaces"
+            tabIndex={0}
+            onKeyDown={handleSpaceKeyDown}
+            onTouchStart={handleSpaceTouchStart}
+            onTouchEnd={handleSpaceTouchEnd}
+          >
+            <article
+              className="space-carousel-slide"
+              key={activeSpace.type}
+              aria-roledescription="slide"
+              aria-label={`${activeSpaceIndex + 1} of ${SPACE_ITEMS.length}: ${activeSpace.title}`}
+            >
               <div className="space-carousel-title">
                 <h3>{activeSpace.title}</h3>
               </div>
@@ -507,23 +503,46 @@ function Home() {
               <div className="space-carousel-copy">
                 <p>{activeSpace.description}</p>
                 <Link to={activeSpaceHref} className="space-carousel-link">
+                  <span className="space-carousel-link-text">
+                    {activeManagedRoom ? 'View rooms and rates' : 'Browse facilities'}
+                  </span>
                   <span className="space-carousel-link-icon"><ArrowRight size={16} aria-hidden="true" /></span>
-                  {activeManagedRoom ? 'View rooms and rates' : 'Browse facilities'}
                 </Link>
               </div>
             </article>
-            <nav className="space-carousel-controls" aria-label="Browse spaces">
-              <button type="button" onClick={() => showSpace(-1)} aria-label={`Show ${previousSpace.title}`}>
-                <ArrowLeft size={18} aria-hidden="true" />
+
+            <div className="space-carousel-controls">
+              <button
+                type="button"
+                className="space-carousel-control space-carousel-control-prev"
+                onClick={() => showSpace(-1)}
+                aria-label={`Show ${previousSpace.title}`}
+              >
+                <ArrowLeft size={16} aria-hidden="true" />
                 <span>{previousSpace.navLabel}</span>
               </button>
-              <span className="space-carousel-count" aria-hidden="true">{activeSpaceIndex + 1} / {SPACE_ITEMS.length}</span>
-              <span className="visually-hidden" aria-live="polite">Showing {activeSpace.title}</span>
-              <button type="button" onClick={() => showSpace(1)} aria-label={`Show ${nextSpace.title}`}>
+              <div className="space-carousel-dots">
+                {SPACE_ITEMS.map((space, index) => (
+                  <button
+                    key={space.type}
+                    type="button"
+                    aria-label={`Show ${space.title}`}
+                    aria-current={index === activeSpaceIndex ? 'true' : undefined}
+                    onClick={() => setActiveSpaceIndex(index)}
+                  />
+                ))}
+              </div>
+              <button
+                type="button"
+                className="space-carousel-control space-carousel-control-next"
+                onClick={() => showSpace(1)}
+                aria-label={`Show ${nextSpace.title}`}
+              >
                 <span>{nextSpace.navLabel}</span>
-                <ArrowRight size={18} aria-hidden="true" />
+                <ArrowRight size={16} aria-hidden="true" />
               </button>
-            </nav>
+            </div>
+            <span className="visually-hidden" aria-live="polite">Showing {activeSpace.title}</span>
           </div>
         </div>
       </section>

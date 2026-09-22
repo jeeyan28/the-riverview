@@ -179,9 +179,9 @@
   .admin-app-nav .app-nav-item { min-height: 52px; font-size: .64rem; }
 
   .public-site { --section-space: 44px; --page-gutter: 24px; }
-  .public-site :is(.how-it-works, .why-book, .spaces, #about) { padding-block: 44px; }
+  .public-site :is(.how-it-works, .spaces, #about) { padding-block: 44px; }
   .public-site .hero h1 { font-size: clamp(2.7rem, 7vw, 4rem); }
-  .public-site :is(.steps-grid, .why-book-list, .about-right) { gap: 10px; }
+  .public-site :is(.steps-grid, .about-right) { gap: 10px; }
 
   #app .content { padding: 14px 14px calc(var(--app-nav-height) + 26px + env(safe-area-inset-bottom)); gap: 14px; }
   #app .card { padding: 14px; }
@@ -292,30 +292,24 @@
   .public-site .hero-actions { gap: 8px; margin-top: 17px; }
   .public-site .hero-actions a { min-height: 44px; padding-inline: 13px; border-radius: 10px; font-size: .72rem; }
 
-  .public-site :is(.how-it-works, .why-book, .spaces, #about) { padding: 30px 14px; }
+  .public-site :is(.how-it-works, .spaces, #about) { padding: 30px 14px; }
   .public-site .section-label { margin-bottom: 7px; font-size: .59rem; letter-spacing: .13em; }
-  .public-site :is(.how-it-works-inner, .spaces-header, .about-left) h2,
-  .public-site .why-book-intro h2 { font-size: clamp(1.45rem, 7vw, 1.68rem); line-height: 1.1; }
-  .public-site :is(.how-it-works-inner, .spaces-header, .why-book-intro) > p { font-size: .74rem; line-height: 1.5; }
+  .public-site :is(.how-it-works-inner, .spaces-header, .about-left) h2 { font-size: clamp(1.45rem, 7vw, 1.68rem); line-height: 1.1; }
+  .public-site :is(.how-it-works-inner, .spaces-header) > p { font-size: .74rem; line-height: 1.5; }
 
   .public-site .steps-grid,
-  .public-site .why-book-list,
   .public-site .about-right { gap: 7px; }
 
-  .public-site .step-card,
-  .public-site .why-book-card,
-  .public-site .why-book-item {
+  .public-site .step-card {
     min-height: 62px;
     padding: 8px 9px;
     gap: 2px 9px;
     border-radius: 12px;
   }
 
-  .public-site .step-card .step-num,
-  .public-site .why-book-card-icon,
-  .public-site .why-book-item-icon { width: 30px; height: 30px; }
-  .public-site :is(.step-card, .why-book-card, .why-book-item) :is(h3, h4) { font-size: .78rem; line-height: 1.25; }
-  .public-site :is(.step-card, .why-book-card, .why-book-item) p { font-size: .66rem; line-height: 1.36; }
+  .public-site .step-card .step-num { width: 30px; height: 30px; }
+  .public-site .step-card :is(h3, h4) { font-size: .78rem; line-height: 1.25; }
+  .public-site .step-card p { font-size: .66rem; line-height: 1.36; }
 
   .public-site .steps-grid { gap: 10px; }
   .public-site .step-card {

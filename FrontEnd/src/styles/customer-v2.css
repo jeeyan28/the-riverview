@@ -145,12 +145,13 @@
 .public-site .hero-eyebrow,
 .public-site .section-label {
   margin-bottom: var(--space-4);
-  color: var(--teal);
   font-size: .75rem;
   font-weight: 750;
   letter-spacing: .13em;
   text-transform: uppercase;
 }
+.public-site .hero-eyebrow { color: var(--teal); }
+.public-site .section-label { color: var(--teal-text); }
 .public-site .hero h1 {
   max-width: 680px;
   margin-bottom: var(--space-5);
@@ -197,16 +198,15 @@
   background: rgba(5,14,27,.64);
 }
 
-.public-site :is(.how-it-works, .why-book, .spaces, #rooms, #about) {
+.public-site :is(.how-it-works, .spaces, #rooms, #about) {
   padding: var(--section-space) var(--page-gutter);
 }
-.public-site :is(.how-it-works-inner, .why-book-inner, .spaces, .rooms-header, .rooms-grid, .about-inner) {
+.public-site :is(.how-it-works-inner, .spaces, .rooms-header, .rooms-grid, .about-inner) {
   width: min(100%, var(--content-max));
   margin-inline: auto;
 }
 .public-site :is(.how-it-works, #rooms, #about) { background: var(--surface); }
-.public-site :is(.why-book, .spaces-showcase) { background: var(--surface-alt); }
-.public-site :is(.how-it-works, .why-book) h2,
+.public-site .how-it-works h2,
 .public-site .rooms-header h2,
 .public-site .spaces-header h2,
 .public-site .about-left h2,
@@ -219,13 +219,12 @@
   line-height: 1.08;
 }
 
-.public-site .steps-grid,
-.public-site .why-book-grid {
+.public-site .steps-grid {
   width: min(100%, var(--content-max));
   margin: var(--space-10) auto 0;
   gap: var(--space-4);
 }
-.public-site :is(.step-card, .why-book-card, .about-card) {
+.public-site :is(.step-card, .about-card) {
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   background: var(--surface-alt);
@@ -247,8 +246,8 @@
 }
 .public-site .step-num::before { content: "STEP "; }
 .public-site .step-card-icon { display: none; }
-.public-site :is(.step-card, .why-book-card, .about-card) h4 { color: var(--text-main); font-size: 1rem; }
-.public-site :is(.step-card, .why-book-card, .about-card) p { color: var(--text-muted-light); }
+.public-site :is(.step-card, .about-card) h4 { color: var(--text-main); font-size: 1rem; }
+.public-site :is(.step-card, .about-card) p { color: var(--text-muted-light); }
 
 .public-site #rooms { background: var(--surface); }
 .public-site .rooms-header { align-items: end; margin-bottom: var(--space-8); }
@@ -313,7 +312,7 @@
 .public-site .about-left p { color: var(--text-muted-light); }
 .public-site .about-right { gap: var(--space-4); }
 .public-site .about-card { padding: var(--space-5); }
-.public-site :is(.about-card-icon, .why-book-card-icon) {
+.public-site .about-card-icon {
   width: 36px;
   height: 36px;
   border-radius: var(--radius-sm);
@@ -349,7 +348,7 @@
 .public-site .footer-col h4 { color: #f1f3f7; }
 .public-site .footer-col a { color: #c5ceda; }
 .public-site .footer-col a { align-items: center; gap: var(--space-2); }
-.public-site .footer-col a:hover { color: var(--teal); }
+.public-site .footer-col a:hover { color: var(--teal-text); }
 .public-site .footer-cta {
   display: flex;
   flex-direction: column;
@@ -537,8 +536,8 @@
   cursor: pointer;
 }
 .bk-addon-option--selected { border-color: var(--teal); background: var(--teal-soft); }
-.bk-addon-option input { width: 18px; height: 18px; accent-color: var(--teal); }
-.bk-addon-option-icon { display: grid; place-items: center; width: 36px; height: 36px; border-radius: var(--radius-sm); background: var(--teal-soft); color: var(--teal); }
+.bk-addon-option input { width: 18px; height: 18px; accent-color: var(--teal-text); }
+.bk-addon-option-icon { display: grid; place-items: center; width: 36px; height: 36px; border-radius: var(--radius-sm); background: var(--teal-soft); color: var(--teal-text); }
 .bk-addon-option strong, .bk-addon-option small { display: block; }
 .bk-addon-option strong { font-size: .82rem; }
 .bk-addon-option small { margin-top: 2px; color: var(--text-muted); font-size: .72rem; line-height: 1.4; }
@@ -586,7 +585,7 @@
   .public-site .rooms-grid { grid-template-columns: 1fr; }
   .public-site .rooms-header-right { align-items: stretch; width: 100%; }
   .public-site .btn-view-all { justify-content: center; }
-  .public-site :is(.how-it-works, .why-book) h2,
+  .public-site .how-it-works h2,
   .public-site .rooms-header h2,
   .public-site .spaces-header h2,
   .public-site .about-left h2,

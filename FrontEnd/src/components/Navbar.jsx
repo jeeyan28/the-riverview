@@ -144,7 +144,7 @@ function Navbar({
         <div className="nav-buttons">
           <AnnouncementsBell variant="desktop" {...announcements} />
 
-          {(isHome || isRooms || isContact) && <ThemeToggle id="nav-theme-toggle" theme={theme} onToggle={onToggleTheme} />}
+          <ThemeToggle id="nav-theme-toggle" theme={theme} onToggle={onToggleTheme} />
 
           <Link
             to="/login"

@@ -10,8 +10,9 @@
   --header-scroll-bg: rgba(242, 247, 245, .94);
   --input-bg: #ffffff;
   --input-text: #17312d;
-  --border: rgba(18, 68, 60, .11);
-  --border-strong: rgba(18, 68, 60, .2);
+  --teal-text: #007361;
+  --border: rgba(18, 68, 60, .16);
+  --border-strong: rgba(18, 68, 60, .28);
   --shadow-depth: 0 10px 26px rgba(23, 49, 45, .09);
   --shadow-high: 0 24px 64px rgba(23, 49, 45, .16);
   --nav-bg: #f2f7f5;
@@ -20,6 +21,11 @@
   --nav-muted: #526a65;
   --nav-card: #e4efec;
   --nav-border: rgba(18, 68, 60, .13);
+}
+
+/* Light-mode cards need a visible edge where shadows are intentionally flat. */
+:root[data-theme="light"] .public-site :is(.room-card, .step-card, .about-card) {
+  box-shadow: var(--shadow-depth);
 }
 
 /* Compact customer notifications. */
@@ -310,7 +316,7 @@
 }
 
 .public-site .bk-modal-back:hover { color: var(--teal-strong); transform: translateX(-2px); }
-.public-site .bk-modal-back:focus-visible { outline: 2px solid var(--teal); outline-offset: 3px; border-radius: 6px; }
+.public-site .bk-modal-back:focus-visible { outline: 2px solid var(--teal-text); outline-offset: 3px; border-radius: 6px; }
 .public-site .bk-header-identity { display: flex; min-width: 0; align-items: center; gap: 12px; }
 .public-site .bk-header-identity > div:last-child { min-width: 0; }
 .public-site .bk-header h2 { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

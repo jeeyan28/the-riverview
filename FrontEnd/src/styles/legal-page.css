@@ -18,7 +18,7 @@
     margin-bottom:2rem;
 }
 .legal-back:hover{
-    color:var(--teal);
+    color:var(--teal-text);
 }
 
 .legal-header{

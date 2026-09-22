@@ -280,7 +280,7 @@
 .drp-root button:focus-visible,
 .pf-modal button:focus-visible,
 .uimodal-btn:focus-visible {
-  outline: 2px solid var(--teal, #00c9a7);
+  outline: 2px solid var(--teal-text, var(--teal));
   outline-offset: 3px;
 }
 

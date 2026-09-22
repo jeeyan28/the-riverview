@@ -2,7 +2,7 @@
 .drp-simple-title { display: inline-flex; min-height: 40px; align-items: center; gap: 7px; color: var(--muted, var(--text-muted-light)); font-size: .74rem; font-weight: 700; }
 .drp-quick { display: inline-flex; gap: 3px; padding: 3px; border: 1px solid var(--border); border-radius: 10px; background: var(--navy3, var(--surface)); }
 .drp-quick button { min-height: 34px; padding: 0 10px; border: 0; border-radius: 7px; background: transparent; color: var(--muted, var(--text-muted-light)); font-size: .72rem; font-weight: 650; white-space: nowrap; }
-.drp-quick button.active { background: var(--navy2, var(--surface-raised)); color: var(--teal); box-shadow: 0 2px 8px rgba(5,15,28,.08); }
+.drp-quick button.active { background: var(--navy2, var(--surface-raised)); color: var(--teal-text); box-shadow: 0 2px 8px rgba(5,15,28,.08); }
 .drp-fields { display: flex; min-width: 0; align-items: end; gap: 7px; }
 .drp-fields label { display: grid; gap: 3px; min-width: 0; color: var(--muted, var(--text-muted-light)); font-size: .64rem; font-weight: 700; }
 .drp-fields input { width: 148px; min-height: 40px !important; padding: 7px 9px !important; color-scheme: light; font-size: .75rem !important; }

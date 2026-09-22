@@ -55,7 +55,7 @@
     flex: 0 0 auto;
     border-radius: 50%;
     background: rgba(0,201,167,.12);
-    color: var(--teal);
+    color: var(--teal-text);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -84,13 +84,13 @@
     padding: .5rem 1.1rem;
     border-radius: 999px;
     border: 1px solid var(--border);
-    color: var(--teal);
+    color: var(--teal-text);
     font-weight: 600;
     font-size: .78rem;
     background: transparent;
     transition: background .2s, border-color .2s;
 }
-.contact-card-btn:hover { background: rgba(0,201,167,.08); border-color: var(--teal); }
+.contact-card-btn:hover { background: rgba(0,201,167,.08); border-color: var(--teal-text); }
 .contact-card-btn i { font-size: .72rem; }
 
 .contact-page .map-embed {

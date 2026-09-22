@@ -81,7 +81,7 @@
 .rp-room-card:focus-visible { outline: 2px solid var(--room-green); outline-offset: 3px; }
 .rp-room-facility {
     font-size: .68rem; font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
-    color: var(--teal);
+    color: var(--teal-text);
 }
 .rp-room-title-row { display: flex; justify-content: space-between; align-items: flex-start; gap: .5rem; }
 .rp-room-type { flex-shrink: 0; }
