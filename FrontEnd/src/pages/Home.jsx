@@ -199,6 +199,7 @@ function Home() {
   const [paymongoReturn, setPaymongoReturn] = useState(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const [helpOpen, setHelpOpen] = useState(false);
+  const [footerVisible, setFooterVisible] = useState(false);
   const location = useLocation();
   const hoursLabel = operatingHoursSummary(settings);
 
@@ -209,12 +210,24 @@ function Home() {
   }, [location.hash]);
 
   useEffect(() => {
+    const footer = document.querySelector('.public-site > footer');
+    if (!footer) return;
+    const observer = new IntersectionObserver(([entry]) => setFooterVisible(entry.isIntersecting));
+    observer.observe(footer);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
     const result = searchParams.get('paymongo');
     const paymentIntentId = searchParams.get('paymentIntentId');
     if (!result || !paymentIntentId) return;
 
     setPaymongoReturn({ result, paymentIntentId });
     setSearchParams({}, { replace: true });
+    if (window.opener && !window.opener.closed) {
+      window.opener.focus();
+      window.close();
+    }
   }, []);
 
   useEffect(() => {
@@ -488,7 +501,7 @@ function Home() {
         </div>
       </section>
 
-      <div className="help-widget">
+      <div className={`help-widget${footerVisible ? ' is-footer-visible' : ''}`}>
         {helpOpen && (
           <div className="help-panel" role="dialog" aria-label="Helpful Information">
             <div className="help-panel-header">

@@ -195,7 +195,7 @@ router.post("/intent/:paymentIntentId/attach", ensureAuthenticated, paymentAttac
         paymentIntentId,
         paymentMethodId: methodId,
         clientKey: intent.data.attributes.client_key,
-        returnUrl: `${base}/index.html?paymongo=success&paymentIntentId=${paymentIntentId}`,
+        returnUrl: `${base.replace(/\/$/, "")}/?paymongo=success&paymentIntentId=${paymentIntentId}`,
       });
     } catch (e) {
       const failure = classifyPaymongoPaymentFailure(e.paymongoErrors || e.message);

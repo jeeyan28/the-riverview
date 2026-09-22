@@ -51,6 +51,13 @@ function getPaymentIntentFailure(intentAttrs) {
   const directFailure = classifyPaymongoPaymentFailure(intentAttrs.status);
   if (directFailure) return directFailure;
 
+  if (intentAttrs.status === "failed") {
+    return {
+      status: "failed",
+      message: "The payment could not be completed. No charge was made. Try another payment method.",
+    };
+  }
+
   if (intentAttrs.status !== "awaiting_payment_method" || !intentAttrs.last_payment_error) {
     return null;
   }

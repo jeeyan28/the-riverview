@@ -937,7 +937,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
 
   function stopPolling() {
     if (pollRef.current) {
-      clearInterval(pollRef.current);
+      clearTimeout(pollRef.current);
       pollRef.current = null;
     }
   }
@@ -955,7 +955,8 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
   }
 
   const POLL_INTERVAL_MS = 2000;
-  const POLL_MAX_ATTEMPTS = 90;
+  const POLL_FAST_ATTEMPTS = 90;
+  const POLL_MAX_ATTEMPTS = 192;
 
   function pollPaymentStatus(paymentIntentId, popup) {
     setStep('paymongoReturn');
@@ -964,7 +965,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
     let attempts = 0;
     let popupClosedChecks = 0;
     stopPolling();
-    pollRef.current = setInterval(async () => {
+    const checkStatus = async () => {
       attempts += 1;
       let paid = false;
       let paidBookingId = null;
@@ -993,13 +994,21 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
       if (slotUnavailableMsg) {
         stopPolling();
         if (popup && !popup.closed) popup.close();
+        window.focus();
         setPmReturn({ phase: 'paidSlotUnavailable', booking: null, message: slotUnavailableMsg });
         return;
       }
 
       if (paymentFailure) {
         stopPolling();
-        if (popup && !popup.closed) popup.close();
+        if (popup && !popup.closed) {
+          try {
+            popup.location.replace(`${window.location.origin}/?paymongo=${paymentFailure.phase}&paymentIntentId=${encodeURIComponent(paymentIntentId)}`);
+          } catch {
+            popup.close();
+          }
+        }
+        window.focus();
         setPmReturn({ ...paymentFailure, booking: null });
         return;
       }
@@ -1007,6 +1016,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
       if (paid) {
         stopPolling();
         if (popup && !popup.closed) popup.close();
+        window.focus();
         const booking = paidBookingId ? await fetchPaidBooking(paidBookingId) : null;
         setPmReturn({ phase: 'confirmed', booking });
         return;
@@ -1026,9 +1036,20 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
 
       if (attempts >= POLL_MAX_ATTEMPTS) {
         stopPolling();
+        if (popup && !popup.closed) {
+          try {
+            popup.location.replace(`${window.location.origin}/?paymongo=pending&paymentIntentId=${encodeURIComponent(paymentIntentId)}`);
+          } catch {
+            popup.close();
+          }
+        }
+        window.focus();
         setPmReturn({ phase: 'pending', booking: null });
+      } else {
+        pollRef.current = setTimeout(checkStatus, attempts < POLL_FAST_ATTEMPTS ? POLL_INTERVAL_MS : 10000);
       }
-    }, POLL_INTERVAL_MS);
+    };
+    pollRef.current = setTimeout(checkStatus, POLL_INTERVAL_MS);
   }
 
   function openPopupAndPoll(redirectUrl, paymentIntentId) {
