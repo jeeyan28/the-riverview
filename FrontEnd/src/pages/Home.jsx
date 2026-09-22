@@ -5,7 +5,7 @@ import {
   Zap, LayoutGrid, ShieldCheck,
   DoorOpen, CalendarDays, Wallet, FileText, MessageCircle,
   Timer, Hourglass, CheckCircle2,
-  HelpCircle, X, ArrowRight,
+  HelpCircle, X, ArrowLeft, ArrowRight,
 } from 'lucide-react';
 import { useSiteSettings } from '../hooks/useSiteSettings';
 import { useToast } from '../hooks/useToast';
@@ -14,12 +14,12 @@ import { operatingHoursSummary } from '../utils/operatingHours';
 import BookingModal from '../components/BookingModal';
 import FacilityBookingCard from '../components/FacilityBookingCard';
 import FacilityCardSkeleton from '../components/FacilityCardSkeleton';
-import FacilityMotionVisual from '../components/FacilityMotionVisual';
 import Toast from '../components/Toast';
 import { API_BASE_URL } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { buildLoginPath } from '../utils/auth';
 import '../styles/home-refinement.css';
+import '../styles/our-spaces.css';
 
 import heroImg4 from '../assets/pictures/RiverView_4.jpg';
 import heroImg5 from '../assets/pictures/RiverView_5.jpg';
@@ -27,6 +27,12 @@ import heroImg6 from '../assets/pictures/RiverView_6.jpg';
 import heroImg7 from '../assets/pictures/RiverView_7.jpg';
 import heroImg8 from '../assets/pictures/RiverView_8.jpg';
 import heroBgImg from '../assets/images/main.png';
+import billiardsSpaceImg from '../assets/images/about-billiards.png';
+import courtSpaceImg from '../assets/images/about-court.png';
+import ktvSpaceImg from '../assets/images/about-ktv.png';
+import billiardsDetailImg from '../assets/pictures/Billiard.jpg';
+import courtDetailImg from '../assets/images/court.png';
+import ktvDetailImg from '../assets/pictures/RiverView_6.jpg';
 
 const HERO_CAROUSEL_INTERVAL_MS = 4000;
 
@@ -56,19 +62,31 @@ const SPACE_ITEMS = [
   {
     type: 'billiards',
     title: 'Billiards Room',
-    label: 'Billiards',
+    navLabel: 'Billiards',
+    image: billiardsSpaceImg,
+    imageAlt: 'Billiards tables at The Riverview',
+    detailImage: billiardsDetailImg,
+    detailImageAlt: 'Friends playing billiards at The Riverview',
     description: 'Multiple tables, great lighting, and a chill atmosphere. Perfect for a quick session or a long evening with friends.',
   },
   {
     type: 'court',
     title: 'Basketball Court',
-    label: 'Court',
+    navLabel: 'Court',
+    image: courtSpaceImg,
+    imageAlt: 'The basketball court at The Riverview',
+    detailImage: courtDetailImg,
+    detailImageAlt: 'Basketball players on the court',
     description: 'Full-size court with proper flooring. Includes scoreboard, timer, and sound system for official games.',
   },
   {
     type: 'ktv',
     title: 'KTV Room',
-    label: 'KTV',
+    navLabel: 'KTV',
+    image: ktvSpaceImg,
+    imageAlt: 'A KTV room at The Riverview',
+    detailImage: ktvDetailImg,
+    detailImageAlt: 'Guests enjoying a KTV room',
     description: 'Private rooms with updated song libraries. Bring your barkada, bring your voice. No judgment here.',
   },
 ];
@@ -200,8 +218,36 @@ function Home() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [helpOpen, setHelpOpen] = useState(false);
   const [footerVisible, setFooterVisible] = useState(false);
+  const [activeSpaceIndex, setActiveSpaceIndex] = useState(0);
+  const spaceTouchStart = useRef(null);
   const location = useLocation();
   const hoursLabel = operatingHoursSummary(settings);
+  const activeSpace = SPACE_ITEMS[activeSpaceIndex];
+  const activeManagedRoom = rooms?.find((room) => matchesSpace(room, activeSpace.type));
+  const activeSpaceHref = activeManagedRoom?._id ? `/rooms/${encodeURIComponent(activeManagedRoom._id)}` : '/rooms';
+  const previousSpace = SPACE_ITEMS[(activeSpaceIndex - 1 + SPACE_ITEMS.length) % SPACE_ITEMS.length];
+  const nextSpace = SPACE_ITEMS[(activeSpaceIndex + 1) % SPACE_ITEMS.length];
+
+  function showSpace(direction) {
+    setActiveSpaceIndex((current) => (current + direction + SPACE_ITEMS.length) % SPACE_ITEMS.length);
+  }
+
+  function handleSpaceTouchStart(event) {
+    const touch = event.touches[0];
+    spaceTouchStart.current = { x: touch.clientX, y: touch.clientY };
+  }
+
+  function handleSpaceTouchEnd(event) {
+    const start = spaceTouchStart.current;
+    spaceTouchStart.current = null;
+    if (!start) return;
+    const touch = event.changedTouches[0];
+    const horizontalDistance = touch.clientX - start.x;
+    const verticalDistance = touch.clientY - start.y;
+    if (Math.abs(horizontalDistance) > 50 && Math.abs(horizontalDistance) > Math.abs(verticalDistance)) {
+      showSpace(horizontalDistance < 0 ? 1 : -1);
+    }
+  }
 
   useEffect(() => {
     if (!location.hash) return;
@@ -438,32 +484,46 @@ function Home() {
         </div>
       </section>
 
-      <section className="spaces-showcase">
+      <section className="spaces-showcase" aria-labelledby="spaces-heading">
         <div className="spaces">
           <div className="spaces-header reveal">
-            <div className="section-label">Our Spaces</div>
-            <h2>Three ways to spend your time.</h2>
-            <p>Bookable services stay focused on the spaces the venue manages: billiards, the basketball court, and KTV.</p>
+            <h2 id="spaces-heading">Our spaces</h2>
+            <p>Billiards, basketball, or KTV. Find the space for your plans.</p>
           </div>
 
-          <div className="spaces-rows reveal-stagger">
-            {SPACE_ITEMS.map((space, index) => {
-              const managedRoom = rooms?.find((room) => matchesSpace(room, space.type));
-              const detailsHref = managedRoom?._id ? `/rooms/${encodeURIComponent(managedRoom._id)}` : '/rooms';
-              return (
-                <div className={`space-row${index % 2 === 1 ? ' space-row-reverse' : ''}`} key={space.type}>
-                  <div className="space-text">
-                    <h3>{space.title}</h3>
-                    <p>{space.description}</p>
-                    <Link to={detailsHref} className="space-details-link">
-                      {managedRoom ? 'View rooms and rates' : 'Browse facilities'}
-                      <ArrowRight size={17} aria-hidden="true" />
-                    </Link>
-                  </div>
-                  <FacilityMotionVisual type={space.type} label={space.label} />
+          <div className="space-carousel" onTouchStart={handleSpaceTouchStart} onTouchEnd={handleSpaceTouchEnd}>
+            <article className="space-carousel-slide" key={activeSpace.type}>
+              <div className="space-carousel-title">
+                <h3>{activeSpace.title}</h3>
+              </div>
+              <div className="space-carousel-media">
+                <div className="space-carousel-main-image">
+                  <img src={activeSpace.image} alt={activeSpace.imageAlt} loading="lazy" decoding="async" />
                 </div>
-              );
-            })}
+                <div className="space-carousel-detail-image">
+                  <img src={activeSpace.detailImage} alt={activeSpace.detailImageAlt} loading="lazy" decoding="async" />
+                </div>
+              </div>
+              <div className="space-carousel-copy">
+                <p>{activeSpace.description}</p>
+                <Link to={activeSpaceHref} className="space-carousel-link">
+                  <span className="space-carousel-link-icon"><ArrowRight size={16} aria-hidden="true" /></span>
+                  {activeManagedRoom ? 'View rooms and rates' : 'Browse facilities'}
+                </Link>
+              </div>
+            </article>
+            <nav className="space-carousel-controls" aria-label="Browse spaces">
+              <button type="button" onClick={() => showSpace(-1)} aria-label={`Show ${previousSpace.title}`}>
+                <ArrowLeft size={18} aria-hidden="true" />
+                <span>{previousSpace.navLabel}</span>
+              </button>
+              <span className="space-carousel-count" aria-hidden="true">{activeSpaceIndex + 1} / {SPACE_ITEMS.length}</span>
+              <span className="visually-hidden" aria-live="polite">Showing {activeSpace.title}</span>
+              <button type="button" onClick={() => showSpace(1)} aria-label={`Show ${nextSpace.title}`}>
+                <span>{nextSpace.navLabel}</span>
+                <ArrowRight size={18} aria-hidden="true" />
+              </button>
+            </nav>
           </div>
         </div>
       </section>

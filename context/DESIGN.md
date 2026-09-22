@@ -12,6 +12,7 @@ Source of truth for visual and interaction design. This documents the system tha
 | `--text-main` | `#F1F3F7` | `#17312D` | Primary text |
 | `--text-muted-light` | `#9aa4b8` | `#58706B` | Secondary text |
 | `--teal` | `#00C9A7` | `#00C9A7` | Primary accent / CTA / brand color |
+| `--space-panel` | `#315d4c` | `#315d4c` | Deep-green “Our Spaces” feature panel in both themes |
 | `--warning` | `#e0a13a` | `#e0a13a` | Warnings, alerts |
 | `--border` | `rgba(255,255,255,.12)` | `rgba(10,22,40,.1)` | Dividers, outlines |
 
@@ -144,7 +145,7 @@ The `motion` (Motion/Framer Motion) library is the standard for anything beyond 
 - At phone and tablet widths up to 900px, the customer shell keeps Home, Reserve, Contact, and Account in a bottom tab bar that accounts for device safe areas. The full-screen menu carries secondary navigation and preferences, and temporarily disables the tab bar while open.
 - Facility cards provide separate **Details** and **Reserve** actions. Details open the dedicated `/rooms/:roomId` page, where customers can compare every type/variant, capacity, exact hourly rate, amenities, status, and available-unit count before checkout. Reserving a listed room type carries that choice into the booking flow.
 - On phones, facility cards become compact image-and-content rows. They show only the two most useful amenities; the Details action opens the dedicated facility page with every room type and its complete information.
-- “Our Spaces” uses circular dimensional CSS miniatures for billiards, court, and KTV. Each scene shows recognizable equipment, surface depth, materials, and shadows. A slow shallow camera orbit runs at rest; holding and dragging turns the model through a full 360 degrees, then a spring returns it to the front on release. Arrow keys provide the same interaction, while reduced-motion users receive a static scene.
+- “Our Spaces” shows one featured facility at a time in a deep-green panel: its name, two circular facility photos, description, and a direct link to its managed room and rates. Previous and next controls name the adjacent facilities, and horizontal touch swipes change the feature on phones. The panel retains white text and controls in both site themes.
 - The reserve-online explanation is a compact full-width editorial section with a short benefit list and one route to live facilities. Avoid placing a small card grid inside an oversized floating slab.
 - Route, session, and post-login waits use the same compact Riverview billiards loader. The mobile version avoids costly blur effects, fits dynamic viewport and safe-area bounds, and keeps its motion transform-only. The public shell renders while its session check runs; authentication redirects as soon as the account handoff is ready and never holds the user behind a fake percentage sequence.
 - Profile, reservation details, booking, reschedule, cancellation, and authentication dialogs use the shared modal behavior: labelled dialog, focus containment, Escape/close affordance, internal scrolling, and stacked full-width actions on phones.
