@@ -110,6 +110,11 @@
     bottom: calc(var(--app-nav-height) + var(--space-8, 32px) + env(safe-area-inset-bottom));
   }
 
+  .public-site .help-widget.is-footer-visible {
+    visibility: hidden;
+    pointer-events: none;
+  }
+
   .public-site .toast {
     bottom: calc(var(--app-nav-height) + var(--space-8, 32px) + env(safe-area-inset-bottom));
   }

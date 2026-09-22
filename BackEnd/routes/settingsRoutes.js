@@ -1,7 +1,8 @@
 const express = require("express");
 const router = express.Router();
 const Settings = require("../model/settings");
-const { requirePermission } = require("../middleware/adminAuth");
+const User = require("../model/user");
+const { ensureAuthenticated, requirePermission } = require("../middleware/adminAuth");
 const { PERMISSIONS } = require("../utils/permissions");
 const { paymentMethodQrUpload } = require("../middleware/upload");
 const { logAudit } = require("../utils/auditLog");
@@ -34,6 +35,31 @@ router.get("/", async (req, res) => {
         .filter(pm => pm.isActive)
         .map(pm => ({ _id: pm._id, name: pm.name, qrImage: pm.qrImage })),
     });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error." });
+  }
+});
+
+router.get("/announcements/read", ensureAuthenticated, async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id).select("+readAnnouncementIds");
+    if (!user) return res.status(401).json({ message: "Session expired." });
+    res.json({ ids: user.readAnnouncementIds.map(String) });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error." });
+  }
+});
+
+router.post("/announcements/:id/read", ensureAuthenticated, validate(settingsItemIdParamsSchema, "params"), validate(emptyBodySchema), async (req, res) => {
+  try {
+    const settings = await Settings.getSingleton();
+    if (!settings.announcements.id(req.params.id)) {
+      return res.status(404).json({ message: "Announcement not found." });
+    }
+    await User.updateOne({ _id: req.user._id }, { $addToSet: { readAnnouncementIds: req.params.id } });
+    res.json({ id: req.params.id });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Server error." });

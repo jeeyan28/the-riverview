@@ -1,11 +1,10 @@
-import { ArrowUpRight, CalendarCheck, Clock3, MapPin, MessageCircle } from 'lucide-react';
+import { ArrowUpRight, CalendarCheck, Mail, MapPin, MessageCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { useSiteSettings } from '../hooks/useSiteSettings';
-import { operatingHoursSummary } from '../utils/operatingHours';
 import '../styles/contact-page.css';
 
 const FACEBOOK_URL = 'https://www.facebook.com/profile.php?id=61550783505442';
 const MAPS_URL = 'https://maps.app.goo.gl/2VqEJXFJifUz2KF76';
+const CONTACT_EMAIL = 'theriverviewtest@gmail.com';
 
 function ContactCard({ icon: Icon, title, children, action }) {
   return (
@@ -21,9 +20,6 @@ function ContactCard({ icon: Icon, title, children, action }) {
 }
 
 function Contact() {
-  const { settings } = useSiteSettings();
-  const hoursLabel = operatingHoursSummary(settings);
-
   return (
     <section id="contact" className="contact-page" aria-labelledby="contact-title">
       <div className="contact-inner">
@@ -32,7 +28,7 @@ function Contact() {
           <h2 id="contact-title">Plan your visit or ask us directly.</h2>
           <p>
             Reserve online for a confirmed time slot. For event questions or help with an
-            existing reservation, message the official Facebook page.
+            existing reservation, message the official Facebook page or email us.
           </p>
         </div>
 
@@ -51,11 +47,11 @@ function Contact() {
             </ContactCard>
 
             <ContactCard
-              icon={Clock3}
-              title="Operating hours"
-              action={<Link className="contact-card-btn" to="/rooms">Check facilities</Link>}
+              icon={Mail}
+              title="Email contact"
+              action={<a className="contact-card-btn" href={`mailto:${CONTACT_EMAIL}`}>Send an email <ArrowUpRight size={14} aria-hidden="true" /></a>}
             >
-              {hoursLabel}. Admin-posted closures appear in the reservation calendar.
+              {CONTACT_EMAIL}
             </ContactCard>
 
             <ContactCard

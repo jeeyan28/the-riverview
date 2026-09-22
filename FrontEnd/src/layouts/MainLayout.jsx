@@ -20,7 +20,7 @@ import { CustomerAppNavigation } from '../components/MobileAppNavigation';
 function MainLayout() {
   const { initializing, user } = useAuth();
   const { settings } = useSiteSettings();
-  const announcements = useAnnouncements(settings.announcements);
+  const announcements = useAnnouncements(settings.announcements, initializing ? null : user?._id);
   const [theme, toggleTheme] = useTheme();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);

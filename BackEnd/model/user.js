@@ -42,6 +42,8 @@ const userSchema = new mongoose.Schema({
   pendingClaimEmail: { type: String, select: false },
   pendingClaimPasswordHash: { type: String, select: false },
 
+  readAnnouncementIds: { type: [mongoose.Schema.Types.ObjectId], default: [], select: false },
+
   createdAt: { type: Date, default: Date.now }
 });
 

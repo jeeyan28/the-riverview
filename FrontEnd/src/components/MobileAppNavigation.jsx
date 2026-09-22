@@ -33,7 +33,7 @@ function CustomerAppNavigation({ user, profileOpen = false, obscured = false, on
         <House size={20} aria-hidden="true" />
         <span>Home</span>
       </NavLink>
-      <NavLink to={user ? '/rooms' : buildLoginPath('/rooms')} className={({ isActive }) => `app-nav-item app-nav-item--primary${isActive ? ' active' : ''}`}>
+      <NavLink to={user ? '/rooms' : buildLoginPath('/rooms')} className={({ isActive }) => `app-nav-item${isActive ? ' active' : ''}`}>
         <DoorOpen size={20} aria-hidden="true" />
         <span>Reserve</span>
       </NavLink>

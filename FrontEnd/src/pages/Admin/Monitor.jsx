@@ -216,7 +216,7 @@ function Monitor() {
     if (mode === 'extend') {
       await roomSessionsService.extend(sessionId, { addedHours: totalHours });
     } else {
-      await roomSessionsService.create({ roomId, roomTarget, duration: totalHours, paymentMethod, paymentTiming, paidAmount, guestName, guestCount, hasCorkage, bookingId });
+      await roomSessionsService.create({ roomId, roomTarget: roomTarget || undefined, duration: totalHours, paymentMethod, paymentTiming, paidAmount, guestName, guestCount, hasCorkage, bookingId });
     }
 
     setModal(null);
