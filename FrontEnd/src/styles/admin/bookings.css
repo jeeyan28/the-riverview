@@ -65,6 +65,37 @@ button.bk-payment-pill{cursor:pointer;}
 #app .walkin-payment-grid .booking-charge-preview{min-height:72px;align-self:start;}
 #app .walkin-payment-grid .booking-form-help{margin-top:5px;}
 #app .walkin-actions{margin-top:0;padding-top:16px;border-top:1px solid var(--border);}
+#app .manual-payment-layout{display:grid;grid-template-columns:minmax(0,1.2fr) repeat(2,minmax(0,1fr));gap:14px;align-items:start;}
+#app .manual-payment-layout .mfield{min-width:0;margin:0;}
+#app .manual-payment-layout :is(input,select){width:100%;min-height:44px;}
+#app .manual-charge{display:flex;flex-direction:column;gap:5px;min-height:90px;padding:13px 16px;border:1px solid var(--border);border-radius:10px;background:var(--navy3);}
+#app .manual-charge span{font-size:.75rem;color:var(--muted);}
+#app .manual-charge strong{font-size:1.2rem;line-height:1.2;color:var(--text);font-variant-numeric:tabular-nums;}
+#app .manual-charge small{font-size:.71rem;line-height:1.4;color:var(--muted);}
+#app .manual-corkage{gap:12px;}
+#app .manual-corkage span{flex:1;min-width:0;}
+#app .manual-corkage b{flex:0 0 auto;font-size:.84rem;color:var(--text);font-variant-numeric:tabular-nums;}
+#app .manual-corkage:has(input:checked){border-color:var(--teal);background:var(--teal-soft);}
+#app .manual-notes{margin:14px 0 0;}
+#app .manual-notes textarea{display:block;width:100%;min-height:80px;padding:11px 12px;border:1px solid var(--border);border-radius:9px;background:var(--navy3);color:var(--text);font:inherit;resize:vertical;}
+
+#app .admin-slot-hint{margin:14px 0 0;padding:14px 16px;border:1px solid var(--border);border-radius:10px;background:var(--navy3);color:var(--muted);font-size:.8rem;line-height:1.5;}
+#app .admin-slot-hint--warning{color:var(--amber);}
+#app .admin-slot-retry{margin-left:8px;padding:0;border:0;background:none;color:var(--teal);font:inherit;font-weight:700;cursor:pointer;text-decoration:underline;}
+#app .admin-slot-picker{margin-top:14px;}
+#app .admin-slot-heading{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:10px;font-size:.79rem;}
+#app .admin-slot-heading strong{font-weight:700;color:var(--text);}
+#app .admin-slot-heading span{color:var(--muted);}
+#app .admin-slot-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;}
+#app .admin-slot{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:4px;min-width:0;min-height:64px;padding:10px 12px;border:1px solid var(--border);border-radius:9px;background:var(--navy2);color:var(--text);font:inherit;text-align:left;cursor:pointer;}
+#app .admin-slot strong{font-size:.82rem;font-weight:700;}
+#app .admin-slot span{font-size:.69rem;color:var(--muted);line-height:1.3;}
+#app .admin-slot:not(:disabled):hover{border-color:var(--teal);background:var(--teal-soft);}
+#app .admin-slot.is-selected{border-color:var(--teal);background:var(--teal-soft);}
+#app .admin-slot.is-selected span{color:var(--teal);}
+#app .admin-slot:disabled{opacity:.76;cursor:not-allowed;}
+#app .admin-slot-selection{margin:10px 0 0;font-size:.76rem;color:var(--teal);}
+#app .admin-slot-selection.is-unavailable{color:var(--red);}
 
 .bd-header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding-bottom:16px;border-bottom:1px solid var(--border);}
 .bd-body{display:flex;flex-direction:column;gap:14px;margin-top:16px;}
@@ -79,9 +110,16 @@ button.bk-payment-pill{cursor:pointer;}
 .bd-field p{font-size:.85rem;color:var(--text);font-weight:500;word-break:break-word;margin:0;}
 .bd-notes-label{font-size:.68rem;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);margin-bottom:6px;}
 .bd-notes-body{font-size:.84rem;color:var(--text);line-height:1.5;white-space:pre-wrap;margin:0;}
+.bd-financial-grid .bd-field:first-child{grid-column:1/-1;}
+.bd-financial-grid .bd-field:first-child p{font-size:1.05rem;font-weight:700;font-variant-numeric:tabular-nums;}
+.bd-spec-grid{grid-template-columns:repeat(3,minmax(0,1fr));}
+.bd-support-value{margin:0;font-size:.92rem;font-weight:700;color:var(--text);}
+.bd-support-caption{margin:5px 0 0;font-size:.76rem;line-height:1.45;color:var(--muted);}
 .bd-screenshot{max-width:220px;width:100%;border-radius:10px;border:1px solid var(--border);cursor:pointer;display:block;}
 .bd-screenshot-hint{font-size:.7rem;color:var(--muted);margin-top:8px;}
-.bd-footer{border-top:1px solid var(--border);padding-top:16px;margin-top:18px;}
+#app .bd-footer{display:flex;flex-wrap:wrap;justify-content:flex-start;gap:8px;border-top:1px solid var(--border);padding-top:16px;margin-top:18px;}
+#app .bd-footer>button{min-height:42px;}
+#app .bd-footer-close{margin-left:auto;}
 
 .bkcal-nav-btn{width:28px;height:28px;border-radius:8px;background:var(--navy3);border:1px solid var(--border);color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:.75rem;}
 .bkcal-nav-btn:hover{background:var(--navy4);}
@@ -105,6 +143,9 @@ button.bk-payment-pill{cursor:pointer;}
 
 @media (max-width:900px){
   .bk-search-wrap{max-width:none;width:100%;}
+  #app .manual-payment-layout{grid-template-columns:repeat(2,minmax(0,1fr));}
+  #app .manual-charge{grid-column:1/-1;}
+  #app .bd-spec-grid{grid-template-columns:repeat(2,minmax(0,1fr));}
 }
 @media (max-width:640px){
   .bk-filters{width:100%;}
@@ -116,4 +157,14 @@ button.bk-payment-pill{cursor:pointer;}
   #app .walkin-form-section{padding-top:14px;}
   #app .booking-form-grid.walkin-guest-grid,#app .booking-form-grid.walkin-time-grid,#app .booking-form-grid.walkin-facility-grid,#app .booking-form-grid.walkin-payment-grid{grid-template-columns:minmax(0,1fr);gap:12px;margin-top:0;}
   #app .walkin-payment-grid .booking-charge-preview{min-height:56px;}
+  #app .manual-payment-layout{grid-template-columns:minmax(0,1fr);gap:12px;}
+  #app .manual-charge{grid-column:auto;min-height:0;}
+  #app .manual-corkage{padding:12px;}
+  #app .manual-corkage b{font-size:.78rem;}
+  #app .admin-slot-heading{align-items:flex-start;flex-direction:column;}
+  #app .admin-slot-grid{grid-template-columns:repeat(2,minmax(0,1fr));}
+  #app .bd-row,#app .bd-spec-grid{grid-template-columns:minmax(0,1fr);}
+  #app .bd-footer{display:grid;grid-template-columns:minmax(0,1fr);}
+  #app .bd-footer>button{width:100%;min-width:0;}
+  #app .bd-footer-close{margin-left:0;}
 }

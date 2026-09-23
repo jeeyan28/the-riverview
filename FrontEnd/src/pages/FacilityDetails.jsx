@@ -188,8 +188,25 @@ function FacilityDetails() {
         </div>
       </header>
 
-      <div className="fd-content" id="room-types">
-        <section className="fd-room-section" aria-labelledby="fd-room-title">
+      <div className="fd-content">
+        <aside className="fd-booking-guide" aria-labelledby="fd-guide-title">
+          <div>
+            <Layers3 size={20} aria-hidden="true" />
+            <h2 id="fd-guide-title">Before you reserve</h2>
+          </div>
+          <ol>
+            <li><strong>Choose a room type</strong><span>Compare its capacity, units, amenities, and exact hourly rate.</span></li>
+            <li><strong>Pick 1–5 whole hours</strong><span>The calendar checks availability for your selected room type.</span></li>
+            <li><strong>Pay for 1 hour or in full</strong><span>Your remaining balance stays visible in your account and to staff.</span></li>
+          </ol>
+          <p><Clock3 size={16} aria-hidden="true" /> Operating times come from the venue schedule configured by staff.</p>
+          <p><CreditCard size={16} aria-hidden="true" /> Online confirmation requires the displayed payment.</p>
+          <ReservationAction user={user} roomId={room._id} className="fd-primary-button" onStart={startBooking}>
+            <CalendarCheck size={18} aria-hidden="true" /> Check availability
+          </ReservationAction>
+        </aside>
+
+        <section className="fd-room-section" id="room-types" aria-labelledby="fd-room-title">
           <div className="fd-section-heading">
             <h2 id="fd-room-title">Rooms, rates, and inclusions</h2>
             <p>Rates apply per whole hour. Select a room type to carry it into the reservation flow.</p>
@@ -249,22 +266,6 @@ function FacilityDetails() {
           </div>
         </section>
 
-        <aside className="fd-booking-guide" aria-labelledby="fd-guide-title">
-          <div>
-            <Layers3 size={20} aria-hidden="true" />
-            <h2 id="fd-guide-title">Before you reserve</h2>
-          </div>
-          <ol>
-            <li><strong>Choose a room type</strong><span>Compare its capacity, units, amenities, and exact hourly rate.</span></li>
-            <li><strong>Pick 1–5 whole hours</strong><span>The calendar checks availability for your selected room type.</span></li>
-            <li><strong>Complete the down payment</strong><span>Your remaining balance stays visible in your account and to staff.</span></li>
-          </ol>
-          <p><Clock3 size={16} aria-hidden="true" /> Operating times come from the venue schedule configured by staff.</p>
-          <p><CreditCard size={16} aria-hidden="true" /> Online confirmation requires the displayed down payment.</p>
-          <ReservationAction user={user} roomId={room._id} className="fd-primary-button" onStart={startBooking}>
-            <CalendarCheck size={18} aria-hidden="true" /> Check availability
-          </ReservationAction>
-        </aside>
       </div>
 
       <BookingModal

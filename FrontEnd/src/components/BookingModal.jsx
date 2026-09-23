@@ -23,7 +23,7 @@ import {
   getSlotState,
   getLatestStartTime,
   buildHourCounts,
-  getFreeHourCount,
+  getBookableStartCount,
   getTimePeriod,
 } from '../utils/rooms';
 import { CORKAGE_FEE, calculateBookingPrice, variantRateLabel } from '../utils/roomPricing';
@@ -33,6 +33,7 @@ import { ArrowLeft, X } from 'lucide-react';
 import ModalPortal from './ModalPortal';
 import Toast from './Toast';
 import { buildLoginPath, buildRoomReservationPath } from '../utils/auth';
+import { businessDate } from '../utils/businessDate';
 
 const PAYMONGO_API_BASE = import.meta.env.VITE_PAYMONGO_API_BASE || 'https://api.paymongo.com/v1';
 
@@ -436,7 +437,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
 
   const [step, setStep] = useState('price');
   const [mobileSummaryOpen, setMobileSummaryOpen] = useState(false);
-  const [viewDate, setViewDate] = useState(new Date());
+  const [viewDate, setViewDate] = useState(() => new Date(`${businessDate()}T12:00:00`));
   const [selectedDate, setSelectedDate] = useState(null);
   const [selectedVariant, setSelectedVariant] = useState(null);
   const [selectedHour, setSelectedHour] = useState(null);
@@ -521,7 +522,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
         : null;
     setStep(initialVariant ? 'schedule' : 'price');
     setMobileSummaryOpen(false);
-    setViewDate(new Date());
+    setViewDate(new Date(`${businessDate()}T12:00:00`));
     setSelectedDate(null);
     setSelectedVariant(initialVariant);
     setSelectedHour(null);
@@ -783,7 +784,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
 
   function handleChooseOption(opt) {
     setSelectedVariant(opt);
-    setViewDate(new Date());
+    setViewDate(new Date(`${businessDate()}T12:00:00`));
     setStep('schedule');
   }
 
@@ -805,7 +806,6 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
     setLockError('');
     setSelectedDate({ y, m, d });
     setSelectedHour(null);
-    setSelectedDuration(minDuration);
   }
 
   function handleChangeDate() {
@@ -1261,21 +1261,20 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
     const m = viewDate.getMonth();
     const firstDay = new Date(y, m, 1).getDay();
     const daysInMonth = new Date(y, m + 1, 0).getDate();
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const todayKey = businessDate();
 
     const days = [];
     for (let d = 1; d <= daysInMonth; d++) {
       const thisDate = new Date(y, m, d);
       const dStr = dateKey(y, m, d);
-      const isToday = thisDate.getTime() === today.getTime();
+      const isToday = dStr === todayKey;
       const holiday = isHolidayDate(dStr, settings?.holidays);
       const closedDay = !isOperatingDay(thisDate, settings?.operatingHours);
-      const past = thisDate < today;
+      const past = dStr < todayKey;
 
-      const freeHours = getFreeHourCount(monthBookings[dStr], openHour, closeHour, totalRooms);
-      const fullyBooked = freeHours === 0;
-      const nearlyFull = !fullyBooked && freeHours <= 2;
+      const availableStarts = getBookableStartCount(monthBookings[dStr], openHour, closeHour, totalRooms, selectedDuration, dStr);
+      const fullyBooked = availableStarts === 0;
+      const nearlyFull = !fullyBooked && availableStarts <= 2;
       const unavailable = holiday || closedDay;
       const blocked = unavailable || fullyBooked;
 
@@ -1287,10 +1286,10 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
           title = holiday ? 'Closed for a holiday/closure' : 'Closed on this day of the week';
         } else if (fullyBooked) {
           variant = 'full';
-          title = 'Fully booked for this room';
+          title = `No ${selectedDuration}-hour start times available for this room`;
         } else if (nearlyFull) {
           variant = 'few';
-          title = `Only ${freeHours} open hour${freeHours === 1 ? '' : 's'} left today`;
+          title = `Only ${availableStarts} start time${availableStarts === 1 ? '' : 's'} left for ${selectedDuration} hour${selectedDuration === 1 ? '' : 's'}`;
         } else {
           variant = 'available';
         }
@@ -1517,7 +1516,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
                     <div className="bk-legend">
                       <span><i className="bk-dot bk-dot--available"></i> Available</span>
                       <span><i className="bk-dot bk-dot--few"></i> Few slots</span>
-                      <span><i className="bk-dot bk-dot--full"></i> Fully booked</span>
+                      <span><i className="bk-dot bk-dot--full"></i> No times available</span>
                       <span><i className="bk-dot bk-dot--unavailable"></i> Unavailable</span>
                     </div>
                   </>
@@ -1576,17 +1575,12 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
                       </div>
                     ) : (
                       (() => {
-                        const now = new Date();
-                        const isToday =
-                          selectedDate.y === now.getFullYear() &&
-                          selectedDate.m === now.getMonth() &&
-                          selectedDate.d === now.getDate();
-                        const currentHour = now.getHours();
+                        const selectedKey = dateKey(selectedDate.y, selectedDate.m, selectedDate.d);
 
                         const groups = { Morning: [], Afternoon: [], Evening: [] };
                         let anyAvailable = false;
-                        for (let h = openHour; h < closeHour; h++) {
-                          if (isToday && h <= currentHour) continue;
+                        for (let h = openHour; h < Math.min(closeHour, 24); h++) {
+                          if (Date.parse(`${selectedKey}T${String(h).padStart(2, '0')}:00:00+08:00`) <= Date.now()) continue;
 
                           const state = getSlotState(h, selectedDuration, closeHour, reserved, totalRooms);
                           const fits = state === 'available';
@@ -1641,13 +1635,14 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
                             {!anyAvailable && (
                               <div className="bk-no-slots-msg">
                                 <i className="fa-solid fa-circle-exclamation"></i>
-                                No {selectedDuration}-hour slots are available on {selectedDateLabel}. Try a shorter duration or{' '}
+                                No {selectedDuration}-hour slots are available on {selectedDateLabel}.{' '}
+                                {selectedDuration > minDuration ? 'Try a shorter duration or ' : 'Please '}
                                 <button type="button" className="bk-no-slots-change-date" onClick={handleChangeDate}>
                                   pick another date
                                 </button>.
                               </div>
                             )}
-                            {Object.entries(groups).map(([period, slots]) => (
+                            {anyAvailable && Object.entries(groups).map(([period, slots]) => (
                               slots.length > 0 && (
                                 <div className="bk-slot-group" key={period}>
                                   <span className="bk-slot-group-label">{period}</span>

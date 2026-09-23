@@ -5,6 +5,7 @@ import { Chart } from 'chart.js/auto';
 import RevenueFilters from '../../components/RevenueFilters';
 import RevenueSummary from '../../components/RevenueSummary';
 import { useRevenueReport } from '../../hooks/useRevenueReport';
+import { businessDate } from '../../utils/businessDate';
 import { formatPeso } from '../../utils/currency';
 
 function displayDate(value) {
@@ -14,8 +15,8 @@ function displayDate(value) {
 }
 
 function Analytics() {
-  const [from, setFrom] = useState('');
-  const [to, setTo] = useState('');
+  const [from, setFrom] = useState(() => businessDate());
+  const [to, setTo] = useState(() => businessDate());
   const [source, setSource] = useState('all');
   const [printRequested, setPrintRequested] = useState(false);
   const { data, loading, error, reload } = useRevenueReport(from, to, source);

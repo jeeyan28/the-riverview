@@ -61,8 +61,8 @@ async function sendOtpEmail(user, otp, purpose = "reset") {
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>${copy.heading}</title>
   </head>
-  <body style="margin:0; padding:0; background-color:#0A1628; font-family:Helvetica, Arial, sans-serif;">
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#0A1628; padding:40px 16px;">
+  <body style="margin:0; padding:0; background-color:#ffffff; font-family:Helvetica, Arial, sans-serif;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#ffffff; padding:40px 16px;">
       <tr>
         <td align="center">
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px; background-color:#0f1e35; border-radius:14px; overflow:hidden; border:1px solid rgba(255,255,255,0.08);">
@@ -159,8 +159,8 @@ async function sendReceiptEmail(booking) {
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Booking Receipt</title>
   </head>
-  <body style="margin:0; padding:0; background-color:#0A1628; font-family:Helvetica, Arial, sans-serif;">
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#0A1628; padding:40px 16px;">
+  <body style="margin:0; padding:0; background-color:#ffffff; font-family:Helvetica, Arial, sans-serif;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#ffffff; padding:40px 16px;">
       <tr>
         <td align="center">
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px; background-color:#0f1e35; border-radius:14px; overflow:hidden; border:1px solid rgba(255,255,255,0.08);">

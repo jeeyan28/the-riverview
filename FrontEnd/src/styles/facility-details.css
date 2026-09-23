@@ -196,12 +196,14 @@
 
 .public-site .fd-content {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 320px;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-8);
   width: min(calc(100% - var(--page-gutter) - var(--page-gutter)), var(--content-max));
   padding-block: calc(var(--space-10) + var(--space-6));
   scroll-margin-top: calc(var(--header-h) + var(--guest-banner-h) + var(--space-4));
 }
+
+.public-site .fd-room-section { scroll-margin-top: calc(var(--header-h) + var(--guest-banner-h) + var(--space-4)); }
 
 .public-site .fd-section-heading {
   max-width: 680px;
@@ -370,9 +372,9 @@
 }
 
 .public-site .fd-booking-guide {
-  position: sticky;
-  top: calc(var(--header-h) + var(--guest-banner-h) + var(--space-4));
-  align-self: start;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 var(--space-6);
   padding: var(--space-6);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
@@ -381,6 +383,7 @@
 
 .public-site .fd-booking-guide > div {
   display: flex;
+  grid-column: 1 / -1;
   align-items: center;
   gap: var(--space-3);
 }
@@ -398,6 +401,8 @@
 
 .public-site .fd-booking-guide ol {
   display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--space-4);
   margin: var(--space-5) 0;
   padding: 0;
@@ -459,7 +464,8 @@
 }
 
 .public-site .fd-booking-guide .fd-primary-button {
-  width: 100%;
+  grid-column: 1 / -1;
+  width: fit-content;
   margin-top: var(--space-4);
 }
 
@@ -493,9 +499,7 @@
     padding-block: var(--space-10);
   }
 
-  .public-site .fd-booking-guide {
-    position: static;
-  }
+  .public-site .fd-booking-guide ol { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 640px) {
@@ -550,8 +554,11 @@
   }
 
   .public-site .fd-booking-guide {
+    grid-template-columns: 1fr;
     padding: var(--space-5);
   }
+
+  .public-site .fd-booking-guide .fd-primary-button { width: 100%; }
 
   .public-site .fd-page--state {
     padding: calc(var(--header-h) + var(--guest-banner-h) + var(--space-5)) var(--space-4) var(--space-8);

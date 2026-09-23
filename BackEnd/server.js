@@ -7,6 +7,7 @@ const cors = require("cors");
 const path = require("path");
 const helmet = require("helmet");
 const session = require("express-session");
+const { STAFF_SESSION_MS, CUSTOMER_SESSION_MS } = require("./utils/sessionPolicy");
 const { MongoStore } = require("connect-mongo");
 require("dotenv").config({ path: path.join(__dirname, ".env") });
 
@@ -84,12 +85,13 @@ app.use(session({
   secret: process.env.SESSION_SECRET,
   resave: false,
   saveUninitialized: false,
+  rolling: true,
   name: "connect.sid",
 
   store: MongoStore.create({
     mongoUrl: process.env.MONGO_URI,
     collectionName: "sessions",
-    ttl: 60 * 60 * 8,
+    ttl: CUSTOMER_SESSION_MS / 1000,
     autoRemove: "native",
   }).on("error", (err) => {
     console.error("Session store error:", err);
@@ -99,7 +101,7 @@ app.use(session({
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
-    maxAge: 1000 * 60 * 60 * 8,
+    maxAge: STAFF_SESSION_MS,
   },
 }));
 

@@ -218,6 +218,17 @@ export function getFreeHourCount(dayBookings, openHour, closeHour, totalRooms) {
   return count;
 }
 
+export function getBookableStartCount(dayBookings, openHour, closeHour, totalRooms, duration, dateStr, nowMs = Date.now()) {
+  const reserved = buildHourCounts(dayBookings);
+  let count = 0;
+  for (let hour = openHour; hour < Math.min(closeHour, 24); hour++) {
+    const start = dateStr ? Date.parse(`${dateStr}T${String(hour).padStart(2, '0')}:00:00+08:00`) : null;
+    if (dateStr && (!Number.isFinite(start) || start <= nowMs)) continue;
+    if (getSlotState(hour, duration, closeHour, reserved, totalRooms) === 'available') count++;
+  }
+  return count;
+}
+
 export function getTimePeriod(hour) {
   if (hour < 12) return 'Morning';
   if (hour < 17) return 'Afternoon';

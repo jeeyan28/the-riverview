@@ -21,6 +21,7 @@ const {
 const { exchangeGoogleAuthCode } = require("../utils/googleVerify");
 const { normalizeName, validateName } = require("../utils/nameValidation");
 const { isAdminRole, getEffectivePermissions, roleLabel } = require("../utils/permissions");
+const { setAuthenticatedSession } = require("../utils/sessionPolicy");
 const { isPasswordStrongEnough, PASSWORD_POLICY_MESSAGE } = require("../utils/passwordPolicy");
 const { GUEST_EMAIL_DOMAIN, EMAIL_RE } = require("../utils/constants");
 const { validate } = require("../middleware/validate");
@@ -433,8 +434,7 @@ router.post("/guest", guestCreationLimiter, validate(guestSchema), async (req, r
 
     await regenerateSession(req);
 
-    req.session.userId = user._id.toString();
-    req.session.role = user.role;
+    setAuthenticatedSession(req, user);
     await saveSession(req);
 
     res.status(201).json({ message: "Guest session started.", user: sanitizeUser(user) });
@@ -484,8 +484,7 @@ router.post("/guest-recovery-login", guestRecoveryLoginLimiter, validate(guestRe
 
     await regenerateSession(req);
 
-    req.session.userId = user._id.toString();
-    req.session.role = user.role;
+    setAuthenticatedSession(req, user);
     await saveSession(req);
 
     res.json({ message: "Welcome back! Your account has been restored.", user: sanitizeUser(user) });
@@ -757,8 +756,7 @@ async function handlePasswordLogin(req, res) {
 
     await regenerateSession(req);
 
-    req.session.userId = user._id.toString();
-    req.session.role = user.role;
+    setAuthenticatedSession(req, user);
     await saveSession(req);
 
     res.json({ message: "Login successful.", user: sanitizeUser(user) });
@@ -813,8 +811,7 @@ router.post("/google", validate(googleCodeSchema), async (req, res) => {
 
     await regenerateSession(req);
 
-    req.session.userId = user._id.toString();
-    req.session.role = user.role;
+    setAuthenticatedSession(req, user);
     await saveSession(req);
 
     res.json({ message: "Login successful.", user: sanitizeUser(user) });

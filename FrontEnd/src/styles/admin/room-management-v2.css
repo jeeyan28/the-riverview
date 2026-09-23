@@ -961,7 +961,7 @@
 }
 
 #app #panel-room-management .facility-room-type-list {
-  margin-top: auto;
+  margin-top: 0;
   overflow: hidden;
   border: 1px solid var(--border-soft);
   border-radius: 12px;
