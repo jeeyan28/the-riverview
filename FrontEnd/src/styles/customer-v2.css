@@ -349,6 +349,7 @@
 .public-site .footer-col a { color: #c5ceda; }
 .public-site .footer-col a { align-items: center; gap: var(--space-2); }
 .public-site .footer-col a:hover { color: var(--teal-text); }
+.public-site .footer-facebook-icon { width: 16px; color: var(--teal-text); font-size: 18px; text-align: center; }
 .public-site .footer-cta {
   display: flex;
   flex-direction: column;

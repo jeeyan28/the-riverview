@@ -1,4 +1,4 @@
-import { ArrowUp, ArrowUpRight, Clock3, Facebook, MapPin } from 'lucide-react';
+import { ArrowUp, ArrowUpRight, Clock3, MapPin } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { operatingHoursSummary } from '../utils/operatingHours';
 
@@ -49,7 +49,7 @@ function Footer({ settings }) {
               <MapPin size={15} aria-hidden="true" /> Get directions <ArrowUpRight size={14} aria-hidden="true" />
             </a>
             <a href={FACEBOOK_URL} target="_blank" rel="noreferrer">
-              <Facebook size={15} aria-hidden="true" /> Facebook support <ArrowUpRight size={14} aria-hidden="true" />
+              <i className="fa-brands fa-facebook footer-facebook-icon" aria-hidden="true" /> Facebook support <ArrowUpRight size={14} aria-hidden="true" />
             </a>
           </div>
         </div>
