@@ -325,34 +325,36 @@
   touch-action: manipulation;
 }
 
-/* Embedded social browsers cannot complete Google's secure OAuth page. */
-:is(.login-page, .claim-modal-scope) .embedded-browser-notice {
+/* Show browser handoff help only after an embedded browser user requests Google sign-in. */
+:is(.login-page, .claim-modal-scope) .google-browser-handoff {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   gap: 10px;
   padding: 11px 12px;
-  border: 1px solid rgba(239, 159, 39, .32);
+  border: 1px solid var(--border);
   border-radius: 12px;
-  background: rgba(239, 159, 39, .1);
+  background: var(--surface);
   color: var(--text);
 }
 
-:is(.login-page, .claim-modal-scope) .embedded-browser-notice > svg { margin-top: 2px; color: #ef9f27; }
-:is(.login-page, .claim-modal-scope) .embedded-browser-notice strong { display: block; font-size: .8rem; line-height: 1.35; }
-:is(.login-page, .claim-modal-scope) .embedded-browser-notice p { margin: 3px 0 8px; color: var(--muted); font-size: .72rem; line-height: 1.45; }
-:is(.login-page, .claim-modal-scope) .embedded-browser-notice button {
+:is(.login-page, .claim-modal-scope) .google-browser-handoff > svg { margin-top: 2px; color: var(--teal); }
+:is(.login-page, .claim-modal-scope) .google-browser-handoff strong { display: block; font-size: .8rem; line-height: 1.35; }
+:is(.login-page, .claim-modal-scope) .google-browser-handoff p { margin: 3px 0 8px; color: var(--muted); font-size: .72rem; line-height: 1.45; }
+:is(.login-page, .claim-modal-scope) .google-browser-handoff :is(button, a) {
   display: inline-flex;
   min-height: 34px;
   align-items: center;
   gap: 6px;
   padding: 6px 9px;
-  border: 1px solid rgba(239, 159, 39, .34);
+  border: 1px solid var(--border);
   border-radius: 8px;
-  background: rgba(239, 159, 39, .08);
+  background: var(--surface);
   color: var(--text);
   font-size: .7rem;
   font-weight: 700;
+  text-decoration: none;
 }
+:is(.login-page, .claim-modal-scope) .google-browser-handoff a { margin-right: 8px; }
 
 /* Admin links give immediate directional feedback on pointer devices. */
 @media (hover: hover) and (pointer: fine) {

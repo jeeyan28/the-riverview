@@ -1052,8 +1052,16 @@
     line-height: 1.5;
 }
 
-:is(.login-page, .claim-modal-scope) .rf-scope .terms-label a { color: var(--teal); font-weight: 600; }
-:is(.login-page, .claim-modal-scope) .rf-scope .terms-label a:hover { text-decoration: underline; }
+:is(.login-page, .claim-modal-scope) .rf-scope .terms-label button {
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--teal);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+}
+:is(.login-page, .claim-modal-scope) .rf-scope .terms-label button:hover { text-decoration: underline; }
 :is(.login-page, .claim-modal-scope) .rf-scope .divider {
     display: flex;
     align-items: center;

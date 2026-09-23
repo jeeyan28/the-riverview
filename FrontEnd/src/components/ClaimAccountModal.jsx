@@ -109,9 +109,14 @@ function ClaimAccountModal({ open, onClose }) {
     }
   }
 
-  const { triggerSignIn } = useGoogleAuth(handleGoogleCredential);
+  const { triggerSignIn, embeddedBrowser } = useGoogleAuth(handleGoogleCredential);
 
   function handleGoogleClick() {
+    if (embeddedBrowser) {
+      setTab('email');
+      showToast('Use email to save this guest account in this app. Your guest session stays here.', 'error');
+      return;
+    }
     const ok = triggerSignIn();
     if (!ok) {
       showToast('Google sign-in is still loading — try again in a second.', 'error');

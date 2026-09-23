@@ -51,15 +51,13 @@
 #app .rm-payment-detail.partial { color: var(--amber); }
 #app .rm-payment-detail.unpaid { color: var(--red); font-weight: 700; }
 
-#app .session-hour-picker { display: grid; grid-template-columns: repeat(5,minmax(56px,1fr)) minmax(144px,1.8fr); gap: 8px; }
+#app .session-hour-picker { display: grid; grid-template-columns: repeat(5,minmax(0,1fr)); gap: 8px; }
 #app .session-hour-option { display: grid; min-height: 52px; place-items: center; align-content: center; border: 1px solid var(--border); border-radius: 10px; background: var(--navy3); color: var(--text); font-size: .95rem; font-weight: 750; }
 #app .session-hour-option small { color: var(--muted); font-size: .6rem; font-weight: 600; }
 #app .session-hour-option.active { border-color: var(--teal); background: var(--teal-soft); color: var(--teal); }
-#app .session-hour-custom { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 8px; min-height: 52px; padding: 4px 8px 4px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--navy3); color: var(--muted); font-size: .68rem; font-weight: 700; }
-#app .session-hour-custom.active { border-color: var(--teal); background: var(--teal-soft); color: var(--teal); }
-#app .session-hour-custom-control { display: flex; align-items: center; gap: 4px; }
-#app .session-hour-custom-control input { width: 64px; min-height: 40px; padding: 4px 8px; text-align: center; }
-#app .session-hour-custom-control small { color: var(--muted); font-size: .62rem; }
+#app .session-fixed-length { display: flex; align-items: baseline; gap: 10px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--navy3); }
+#app .session-fixed-length strong { color: var(--text); font-size: .95rem; }
+#app .session-fixed-length small { color: var(--muted); font-size: .7rem; }
 #app .session-payment-ledger { display: grid; grid-template-columns: repeat(3,1fr); gap: 1px; overflow: hidden; margin-bottom: 14px; border: 1px solid var(--border); border-radius: 11px; background: var(--border); }
 #app .session-payment-ledger > div { display: grid; gap: 3px; padding: 12px; background: var(--navy3); }
 #app .session-payment-ledger span { color: var(--muted); font-size: .65rem; }
@@ -90,7 +88,7 @@
 #app .finish-payment-ledger span { color: var(--muted); font-size: .68rem; }
 #app .finish-payment-ledger strong { color: var(--text); font-size: .9rem; font-variant-numeric: tabular-nums; }
 #app .finish-payment-ledger > div:last-child strong { color: var(--amber); }
-#app .session-collection-options { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; margin-bottom: 14px; }
+#app .session-collection-options { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; margin-bottom: 14px; }
 #app .session-collection-options button { display: grid; gap: 3px; min-height: 70px; padding: 11px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--navy3); color: var(--text); text-align: left; }
 #app .session-collection-options button strong { font-size: .75rem; }
 #app .session-collection-options button small { color: var(--muted); font-size: .64rem; line-height: 1.35; }
@@ -199,7 +197,6 @@
   #app #panel-room-management .mc-icon { width: 38px; height: 38px; }
   #app #panel-room-management .fm-modal-header { margin: -20px -20px 16px; padding: 18px 20px 14px; }
   #app .session-hour-picker { grid-template-columns: repeat(3,minmax(0,1fr)); }
-  #app .session-hour-custom { grid-column: span 2; }
   #app .session-payment-ledger { grid-template-columns: 1fr; }
   #app .finish-payment-ledger { grid-template-columns: 1fr; }
   #app .session-collection-options { grid-template-columns: 1fr; }

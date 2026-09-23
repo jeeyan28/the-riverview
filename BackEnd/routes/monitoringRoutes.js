@@ -3,9 +3,9 @@ const { MonitorRoom, RoomSession } = require("../model/monitoring");
 const Booking = require("../model/booking");
 const { ensureAdmin, requirePermission, requireAnyPermission } = require("../middleware/adminAuth");
 const { PERMISSIONS, hasPermission } = require("../utils/permissions");
-const { bookingCollected, financialFields, extendSessionFields, endSessionFields } = require("../utils/bookingLifecycle");
+const { bookingCollected, financialFields, fullOrDeferredPaymentFields, extendSessionFields, endSessionFields } = require("../utils/bookingLifecycle");
 const { calculateBookingPrice, calculateSessionExtension, parsePaxCapacity } = require("../utils/roomPricing");
-const { TIME_ZONE } = require("../utils/constants");
+const { TIME_ZONE, MAX_MONITOR_SESSION_HOURS } = require("../utils/constants");
 const { getMonitorReport } = require("../utils/monitorReport");
 const { createWorkbook, addMonitoringGridSheets, addSummarySheet, addActivitySheet, addRoomTypeSheet } = require("../utils/reportWorkbook");
 const { validate } = require("../middleware/validate");
@@ -191,14 +191,31 @@ sessionsRouter.post("/", requireAnyPermission(PERMISSIONS.ROOM_OPERATE, PERMISSI
     if (!duration) {
       return res.status(400).json({ message: "duration is required." });
     }
-    if (!Number.isInteger(duration) || duration < 1 || duration > 24) {
-      return res.status(400).json({ message: "Duration must be from 1 to 24 whole hours." });
+    if (!Number.isInteger(duration) || duration < 1 || duration > MAX_MONITOR_SESSION_HOURS) {
+      return res.status(400).json({ message: `Duration must be from 1 to ${MAX_MONITOR_SESSION_HOURS} whole hours.` });
     }
-    if (paymentStatus !== undefined && !["Paid", "Partial", "Unpaid"].includes(paymentStatus)) {
+    if (paymentStatus !== undefined && !["Paid", "Unpaid"].includes(paymentStatus)) {
       return res.status(400).json({ message: "Invalid payment status." });
     }
     if (paymentTiming !== undefined && !["Before", "After"].includes(paymentTiming)) {
       return res.status(400).json({ message: "Invalid payment timing." });
+    }
+
+    let booking = null;
+    if (bookingId) {
+      booking = await Booking.findById(bookingId);
+      if (!booking) return res.status(404).json({ message: "Booking not found." });
+      if (booking.status !== Booking.BOOKING_STATUS.CONFIRMED) {
+        return res.status(400).json({ message: "This booking cannot be started (already started or not confirmed)." });
+      }
+    }
+
+    const sessionDuration = booking ? Number(booking.duration) : duration;
+    if (booking && duration !== sessionDuration) {
+      return res.status(400).json({ message: "Session length must match the confirmed reservation." });
+    }
+    if (!Number.isInteger(sessionDuration) || sessionDuration < 1 || sessionDuration > MAX_MONITOR_SESSION_HOURS) {
+      return res.status(400).json({ message: `Confirmed reservation length must be from 1 to ${MAX_MONITOR_SESSION_HOURS} whole hours.` });
     }
 
     let room;
@@ -266,16 +283,6 @@ sessionsRouter.post("/", requireAnyPermission(PERMISSIONS.ROOM_OPERATE, PERMISSI
       return res.status(400).json({ message: "roomId, or bookingId with roomTarget, is required." });
     }
 
-    let booking = null;
-    if (bookingId) {
-      booking = await Booking.findById(bookingId);
-      if (!booking) return res.status(404).json({ message: "Booking not found." });
-      if (booking.status !== Booking.BOOKING_STATUS.CONFIRMED) {
-        return res.status(400).json({ message: "This booking cannot be started (already started or not confirmed)." });
-      }
-    }
-
-    const sessionDuration = booking ? booking.duration : duration;
     const guestCount = booking ? booking.guestCount : Math.max(1, Number(requestedGuestCount) || 1);
     const roomCapacity = parsePaxCapacity(room.pax);
     if (!booking && roomCapacity && guestCount > roomCapacity) {
@@ -298,12 +305,12 @@ sessionsRouter.post("/", requireAnyPermission(PERMISSIONS.ROOM_OPERATE, PERMISSI
       paidAmount = requestedPaidAmount === undefined ? alreadyReceived : Number(requestedPaidAmount);
       if (!Number.isFinite(paidAmount) || paidAmount < alreadyReceived) return res.status(400).json({ message: "Received payments cannot be reduced when starting a reservation." });
       if (paidAmount > amount) return res.status(400).json({ message: "Received payment cannot exceed the session charge." });
-      resolvedPaymentStatus = financialFields(amount, paidAmount, booking.refundedAmount || 0).paymentStatus;
+      resolvedPaymentStatus = fullOrDeferredPaymentFields(amount, alreadyReceived, paidAmount, booking.refundedAmount || 0).paymentStatus;
     } else {
       resolvedPaymentStatus = paymentStatus || "Unpaid";
       paidAmount = Number(requestedPaidAmount) || (resolvedPaymentStatus === "Paid" ? amount : 0);
       if (paidAmount > amount) return res.status(400).json({ message: "Received payment cannot exceed the session charge." });
-      resolvedPaymentStatus = financialFields(amount, paidAmount, 0).paymentStatus;
+      resolvedPaymentStatus = fullOrDeferredPaymentFields(amount, 0, paidAmount).paymentStatus;
     }
 
     if (await RoomSession.exists({ room: room._id, status: "Active" })) return res.status(409).json({ message: "This room already has an active session." });
@@ -365,7 +372,7 @@ sessionsRouter.put("/:id/extend", requirePermission(PERMISSIONS.ROOM_OPERATE), v
     if (!addedHours || addedHours <= 0) {
       return res.status(400).json({ message: "addedHours must be greater than 0." });
     }
-    if (paymentStatus !== undefined && !["Paid", "Partial", "Unpaid"].includes(paymentStatus)) {
+    if (paymentStatus !== undefined && paymentStatus !== "Paid") {
       return res.status(400).json({ message: "Invalid payment status." });
     }
 
@@ -383,8 +390,8 @@ sessionsRouter.put("/:id/extend", requirePermission(PERMISSIONS.ROOM_OPERATE), v
     }
 
     const newDuration = Number(session.duration) + Number(addedHours);
-    if (newDuration > 24) {
-      return res.status(400).json({ message: "Total session duration cannot exceed 24 hours." });
+    if (newDuration > MAX_MONITOR_SESSION_HOURS) {
+      return res.status(400).json({ message: `Total session duration cannot exceed ${MAX_MONITOR_SESSION_HOURS} hours.` });
     }
 
     const room = await MonitorRoom.findById(session.room);
