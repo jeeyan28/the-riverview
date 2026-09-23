@@ -1,3 +1,5 @@
+import { cancellationAmounts } from './cancellationPolicy.js';
+
 export function formatHour(h) {
   const hh = h % 24;
   const period = hh >= 12 ? 'PM' : 'AM';
@@ -19,8 +21,9 @@ function receiptHtml(fields) {
   const {
     reservationCode, facility, guestName, guestContact, guestEmail,
     roomName, guestCount, dateLabel, timeLabel, bookedOnLabel,
-    amount, downPayment, remaining,
+    amount, downPayment, paidAtVenue, remaining, status, refunded, retained, refundRemaining, customerCancelled, refundException, showRefundToArrange,
   } = fields;
+  const closed = ['Cancelled', 'Rejected', 'No Show'].includes(status);
 
   return `<!DOCTYPE html>
 <html>
@@ -135,9 +138,9 @@ function receiptHtml(fields) {
 <body>
   <div class="receipt">
     <div class="receipt-head">
-      <div class="check-badge">&#10003;</div>
-      <h1>Booking Confirmed</h1>
-      <p>Your reservation has been successfully created.</p>
+      <div class="check-badge">${closed ? '&#10005;' : '&#10003;'}</div>
+      <h1>${closed ? `Reservation ${esc(status)}` : 'Booking Confirmed'}</h1>
+      <p>${closed ? 'Payment record for this reservation.' : 'Your reservation has been successfully created.'}</p>
       <span class="facility-tag">${esc(facility)}</span>
     </div>
 
@@ -150,7 +153,7 @@ function receiptHtml(fields) {
       <div class="info-grid">
         <div class="info-item"><span class="label">Booked By</span><span class="value">${esc(guestName)}</span></div>
         <div class="info-item"><span class="label">Contact No.</span><span class="value">${esc(guestContact)}</span></div>
-        <div class="info-item span-2"><span class="label">Email</span><span class="value">${esc(guestEmail)}</span></div>
+        <div class="info-item span-2"><span class="label">Email</span><span class="value">${esc(guestEmail || '—')}</span></div>
         <div class="info-item"><span class="label">Room</span><span class="value">${esc(roomName)}</span></div>
         <div class="info-item"><span class="label">Guests</span><span class="value">${esc(guestCount)}</span></div>
         <div class="info-item"><span class="label">Booking Date</span><span class="value">${esc(dateLabel)}</span></div>
@@ -161,10 +164,17 @@ function receiptHtml(fields) {
       <div class="cost-card">
         <div class="cost-row total"><span class="cost-label">Total Amount</span><span class="cost-value">&#8369;${amount.toLocaleString()}</span></div>
         <div class="cost-row"><span class="cost-label">Paid Online</span><span class="cost-value paid">&#8369;${downPayment.toLocaleString()}</span></div>
-        <div class="cost-row"><span class="cost-label">Remaining Balance</span><span class="cost-value balance">&#8369;${remaining.toLocaleString()}</span></div>
+        ${paidAtVenue > 0 ? `<div class="cost-row"><span class="cost-label">Paid Later</span><span class="cost-value paid">&#8369;${paidAtVenue.toLocaleString()}</span></div>` : ''}
+        ${closed ? `
+          <div class="cost-row"><span class="cost-label">Refunded</span><span class="cost-value">&#8369;${refunded.toLocaleString()}</span></div>
+          <div class="cost-row"><span class="cost-label">Payment Retained</span><span class="cost-value paid">&#8369;${retained.toLocaleString()}</span></div>
+          ${status === 'Cancelled' && showRefundToArrange && refundRemaining > 0 ? `<div class="cost-row"><span class="cost-label">Refund to Arrange</span><span class="cost-value balance">&#8369;${refundRemaining.toLocaleString()}</span></div>` : ''}
+        ` : `<div class="cost-row"><span class="cost-label">Remaining Balance</span><span class="cost-value balance">&#8369;${remaining.toLocaleString()}</span></div>`}
       </div>
 
-      ${guestEmail ? `<p class="note">A copy of this receipt has been sent to your gmail: ${esc(guestEmail)}</p>` : ''}
+      ${status === 'Cancelled' && customerCancelled ? `<p class="note">${refundException ? 'A refund exception was approved.' : 'The first-hour charge is non-refundable for a customer cancellation.'} ${refundRemaining > 0 ? 'Contact admin to arrange the remaining manual refund.' : ''}</p>` : ''}
+      ${status === 'Cancelled' && !customerCancelled && showRefundToArrange && refundRemaining > 0 ? '<p class="note">Contact admin to arrange the manual refund.</p>' : ''}
+      ${guestEmail ? `<p class="note">A booking confirmation was sent to ${esc(guestEmail)}.</p>` : ''}
     </div>
 
     <div class="actions">
@@ -207,14 +217,17 @@ export function openBookingReceipt(booking, overrides = {}) {
 
   const downPayment = Number(booking.downPayment || 0);
   const amount = Number(booking.amount || 0);
-  const remaining = Math.max(0, amount - downPayment);
+  const closed = ['Cancelled', 'Rejected', 'No Show'].includes(booking.status);
+  const cancellation = cancellationAmounts(booking);
+  const paidAtVenue = Math.max(0, cancellation.paid - downPayment);
+  const remaining = closed ? 0 : Math.max(0, amount - cancellation.retained);
 
   const html = receiptHtml({
     reservationCode: booking.reservationCode || '—',
     facility,
     guestName: booking.guestName || '—',
     guestContact: guestPhoneDisplay(booking.guestContact),
-    guestEmail: booking.guestEmail || '—',
+    guestEmail: booking.guestEmail || '',
     roomName,
     guestCount: String(booking.guestCount || 1),
     dateLabel,
@@ -222,7 +235,15 @@ export function openBookingReceipt(booking, overrides = {}) {
     bookedOnLabel,
     amount,
     downPayment,
+    paidAtVenue,
     remaining,
+    status: booking.status,
+    refunded: cancellation.refunded,
+    retained: cancellation.retained,
+    refundRemaining: cancellation.refundRemaining,
+    customerCancelled: cancellation.customerCancelled,
+    refundException: Boolean(booking.cancellationRefundException),
+    showRefundToArrange: Boolean(booking.cancellationSource || booking.cancellationRequestedAt),
   });
 
   const win = window.open('', '_blank');

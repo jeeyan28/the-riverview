@@ -4,12 +4,13 @@ const Booking = require("../model/booking");
 const Settings = require("../model/settings");
 const BookingLock = require("../model/bookingLock");
 const { RoomSession } = require("../model/monitoring");
-const { bookingCollected, financialFields, reviewCancellationFields } = require("../utils/bookingLifecycle");
+const { bookingCollected, bookingStartMs, financialFields, reviewCancellationFields } = require("../utils/bookingLifecycle");
 const { LOCK_DURATION_MINUTES } = BookingLock;
 const { requirePermission, ensureAuthenticated } = require("../middleware/adminAuth");
 const { paymentProofUpload } = require("../middleware/upload");
 const { PERMISSIONS, isAdminRole } = require("../utils/permissions");
-const { validateAndPriceBooking, computeDownPayment, saveWithReservationCode, runInTransaction, bookingStartMs } = require("../utils/bookingHelper");
+const { validateAndPriceBooking, computeDownPayment, saveWithReservationCode, runInTransaction } = require("../utils/bookingHelper");
+const { isBeforeReservationDay } = require("../utils/businessDate");
 const { validate } = require("../middleware/validate");
 const {
   bookingIdParamsSchema,
@@ -295,8 +296,8 @@ router.put("/:id/reschedule", ensureAuthenticated, bookingActionLimiter, validat
         if (existing.rescheduleCount >= Booking.MAX_RESCHEDULES) {
           throw new AppError(409, "This booking has already been rescheduled the maximum number of times.");
         }
-        if (bookingStartMs(existing.date, existing.timeIn) - Date.now() < Booking.RESCHEDULE_CUTOFF_HOURS * 3600000) {
-          throw new AppError(409, `Reschedule is no longer available within ${Booking.RESCHEDULE_CUTOFF_HOURS} hours of your reservation.`);
+        if (!isBeforeReservationDay(existing.date)) {
+          throw new AppError(409, "Reschedule is only available before the day of your reservation.");
         }
 
         const pricing = await validateAndPriceBooking({
@@ -352,6 +353,8 @@ router.put("/:id/cancellation-request", ensureAuthenticated, bookingActionLimite
     if (booking.status !== Booking.BOOKING_STATUS.CONFIRMED) return res.status(409).json({ message: "Only confirmed reservations can be cancelled." });
     if (booking.cancellationStatus === "Requested") return res.status(409).json({ message: "A cancellation request is already waiting for review." });
     booking.cancellationStatus = "Requested";
+    booking.cancellationSource = "customer";
+    booking.cancellationRefundException = false;
     booking.cancellationRequestedAt = new Date();
     booking.cancellationReason = req.body.reason;
     await booking.save();
@@ -364,13 +367,28 @@ router.put("/:id/cancellation-request", ensureAuthenticated, bookingActionLimite
 
 router.put("/:id/cancellation-review", requirePermission(PERMISSIONS.BOOKING_MANAGE), validate(bookingIdParamsSchema, "params"), validate(cancellationReviewSchema), async (req, res) => {
   try {
-    const booking = await Booking.findById(req.params.id);
-    if (!booking) return res.status(404).json({ message: "Booking not found." });
-    if (booking.cancellationStatus !== "Requested") return res.status(409).json({ message: "There is no pending cancellation request for this reservation." });
-    const fields = reviewCancellationFields(booking, { decision: req.body.decision, refundedAmount: req.body.refundedAmount, note: req.body.note }, req.user._id);
-    Object.assign(booking, fields);
-    await booking.save();
-    await logAudit({ category: "Booking", action: "updated", description: `${req.body.decision}d cancellation for ${booking.reservationCode}`, user: req.user });
+    const { booking, recordedRefund, wasRequested } = await runInTransaction(async (session) => {
+      const booking = await Booking.findById(req.params.id).session(session);
+      if (!booking) throw new AppError(404, "Booking not found.");
+      const wasRequested = booking.cancellationStatus === "Requested";
+      const alreadyApproved = booking.cancellationStatus === "Approved" && booking.status === "Cancelled";
+      if (!wasRequested && !alreadyApproved) throw new AppError(409, "There is no cancellation to review or refund to record.");
+      if (alreadyApproved && req.body.decision !== "approve") throw new AppError(409, "An approved cancellation cannot be rejected.");
+      const previousRefund = Number(booking.refundedAmount || 0);
+      const fields = reviewCancellationFields(booking, {
+        decision: req.body.decision,
+        refundedAmount: req.body.refundedAmount,
+        refundException: req.body.refundException,
+        note: req.body.note,
+      }, req.user._id);
+      if (alreadyApproved && fields.refundedAmount === previousRefund && fields.cancellationRefundException === Boolean(booking.cancellationRefundException)) {
+        throw new AppError(400, "Record a new manual refund amount or an explained policy exception.");
+      }
+      Object.assign(booking, fields);
+      await booking.save({ session });
+      return { booking, recordedRefund: fields.refundedAmount - previousRefund, wasRequested };
+    });
+    await logAudit({ category: "Booking", action: "updated", description: `${wasRequested ? `${req.body.decision}d cancellation` : "updated cancellation refund"} for ${booking.reservationCode}; newly recorded refund ₱${recordedRefund.toFixed(2)}${booking.cancellationRefundException ? "; policy exception" : ""}${req.body.note ? `; note: ${req.body.note}` : ""}`, user: req.user });
     res.json(booking);
   } catch (err) {
     console.error(err);
@@ -427,11 +445,25 @@ router.put("/:id", requirePermission(PERMISSIONS.BOOKING_MANAGE), validate(booki
         }
 
         const update = {};
+        const correctingNoShow = existing.status === Booking.BOOKING_STATUS.NO_SHOW && status === Booking.BOOKING_STATUS.DONE;
         if (status !== undefined && status !== existing.status) {
-          if (!["Pending", "Confirmed"].includes(existing.status) || !["Confirmed", "Rejected", "Cancelled", "Done"].includes(status)) throw new AppError(409, "Use the monitoring controls for session start and completion.");
+          const allowed = existing.status === Booking.BOOKING_STATUS.PENDING
+            ? [Booking.BOOKING_STATUS.CONFIRMED, Booking.BOOKING_STATUS.REJECTED, Booking.BOOKING_STATUS.CANCELLED]
+            : existing.status === Booking.BOOKING_STATUS.CONFIRMED
+              ? [Booking.BOOKING_STATUS.DONE, Booking.BOOKING_STATUS.CANCELLED]
+              : [];
+          if (!correctingNoShow && !allowed.includes(status)) throw new AppError(409, "Use the reservation or monitoring controls for this status change.");
+          if (correctingNoShow && Object.keys(req.body).some((key) => key !== "status")) throw new AppError(400, "Only the status can be corrected on a no-show reservation.");
+          if (status === Booking.BOOKING_STATUS.DONE && existing.status === Booking.BOOKING_STATUS.CONFIRMED) {
+            if (existing.cancellationStatus === "Requested") throw new AppError(409, "Review the cancellation request before completing this reservation.");
+            const start = bookingStartMs(existing.date, existing.timeIn);
+            if (!Number.isFinite(start) || start > Date.now()) throw new AppError(409, "A reservation cannot be completed before its start time.");
+          }
           if (status === "Rejected" && bookingCollected(existing) > 0) throw new AppError(409, "Use cancellation review to preserve the payment and record any refund.");
+          if (status === "Cancelled" && existing.cancellationStatus === "Requested") throw new AppError(409, "Review the customer cancellation request before cancelling this reservation.");
           update.status = status;
-          if (status === "Cancelled") Object.assign(update, reviewCancellationFields(existing, { decision: "approve" }, req.user._id));
+          if (correctingNoShow) update.noShowAt = null;
+          if (status === "Cancelled") Object.assign(update, reviewCancellationFields(existing, { decision: "approve", cancellationSource: "admin" }, req.user._id));
         }
         if (paymentMethod !== undefined) update.paymentMethod = paymentMethod;
         if (guestName !== undefined) update.guestName = guestName;
@@ -453,7 +485,7 @@ router.put("/:id", requirePermission(PERMISSIONS.BOOKING_MANAGE), validate(booki
         const pricingChanging = scheduleChanging || guestCount !== undefined || hasCorkage !== undefined;
         const financialChanging = pricingChanging || paidAmount !== undefined;
         if (financialChanging || (status !== undefined && status !== existing.status)) {
-          if (["Done", "Ongoing", "No Show", "Rejected", "Cancelled"].includes(existing.status)) throw new AppError(409, "This reservation is closed or has started. Correct its monitoring record instead.");
+          if (["Done", "Ongoing", "No Show", "Rejected", "Cancelled"].includes(existing.status) && !correctingNoShow) throw new AppError(409, "This reservation is closed or has started. Correct its monitoring record instead.");
           if (await RoomSession.exists({ booking: existing._id, status: { $in: ["Active", "Finished"] } }).session(session)) throw new AppError(409, "Change charges and payments through the linked monitoring session.");
         }
 

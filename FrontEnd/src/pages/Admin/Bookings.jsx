@@ -10,37 +10,38 @@ import { resolveImageUrl } from '../../utils/resolveImageUrl';
 import { formatPeso } from '../../utils/currency';
 import { guestPhoneDisplay } from '../../utils/receipt';
 import { businessDate } from '../../utils/businessDate';
+import { cancellationAmounts } from '../../utils/cancellationPolicy';
 import { useAuth } from '../../context/AuthContext';
 import { useSiteSettings } from '../../hooks/useSiteSettings';
 import { roomsService } from '../../services/rooms';
 import { bookingsService } from '../../services/bookings';
 import { CORKAGE_FEE, calculateBookingPrice } from '../../utils/roomPricing';
+import { RESERVATION_STATUS_FILTERS, reservationPresentation, reservationWindow } from '../../utils/reservationStatus';
 
 
 
 const STATUS_PILL_CLASS = {
-  Ongoing: 'pill-active',
   Pending: 'pill-pending',
   Done: 'pill-done',
-  Overdue: 'pill-overdue',
   Cancelled: 'pill-done',
   'No Show': 'pill-overdue',
-  'Pending Payment Verification': 'pill-pending',
-  'Awaiting Online Payment': 'pill-pending',
   Confirmed: 'pill-active',
   Rejected: 'pill-overdue',
 };
-const BOOKING_STATUSES = ['Pending Payment Verification', 'Awaiting Online Payment', 'Confirmed', 'Rejected', 'Ongoing', 'Pending', 'Done', 'Overdue', 'Cancelled', 'No Show'];
-const EDITABLE_BOOKING_STATUSES = BOOKING_STATUSES.filter((s) => !['Done', 'No Show', 'Rejected', 'Cancelled', 'Ongoing', 'Overdue'].includes(s));
 const PAYMENT_METHODS = ['Cash', 'GCash', 'Maya', 'QR Ph', 'Credit / Debit Card'];
 const SEARCH_DEBOUNCE_MS = 350;
 const BOOKINGS_POLL_MS = 15000;
 const MAX_GUEST_HISTORY_ROWS = 5;
-const SHORT_STATUS = { 'Pending Payment Verification': 'Pending' };
 const WEEKDAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-function shortStatusLabel(status) {
-  return SHORT_STATUS[status] || status;
+function ReservationStatus({ booking, now }) {
+  const { status, warning } = reservationPresentation(booking, now);
+  return (
+    <span className="bk-status-cell">
+      <span className={`pill ${STATUS_PILL_CLASS[status] || 'pill-pending'}`}>{status}</span>
+      {warning && <span className={`bk-status-note${warning === 'Overdue' ? ' bk-status-note--overdue' : ''}`}>{warning}</span>}
+    </span>
+  );
 }
 
 function shortBookingId(b) {
@@ -62,12 +63,12 @@ function netCollected(b) {
 }
 
 function outstandingBalance(b) {
-  if (['Cancelled', 'Rejected', 'No Show'].includes(b?.status)) return 0;
+  if (['Cancelled', 'Rejected', 'No Show'].includes(reservationPresentation(b).status)) return 0;
   return Math.max(0, Number(b?.amount || 0) - netCollected(b));
 }
 
 function isFullPayment(b) {
-  return !['Cancelled', 'Rejected', 'No Show'].includes(b?.status)
+  return !['Cancelled', 'Rejected', 'No Show'].includes(reservationPresentation(b).status)
     && Number(b?.amount || 0) > 0 && netCollected(b) >= Number(b.amount);
 }
 
@@ -75,8 +76,12 @@ function paymentPlanLabel(b) {
   const paid = netCollected(b);
   const balance = outstandingBalance(b);
   const refunded = Number(b?.refundedAmount) || 0;
+  const cancellation = cancellationAmounts(b);
+  if (b?.status === 'Cancelled' && b?.cancellationStatus === 'Approved' && cancellation.customerCancelled && cancellation.refundRemaining > 0) {
+    return `${formatPeso(paid)} retained · ${formatPeso(cancellation.refundRemaining)} refund to arrange`;
+  }
   if (refunded > 0) return `${formatPeso(refunded)} refunded · ${formatPeso(paid)} retained`;
-  if (['Cancelled', 'Rejected', 'No Show'].includes(b?.status)) return paid > 0 ? `${formatPeso(paid)} retained` : 'No payment retained';
+  if (['Cancelled', 'Rejected', 'No Show'].includes(reservationPresentation(b).status)) return paid > 0 ? `${formatPeso(paid)} retained` : 'No payment retained';
   if (isFullPayment(b)) return `Paid ${formatPeso(paid)}`;
   if (paid > 0) return `${formatPeso(paid)} paid · ${formatPeso(balance)} due`;
   return `${formatPeso(balance)} due`;
@@ -88,7 +93,7 @@ function onlinePaymentNote(b) {
   const refunded = Math.max(0, Number(b?.refundedAmount) || 0);
   const balance = outstandingBalance(b);
   if (refunded > 0) return `${formatPeso(online)} was verified online via PayMongo. ${formatPeso(refunded)} was refunded manually; ${formatPeso(netCollected(b))} remains collected.`;
-  if (['Cancelled', 'Rejected', 'No Show'].includes(b?.status)) return `${formatPeso(online)} was verified online via PayMongo. ${formatPeso(netCollected(b))} was retained.`;
+  if (['Cancelled', 'Rejected', 'No Show'].includes(reservationPresentation(b).status)) return `${formatPeso(online)} was verified online via PayMongo. ${formatPeso(netCollected(b))} was retained.`;
   if (later > 0) return `${formatPeso(online)} was verified online via PayMongo and ${formatPeso(later)} was recorded later. ${balance > 0 ? `${formatPeso(balance)} remains due.` : 'No balance remains.'}`;
   if (balance > 0) return `${formatPeso(online)} was verified online via PayMongo. Collect ${formatPeso(balance)} at the venue.`;
   return 'Paid in full online via PayMongo. The payment is verified and needs no manual approval.';
@@ -127,14 +132,18 @@ function Bookings() {
   const { minDuration, maxDuration } = useSiteSettings();
 
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState(() => new URLSearchParams(window.location.search).get('status') || '');
+  const [statusFilter, setStatusFilter] = useState(() => {
+    const requested = new URLSearchParams(window.location.search).get('status');
+    return RESERVATION_STATUS_FILTERS.includes(requested) ? requested : '';
+  });
   const [cancellationFilter, setCancellationFilter] = useState(() => new URLSearchParams(window.location.search).get('cancellationStatus') || '');
   const [roomFilter, setRoomFilter] = useState('');
   const [dateFrom, setDateFrom] = useState(() => new URLSearchParams(window.location.search).get('from') || new URLSearchParams(window.location.search).get('date') || '');
   const [dateTo, setDateTo] = useState(() => new URLSearchParams(window.location.search).get('to') || new URLSearchParams(window.location.search).get('date') || '');
   const searchDebounce = useRef(null);
 
-  const [bookings, setBookings] = useState([]);
+  const [allBookings, setBookings] = useState([]);
+  const [clockMs, setClockMs] = useState(Date.now);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [rooms, setRooms] = useState([]);
@@ -171,7 +180,6 @@ function Bookings() {
     try {
       const data = await bookingsService.list({
         search: search.trim(),
-        status: statusFilter,
         cancellationStatus: cancellationFilter,
         room: roomFilter,
         from: dateFrom,
@@ -184,11 +192,11 @@ function Bookings() {
     } finally {
       if (!silent) setLoading(false);
     }
-  }, [search, statusFilter, cancellationFilter, roomFilter, dateFrom, dateTo]);
+  }, [search, cancellationFilter, roomFilter, dateFrom, dateTo]);
 
   useEffect(() => {
     fetchBookings();
-  }, [statusFilter, cancellationFilter, roomFilter, dateFrom, dateTo]);
+  }, [cancellationFilter, roomFilter, dateFrom, dateTo]);
 
   useEffect(() => {
     clearTimeout(searchDebounce.current);
@@ -200,6 +208,29 @@ function Bookings() {
     const handle = setInterval(() => fetchBookings({ silent: true }), BOOKINGS_POLL_MS);
     return () => clearInterval(handle);
   }, [fetchBookings]);
+
+  useEffect(() => {
+    let handle;
+    function scheduleNextMinute() {
+      handle = setTimeout(() => {
+        setClockMs(Date.now());
+        scheduleNextMinute();
+      }, 60_000 - (Date.now() % 60_000) + 25);
+    }
+    function refreshVisibleClock() {
+      if (!document.hidden) setClockMs(Date.now());
+    }
+    scheduleNextMinute();
+    document.addEventListener('visibilitychange', refreshVisibleClock);
+    return () => {
+      clearTimeout(handle);
+      document.removeEventListener('visibilitychange', refreshVisibleClock);
+    };
+  }, []);
+
+  const bookings = useMemo(() => statusFilter
+    ? allBookings.filter((booking) => reservationPresentation(booking, clockMs).status === statusFilter)
+    : allBookings, [allBookings, statusFilter, clockMs]);
 
   function openEditBooking(id) {
     if (!guardPermission('booking:manage')) return;
@@ -222,8 +253,18 @@ function Bookings() {
       await fetchBookings();
     } catch (err) {
       console.error(err);
-      alert('Could not update this reservation.');
+      alert(err.message || 'Could not update this reservation.');
     }
+  }
+
+  async function markBookingDone(booking) {
+    if (!guardPermission('booking:manage')) return;
+    const wasNoShow = reservationPresentation(booking, clockMs).status === 'No Show';
+    const message = wasNoShow
+      ? 'Mark this no-show as done? Use this only if the guest actually used the facility.'
+      : 'Mark this reservation as done? Use this only if the guest used the facility without a Room Monitor session.';
+    if (!(await confirm(message, { confirmText: 'Mark Done' }))) return;
+    await updateBookingStatus(booking._id, 'Done');
   }
 
   async function deleteBooking(id) {
@@ -303,14 +344,14 @@ function Bookings() {
     [bookings]
   );
 
-  const detailBooking = useMemo(() => bookings.find((b) => b._id === detailId) || null, [bookings, detailId]);
-  const editBooking = useMemo(() => bookings.find((b) => b._id === editId) || null, [bookings, editId]);
-  const proofBooking = useMemo(() => bookings.find((b) => b._id === proofId) || null, [bookings, proofId]);
-  const cancellationReviewBooking = useMemo(() => bookings.find((b) => b._id === cancellationReviewId) || null, [bookings, cancellationReviewId]);
+  const detailBooking = useMemo(() => allBookings.find((b) => b._id === detailId) || null, [allBookings, detailId]);
+  const editBooking = useMemo(() => allBookings.find((b) => b._id === editId) || null, [allBookings, editId]);
+  const proofBooking = useMemo(() => allBookings.find((b) => b._id === proofId) || null, [allBookings, proofId]);
+  const cancellationReviewBooking = useMemo(() => allBookings.find((b) => b._id === cancellationReviewId) || null, [allBookings, cancellationReviewId]);
 
   const historyForDetail = useMemo(() => {
     if (!detailBooking) return [];
-    return bookings
+    return allBookings
       .filter(
         (b) =>
           b._id !== detailBooking._id &&
@@ -318,7 +359,7 @@ function Bookings() {
       )
       .sort((a, b) => (b.date || '').localeCompare(a.date || ''))
       .slice(0, MAX_GUEST_HISTORY_ROWS);
-  }, [bookings, detailBooking]);
+  }, [allBookings, detailBooking]);
 
   const bookingsByDate = useMemo(() => {
     const map = {};
@@ -419,7 +460,8 @@ function Bookings() {
       key: 'status',
       label: 'Status',
       sortable: true,
-      render: (b) => <span className={`pill ${STATUS_PILL_CLASS[b.status] || 'pill-pending'}`}>{b.status}</span>,
+      sortValue: (b) => reservationPresentation(b, clockMs).status,
+      render: (b) => <ReservationStatus booking={b} now={clockMs} />,
     },
     {
       key: 'actions',
@@ -443,9 +485,9 @@ function Bookings() {
                     </button>
                   </>
                 )}
-                {!isPendingVerification && b.status === 'Overdue' && (
-                  <button className="tbl-action-btn" style={{ color: 'var(--red)' }} onClick={() => updateBookingStatus(b._id, 'Done')}>
-                    Resolve
+                {reservationPresentation(b, clockMs).status === 'No Show' && (
+                  <button className="tbl-action-btn" style={{ color: 'var(--teal)' }} onClick={() => markBookingDone(b)}>
+                    Done
                   </button>
                 )}
               </>
@@ -480,19 +522,20 @@ function Bookings() {
       <div className="card bk-toolbar-card">
         <div className="bk-toolbar">
           <div className="bk-search-wrap">
-            <i className="ti ti-search bk-search-icon"></i>
+            <i className="ti ti-search bk-search-icon" aria-hidden="true"></i>
             <input
               type="text"
               className="bk-filter-input bk-search-input"
+              aria-label="Search reservations"
               placeholder="Search name, phone, or reservation code…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
           <div className="bk-filters">
-            <select className="bk-filter-input" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+            <select className="bk-filter-input" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} aria-label="Reservation status filter">
               <option value="">All Status</option>
-              {BOOKING_STATUSES.map((s) => (
+              {RESERVATION_STATUS_FILTERS.map((s) => (
                 <option key={s} value={s}>{s}</option>
               ))}
             </select>
@@ -602,9 +645,7 @@ function Bookings() {
                 <div className="modal-lg-title">Reservation Details</div>
                 <p className="modal-lg-sub" style={{ marginBottom: 0 }}>Reservation Code: {detailBooking.reservationCode || shortBookingId(detailBooking)}</p>
               </div>
-              <span className={`pill ${STATUS_PILL_CLASS[detailBooking.status] || 'pill-pending'}`}>
-                {shortStatusLabel(detailBooking.status)}
-              </span>
+              <ReservationStatus booking={detailBooking} now={clockMs} />
             </div>
 
             <div className="bd-body">
@@ -667,7 +708,7 @@ function Bookings() {
                               <td style={{ padding: '8px 10px' }}>{h.date}</td>
                               <td>{facilityName(h)}</td>
                               <td>{h.duration}hrs</td>
-                              <td><span className={`pill ${STATUS_PILL_CLASS[h.status] || 'pill-pending'}`}>{shortStatusLabel(h.status)}</span></td>
+                              <td><ReservationStatus booking={h} now={clockMs} /></td>
                             </tr>
                           ))
                         )}
@@ -720,8 +761,15 @@ function Bookings() {
                   <div className="bd-section-title"><i className="ti ti-file-x"></i> Cancellation review</div>
                   <p className="bd-notes-body">Status: <strong>{detailBooking.cancellationStatus}</strong>{detailBooking.cancellationReason ? ` · ${detailBooking.cancellationReason}` : ''}</p>
                   {detailBooking.cancellationReviewNote && <p className="bd-screenshot-hint">Review note: {detailBooking.cancellationReviewNote}</p>}
+                  {detailBooking.cancellationRefundNote && <p className="bd-screenshot-hint">Refund note: {detailBooking.cancellationRefundNote}</p>}
+                  {detailBooking.status === 'Cancelled' && cancellationAmounts(detailBooking).refundRemaining > 0 && (
+                    <p className="bd-screenshot-hint">Refund to arrange with the guest: {formatPeso(cancellationAmounts(detailBooking).refundRemaining)}. Record it after the manual transfer.</p>
+                  )}
                   {canManage && detailBooking.cancellationStatus === 'Requested' && (
                     <button type="button" className="btn-confirm" style={{ marginTop: 12 }} onClick={() => setCancellationReviewId(detailBooking._id)}>Review request</button>
+                  )}
+                  {canManage && detailBooking.cancellationStatus === 'Approved' && recordedPayment(detailBooking) > Number(detailBooking.refundedAmount || 0) && (
+                    <button type="button" className="btn-confirm" style={{ marginTop: 12 }} onClick={() => setCancellationReviewId(detailBooking._id)}>{cancellationAmounts(detailBooking).refundRemaining > 0 ? 'Record manual refund' : 'Review refund exception'}</button>
                   )}
                 </div>
               )}
@@ -729,7 +777,7 @@ function Bookings() {
 
             <div className="modal-actions bd-footer" style={{ justifyContent: 'space-between' }}>
               <div style={{ display: 'flex', gap: 10 }}>
-                {canManage && !['Done', 'No Show', 'Rejected', 'Cancelled', 'Ongoing', 'Overdue'].includes(detailBooking.status) && (
+                {canManage && !['Done', 'No Show', 'Rejected', 'Cancelled'].includes(reservationPresentation(detailBooking, clockMs).status) && detailBooking.status !== 'Ongoing' && (
                   <button
                     className="btn-cancel"
                     onClick={() => { const id = detailBooking._id; setDetailId(null); openEditBooking(id); }}
@@ -737,7 +785,7 @@ function Bookings() {
                     Edit Reservation
                   </button>
                 )}
-                {canManage && (
+                {canManage && ['Pending', 'Rejected'].includes(detailBooking.status) && recordedPayment(detailBooking) === 0 && (
                   <button
                     className="btn-cancel"
                     style={{ color: 'var(--red)', borderColor: 'rgba(225,29,72,.3)' }}
@@ -746,25 +794,21 @@ function Bookings() {
                     Delete
                   </button>
                 )}
-                {canManage && detailBooking.status === 'Confirmed' && (
+                {canManage && ['Confirmed', 'No Show'].includes(reservationPresentation(detailBooking, clockMs).status) && detailBooking.status !== 'Ongoing' && detailBooking.cancellationStatus !== 'Requested' && (detailBooking.status === 'No Show' || clockMs >= (reservationWindow(detailBooking)?.start ?? Infinity)) && (
                   <button
                     className="btn-cancel"
                     style={{ color: 'var(--teal)', borderColor: 'rgba(45,212,191,.35)' }}
-                    onClick={async () => {
-                      if (!(await confirm('Mark this reservation as done? Use this only if it did not go through a Room Monitor session.', { confirmText: 'Mark Done' }))) return;
-                      await updateBookingStatus(detailBooking._id, 'Done');
-                      setDetailId(null);
-                    }}
+                    onClick={() => markBookingDone(detailBooking)}
                   >
                     Mark Done
                   </button>
                 )}
-                {canManage && !['Cancelled', 'Rejected', 'Done'].includes(detailBooking.status) && (
+                {canManage && ['Pending', 'Confirmed'].includes(detailBooking.status) && reservationPresentation(detailBooking, clockMs).status !== 'No Show' && (
                   <button
                     className="btn-cancel"
                     style={{ color: 'var(--amber)', borderColor: 'rgba(245,165,36,.35)' }}
                     onClick={async () => {
-                      if (!(await confirm('Cancel this reservation? The guest will need to rebook if they still want the slot.', { danger: true, confirmText: 'Cancel Reservation' }))) return;
+                      if (!(await confirm('Cancel this reservation on behalf of the venue? Use cancellation review for a customer request. The guest will need to rebook if they still want the slot.', { danger: true, confirmText: 'Cancel Reservation' }))) return;
                       await updateBookingStatus(detailBooking._id, 'Cancelled');
                       setDetailId(null);
                     }}
@@ -775,7 +819,7 @@ function Bookings() {
               </div>
               <div style={{ display: 'flex', gap: 10 }}>
                 <button className="btn-cancel" onClick={() => setDetailId(null)}>Close</button>
-                {canManage && ['Pending', 'Pending Payment Verification'].includes(detailBooking.status) && (
+                {canManage && ['Pending', 'Pending Payment Verification'].includes(detailBooking.status) && (detailBooking.status === 'Pending Payment Verification' || recordedPayment(detailBooking) === 0) && (
                   <button
                     className="btn-cancel"
                     style={{ color: 'var(--red)', borderColor: 'rgba(225,29,72,.3)' }}
@@ -835,7 +879,7 @@ function Bookings() {
                     <td style={{ padding: '8px 10px' }}>{h.date}</td>
                     <td>{facilityName(h)}</td>
                     <td>{h.duration}hrs</td>
-                    <td><span className={`pill ${STATUS_PILL_CLASS[h.status] || 'pill-pending'}`}>{shortStatusLabel(h.status)}</span></td>
+                    <td><ReservationStatus booking={h} now={clockMs} /></td>
                   </tr>
                 ))
               )}
@@ -901,6 +945,10 @@ function CreateBookingModal({ open, rooms, onClose, onCreated, minDuration = 1, 
       alert('Complete the guest, room, hourly schedule, and payment fields.');
       return;
     }
+    if (estimatedCharge > 0 && amountReceived > estimatedCharge) {
+      alert('Amount received cannot exceed the calculated reservation charge.');
+      return;
+    }
     setSaving(true);
     try {
       await bookingsService.create({ guestName: guestName.trim(), guestContact: guestContact.trim(), guestCount: parsedGuestCount, hasCorkage, specialRequests: specialRequests.trim(), roomId, variantLabel: variantLabel || undefined, date, timeIn, duration: parsedDuration, paidAmount: amountReceived, status: 'Pending', paymentMethod: 'Cash' });
@@ -914,24 +962,43 @@ function CreateBookingModal({ open, rooms, onClose, onCreated, minDuration = 1, 
   }
 
   return (
-    <Modal open={open} onClose={onClose} title="Add walk-in reservation" size="lg">
-      <form onSubmit={submit}>
-        <p className="booking-form-help">Creates a pending walk-in reservation. Confirm it after the guest details and schedule are checked; any money received is recorded separately from the charge.</p>
-        <div className="booking-form-grid">
-          <div className="mfield"><label htmlFor="manual-guest-name">Guest name</label><input id="manual-guest-name" required value={guestName} onChange={(event) => setGuestName(event.target.value)} placeholder="e.g. Juan Dela Cruz" /></div>
-          <div className="mfield"><label htmlFor="manual-guest-contact">Phone or email</label><input id="manual-guest-contact" value={guestContact} onChange={(event) => setGuestContact(event.target.value)} placeholder="Optional contact" /></div>
-          <div className="mfield"><label htmlFor="manual-guest-count">Guests</label><input id="manual-guest-count" type="number" min="1" required value={guestCount} onChange={(event) => setGuestCount(event.target.value)} /></div>
-          <div className="mfield"><label htmlFor="manual-room">Facility</label><select id="manual-room" required value={roomId} onChange={(event) => setRoomId(event.target.value)}><option value="">Choose a facility</option>{rooms.map((room) => <option key={room._id} value={room._id}>{room.name}</option>)}</select></div>
-          <div className="mfield"><label htmlFor="manual-variant">Room type</label><select id="manual-variant" value={variantLabel} onChange={(event) => setVariantLabel(event.target.value)} disabled={!variants.length}><option value="">{variants.length ? 'Choose a room type' : 'Base price'}</option>{variants.map((variant) => <option key={variant.label} value={variant.label}>{variant.label}</option>)}</select></div>
-          <div className="mfield"><label htmlFor="manual-date">Date</label><input id="manual-date" type="date" required value={date} onChange={(event) => setDate(event.target.value)} /></div>
-          <div className="mfield"><label htmlFor="manual-time">Start time</label><input id="manual-time" type="time" step="3600" required value={timeIn} onChange={(event) => setTimeIn(event.target.value)} /></div>
-          <div className="mfield"><label htmlFor="manual-duration">Duration (hours)</label><input id="manual-duration" type="number" min={minDuration} max={maxDuration} step="1" required value={duration} onChange={(event) => setDuration(event.target.value)} /></div>
-          <div className="mfield"><label htmlFor="manual-paid">Amount received (₱)</label><input id="manual-paid" type="number" min="0" step="0.01" value={paidAmount} onChange={(event) => setPaidAmount(event.target.value)} /><p className="booking-form-help">Leave 0 if the guest pays after the session.</p></div>
-          <label className="booking-addon-check booking-form-wide"><input type="checkbox" checked={hasCorkage} onChange={(event) => setHasCorkage(event.target.checked)} /><span><strong>Outside food or drinks</strong><small>Add ₱{CORKAGE_FEE.toLocaleString()} corkage.</small></span></label>
-          <div className="mfield booking-form-wide"><label htmlFor="manual-notes">Special requests / notes</label><textarea id="manual-notes" rows="2" value={specialRequests} onChange={(event) => setSpecialRequests(event.target.value)} placeholder="Optional booking notes" /></div>
-          <div className="booking-charge-preview booking-form-wide"><span>Calculated reservation charge</span><strong>{formatPeso(estimatedCharge)}</strong></div>
-        </div>
-        <div className="modal-actions"><button type="button" className="btn-cancel" onClick={onClose}>Cancel</button><button type="submit" className="btn-confirm" disabled={saving}>{saving ? 'Creating…' : 'Create pending booking'}</button></div>
+    <Modal open={open} onClose={onClose} title="Add walk-in reservation" size="2xl" className="walkin-booking-modal">
+      <form onSubmit={submit} className="walkin-booking-form">
+        <p className="walkin-form-intro">Enter the guest and schedule, then review the charge. The reservation starts as Pending until you confirm it.</p>
+
+        <section className="walkin-form-section" aria-labelledby="walkin-guest-heading">
+          <h3 id="walkin-guest-heading" className="walkin-section-title">Guest</h3>
+          <div className="booking-form-grid walkin-guest-grid">
+            <div className="mfield"><label htmlFor="manual-guest-name">Guest name</label><input id="manual-guest-name" required value={guestName} onChange={(event) => setGuestName(event.target.value)} placeholder="e.g. Juan Dela Cruz" /></div>
+            <div className="mfield"><label htmlFor="manual-guest-contact">Phone or email <span className="walkin-optional">Optional</span></label><input id="manual-guest-contact" value={guestContact} onChange={(event) => setGuestContact(event.target.value)} placeholder="Contact details" /></div>
+            <div className="mfield"><label htmlFor="manual-guest-count">Guests</label><input id="manual-guest-count" type="number" min="1" required value={guestCount} onChange={(event) => setGuestCount(event.target.value)} /></div>
+          </div>
+        </section>
+
+        <section className="walkin-form-section" aria-labelledby="walkin-schedule-heading">
+          <h3 id="walkin-schedule-heading" className="walkin-section-title">Facility & schedule</h3>
+          <div className="booking-form-grid walkin-facility-grid">
+            <div className="mfield"><label htmlFor="manual-room">Facility</label><select id="manual-room" required value={roomId} onChange={(event) => setRoomId(event.target.value)}><option value="">Choose a facility</option>{rooms.map((room) => <option key={room._id} value={room._id}>{room.name}</option>)}</select></div>
+            <div className="mfield"><label htmlFor="manual-variant">Room type</label><select id="manual-variant" required={variants.length > 0} value={variantLabel} onChange={(event) => setVariantLabel(event.target.value)} disabled={!variants.length}><option value="">{variants.length ? 'Choose a room type' : 'Base price'}</option>{variants.map((variant) => <option key={variant.label} value={variant.label}>{variant.label}</option>)}</select></div>
+          </div>
+          <div className="booking-form-grid walkin-time-grid">
+            <div className="mfield"><label htmlFor="manual-date">Date</label><input id="manual-date" type="date" required value={date} onChange={(event) => setDate(event.target.value)} /></div>
+            <div className="mfield"><label htmlFor="manual-time">Start time</label><input id="manual-time" type="time" step="3600" required value={timeIn} onChange={(event) => setTimeIn(event.target.value)} /></div>
+            <div className="mfield"><label htmlFor="manual-duration">Duration (hours)</label><input id="manual-duration" type="number" min={minDuration} max={maxDuration} step="1" required value={duration} onChange={(event) => setDuration(event.target.value)} /></div>
+          </div>
+        </section>
+
+        <section className="walkin-form-section" aria-labelledby="walkin-payment-heading">
+          <h3 id="walkin-payment-heading" className="walkin-section-title">Payment & notes</h3>
+          <div className="booking-form-grid walkin-payment-grid">
+            <div className="booking-charge-preview"><span>Reservation charge</span><strong>{formatPeso(estimatedCharge)}</strong></div>
+            <div className="mfield"><label htmlFor="manual-paid">Amount received (₱)</label><input id="manual-paid" type="number" min="0" max={estimatedCharge > 0 ? estimatedCharge : undefined} step="0.01" value={paidAmount} onChange={(event) => setPaidAmount(event.target.value)} /><p className="booking-form-help">Enter 0 if nothing has been paid yet.</p></div>
+            <label className="booking-addon-check booking-form-wide"><input type="checkbox" checked={hasCorkage} onChange={(event) => setHasCorkage(event.target.checked)} /><span><strong>Outside food or drinks</strong><small>Add ₱{CORKAGE_FEE.toLocaleString()} corkage.</small></span></label>
+            <div className="mfield booking-form-wide"><label htmlFor="manual-notes">Special requests / notes <span className="walkin-optional">Optional</span></label><textarea id="manual-notes" rows="2" value={specialRequests} onChange={(event) => setSpecialRequests(event.target.value)} placeholder="Add details the staff should know" /></div>
+          </div>
+        </section>
+
+        <div className="modal-actions walkin-actions"><button type="button" className="btn-cancel" onClick={onClose}>Cancel</button><button type="submit" className="btn-confirm" disabled={saving}>{saving ? 'Creating…' : 'Create pending reservation'}</button></div>
       </form>
     </Modal>
   );
@@ -940,13 +1007,19 @@ function CreateBookingModal({ open, rooms, onClose, onCreated, minDuration = 1, 
 function CancellationReviewModal({ booking, onClose, onSubmit }) {
   const [decision, setDecision] = useState('approve');
   const [refundedAmount, setRefundedAmount] = useState('0');
+  const [refundException, setRefundException] = useState(false);
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
+  const amounts = cancellationAmounts(booking);
+  const alreadyApproved = booking?.cancellationStatus === 'Approved';
+  const maxRefund = refundException ? amounts.paid : amounts.refundLimit;
+  const noRefundChange = alreadyApproved && Number(refundedAmount) === amounts.refunded && refundException === Boolean(booking?.cancellationRefundException);
 
   useEffect(() => {
     if (!booking) return;
     setDecision('approve');
     setRefundedAmount(String(booking.refundedAmount ?? 0));
+    setRefundException(Boolean(booking.cancellationRefundException));
     setNote('');
   }, [booking]);
 
@@ -956,27 +1029,41 @@ function CancellationReviewModal({ booking, onClose, onSubmit }) {
       alert('Refund must be a valid non-negative amount.');
       return;
     }
-    if (decision === 'approve' && refund > recordedPayment(booking)) {
-      alert('Refund cannot exceed the recorded payment.');
+    if (refund < amounts.refunded) {
+      alert('Previously recorded refunds cannot be removed.');
+      return;
+    }
+    if (decision === 'approve' && refund > maxRefund) {
+      alert(amounts.customerCancelled && !refundException
+        ? 'For customer cancellations, retain the first-hour charge. An explained venue or payment issue can be marked as an exception.'
+        : 'Refund cannot exceed the recorded payment.');
+      return;
+    }
+    if (refundException && !booking.cancellationRefundException && amounts.customerCancelled && !note.trim()) {
+      alert('Explain the venue or payment issue for this refund exception.');
       return;
     }
     setSaving(true);
     try {
-      await onSubmit(booking._id, { decision, refundedAmount: refund, note });
+      await onSubmit(booking._id, { decision, refundedAmount: refund, refundException, note });
     } finally {
       setSaving(false);
     }
   }
 
   return (
-    <Modal open={!!booking} onClose={onClose} title="Review cancellation request">
+    <Modal open={!!booking} onClose={onClose} title={alreadyApproved ? 'Record manual refund' : 'Review cancellation request'}>
       {booking && (
         <>
           <p className="mfield-note">{booking.guestName} · {booking.reservationCode || shortBookingId(booking)} · recorded payment {formatPeso(recordedPayment(booking))}</p>
-          <div className="mfield"><label htmlFor="cancellation-decision">Decision</label><select id="cancellation-decision" value={decision} onChange={(event) => setDecision(event.target.value)}><option value="approve">Approve cancellation</option><option value="reject">Reject request</option></select></div>
-          <div className="mfield"><label htmlFor="cancellation-refund">Manual refund (₱)</label><input id="cancellation-refund" type="number" min="0" step="0.01" value={refundedAmount} onChange={(event) => setRefundedAmount(event.target.value)} disabled={decision === 'reject'} /><p className="mfield-note">Record the amount actually refunded. The system never sends an automatic provider refund.</p></div>
+          {!alreadyApproved && <div className="mfield"><label htmlFor="cancellation-decision">Decision</label><select id="cancellation-decision" value={decision} onChange={(event) => { setDecision(event.target.value); if (event.target.value === 'reject') { setRefundException(false); setRefundedAmount(String(booking.refundedAmount ?? 0)); } }}><option value="approve">Approve cancellation</option><option value="reject">Reject request</option></select></div>}
+          {amounts.customerCancelled && <p className="mfield-note">{booking.cancellationRefundException ? 'Refund exception approved.' : `First-hour charge retained: ${amounts.firstHour === null ? 'needs review' : formatPeso(Math.min(amounts.paid, amounts.firstHour))}.`} Maximum {booking.cancellationRefundException ? 'exception' : 'standard'} refund: {formatPeso(amounts.refundLimit)}.</p>}
+          {amounts.customerCancelled && decision === 'approve' && (
+            <div className="mfield"><label className="cancellation-exception-label" htmlFor="cancellation-refund-exception"><input id="cancellation-refund-exception" className="cancellation-exception-checkbox" type="checkbox" checked={refundException} onChange={(event) => setRefundException(event.target.checked)} disabled={Boolean(booking.cancellationRefundException)} /> Venue or payment issue exception</label><p className="mfield-note">Use for a venue cancellation, duplicate charge, or verified payment error. Explain it in the note.</p></div>
+          )}
+          <div className="mfield"><label htmlFor="cancellation-refund">Total manually refunded (₱)</label><input id="cancellation-refund" type="number" min={amounts.refunded} max={maxRefund} step="0.01" value={refundedAmount} onChange={(event) => setRefundedAmount(event.target.value)} disabled={decision === 'reject'} /><p className="mfield-note">Enter the cumulative amount already sent to the guest. This only records the refund; it does not transfer money through PayMongo.</p></div>
           <div className="mfield"><label htmlFor="cancellation-note">Review note</label><textarea id="cancellation-note" rows="3" value={note} onChange={(event) => setNote(event.target.value)} placeholder="Optional note for the audit trail" /></div>
-          <div className="modal-actions"><button type="button" className="btn-cancel" onClick={onClose}>Keep request</button><button type="button" className="btn-confirm" disabled={saving} onClick={submit}>{saving ? 'Saving…' : 'Save review'}</button></div>
+          <div className="modal-actions"><button type="button" className="btn-cancel" onClick={onClose}>Close</button><button type="button" className="btn-confirm" disabled={saving || noRefundChange} onClick={submit}>{saving ? 'Saving…' : alreadyApproved ? 'Record refund' : 'Save review'}</button></div>
         </>
       )}
     </Modal>
@@ -996,7 +1083,6 @@ function EditBookingModal({ booking, rooms, onClose, onSaved, minDuration, maxDu
   const [duration, setDuration] = useState(1);
   const [paymentMethod, setPaymentMethod] = useState('Cash');
   const [hasCorkage, setHasCorkage] = useState(false);
-  const [status, setStatus] = useState('Pending');
   const [specialRequests, setSpecialRequests] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -1013,7 +1099,6 @@ function EditBookingModal({ booking, rooms, onClose, onSaved, minDuration, maxDu
       setDuration(booking.duration || 1);
       setPaymentMethod(booking.paymentMethod || 'Cash');
       setHasCorkage(Number(booking.corkageFee) > 0);
-      setStatus(booking.status || 'Pending');
       setSpecialRequests(booking.specialRequests || '');
     }
   }, [booking]);
@@ -1056,7 +1141,6 @@ function EditBookingModal({ booking, rooms, onClose, onSaved, minDuration, maxDu
         duration: d,
         paymentMethod,
         hasCorkage,
-        status,
         specialRequests: specialRequests.trim(),
       });
       onClose();
@@ -1169,14 +1253,8 @@ function EditBookingModal({ booking, rooms, onClose, onSaved, minDuration, maxDu
 
             <div>
               <div className="bd-section-title"><i className="ti ti-shield-check"></i> Status</div>
-              <div className="mfield">
-                <label>Reservation status</label>
-                <select value={status} onChange={(e) => setStatus(e.target.value)}>
-                  {(status === 'Done' ? [...EDITABLE_BOOKING_STATUSES, 'Done'] : EDITABLE_BOOKING_STATUSES).map((s) => (
-                    <option key={s} value={s}>{s}</option>
-                  ))}
-                </select>
-              </div>
+              <ReservationStatus booking={booking} />
+              <p className="mfield-note">Use the reservation actions to confirm, complete, or cancel a booking.</p>
             </div>
           </div>
 

@@ -11,6 +11,9 @@
    (panel switching, gating, etc.) from earlier tiers.
    ══════════════════════════════════════════ */
 #panel-dashboard{gap:18px;}
+#panel-dashboard .dash-reservation-status{display:inline-flex;flex-direction:column;align-items:flex-start;gap:4px;}
+#panel-dashboard .dash-reservation-status small{font-size:.67rem;color:var(--muted);}
+#panel-dashboard .dash-reservation-status .dash-status-warning{color:var(--red);font-weight:600;}
 
 /* Metric cards — icon badges, per-card accent color, soft depth + hover lift */
 #panel-dashboard .metric-row{gap:14px;}

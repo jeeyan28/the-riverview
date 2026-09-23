@@ -9,14 +9,12 @@ import { bookingsService } from '../../services/bookings';
 import { formatPeso } from '../../utils/currency';
 import { businessDate } from '../../utils/businessDate';
 import { buildRoomView, formatTimeRemaining } from '../../hooks/useRoomMonitorData';
+import { reservationPresentation } from '../../utils/reservationStatus';
 
 const STATUS_PILL_CLASS = {
-  Ongoing: 'pill-active',
   Pending: 'pill-pending',
   Done: 'pill-done',
-  Overdue: 'pill-overdue',
   Cancelled: 'pill-done',
-  'Pending Payment Verification': 'pill-pending',
   Confirmed: 'pill-active',
   Rejected: 'pill-overdue',
   'No Show': 'pill-overdue',
@@ -160,7 +158,10 @@ function Dashboard() {
     {
       key: 'status',
       label: 'Status',
-      render: (b) => <span className={`pill ${STATUS_PILL_CLASS[b.status] || 'pill-pending'}`}>{b.status}</span>,
+      render: (b) => {
+        const { status, warning } = reservationPresentation(b);
+        return <span className="dash-reservation-status"><span className={`pill ${STATUS_PILL_CLASS[status] || 'pill-pending'}`}>{status}</span>{warning && <small className={warning === 'Overdue' ? 'dash-status-warning' : ''}>{warning}</small>}</span>;
+      },
     },
   ];
 
@@ -200,7 +201,7 @@ function Dashboard() {
           )}
         </div>
         <div className="mc">
-          <div className="mc-label"><i className="ti ti-cash"></i>Today's Service Revenue</div>
+          <div className="mc-label"><i className="ti ti-cash"></i>Today's Net Collected</div>
           <div className="mc-val">{summaryLoading ? '—' : summaryError ? '—' : formatPeso(summary.todayRevenue.amount)}</div>
           {!summaryLoading && !summaryError && (
             <div className={`mc-sub ${summary.todayRevenue.direction === 'up' ? 'up' : summary.todayRevenue.direction === 'down' ? 'dn' : ''}`}>

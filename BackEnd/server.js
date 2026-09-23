@@ -130,11 +130,10 @@ app.use((err, req, res, next) => {
 });
 
 function startBookingLifecycleScheduler() {
-  const { voidExpiredBookings, updateBookingLifecycleStatuses } = require("./utils/bookingHelper");
-  const INTERVAL_MS = 5 * 60 * 1000;
+  const { voidExpiredBookings } = require("./utils/bookingHelper");
+  const INTERVAL_MS = 60 * 1000;
   async function tick() {
     try { await voidExpiredBookings(); } catch (e) { console.error("scheduler: voidExpiredBookings failed:", e.message); }
-    try { await updateBookingLifecycleStatuses(); } catch (e) { console.error("scheduler: updateBookingLifecycleStatuses failed:", e.message); }
   }
   setInterval(tick, INTERVAL_MS);
   tick();

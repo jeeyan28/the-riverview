@@ -50,19 +50,56 @@ function endSessionFields(session, { paid = false, paidAmount } = {}, now = new 
   return { ...fields, status: "Finished", endedAt: now };
 }
 
-function reviewCancellationFields(booking, { decision, refundedAmount = booking.refundedAmount || 0, note = "" }, reviewer, now = new Date()) {
+function firstHourCharge(booking) {
+  if (booking.firstHourPayment !== undefined && booking.firstHourPayment !== null) return money(booking.firstHourPayment);
+  // For older partial-payment records, the original deposit is more accurate after a reschedule.
+  if (Number(booking.downPaymentHours) === 1 && Number(booking.duration) > 1 && Number(booking.downPayment) > 0) {
+    return money(booking.downPayment);
+  }
+  const firstRate = Number(booking.hourlyRates?.[0]);
+  if (Number.isFinite(firstRate) && firstRate >= 0) return money(firstRate);
+  throw new AppError(409, "The first-hour charge is missing. Review this older reservation before recording a customer refund.");
+}
+
+function cancellationRefundLimit(booking, refundException = booking.cancellationRefundException || false, source = booking.cancellationSource) {
+  const paid = bookingCollected(booking);
+  const customerCancelled = source === "customer" || (!source && booking.cancellationRequestedAt);
+  if (!customerCancelled || refundException || paid === 0) return paid;
+  return money(Math.max(0, paid - firstHourCharge(booking)));
+}
+
+function reviewCancellationFields(booking, { decision, refundedAmount = booking.refundedAmount || 0, note = "", refundException, cancellationSource }, reviewer, now = new Date()) {
   if (!['Pending', 'Confirmed', 'Cancelled'].includes(booking.status)) throw new AppError(409, "This reservation can no longer be cancelled.");
+  if (!['approve', 'reject'].includes(decision)) throw new AppError(400, "Choose to approve or reject the cancellation.");
   if (decision === "reject" && booking.cancellationStatus !== "Requested") throw new AppError(409, "There is no cancellation request to reject.");
+  if (decision === "approve" && booking.status === "Cancelled" && booking.cancellationStatus !== "Approved") throw new AppError(409, "This reservation has no approved cancellation to update.");
   const paidAmount = bookingCollected(booking);
   const refunded = money(refundedAmount);
   if (refunded < Number(booking.refundedAmount || 0)) throw new AppError(400, "Previously recorded refunds cannot be removed.");
   if (decision === "reject" && refunded !== Number(booking.refundedAmount || 0)) throw new AppError(400, "Rejecting a cancellation cannot record a refund.");
+  const source = cancellationSource || booking.cancellationSource || (booking.cancellationRequestedAt ? "customer" : "admin");
+  const exception = refundException === undefined ? Boolean(booking.cancellationRefundException) : refundException;
+  if (decision === "reject" && (refundException || cancellationSource)) throw new AppError(400, "A rejected request cannot change the refund policy.");
+  if (booking.cancellationRefundException && !exception) throw new AppError(400, "A recorded refund exception cannot be removed.");
+  if (source === "customer" && exception && !booking.cancellationRefundException && !String(note).trim()) {
+    throw new AppError(400, "Explain the venue or payment issue before making a refund exception.");
+  }
+  if (decision === "approve" && refunded > 0 && refunded > cancellationRefundLimit(booking, exception, source)) {
+    throw new AppError(400, "Customer cancellations must retain the first-hour charge. Record an explained exception for a venue or payment issue.");
+  }
+  const updatingApproved = booking.status === "Cancelled" && booking.cancellationStatus === "Approved";
   return {
     ...financialFields(booking.amount, paidAmount, refunded),
     status: decision === "approve" ? "Cancelled" : booking.status,
     cancellationStatus: decision === "approve" ? "Approved" : "Rejected",
-    cancellationReviewedAt: now, cancellationReviewedBy: reviewer, cancellationReviewNote: note,
+    cancellationSource: source,
+    cancellationRefundException: exception,
+    cancellationReviewedAt: updatingApproved ? booking.cancellationReviewedAt : now,
+    cancellationReviewedBy: updatingApproved ? booking.cancellationReviewedBy : reviewer,
+    cancellationReviewNote: updatingApproved ? booking.cancellationReviewNote || "" : note || booking.cancellationReviewNote || "",
+    ...(updatingApproved && note ? { cancellationRefundNote: note } : {}),
+    ...(refunded !== Number(booking.refundedAmount || 0) ? { paymentUpdatedAt: now } : {}),
   };
 }
 
-module.exports = { money, bookingCollected, financialFields, bookingStartMs, extendSessionFields, endSessionFields, reviewCancellationFields };
+module.exports = { money, bookingCollected, financialFields, bookingStartMs, extendSessionFields, endSessionFields, firstHourCharge, cancellationRefundLimit, reviewCancellationFields };

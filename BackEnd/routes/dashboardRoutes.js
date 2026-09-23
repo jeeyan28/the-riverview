@@ -47,7 +47,7 @@ router.get('/summary', async (req, res) => {
       pendingReservations,
       cancellationRequests,
       unpaidSessions: sales.rows.filter((row) => row.date === todayKey && row.sessionId && row.balance > 0).length,
-      revenueBasis: 'Recorded payments, net of refunds, by service date in Asia/Manila.',
+      revenueBasis: 'Recorded payments, net of manual refunds already sent, by service date in Asia/Manila. Approved refunds remain collected until staff records the transfer.',
       warnings: sales.warnings,
     });
   } catch (err) {

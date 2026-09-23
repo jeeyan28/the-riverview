@@ -103,7 +103,7 @@ router.post("/intent", ensureAuthenticated, paymentIntentLimiter, validate(creat
     try {
       intent = await createPaymentIntent({
         amountPesos: downPayment,
-        description: `Down payment — ${room.name} (${date} ${timeIn})`,
+        description: `${downPaymentHours === duration ? "Full payment" : "One-hour down payment"} — ${room.name} (${date} ${timeIn})`,
         statementDescriptor: room.name,
         metadata: toBookingMetadata({
           guestName: guestName.trim(),

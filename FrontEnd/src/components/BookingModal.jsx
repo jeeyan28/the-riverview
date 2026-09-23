@@ -5,6 +5,7 @@ import fallbackRoomImg from '../assets/pictures/Billiard.jpg';
 import RoomOptionCard from './RoomOptionCard';
 import { bookingsService } from '../services/bookings';
 import { useCountdownClock } from '../hooks/useCountdownClock';
+import { useToast } from '../hooks/useToast';
 import { formatHour, openBookingReceipt, guestPhoneDisplay } from '../utils/receipt';
 import {
   dateKey,
@@ -27,8 +28,10 @@ import {
 } from '../utils/rooms';
 import { CORKAGE_FEE, calculateBookingPrice, variantRateLabel } from '../utils/roomPricing';
 import { API_BASE_URL } from '../services/api';
+import { terminalPaymentFailure } from '../utils/paymongoStatus';
 import { ArrowLeft, X } from 'lucide-react';
 import ModalPortal from './ModalPortal';
+import Toast from './Toast';
 import { buildLoginPath, buildRoomReservationPath } from '../utils/auth';
 
 const PAYMONGO_API_BASE = import.meta.env.VITE_PAYMONGO_API_BASE || 'https://api.paymongo.com/v1';
@@ -43,7 +46,7 @@ const STEPS = [
   { key: 'price', label: 'Room' },
   { key: 'schedule', label: 'Date & Time' },
   { key: 'details', label: 'Details' },
-  { key: 'payment', label: 'Down payment' },
+  { key: 'payment', label: 'Payment' },
 ];
 const STEP_INDEX = { price: 1, schedule: 2, details: 3, payment: 4 };
 
@@ -53,20 +56,6 @@ const PAYMENT_METHODS = [
   { key: 'qrph', label: 'QR Ph', description: 'Scan with a QR Ph app', icon: 'fa-solid fa-qrcode' },
   { key: 'card', label: 'Credit / Debit Card', description: 'Visa or Mastercard', icon: 'fa-solid fa-credit-card' },
 ];
-
-const TERMINAL_PAYMENT_STATUSES = new Set(['expired', 'cancelled', 'failed']);
-
-function terminalPaymentFailure(data) {
-  if (!TERMINAL_PAYMENT_STATUSES.has(data?.status)) return null;
-  return {
-    phase: data.status,
-    message: data.message || (data.status === 'expired'
-      ? 'This payment session expired before it was completed. No charge was made.'
-      : data.status === 'cancelled'
-        ? 'This payment was cancelled. No charge was made.'
-        : 'The payment could not be completed. No charge was made.'),
-  };
-}
 
 function BookingStepper({ step, onStepClick, steps = STEPS }) {
   const activeIndex = Math.max(0, steps.findIndex((item) => item.key === step)) + 1;
@@ -306,7 +295,16 @@ function BookingSummaryContents({
 }
 
 function BookingSuccess({ booking, room, selectedVariant, onDone, onViewBooking }) {
-  if (!booking) return null;
+  if (!booking) {
+    return (
+      <>
+        <div className="bk-confirm-icon"><i className="fa-solid fa-check"></i></div>
+        <h3>Booking successful!</h3>
+        <p>Your payment is confirmed. View your reservation details and receipt in Profile → Reservations.</p>
+        <button className="bk-done" onClick={onDone}>Back to Home</button>
+      </>
+    );
+  }
 
   const facility = room?.name || booking.roomLabel || '—';
   const roomName = selectedVariant?.label || booking.variantLabel || booking.roomLabel || '—';
@@ -342,8 +340,8 @@ function BookingSuccess({ booking, room, selectedVariant, onDone, onViewBooking 
   return (
     <>
       <div className="bk-confirm-icon"><i className="fa-solid fa-check"></i></div>
-      <h3>Reservation Confirmed!</h3>
-      <p>Your reservation has been successfully created. We can't wait to host you.</p>
+      <h3>Booking successful!</h3>
+      <p>Your reservation is confirmed. Download your receipt below, or view the details and receipt later in Profile → Reservations.</p>
 
       <div className="bk-success-card">
         <div className="bk-success-grid">
@@ -428,6 +426,7 @@ function BookingSuccess({ booking, room, selectedVariant, onDone, onViewBooking 
 function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, closeHour, settings, initialVariantLabel = '' }) {
   const open = !!room || !!returnInfo;
   const { user: authUser, revalidate, logout } = useAuth();
+  const { toast, showToast } = useToast();
 
   const [monthBookings, setMonthBookings] = useState({});
   const [calendarLoading, setCalendarLoading] = useState(false);
@@ -473,6 +472,12 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
   const pollRef = useRef(null);
 
   const [pmReturn, setPmReturn] = useState({ phase: 'loading', booking: null });
+
+  useEffect(() => {
+    if (step === 'paymongoReturn' && pmReturn.phase === 'confirmed') {
+      showToast('Booking successful! Download your receipt or view it in Profile → Reservations.');
+    }
+  }, [step, pmReturn.phase, showToast]);
 
   const [lock, setLock] = useState(null);
   const [lockError, setLockError] = useState('');
@@ -578,6 +583,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
       }
 
       const maxAttempts = 6;
+      let awaitingMethodChecks = 0;
       for (let attempt = 0; attempt < maxAttempts; attempt++) {
         if (cancelled) return;
         try {
@@ -586,7 +592,12 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
             { credentials: 'include' }
           );
           const data = await res.json().catch(() => ({}));
-          const paymentFailure = terminalPaymentFailure(data);
+          if (res.status === 401 || res.status === 403) {
+            if (!cancelled) setPmReturn({ phase: 'needLogin', booking: null });
+            return;
+          }
+          awaitingMethodChecks = data.status === 'awaiting_payment_method' ? awaitingMethodChecks + 1 : 0;
+          const paymentFailure = terminalPaymentFailure(data, { httpStatus: res.status, awaitingMethodChecks });
           if (paymentFailure) {
             if (!cancelled) setPmReturn({ ...paymentFailure, booking: null });
             return;
@@ -964,6 +975,8 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
 
     let attempts = 0;
     let popupClosedChecks = 0;
+    let awaitingMethodChecks = 0;
+    let statusFailures = 0;
     stopPolling();
     const checkStatus = async () => {
       attempts += 1;
@@ -973,22 +986,42 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
       let paymentFailure = null;
       let remoteStatus = '';
       let statusChecked = false;
+      let authRequired = false;
       try {
         const res = await fetch(`${API_BASE_URL}/api/payments/paymongo/status/${encodeURIComponent(paymentIntentId)}`, {
           credentials: 'include',
         });
         const data = await res.json().catch(() => ({}));
         statusChecked = res.ok || [402, 409, 410].includes(res.status);
+        statusFailures = statusChecked ? 0 : statusFailures + 1;
+        authRequired = res.status === 401 || res.status === 403;
         remoteStatus = data.status || '';
+        awaitingMethodChecks = remoteStatus === 'awaiting_payment_method' ? awaitingMethodChecks + 1 : 0;
         if (res.status === 409 && data.status === 'paid_slot_unavailable') {
           slotUnavailableMsg = data.message || "Your payment succeeded, but this slot was just taken. Please contact support so we can help resolve it.";
         } else {
-          paymentFailure = terminalPaymentFailure(data);
+          paymentFailure = terminalPaymentFailure(data, { httpStatus: res.status, awaitingMethodChecks });
           paid = res.ok && ['Paid', 'Partial'].includes(data.paymentStatus);
           paidBookingId = data.bookingId || null;
         }
       } catch (err) {
         console.error(err);
+        statusFailures += 1;
+      }
+
+      if (authRequired) {
+        stopPolling();
+        setPmReturn({ phase: 'needLogin', booking: null });
+        return;
+      }
+      if (statusFailures >= 6) {
+        stopPolling();
+        setPmReturn({
+          phase: 'pending',
+          booking: null,
+          message: 'We could not verify your payment status. Check Profile → Reservations before trying another payment.',
+        });
+        return;
       }
 
       if (slotUnavailableMsg) {
@@ -1024,7 +1057,10 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
 
       if (popup && popup.closed && statusChecked && remoteStatus !== 'processing') {
         popupClosedChecks += 1;
-        if (popupClosedChecks < 3) return;
+        if (popupClosedChecks < 3) {
+          pollRef.current = setTimeout(checkStatus, POLL_INTERVAL_MS);
+          return;
+        }
         stopPolling();
         setPmReturn({
           phase: 'cancelled',
@@ -1749,7 +1785,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
 
                 <div className="bk-detail-actions">
                   <button className="bk-confirm bk-continue" disabled={confirming} onClick={continueToPayment}>
-                    Continue to down payment <i className="fa-solid fa-arrow-right"></i>
+                    Continue to payment <i className="fa-solid fa-arrow-right"></i>
                   </button>
                 </div>
               </div>
@@ -1769,6 +1805,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
                   <p className="bk-downpayment-duration">{remainingBalanceAmount > 0
                     ? `Pays for the first hour and confirms your reservation. Balance due at venue: ₱${remainingBalanceAmount.toLocaleString()}.`
                     : 'Pays the full booking total and confirms your reservation. No balance due at venue.'}</p>
+                  <p className="bk-downpayment-duration">If you cancel, the first-hour charge of ₱{(priceBreakdown.hourlyRates[0] || 0).toLocaleString()} is non-refundable. {downPaymentAmount > (priceBreakdown.hourlyRates[0] || 0) ? `Contact admin after cancellation approval to arrange a manual refund of the remaining ₱${(downPaymentAmount - (priceBreakdown.hourlyRates[0] || 0)).toLocaleString()}.` : 'A one-hour down payment has no refundable balance.'}</p>
                 </div>
 
                 <div className="bk-payment-methods">
@@ -2022,7 +2059,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
                       {pmReturn.phase === 'expired' && 'Payment session expired'}
                       {pmReturn.phase === 'failed' && 'Payment could not be completed'}
                       {pmReturn.phase === 'needLogin' && 'Please log in to confirm'}
-                      {pmReturn.phase === 'pending' && 'Still confirming your payment…'}
+                      {pmReturn.phase === 'pending' && (pmReturn.message ? 'Payment status unavailable' : 'Still confirming your payment…')}
                     </h3>
 
                     <p>
@@ -2036,7 +2073,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
                       {pmReturn.phase === 'needLogin' &&
                         'Log in with the same account you reserved with to see your payment status.'}
                       {pmReturn.phase === 'pending' &&
-                        'This can take a little longer than usual. You\'ll see your reservation move to "Confirmed" in your profile shortly — no need to pay again.'}
+                        (pmReturn.message || 'This can take a little longer than usual. You\'ll see your reservation move to "Confirmed" in your profile shortly — no need to pay again.')}
                     </p>
 
                     {['cancelled', 'expired', 'failed'].includes(pmReturn.phase) && room ? (
@@ -2077,6 +2114,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
         </div>
         </div>
       </div>
+      <Toast {...toast} />
     </ModalPortal>
   );
 }
