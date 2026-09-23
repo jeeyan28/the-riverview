@@ -1347,7 +1347,7 @@ function SessionModal({ modal, onClose, onSubmit }) {
             {fromBooking && (
               <p className="mfield-note">This {duration}-hour length comes from the confirmed reservation.</p>
             )}
-            {isExtend && <p className="mfield-note">The original start time stays unchanged. The full charge is recalculated from its hourly rates.</p>}
+            {isExtend && <p className="mfield-note">The original charge stays fixed. Only the added hours are charged at their current rates.</p>}
           </div>
 
           {!isExtend && (

@@ -57,21 +57,41 @@ function recordedPayment(b) {
   return Math.max(Number(b?.paidAmount) || 0, Number(b?.downPayment) || 0);
 }
 
+function netCollected(b) {
+  return Math.max(0, recordedPayment(b) - (Number(b?.refundedAmount) || 0));
+}
+
 function outstandingBalance(b) {
   if (['Cancelled', 'Rejected', 'No Show'].includes(b?.status)) return 0;
-  return Math.max(0, Number(b?.amount || 0) - recordedPayment(b) + Number(b?.refundedAmount || 0));
+  return Math.max(0, Number(b?.amount || 0) - netCollected(b));
 }
 
 function isFullPayment(b) {
-  return Number(b?.amount || 0) > 0 && recordedPayment(b) >= Number(b.amount);
+  return !['Cancelled', 'Rejected', 'No Show'].includes(b?.status)
+    && Number(b?.amount || 0) > 0 && netCollected(b) >= Number(b.amount);
 }
 
 function paymentPlanLabel(b) {
-  const paid = recordedPayment(b);
+  const paid = netCollected(b);
   const balance = outstandingBalance(b);
+  const refunded = Number(b?.refundedAmount) || 0;
+  if (refunded > 0) return `${formatPeso(refunded)} refunded · ${formatPeso(paid)} retained`;
+  if (['Cancelled', 'Rejected', 'No Show'].includes(b?.status)) return paid > 0 ? `${formatPeso(paid)} retained` : 'No payment retained';
   if (isFullPayment(b)) return `Paid ${formatPeso(paid)}`;
   if (paid > 0) return `${formatPeso(paid)} paid · ${formatPeso(balance)} due`;
   return `${formatPeso(balance)} due`;
+}
+
+function onlinePaymentNote(b) {
+  const online = Math.max(0, Number(b?.downPayment) || 0);
+  const later = Math.max(0, recordedPayment(b) - online);
+  const refunded = Math.max(0, Number(b?.refundedAmount) || 0);
+  const balance = outstandingBalance(b);
+  if (refunded > 0) return `${formatPeso(online)} was verified online via PayMongo. ${formatPeso(refunded)} was refunded manually; ${formatPeso(netCollected(b))} remains collected.`;
+  if (['Cancelled', 'Rejected', 'No Show'].includes(b?.status)) return `${formatPeso(online)} was verified online via PayMongo. ${formatPeso(netCollected(b))} was retained.`;
+  if (later > 0) return `${formatPeso(online)} was verified online via PayMongo and ${formatPeso(later)} was recorded later. ${balance > 0 ? `${formatPeso(balance)} remains due.` : 'No balance remains.'}`;
+  if (balance > 0) return `${formatPeso(online)} was verified online via PayMongo. Collect ${formatPeso(balance)} at the venue.`;
+  return 'Paid in full online via PayMongo. The payment is verified and needs no manual approval.';
 }
 
 function paymentPlanPillClass(b) {
@@ -685,9 +705,7 @@ function Bookings() {
                 <div className="bd-card">
                   <div className="bd-section-title"><i className="ti ti-credit-card"></i> Payment</div>
                   <p style={{ fontSize: '.85rem', color: 'var(--muted)', margin: 0 }}>
-                    {outstandingBalance(detailBooking) > 0
-                      ? `The ${formatPeso(recordedPayment(detailBooking))} online downpayment is verified. Collect ${formatPeso(outstandingBalance(detailBooking))} at the venue.`
-                      : 'Paid in full online via PayMongo. The payment is verified and needs no manual approval.'}
+                    {onlinePaymentNote(detailBooking)}
                   </p>
                 </div>
               )}

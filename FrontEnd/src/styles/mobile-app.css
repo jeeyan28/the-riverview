@@ -108,11 +108,14 @@
 
   .public-site .help-widget {
     bottom: calc(var(--app-nav-height) + var(--space-8, 32px) + env(safe-area-inset-bottom));
+    transition: opacity .2s var(--ease-out, ease), transform .2s var(--ease-out, ease), visibility .2s linear;
   }
 
   .public-site .help-widget.is-footer-visible {
     visibility: hidden;
     pointer-events: none;
+    opacity: 0;
+    transform: translateY(8px) scale(.96);
   }
 
   .public-site .toast {

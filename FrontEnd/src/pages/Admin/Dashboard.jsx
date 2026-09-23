@@ -200,7 +200,7 @@ function Dashboard() {
           )}
         </div>
         <div className="mc">
-          <div className="mc-label"><i className="ti ti-cash"></i>Today's Revenue</div>
+          <div className="mc-label"><i className="ti ti-cash"></i>Today's Service Revenue</div>
           <div className="mc-val">{summaryLoading ? '—' : summaryError ? '—' : formatPeso(summary.todayRevenue.amount)}</div>
           {!summaryLoading && !summaryError && (
             <div className={`mc-sub ${summary.todayRevenue.direction === 'up' ? 'up' : summary.todayRevenue.direction === 'down' ? 'dn' : ''}`}>
@@ -236,12 +236,15 @@ function Dashboard() {
       </div>
 
       {!summaryLoading && financial && (
-        <div className="finance-activity">
-          <span>Today collected: <strong>{formatPeso(financial.collected)}</strong></span>
-          <span>Charges: <strong>{formatPeso(financial.charged)}</strong></span>
-          <span>Refunded: <strong>{formatPeso(financial.refunded)}</strong></span>
-          <span>Unpaid sessions: <strong>{summary.unpaidSessions || 0}</strong></span>
-        </div>
+        <>
+          <div className="finance-activity">
+            <span>Collected for today's bookings: <strong>{formatPeso(financial.collected)}</strong></span>
+            <span>Charges: <strong>{formatPeso(financial.charged)}</strong></span>
+            <span>Refunded: <strong>{formatPeso(financial.refunded)}</strong></span>
+            <span>Unpaid sessions: <strong>{summary.unpaidSessions || 0}</strong></span>
+          </div>
+          <p className="finance-basis">{summary.revenueBasis}</p>
+        </>
       )}
 
       <div className="dash-grid">

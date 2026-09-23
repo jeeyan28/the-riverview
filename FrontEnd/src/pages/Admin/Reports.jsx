@@ -16,7 +16,7 @@ function displayDate(value) {
 }
 
 function statusClass(status) {
-  if (status === 'Cancelled' || status === 'Rejected' || status === 'No Show') return 'pill-overdue';
+  if (status === 'Cancelled' || status === 'Rejected' || status === 'No Show' || status === 'Refunded' || status === 'Partial refund') return 'pill-overdue';
   if (status === 'Done' || status === 'Finished') return 'pill-done';
   if (status === 'Pending' || status === 'Partial' || status === 'Unpaid') return 'pill-pending';
   return 'pill-active';

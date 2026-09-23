@@ -60,8 +60,8 @@ function Footer({ settings }) {
             <span>0355 Caingin, San Rafael, Bulacan 3008</span>
           </div>
           <div className="footer-legal-links">
-            <Link to="/terms">Terms</Link>
             <Link to="/privacy">Privacy</Link>
+            <Link to="/terms" aria-label="Terms">Terms</Link>
           </div>
           <a href="/#home" className="footer-back-top" onClick={(event) => handleSectionLink(event, 'home')}>
             Back to top <ArrowUp size={14} aria-hidden="true" />

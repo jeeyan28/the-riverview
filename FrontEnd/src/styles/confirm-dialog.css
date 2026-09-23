@@ -3,7 +3,7 @@
     padding: 20px; background: rgba(6,10,18,.72); backdrop-filter: blur(3px);
     opacity: 0; transition: opacity .15s ease;
 }
-.uimodal-overlay.uimodal-show { opacity: 1; }
+.uimodal-overlay.uimodal-show { opacity: 1; animation: uimodal-backdrop-enter 180ms ease both; }
 .uimodal-box {
     width: 100%; max-width: 400px; background: var(--navy2, #FFFFFF); border: 1px solid var(--border, rgba(16,24,40,.08));
     border-radius: 16px; padding: 24px; box-shadow: 0 20px 60px rgba(16,24,40,.25);
@@ -11,7 +11,12 @@
     max-height: calc(100dvh - 40px); overflow-y: auto;
     transform: translateY(8px) scale(.98); transition: transform .15s ease;
 }
-.uimodal-overlay.uimodal-show .uimodal-box { transform: none; }
+.uimodal-overlay.uimodal-show .uimodal-box { transform: none; animation: uimodal-dialog-enter 240ms ease both; }
+@keyframes uimodal-backdrop-enter { from { opacity: 0; } to { opacity: 1; } }
+@keyframes uimodal-dialog-enter {
+    from { opacity: 0; transform: translateY(8px) scale(.98); }
+    to { opacity: 1; transform: none; }
+}
 .uimodal-icon {
     width: 40px; height: 40px; border-radius: 11px; display: flex; align-items: center; justify-content: center;
     margin-bottom: 14px; background: var(--teal-soft, rgba(0,201,167,.10)); color: var(--teal, #00C9A7); flex-shrink: 0;
@@ -35,3 +40,8 @@
 .uimodal-btn:disabled { opacity: .5; cursor: not-allowed; }
 .uimodal-btn-primary:disabled:hover { background: var(--teal, #00C9A7); }
 .uimodal-btn-danger:disabled:hover { background: var(--red, #E11D48); }
+
+@media (prefers-reduced-motion: reduce) {
+    .uimodal-overlay.uimodal-show,
+    .uimodal-overlay.uimodal-show .uimodal-box { animation: none; }
+}

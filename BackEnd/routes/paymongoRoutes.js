@@ -66,8 +66,8 @@ router.post("/intent", ensureAuthenticated, paymentIntentLimiter, validate(creat
     const guestCount = guestCountRaw || 1;
 
     const downPaymentHours = downPaymentHoursRaw !== undefined ? downPaymentHoursRaw : 1;
-    if (downPaymentHours > duration) {
-      return res.status(400).json({ message: `Downpayment hours must be a whole number between 1 and ${duration}.` });
+    if (downPaymentHours !== 1 && downPaymentHours !== duration) {
+      return res.status(400).json({ message: "Choose a 1-hour down payment or pay the full booking total." });
     }
 
     if (req.user.isGuest) {
@@ -97,7 +97,7 @@ router.post("/intent", ensureAuthenticated, paymentIntentLimiter, validate(creat
       return res.status(e.status || 500).json({ message: e.message || "Server error." });
     }
 
-    const downPayment = computeDownPayment(hourlyRates, downPaymentHours);
+    const downPayment = downPaymentHours === duration ? amount : computeDownPayment(hourlyRates, 1);
 
     let intent;
     try {

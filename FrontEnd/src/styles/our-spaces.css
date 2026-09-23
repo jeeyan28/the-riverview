@@ -241,6 +241,8 @@
 }
 
 .public-site .space-carousel-link:focus-visible,
+.public-site .space-carousel-control:active { transform: scale(.98); }
+
 .public-site .space-carousel-control:focus-visible,
 .public-site .space-carousel-dots button:focus-visible {
   outline: 3px solid var(--teal-text);

@@ -406,7 +406,19 @@
   background: var(--surface-alt);
   color: var(--text-muted-light);
   font-weight: 650;
+  cursor: pointer;
+  transition:
+    background-color var(--dur-fast, .16s) var(--ease-out),
+    border-color var(--dur-fast, .16s) var(--ease-out),
+    color var(--dur-fast, .16s) var(--ease-out),
+    transform var(--dur-fast, .16s) var(--ease-out);
 }
+.public-site .rp-filter-button:hover {
+  border-color: color-mix(in srgb, var(--teal) 35%, var(--border));
+  color: var(--text-main);
+  transform: translateY(-1px);
+}
+.public-site .rp-filter-button:active { transform: translateY(0) scale(.98); }
 .public-site .rp-filter-button.is-selected { border-color: rgba(0,201,167,.48); background: rgba(0,201,167,.1); color: var(--teal-strong); }
 .public-site .rp-result-count { flex-shrink: 0; color: var(--text-muted-light); font-size: .8rem; }
 .public-site .rp-empty {

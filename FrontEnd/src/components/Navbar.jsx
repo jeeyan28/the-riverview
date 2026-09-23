@@ -32,17 +32,26 @@ function Navbar({
   const [activeSection, setActiveSection] = useState('home');
 
   useEffect(() => {
+    let frame = 0;
     function handleScroll() {
-      const sections = document.querySelectorAll('section[id]');
-      if (!sections.length) return;
-      let current = '';
-      sections.forEach((s) => {
-        if (window.scrollY >= s.offsetTop - 120) current = s.id;
+      if (frame) return;
+      frame = requestAnimationFrame(() => {
+        frame = 0;
+        const sections = document.querySelectorAll('section[id]');
+        if (!sections.length) return;
+        let current = '';
+        sections.forEach((s) => {
+          if (window.scrollY >= s.offsetTop - 120) current = s.id;
+        });
+        setActiveSection(current);
       });
-      setActiveSection(current);
     }
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    handleScroll();
+    return () => {
+      if (frame) cancelAnimationFrame(frame);
+      window.removeEventListener('scroll', handleScroll);
+    };
   }, []);
 
   function handleSectionLink(e, id) {
