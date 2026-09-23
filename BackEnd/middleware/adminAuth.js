@@ -1,5 +1,6 @@
 const { hasPermission, isAdminRole } = require("../utils/permissions");
 const User = require("../model/user");
+const { refreshSessionLifetime } = require("../utils/sessionPolicy");
 
 async function ensureAuthenticated(req, res, next) {
   if (!req.session || !req.session.userId) {
@@ -11,6 +12,7 @@ async function ensureAuthenticated(req, res, next) {
       return res.status(401).json({ message: "Not logged in." });
     }
     req.user = user;
+    refreshSessionLifetime(req, user);
     next();
   } catch (err) {
     res.status(401).json({ message: "Not logged in." });

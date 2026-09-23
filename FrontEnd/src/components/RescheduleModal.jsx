@@ -13,7 +13,7 @@ import {
   isOperatingDay,
   getSlotState,
   getTimePeriod,
-  getFreeHourCount,
+  getBookableStartCount,
   getAvailableRoomCountForDuration,
 } from '../utils/rooms';
 
@@ -62,8 +62,8 @@ function RescheduleModal({ booking, onClose, onRescheduled }) {
   const { openHour, closeHour, settings } = useSiteSettings();
   const [room, setRoom] = useState(null);
   const [step, setStep] = useState('date');
-  const [viewYear, setViewYear] = useState(() => new Date().getFullYear());
-  const [viewMonth, setViewMonth] = useState(() => new Date().getMonth());
+  const [viewYear, setViewYear] = useState(() => Number(businessDate().slice(0, 4)));
+  const [viewMonth, setViewMonth] = useState(() => Number(businessDate().slice(5, 7)) - 1);
   const [monthBookings, setMonthBookings] = useState({});
   const [monthLoading, setMonthLoading] = useState(true);
   const [selectedDateKey, setSelectedDateKey] = useState(null);
@@ -132,24 +132,25 @@ function RescheduleModal({ booking, onClose, onRescheduled }) {
     return () => { cancelled = true; };
   }, [selectedDateKey, roomId, variantLabel]);
 
-  const today = new Date();
+  const todayKey = businessDate();
+  const todayYear = Number(todayKey.slice(0, 4));
+  const todayMonth = Number(todayKey.slice(5, 7)) - 1;
   const firstOfMonth = new Date(viewYear, viewMonth, 1);
   const firstDay = firstOfMonth.getDay();
   const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
-  const isCurrentMonth = today.getFullYear() === viewYear && today.getMonth() === viewMonth;
-  const isEarliestMonth = viewYear === today.getFullYear() && viewMonth === today.getMonth();
+  const isEarliestMonth = viewYear === todayYear && viewMonth === todayMonth;
 
   const calendarDays = Array.from({ length: daysInMonth }, (_, i) => {
     const d = i + 1;
     const dStr = dateKey(viewYear, viewMonth, d);
     const dateObj = new Date(viewYear, viewMonth, d);
-    const isPast = dateObj < new Date(today.getFullYear(), today.getMonth(), today.getDate());
-    const isToday = isCurrentMonth && d === today.getDate();
+    const isPast = dStr < todayKey;
+    const isToday = dStr === todayKey;
     const holiday = isHolidayDate(dStr, settings.holidays);
     const closedDay = !isOperatingDay(dateObj, settings.operatingHours);
     const dayList = excludeOwnSlotFromDayList(monthBookings[dStr], booking);
-    const freeHours = getFreeHourCount(dayList, openHour, closeHour, totalRooms);
-    const fullyBooked = freeHours === 0;
+    const availableStarts = getBookableStartCount(dayList, openHour, closeHour, totalRooms, duration, dStr);
+    const fullyBooked = availableStarts === 0;
     const unavailable = holiday || closedDay;
     const disabled = isPast || unavailable || fullyBooked;
 
@@ -161,10 +162,10 @@ function RescheduleModal({ booking, onClose, onRescheduled }) {
       title = holiday ? 'Closed for a holiday' : 'Closed on this day';
     } else if (fullyBooked) {
       variant = 'full';
-      title = 'Fully booked';
-    } else if (freeHours <= 2) {
+      title = `No ${duration}-hour times available`;
+    } else if (availableStarts <= 2) {
       variant = 'few';
-      title = `Only ${freeHours} open hour${freeHours === 1 ? '' : 's'} left`;
+      title = `Only ${availableStarts} start time${availableStarts === 1 ? '' : 's'} left`;
     } else {
       variant = 'available';
     }
@@ -194,10 +195,8 @@ function RescheduleModal({ booking, onClose, onRescheduled }) {
   const slotGroups = useMemo(() => {
     if (!selectedDateKey) return {};
     const groups = { Morning: [], Afternoon: [], Evening: [] };
-    const isToday = selectedDateKey === dateKey(today.getFullYear(), today.getMonth(), today.getDate());
-    const currentHour = today.getHours();
-    for (let h = openHour; h < closeHour; h++) {
-      if (isToday && h <= currentHour) continue;
+    for (let h = openHour; h < Math.min(closeHour, 24); h++) {
+      if (Date.parse(`${selectedDateKey}T${String(h).padStart(2, '0')}:00:00+08:00`) <= Date.now()) continue;
       const state = getSlotState(h, duration, closeHour, reserved, totalRooms);
       groups[getTimePeriod(h)].push({ hour: h, state });
     }

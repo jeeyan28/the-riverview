@@ -33,7 +33,7 @@
 #app .booking-form-grid :is(input, select, textarea) { width: 100%; min-height: 44px; }
 #app .booking-form-grid textarea { padding: 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--navy3); color: var(--text); }
 #app .booking-addon-check { display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 12px 16px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--navy3); color: var(--text); cursor: pointer; }
-#app .booking-addon-check input { width: 18px; height: 18px; flex: 0 0 auto; accent-color: var(--teal); }
+#app .booking-addon-check input[type="checkbox"] { width: 20px; height: 20px; min-height: 20px; padding: 0; margin: 0; flex: 0 0 20px; accent-color: var(--teal); }
 #app .booking-addon-check strong, #app .booking-addon-check small { display: block; }
 #app .booking-addon-check small { margin-top: 2px; color: var(--muted); }
 #app .booking-charge-preview { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; border-radius: var(--radius-sm); background: var(--teal-soft); color: var(--text); }

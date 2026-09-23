@@ -78,7 +78,7 @@ function AuthForm({ mode, onSwitchMode, onForgotPassword, onAuthSuccess }) {
       return;
     }
     try {
-      const user = await loginWithGoogle(response.code, true);
+      const user = await loginWithGoogle(response.code);
       onAuthSuccess?.(user);
     } catch (err) {
       showToast(err.message || 'Google sign-in failed.', 'error');
@@ -152,7 +152,6 @@ function AuthForm({ mode, onSwitchMode, onForgotPassword, onAuthSuccess }) {
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [remember, setRemember] = useState(false);
   const [emailError, setEmailError] = useState('');
   const [passwordError, setPasswordError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -181,7 +180,7 @@ function AuthForm({ mode, onSwitchMode, onForgotPassword, onAuthSuccess }) {
 
     setLoading(true);
     try {
-      const user = await login(trimmedEmail, password, remember);
+      const user = await login(trimmedEmail, password);
       onAuthSuccess?.(user);
     } catch (err) {
       if (typeof err.status === 'number') {
@@ -583,42 +582,6 @@ function AuthForm({ mode, onSwitchMode, onForgotPassword, onAuthSuccess }) {
               }}
               error={passwordError}
             />
-          </div>
-
-          <div className="remember-row">
-            <input
-              type="checkbox"
-              id="remember-input"
-              checked={remember}
-              onChange={() => {}}
-              style={{ display: 'none' }}
-            />
-            <div
-              className={`custom-check${remember ? ' checked' : ''}`}
-              role="checkbox"
-              aria-checked={remember}
-              tabIndex={0}
-              onClick={() => setRemember((r) => !r)}
-              onKeyDown={(e) => {
-                if (e.key === ' ' || e.key === 'Enter') {
-                  e.preventDefault();
-                  setRemember((r) => !r);
-                }
-              }}
-            >
-              <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
-                <path
-                  d="M1 4L3.5 6.5L9 1"
-                  stroke="#0A1628"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </div>
-            <label htmlFor="remember-input" className="remember-label">
-              Remember me for 30 days
-            </label>
           </div>
 
           <button type="submit" className={`btn-submit${loading ? ' loading' : ''}`}>

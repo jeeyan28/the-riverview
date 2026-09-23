@@ -73,7 +73,7 @@ function Login() {
                   <h2>Continue to The Riverview</h2>
                   <p>
                     {hasReservationIntent
-                      ? 'Choose an option below to continue your reservation.'
+                      ? 'Sign in, create an account, or book as a guest.'
                       : 'Sign in to a customer or staff account, create a customer account, or book as a guest.'}
                   </p>
                 </>
@@ -89,8 +89,8 @@ function Login() {
               <div className="reservation-auth-notice" role="alert">
                 <CircleAlert size={17} aria-hidden="true" />
                 <div>
-                  <strong>Sign in before reserving</strong>
-                  <span>Nothing has been booked yet. Sign in, create an account, or continue as a guest below; then we’ll return you to your reservation.</span>
+                  <strong>You’ll return to this room</strong>
+                  <span>After you continue, choose a date and time to reserve it.</span>
                 </div>
               </div>
             )}

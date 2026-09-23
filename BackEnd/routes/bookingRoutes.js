@@ -232,7 +232,7 @@ router.post("/", requirePermission(PERMISSIONS.BOOKING_MANAGE), paymentProofUplo
           ...(paymentMethod ? { paymentMethod } : {}),
           bookedBy: req.session.userId,
           source: "walk-in",
-          status: req.body.status || Booking.BOOKING_STATUS.PENDING,
+          status: Booking.BOOKING_STATUS.CONFIRMED,
           ...financialFields(amount, req.body.paidAmount || 0),
           paymentUpdatedAt: req.body.paidAmount ? new Date() : undefined,
         });
@@ -244,7 +244,7 @@ router.post("/", requirePermission(PERMISSIONS.BOOKING_MANAGE), paymentProofUplo
       return res.status(e.status || 500).json({ message: e.message || "Server error." });
     }
 
-    await logAudit({ category: "Booking", action: "created", description: `created walk-in booking ${booking.reservationCode} for ${booking.guestName}`, user: req.user });
+    await logAudit({ category: "Booking", action: "created", description: `created manual reservation ${booking.reservationCode} for ${booking.guestName}`, user: req.user });
     res.status(201).json(booking);
   } catch (err) {
     console.error(err);

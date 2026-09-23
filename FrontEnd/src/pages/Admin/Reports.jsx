@@ -6,6 +6,7 @@ import RevenueFilters from '../../components/RevenueFilters';
 import RevenueSummary from '../../components/RevenueSummary';
 import SessionReportPanel from '../../components/SessionReportPanel';
 import { useRevenueReport } from '../../hooks/useRevenueReport';
+import { businessDate } from '../../utils/businessDate';
 import { reportsService } from '../../services/reports';
 import { formatPeso } from '../../utils/currency';
 
@@ -24,8 +25,8 @@ function statusClass(status) {
 
 function Reports() {
   const [reportView, setReportView] = useState('revenue');
-  const [from, setFrom] = useState('');
-  const [to, setTo] = useState('');
+  const [from, setFrom] = useState(() => businessDate());
+  const [to, setTo] = useState(() => businessDate());
   const [source, setSource] = useState('all');
   const [search, setSearch] = useState('');
   const [exporting, setExporting] = useState(false);

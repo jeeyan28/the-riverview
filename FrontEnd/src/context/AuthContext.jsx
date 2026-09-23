@@ -32,12 +32,7 @@ function replaceStoredUser(user, storage) {
 }
 
 function writeStoredUser(user) {
-  const storage = sessionStorage.getItem(STORAGE_KEY)
-    ? sessionStorage
-    : localStorage.getItem(STORAGE_KEY)
-      ? localStorage
-      : sessionStorage;
-  replaceStoredUser(user, storage);
+  replaceStoredUser(user, localStorage);
 }
 
 function clearStoredUser() {
@@ -91,7 +86,7 @@ export function AuthProvider({ children }) {
     return () => window.removeEventListener('pageshow', handlePageShow);
   }, [revalidate]);
 
-  const login = useCallback(async (email, password, rememberMe) => {
+  const login = useCallback(async (email, password) => {
     const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
       method: 'POST',
       credentials: 'include',
@@ -106,12 +101,11 @@ export function AuthProvider({ children }) {
       throw err;
     }
     setUser(data.user);
-    const storage = rememberMe ? localStorage : sessionStorage;
-    replaceStoredUser(data.user, storage);
+    writeStoredUser(data.user);
     return data.user;
   }, []);
 
-  const loginWithGoogle = useCallback(async (code, rememberMe) => {
+  const loginWithGoogle = useCallback(async (code) => {
     const res = await fetch(`${API_BASE_URL}/api/auth/google`, {
       method: 'POST',
       credentials: 'include',
@@ -121,8 +115,7 @@ export function AuthProvider({ children }) {
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.message || 'Google sign-in failed.');
     setUser(data.user);
-    const storage = rememberMe ? localStorage : sessionStorage;
-    replaceStoredUser(data.user, storage);
+    writeStoredUser(data.user);
     return data.user;
   }, []);
 
@@ -140,7 +133,7 @@ export function AuthProvider({ children }) {
       throw err;
     }
     setUser(data.user);
-    replaceStoredUser(data.user, sessionStorage);
+    writeStoredUser(data.user);
     return data.user;
   }, []);
 

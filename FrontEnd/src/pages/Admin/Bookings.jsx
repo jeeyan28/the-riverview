@@ -3,6 +3,7 @@ import '../../styles/admin/finance.css';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import DataTable from '../../components/DataTable';
 import Modal from '../../components/Modal';
+import ReservationTimePicker, { reservationSelectionKey } from '../../components/ReservationTimePicker';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import { useConfirm } from '../../hooks/useConfirm';
 import { dateKey } from '../../utils/rooms';
@@ -33,7 +34,6 @@ const STATUS_PILL_CLASS = {
 const PAYMENT_METHODS = ['Cash', 'GCash', 'Maya', 'QR Ph', 'Credit / Debit Card'];
 const SEARCH_DEBOUNCE_MS = 350;
 const BOOKINGS_POLL_MS = 15000;
-const MAX_GUEST_HISTORY_ROWS = 5;
 const WEEKDAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 function ReservationStatus({ booking, now }) {
@@ -87,18 +87,6 @@ function paymentPlanLabel(b) {
   if (isFullPayment(b)) return `Paid ${formatPeso(paid)}`;
   if (paid > 0) return `${formatPeso(paid)} paid · ${formatPeso(balance)} due`;
   return `${formatPeso(balance)} due`;
-}
-
-function onlinePaymentNote(b) {
-  const online = Math.max(0, Number(b?.downPayment) || 0);
-  const later = Math.max(0, recordedPayment(b) - online);
-  const refunded = Math.max(0, Number(b?.refundedAmount) || 0);
-  const balance = outstandingBalance(b);
-  if (refunded > 0) return `${formatPeso(online)} was verified online via PayMongo. ${formatPeso(refunded)} was refunded manually; ${formatPeso(netCollected(b))} remains collected.`;
-  if (['Cancelled', 'Rejected', 'No Show'].includes(reservationPresentation(b).status)) return `${formatPeso(online)} was verified online via PayMongo. ${formatPeso(netCollected(b))} was retained.`;
-  if (later > 0) return `${formatPeso(online)} was verified online via PayMongo and ${formatPeso(later)} was recorded later. ${balance > 0 ? `${formatPeso(balance)} remains due.` : 'No balance remains.'}`;
-  if (balance > 0) return `${formatPeso(online)} was verified online via PayMongo. Collect ${formatPeso(balance)} at the venue.`;
-  return 'Paid in full online via PayMongo. The payment is verified and needs no manual approval.';
 }
 
 function paymentPlanPillClass(b) {
@@ -157,9 +145,6 @@ function Bookings() {
   const [proofId, setProofId] = useState(null);
   const [cancellationReviewId, setCancellationReviewId] = useState(null);
   const [manualBookingOpen, setManualBookingOpen] = useState(() => new URLSearchParams(window.location.search).get('openManualBooking') === '1');
-  const [historyOpen, setHistoryOpen] = useState(false);
-  const [fullHistory, setFullHistory] = useState([]);
-  const [historyLoading, setHistoryLoading] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -323,25 +308,6 @@ function Bookings() {
     }
   }
 
-  async function openFullHistory() {
-    if (!detailBooking) return;
-    setHistoryOpen(true);
-    setHistoryLoading(true);
-    try {
-      const params = detailBooking.guestContact ? { guestContact: detailBooking.guestContact } : { guestName: detailBooking.guestName };
-      const data = await bookingsService.list(params);
-      const list = (Array.isArray(data) ? data : [])
-        .filter((b) => b._id !== detailBooking._id)
-        .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
-      setFullHistory(list);
-    } catch (err) {
-      console.error(err);
-      setFullHistory([]);
-    } finally {
-      setHistoryLoading(false);
-    }
-  }
-
   const stats = useMemo(
     () => ({
       total: bookings.length,
@@ -357,17 +323,6 @@ function Bookings() {
   const proofBooking = useMemo(() => allBookings.find((b) => b._id === proofId) || null, [allBookings, proofId]);
   const cancellationReviewBooking = useMemo(() => allBookings.find((b) => b._id === cancellationReviewId) || null, [allBookings, cancellationReviewId]);
 
-  const historyForDetail = useMemo(() => {
-    if (!detailBooking) return [];
-    return allBookings
-      .filter(
-        (b) =>
-          b._id !== detailBooking._id &&
-          (detailBooking.guestContact ? b.guestContact === detailBooking.guestContact : b.guestName === detailBooking.guestName)
-      )
-      .sort((a, b) => (b.date || '').localeCompare(a.date || ''))
-      .slice(0, MAX_GUEST_HISTORY_ROWS);
-  }, [allBookings, detailBooking]);
 
   const bookingsByDate = useMemo(() => {
     const map = {};
@@ -587,7 +542,7 @@ function Bookings() {
                 <i className="ti ti-x"></i> Clear
               </button>
             )}
-            {canManage && <button type="button" className="save-btn" onClick={() => setManualBookingOpen(true)}><i className="ti ti-plus" aria-hidden="true" /> Add walk-in</button>}
+            {canManage && <button type="button" className="save-btn" onClick={() => setManualBookingOpen(true)}><i className="ti ti-plus" aria-hidden="true" /> Add manual reservation</button>}
           </div>
         </div>
         <div className="bk-results-row">
@@ -677,62 +632,23 @@ function Bookings() {
 
                 <div className="bd-card">
                   <div className="bd-section-title"><i className="ti ti-credit-card"></i> Payment Breakdown</div>
-                  <div className="bd-grid">
-                    <div className="bd-field"><label>Recorded payment</label><p>{formatPeso(recordedPayment(detailBooking))}</p></div>
-                    <div className="bd-field"><label>Refunded</label><p>{formatPeso(detailBooking.refundedAmount)}</p></div>
-                    <div className="bd-field"><label>Outstanding balance</label><p>{formatPeso(outstandingBalance(detailBooking))}</p></div>
+                  <div className="bd-grid bd-financial-grid">
                     <div className="bd-field"><label>Total charge</label><p>{formatPeso(detailBooking.amount)}</p></div>
-                    <div className="bd-field"><label>Payment Method</label><p>{detailBooking.paymentMethod || '—'}</p></div>
+                    <div className="bd-field"><label>Payment received</label><p>{formatPeso(netCollected(detailBooking))}</p></div>
+                    <div className="bd-field"><label>Balance due</label><p>{formatPeso(outstandingBalance(detailBooking))}</p></div>
                   </div>
                 </div>
               </div>
 
-              <div className="bd-row">
-                <div className="bd-card">
-                  <div className="bd-section-title"><i className="ti ti-calendar-event"></i> Reservation Specifications</div>
-                  <div className="bd-grid">
-                    <div className="bd-field"><label>Facility Name</label><p>{facilityName(detailBooking)}</p></div>
-                    <div className="bd-field"><label>Room</label><p>{detailBooking.variantLabel || '—'}</p></div>
-                    <div className="bd-field"><label>Reservation Date</label><p>{detailBooking.date || '—'}</p></div>
-                    <div className="bd-field"><label>Check-in Time</label><p>{detailBooking.timeIn || '—'}</p></div>
-                    <div className="bd-field"><label>Duration</label><p>{detailBooking.duration ? `${detailBooking.duration} hr${detailBooking.duration > 1 ? 's' : ''}` : '—'}</p></div>
-                    <div className="bd-field"><label>Reserved On</label><p>{detailBooking.createdAt ? new Date(detailBooking.createdAt).toLocaleString(undefined, { month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }) : '—'}</p></div>
-                  </div>
-                </div>
-
-                <div className="bd-card">
-                  <div className="bd-section-title"><i className="ti ti-history"></i> Customer Reservation History</div>
-                  <div className="card card-flush">
-                    <table className="tbl">
-                      <thead style={{ background: 'var(--navy3)' }}>
-                        <tr><th style={{ padding: '8px 10px' }}>Date</th><th>Room</th><th>Hrs</th><th>Status</th></tr>
-                      </thead>
-                      <tbody>
-                        {historyForDetail.length === 0 ? (
-                          <tr><td colSpan={4} style={{ textAlign: 'center', color: 'var(--muted)', padding: '10px 0', fontSize: '.8rem' }}>No previous reservations from this guest.</td></tr>
-                        ) : (
-                          historyForDetail.map((h) => (
-                            <tr key={h._id}>
-                              <td style={{ padding: '8px 10px' }}>{h.date}</td>
-                              <td>{facilityName(h)}</td>
-                              <td>{h.duration}hrs</td>
-                              <td><ReservationStatus booking={h} now={clockMs} /></td>
-                            </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                  {historyForDetail.length > 0 && (
-                    <button
-                      type="button"
-                      className="tbl-action-btn"
-                      style={{ color: 'var(--text)', marginTop: 10 }}
-                      onClick={openFullHistory}
-                    >
-                      View All History
-                    </button>
-                  )}
+              <div className="bd-card">
+                <div className="bd-section-title"><i className="ti ti-calendar-event"></i> Reservation Specifications</div>
+                <div className="bd-grid bd-spec-grid">
+                  <div className="bd-field"><label>Facility Name</label><p>{facilityName(detailBooking)}</p></div>
+                  <div className="bd-field"><label>Room</label><p>{detailBooking.variantLabel || '—'}</p></div>
+                  <div className="bd-field"><label>Reservation Date</label><p>{detailBooking.date || '—'}</p></div>
+                  <div className="bd-field"><label>Check-in Time</label><p>{detailBooking.timeIn || '—'}</p></div>
+                  <div className="bd-field"><label>Duration</label><p>{detailBooking.duration ? `${detailBooking.duration} hr${detailBooking.duration > 1 ? 's' : ''}` : '—'}</p></div>
+                  <div className="bd-field"><label>Reserved On</label><p>{detailBooking.createdAt ? new Date(detailBooking.createdAt).toLocaleString(undefined, { month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }) : '—'}</p></div>
                 </div>
               </div>
 
@@ -750,18 +666,16 @@ function Bookings() {
                 </div>
               )}
 
-              {detailBooking.paymentProvider === 'paymongo' && (
+              <div className="bd-row bd-support-row">
                 <div className="bd-card">
-                  <div className="bd-section-title"><i className="ti ti-credit-card"></i> Payment</div>
-                  <p style={{ fontSize: '.85rem', color: 'var(--muted)', margin: 0 }}>
-                    {onlinePaymentNote(detailBooking)}
-                  </p>
+                  <div className="bd-section-title"><i className="ti ti-credit-card"></i> Payment method</div>
+                  <p className="bd-support-value">{recordedPayment(detailBooking) > 0 ? detailBooking.paymentMethod || 'Method not recorded' : 'No payment recorded yet'}</p>
+                  <p className="bd-support-caption">{recordedPayment(detailBooking) > 0 ? detailBooking.paymentProvider === 'paymongo' ? 'Paid online' : 'Recorded by staff' : 'Record the method when payment is collected.'}</p>
                 </div>
-              )}
-
-              <div className="bd-card">
-                <div className="bd-section-title"><i className="ti ti-file-text"></i> Special Requests / Notes</div>
-                <p className="bd-notes-body">{detailBooking.specialRequests?.trim() || 'No special requests provided.'}</p>
+                <div className="bd-card">
+                  <div className="bd-section-title"><i className="ti ti-file-text"></i> Notes</div>
+                  <p className="bd-notes-body">{detailBooking.specialRequests?.trim() || 'No notes added.'}</p>
+                </div>
               </div>
 
               {detailBooking.cancellationStatus && detailBooking.cancellationStatus !== 'None' && (
@@ -783,8 +697,7 @@ function Bookings() {
               )}
             </div>
 
-            <div className="modal-actions bd-footer" style={{ justifyContent: 'space-between' }}>
-              <div style={{ display: 'flex', gap: 10 }}>
+            <div className="modal-actions bd-footer">
                 {canManage && !['Done', 'No Show', 'Rejected', 'Cancelled'].includes(reservationPresentation(detailBooking, clockMs).status) && detailBooking.status !== 'Ongoing' && (
                   <button
                     className="btn-cancel"
@@ -824,9 +737,6 @@ function Bookings() {
                     Cancel Reservation
                   </button>
                 )}
-              </div>
-              <div style={{ display: 'flex', gap: 10 }}>
-                <button className="btn-cancel" onClick={() => setDetailId(null)}>Close</button>
                 {canManage && ['Pending', 'Pending Payment Verification'].includes(detailBooking.status) && (detailBooking.status === 'Pending Payment Verification' || recordedPayment(detailBooking) === 0) && (
                   <button
                     className="btn-cancel"
@@ -858,7 +768,7 @@ function Bookings() {
                     Confirm Reservation
                   </button>
                 )}
-              </div>
+              <button className="btn-cancel bd-footer-close" onClick={() => setDetailId(null)}>Close</button>
             </div>
           </>
         )}
@@ -869,35 +779,6 @@ function Bookings() {
         onClose={() => setCancellationReviewId(null)}
         onSubmit={reviewCancellation}
       />
-
-      <Modal open={historyOpen} onClose={() => setHistoryOpen(false)} title={`Reservation History — ${detailBooking?.guestName || ''}`}>
-        <div className="card card-flush">
-          <table className="tbl">
-            <thead style={{ background: 'var(--navy3)' }}>
-              <tr><th style={{ padding: '8px 10px' }}>Date</th><th>Room</th><th>Hrs</th><th>Status</th></tr>
-            </thead>
-            <tbody>
-              {historyLoading ? (
-                <tr><td colSpan={4} style={{ textAlign: 'center', color: 'var(--muted)', padding: '10px 0', fontSize: '.8rem' }}>Loading…</td></tr>
-              ) : fullHistory.length === 0 ? (
-                <tr><td colSpan={4} style={{ textAlign: 'center', color: 'var(--muted)', padding: '10px 0', fontSize: '.8rem' }}>No previous reservations from this guest.</td></tr>
-              ) : (
-                fullHistory.map((h) => (
-                  <tr key={h._id}>
-                    <td style={{ padding: '8px 10px' }}>{h.date}</td>
-                    <td>{facilityName(h)}</td>
-                    <td>{h.duration}hrs</td>
-                    <td><ReservationStatus booking={h} now={clockMs} /></td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-        <div className="modal-actions">
-          <button className="btn-cancel" onClick={() => setHistoryOpen(false)}>Close</button>
-        </div>
-      </Modal>
 
       <ConfirmDialog {...confirmProps} />
     </div>
@@ -910,19 +791,23 @@ function CreateBookingModal({ open, rooms, onClose, onCreated, minDuration = 1, 
   const [guestCount, setGuestCount] = useState('1');
   const [roomId, setRoomId] = useState('');
   const [variantLabel, setVariantLabel] = useState('');
-  const [date, setDate] = useState(() => businessDate());
-  const [timeIn, setTimeIn] = useState('07:00');
+  const [date, setDate] = useState('');
+  const [timeIn, setTimeIn] = useState('');
   const [duration, setDuration] = useState(String(minDuration));
   const [paidAmount, setPaidAmount] = useState('0');
+  const [paymentMethod, setPaymentMethod] = useState('Cash');
   const [hasCorkage, setHasCorkage] = useState(false);
   const [specialRequests, setSpecialRequests] = useState('');
+  const [availability, setAvailability] = useState({ key: '', status: 'incomplete' });
   const [saving, setSaving] = useState(false);
   const selectedRoom = rooms.find((room) => room._id === roomId);
   const variants = Array.isArray(selectedRoom?.variants) ? selectedRoom.variants.filter((variant) => variant.status !== 'Unavailable') : [];
   const selectedVariant = variants.find((variant) => variant.label === variantLabel) || null;
-  const estimatedCharge = selectedVariant
-    ? calculateBookingPrice({ variant: selectedVariant, startHour: Number.parseInt(timeIn, 10) || 0, duration: Number(duration) || 1, guestCount: Number(guestCount) || 1, hasCorkage }).amount
+  const estimatedCharge = selectedRoom
+    ? calculateBookingPrice({ variant: selectedVariant || selectedRoom, startHour: Number.parseInt(timeIn, 10) || 0, duration: Number(duration) || 1, guestCount: Number(guestCount) || 1, hasCorkage }).amount
     : 0;
+  const selectionKey = reservationSelectionKey({ roomId, variantLabel, date, duration, timeIn });
+  const available = availability.key === selectionKey && availability.status === 'available';
 
   useEffect(() => {
     if (!open) return;
@@ -931,12 +816,14 @@ function CreateBookingModal({ open, rooms, onClose, onCreated, minDuration = 1, 
     setGuestCount('1');
     setRoomId(rooms[0]?._id || '');
     setVariantLabel('');
-    setDate(businessDate());
-    setTimeIn('07:00');
+    setDate('');
+    setTimeIn('');
     setDuration(String(minDuration));
     setPaidAmount('0');
+    setPaymentMethod('Cash');
     setHasCorkage(false);
     setSpecialRequests('');
+    setAvailability({ key: '', status: 'incomplete' });
   }, [open, rooms, minDuration]);
 
   useEffect(() => {
@@ -953,26 +840,30 @@ function CreateBookingModal({ open, rooms, onClose, onCreated, minDuration = 1, 
       alert('Complete the guest, room, hourly schedule, and payment fields.');
       return;
     }
-    if (estimatedCharge > 0 && amountReceived > estimatedCharge) {
+    if (!available) {
+      alert('Choose an available start time for this reservation.');
+      return;
+    }
+    if (amountReceived > estimatedCharge) {
       alert('Amount received cannot exceed the calculated reservation charge.');
       return;
     }
     setSaving(true);
     try {
-      await bookingsService.create({ guestName: guestName.trim(), guestContact: guestContact.trim(), guestCount: parsedGuestCount, hasCorkage, specialRequests: specialRequests.trim(), roomId, variantLabel: variantLabel || undefined, date, timeIn, duration: parsedDuration, paidAmount: amountReceived, status: 'Pending', paymentMethod: 'Cash' });
+      await bookingsService.create({ guestName: guestName.trim(), guestContact: guestContact.trim(), guestCount: parsedGuestCount, hasCorkage, specialRequests: specialRequests.trim(), roomId, variantLabel: variantLabel || undefined, date, timeIn, duration: parsedDuration, paidAmount: amountReceived, paymentMethod });
       onClose();
       await onCreated();
     } catch (err) {
-      alert(err.message || 'Could not create the walk-in booking.');
+      alert(err.message || 'Could not create the manual reservation.');
     } finally {
       setSaving(false);
     }
   }
 
   return (
-    <Modal open={open} onClose={onClose} title="Add walk-in reservation" size="2xl" className="walkin-booking-modal">
+    <Modal open={open} onClose={onClose} title="Add manual reservation" size="2xl" className="walkin-booking-modal">
       <form onSubmit={submit} className="walkin-booking-form">
-        <p className="walkin-form-intro">Enter the guest and schedule, then review the charge. The reservation starts as Pending until you confirm it.</p>
+        <p className="walkin-form-intro">Enter the guest and choose an available time. The reservation will be confirmed when you create it.</p>
 
         <section className="walkin-form-section" aria-labelledby="walkin-guest-heading">
           <h3 id="walkin-guest-heading" className="walkin-section-title">Guest</h3>
@@ -986,27 +877,32 @@ function CreateBookingModal({ open, rooms, onClose, onCreated, minDuration = 1, 
         <section className="walkin-form-section" aria-labelledby="walkin-schedule-heading">
           <h3 id="walkin-schedule-heading" className="walkin-section-title">Facility & schedule</h3>
           <div className="booking-form-grid walkin-facility-grid">
-            <div className="mfield"><label htmlFor="manual-room">Facility</label><select id="manual-room" required value={roomId} onChange={(event) => setRoomId(event.target.value)}><option value="">Choose a facility</option>{rooms.map((room) => <option key={room._id} value={room._id}>{room.name}</option>)}</select></div>
-            <div className="mfield"><label htmlFor="manual-variant">Room type</label><select id="manual-variant" required={variants.length > 0} value={variantLabel} onChange={(event) => setVariantLabel(event.target.value)} disabled={!variants.length}><option value="">{variants.length ? 'Choose a room type' : 'Base price'}</option>{variants.map((variant) => <option key={variant.label} value={variant.label}>{variant.label}</option>)}</select></div>
+            <div className="mfield"><label htmlFor="manual-room">Facility</label><select id="manual-room" required value={roomId} onChange={(event) => { setRoomId(event.target.value); setTimeIn(''); }}><option value="">Choose a facility</option>{rooms.map((room) => <option key={room._id} value={room._id}>{room.name}</option>)}</select></div>
+            <div className="mfield"><label htmlFor="manual-variant">Room type</label><select id="manual-variant" required={variants.length > 0} value={variantLabel} onChange={(event) => { setVariantLabel(event.target.value); setTimeIn(''); }} disabled={!variants.length}><option value="">{variants.length ? 'Choose a room type' : 'Base price'}</option>{variants.map((variant) => <option key={variant.label} value={variant.label}>{variant.label}</option>)}</select></div>
           </div>
           <div className="booking-form-grid walkin-time-grid">
-            <div className="mfield"><label htmlFor="manual-date">Date</label><input id="manual-date" type="date" required value={date} onChange={(event) => setDate(event.target.value)} /></div>
-            <div className="mfield"><label htmlFor="manual-time">Start time</label><input id="manual-time" type="time" step="3600" required value={timeIn} onChange={(event) => setTimeIn(event.target.value)} /></div>
-            <div className="mfield"><label htmlFor="manual-duration">Duration (hours)</label><input id="manual-duration" type="number" min={minDuration} max={maxDuration} step="1" required value={duration} onChange={(event) => setDuration(event.target.value)} /></div>
+            <div className="mfield"><label htmlFor="manual-date">Date</label><input id="manual-date" type="date" required value={date} min={businessDate()} onChange={(event) => { setDate(event.target.value); setTimeIn(''); }} /></div>
+            <div className="mfield"><label htmlFor="manual-duration">Duration (hours)</label><select id="manual-duration" value={duration} onChange={(event) => { setDuration(event.target.value); setTimeIn(''); }}>{Array.from({ length: maxDuration - minDuration + 1 }, (_, index) => String(minDuration + index)).map((hours) => <option key={hours} value={hours}>{hours} hour{hours === '1' ? '' : 's'}</option>)}</select></div>
           </div>
+          <ReservationTimePicker room={selectedRoom} variantLabel={variantLabel} date={date} duration={duration} timeIn={timeIn} onSelect={setTimeIn} onAvailabilityChange={setAvailability} />
         </section>
 
         <section className="walkin-form-section" aria-labelledby="walkin-payment-heading">
-          <h3 id="walkin-payment-heading" className="walkin-section-title">Payment & notes</h3>
-          <div className="booking-form-grid walkin-payment-grid">
-            <div className="booking-charge-preview"><span>Reservation charge</span><strong>{formatPeso(estimatedCharge)}</strong></div>
-            <div className="mfield"><label htmlFor="manual-paid">Amount received (₱)</label><input id="manual-paid" type="number" min="0" max={estimatedCharge > 0 ? estimatedCharge : undefined} step="0.01" value={paidAmount} onChange={(event) => setPaidAmount(event.target.value)} /><p className="booking-form-help">Enter 0 if nothing has been paid yet.</p></div>
-            <label className="booking-addon-check booking-form-wide"><input type="checkbox" checked={hasCorkage} onChange={(event) => setHasCorkage(event.target.checked)} /><span><strong>Outside food or drinks</strong><small>Add ₱{CORKAGE_FEE.toLocaleString()} corkage.</small></span></label>
-            <div className="mfield booking-form-wide"><label htmlFor="manual-notes">Special requests / notes <span className="walkin-optional">Optional</span></label><textarea id="manual-notes" rows="2" value={specialRequests} onChange={(event) => setSpecialRequests(event.target.value)} placeholder="Add details the staff should know" /></div>
+          <h3 id="walkin-payment-heading" className="walkin-section-title">Payment</h3>
+          <div className="manual-payment-layout">
+            <div className="manual-charge"><span>Total reservation charge</span><strong>{available ? formatPeso(estimatedCharge) : '—'}</strong><small>{available ? 'Includes selected hours and any corkage.' : 'Choose an available time to see the charge.'}</small></div>
+            <div className="mfield"><label htmlFor="manual-paid">Amount received</label><input id="manual-paid" type="number" min="0" max={estimatedCharge} step="0.01" value={paidAmount} onChange={(event) => setPaidAmount(event.target.value)} disabled={!available} /><p className="booking-form-help">Leave at ₱0 to collect at the venue.</p></div>
+            {Number(paidAmount) > 0 && <div className="mfield"><label htmlFor="manual-payment-method">Payment method</label><select id="manual-payment-method" value={paymentMethod} onChange={(event) => setPaymentMethod(event.target.value)}>{PAYMENT_METHODS.map((method) => <option key={method} value={method}>{method}</option>)}</select></div>}
           </div>
         </section>
 
-        <div className="modal-actions walkin-actions"><button type="button" className="btn-cancel" onClick={onClose}>Cancel</button><button type="submit" className="btn-confirm" disabled={saving}>{saving ? 'Creating…' : 'Create pending reservation'}</button></div>
+        <section className="walkin-form-section" aria-labelledby="walkin-notes-heading">
+          <h3 id="walkin-notes-heading" className="walkin-section-title">Add-ons & notes</h3>
+          <label className="booking-addon-check manual-corkage"><input type="checkbox" checked={hasCorkage} onChange={(event) => setHasCorkage(event.target.checked)} /><span><strong>Outside food or drinks</strong><small>Apply the corkage fee to this reservation.</small></span><b>+{formatPeso(CORKAGE_FEE)}</b></label>
+          <div className="mfield manual-notes"><label htmlFor="manual-notes">Special requests / notes <span className="walkin-optional">Optional</span></label><textarea id="manual-notes" rows="3" value={specialRequests} onChange={(event) => setSpecialRequests(event.target.value)} placeholder="Add details the staff should know" /></div>
+        </section>
+
+        <div className="modal-actions walkin-actions"><button type="button" className="btn-cancel" onClick={onClose}>Cancel</button><button type="submit" className="btn-confirm" disabled={saving || !available}>{saving ? 'Creating…' : 'Create confirmed reservation'}</button></div>
       </form>
     </Modal>
   );
@@ -1092,6 +988,7 @@ function EditBookingModal({ booking, rooms, onClose, onSaved, minDuration, maxDu
   const [paymentMethod, setPaymentMethod] = useState('Cash');
   const [hasCorkage, setHasCorkage] = useState(false);
   const [specialRequests, setSpecialRequests] = useState('');
+  const [availability, setAvailability] = useState({ key: '', status: 'incomplete' });
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -1113,11 +1010,15 @@ function EditBookingModal({ booking, rooms, onClose, onSaved, minDuration, maxDu
 
   const selectedRoom = (rooms || []).find((r) => r._id === roomId) || null;
   const variantOptions = selectedRoom?.variants || [];
+  const selectionKey = reservationSelectionKey({ roomId, variantLabel, date, duration, timeIn });
+  const scheduleChanged = booking && (roomId !== String(booking.room?._id || booking.room) || (variantLabel || '') !== (booking.variantLabel || '') || date !== booking.date || timeIn !== booking.timeIn || Number(duration) !== Number(booking.duration));
+  const available = availability.key === selectionKey && availability.status === 'available';
 
   function handleRoomChange(nextRoomId) {
     setRoomId(nextRoomId);
     const nextRoom = (rooms || []).find((r) => r._id === nextRoomId) || null;
     setVariantLabel(nextRoom?.variants?.[0]?.label || '');
+    setTimeIn('');
   }
 
   async function handleSave() {
@@ -1133,6 +1034,10 @@ function EditBookingModal({ booking, rooms, onClose, onSaved, minDuration, maxDu
     const d = Number(duration);
     if (!Number.isFinite(d) || d < minDuration || d > maxDuration) {
       alert(`Duration must be between ${minDuration} and ${maxDuration} hours.`);
+      return;
+    }
+    if (scheduleChanged && !available) {
+      alert('Choose an available start time before saving the new schedule.');
       return;
     }
     setSaving(true);
@@ -1230,7 +1135,7 @@ function EditBookingModal({ booking, rooms, onClose, onSaved, minDuration, maxDu
                 <label>Room</label>
                 <select
                   value={variantLabel}
-                  onChange={(e) => setVariantLabel(e.target.value)}
+                  onChange={(e) => { setVariantLabel(e.target.value); setTimeIn(''); }}
                   disabled={!variantOptions.length}
                 >
                   {!variantOptions.length && <option value="">—</option>}
@@ -1241,11 +1146,7 @@ function EditBookingModal({ booking, rooms, onClose, onSaved, minDuration, maxDu
               </div>
               <div className="mfield">
                 <label>Reservation Date</label>
-                <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-              </div>
-              <div className="mfield">
-                <label>Check-in time</label>
-                <input type="time" value={timeIn} onChange={(e) => setTimeIn(e.target.value)} />
+                <input type="date" value={date} min={businessDate()} onChange={(e) => { setDate(e.target.value); setTimeIn(''); }} />
               </div>
               <div className="mfield">
                 <label>Duration (hours)</label>
@@ -1254,7 +1155,7 @@ function EditBookingModal({ booking, rooms, onClose, onSaved, minDuration, maxDu
                   min={minDuration}
                   max={maxDuration}
                   value={duration}
-                  onChange={(e) => setDuration(e.target.value)}
+                  onChange={(e) => { setDuration(e.target.value); setTimeIn(''); }}
                 />
               </div>
             </div>
@@ -1264,6 +1165,11 @@ function EditBookingModal({ booking, rooms, onClose, onSaved, minDuration, maxDu
               <ReservationStatus booking={booking} />
               <p className="mfield-note">Use the reservation actions to confirm, complete, or cancel a booking.</p>
             </div>
+          </div>
+
+          <div className="bd-section">
+            <div className="bd-section-title"><i className="ti ti-clock"></i> Check-in time & availability</div>
+            <ReservationTimePicker room={selectedRoom} variantLabel={variantLabel} date={date} duration={duration} timeIn={timeIn} onSelect={setTimeIn} onAvailabilityChange={setAvailability} booking={booking} />
           </div>
 
           <div className="bd-section">
@@ -1281,7 +1187,7 @@ function EditBookingModal({ booking, rooms, onClose, onSaved, minDuration, maxDu
 
           <div className="modal-actions">
             <button className="btn-cancel" onClick={onClose}>Cancel</button>
-            <button className="btn-confirm" disabled={saving} onClick={handleSave}>
+            <button className="btn-confirm" disabled={saving || (scheduleChanged && !available)} onClick={handleSave}>
               {saving ? 'Saving…' : 'Save Changes'}
             </button>
           </div>

@@ -8,7 +8,13 @@ export const bookingsService = {
 
   updateStatus: (id, status) => apiRequest(`${BASE}/${id}`, { method: 'PUT', body: { status }, fallbackMessage: 'Failed to end the session.' }),
 
-  create: (payload) => apiRequest(BASE, { method: 'POST', body: payload, fallbackMessage: 'Failed to start the session.' }),
+  create: (payload) => apiRequest(BASE, { method: 'POST', body: payload, fallbackMessage: 'Failed to create the reservation.' }),
+
+  availability: ({ roomId, date, variantLabel }) => {
+    const params = new URLSearchParams({ roomId, date });
+    if (variantLabel) params.set('variantLabel', variantLabel);
+    return apiRequest(`${BASE}/availability?${params}`, { fallbackMessage: 'Could not check reservation availability.' });
+  },
 
   list: (params = {}) => {
     const qs = new URLSearchParams();
