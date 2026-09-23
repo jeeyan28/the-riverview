@@ -63,7 +63,7 @@ userSchema.methods.comparePassword = async function (candidate) {
 };
 
 userSchema.methods.setPassword = async function (plainText) {
-  this.password = await bcrypt.hash(plainText, SALT_ROUNDS);
+  this.password = plainText;
 };
 
 userSchema.methods.setPasswordHash = function (preHashed) {
