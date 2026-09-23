@@ -16,6 +16,8 @@ const STATUS_PILL_CLASS = {
   Done: 'pill-done',
   Cancelled: 'pill-done',
   Confirmed: 'pill-active',
+  Overdue: 'pill-overdue',
+  'In Use': 'pill-active',
   Rejected: 'pill-overdue',
   'No Show': 'pill-overdue',
 };

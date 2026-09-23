@@ -40,6 +40,18 @@ function bookingStartMs(date, time) {
   return result;
 }
 
+function completeReservationFields(booking, { now = Date.now(), hasMonitorSession = false } = {}) {
+  if (hasMonitorSession) throw new AppError(409, "Finish the linked session in Live Monitor instead.");
+  if (booking.status === "No Show") return { status: "Done", noShowAt: null };
+  if (booking.status === "Confirmed") {
+    if (booking.cancellationStatus === "Requested") throw new AppError(409, "Review the cancellation request before completing this reservation.");
+    const start = bookingStartMs(booking.date, booking.timeIn);
+    if (!Number.isFinite(start) || start > now) throw new AppError(409, "A reservation cannot be completed before its start time.");
+    return { status: "Done", noShowAt: null };
+  }
+  throw new AppError(409, "Only a confirmed or no-show reservation can be marked done.");
+}
+
 function extendSessionFields(session, addedHours, nextAmount) {
   if (session.status !== "Active") throw new AppError(409, "Only active sessions can be extended.");
   const hours = Number(addedHours);
@@ -111,4 +123,4 @@ function reviewCancellationFields(booking, { decision, refundedAmount = booking.
   };
 }
 
-module.exports = { money, bookingCollected, financialFields, fullOrDeferredPaymentFields, bookingStartMs, extendSessionFields, endSessionFields, firstHourCharge, cancellationRefundLimit, reviewCancellationFields };
+module.exports = { money, bookingCollected, financialFields, fullOrDeferredPaymentFields, bookingStartMs, completeReservationFields, extendSessionFields, endSessionFields, firstHourCharge, cancellationRefundLimit, reviewCancellationFields };

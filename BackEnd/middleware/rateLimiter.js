@@ -11,13 +11,21 @@ const loginLimiter = rateLimit({
   message: { message: "Too many login attempts from this network. Please try again later." },
 });
 
-const forgotPasswordLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000,
-  max: 5,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { message: "Too many password reset requests. Please try again later." },
-});
+function passwordResetLimiter(message, max = 5) {
+  return rateLimit({
+    windowMs: 60 * 60 * 1000,
+    max,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { message },
+  });
+}
+
+// Three code requests are allowed per hour. Verification and password updates
+// have separate safety limits so they never use up those three code requests.
+const forgotPasswordLimiter = passwordResetLimiter("This network has reached the limit of 3 password reset code requests per hour. Please try again later.", 3);
+const verifyResetOtpLimiter = passwordResetLimiter("Too many verification attempts. Please try again later.");
+const resetPasswordLimiter = passwordResetLimiter("Too many password update attempts. Please try again later.");
 
 const registerOtpLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
@@ -78,6 +86,8 @@ const paymentAttachLimiter = rateLimit({
 module.exports = {
   loginLimiter,
   forgotPasswordLimiter,
+  verifyResetOtpLimiter,
+  resetPasswordLimiter,
   registerOtpLimiter,
   guestCreationLimiter,
   guestRecoveryLoginLimiter,

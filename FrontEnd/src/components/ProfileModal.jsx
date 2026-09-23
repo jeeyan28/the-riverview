@@ -598,7 +598,7 @@ function ProfileModal({ open, onClose }) {
                   <i className="fa-solid fa-calendar-clock"></i> Reschedule
                 </button>
               )}
-              {viewingBooking.status === 'Confirmed' && reservationPresentation(viewingBooking, clockMs).status === 'Confirmed' && viewingBooking.cancellationStatus !== 'Requested' && viewingBooking.cancellationStatus !== 'Approved' && (
+              {viewingBooking.status === 'Confirmed' && ['Confirmed', 'Overdue'].includes(reservationPresentation(viewingBooking, clockMs).status) && viewingBooking.cancellationStatus !== 'Requested' && viewingBooking.cancellationStatus !== 'Approved' && (
                 <button type="button" className="pf-btn pf-btn-ghost pf-btn-danger" onClick={() => setCancellingBooking(viewingBooking)}>
                   <i className="fa-solid fa-ban"></i> Request cancellation
                 </button>

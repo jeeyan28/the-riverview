@@ -26,6 +26,8 @@ const STATUS_PILL_CLASS = {
   Cancelled: 'pill-done',
   'No Show': 'pill-overdue',
   Confirmed: 'pill-active',
+  Overdue: 'pill-overdue',
+  'In Use': 'pill-active',
   Rejected: 'pill-overdue',
 };
 const PAYMENT_METHODS = ['Cash', 'GCash', 'Maya', 'QR Ph', 'Credit / Debit Card'];
@@ -264,7 +266,13 @@ function Bookings() {
       ? 'Mark this no-show as done? Use this only if the guest actually used the facility.'
       : 'Mark this reservation as done? Use this only if the guest used the facility without a Room Monitor session.';
     if (!(await confirm(message, { confirmText: 'Mark Done' }))) return;
-    await updateBookingStatus(booking._id, 'Done');
+    try {
+      await bookingsService.markDone(booking._id);
+      await fetchBookings();
+    } catch (err) {
+      console.error(err);
+      alert(err.message || 'Could not mark this reservation done.');
+    }
   }
 
   async function deleteBooking(id) {
@@ -794,7 +802,7 @@ function Bookings() {
                     Delete
                   </button>
                 )}
-                {canManage && ['Confirmed', 'No Show'].includes(reservationPresentation(detailBooking, clockMs).status) && detailBooking.status !== 'Ongoing' && detailBooking.cancellationStatus !== 'Requested' && (detailBooking.status === 'No Show' || clockMs >= (reservationWindow(detailBooking)?.start ?? Infinity)) && (
+                {canManage && ['Confirmed', 'Overdue', 'No Show'].includes(reservationPresentation(detailBooking, clockMs).status) && detailBooking.status !== 'Ongoing' && detailBooking.cancellationStatus !== 'Requested' && (detailBooking.status === 'No Show' || clockMs >= (reservationWindow(detailBooking)?.start ?? Infinity)) && (
                   <button
                     className="btn-cancel"
                     style={{ color: 'var(--teal)', borderColor: 'rgba(45,212,191,.35)' }}
