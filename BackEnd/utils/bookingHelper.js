@@ -13,7 +13,8 @@ const { getPaymongoPaymentMethodLabel } = require("./paymongo");
 
 async function voidExpiredBookings() {
   const now = Date.now();
-  const confirmed = await Booking.find({ status: Booking.BOOKING_STATUS.CONFIRMED, cancellationStatus: { $ne: "Requested" } }).select("date timeIn duration");
+  const todayKey = new Intl.DateTimeFormat("en-CA", { timeZone: TIME_ZONE }).format(new Date(now));
+  const confirmed = await Booking.find({ status: Booking.BOOKING_STATUS.CONFIRMED, cancellationStatus: { $ne: "Requested" }, date: { $lte: todayKey } }).select("date timeIn duration");
   const expiredIds = confirmed
     .filter((b) => {
       return bookingStartMs(b.date, b.timeIn) + Number(b.duration) * 3600000 <= now;
@@ -21,24 +22,6 @@ async function voidExpiredBookings() {
     .map((b) => b._id);
   if (expiredIds.length) {
     await Booking.updateMany({ _id: { $in: expiredIds }, status: Booking.BOOKING_STATUS.CONFIRMED, cancellationStatus: { $ne: "Requested" } }, { status: Booking.BOOKING_STATUS.NO_SHOW, noShowAt: new Date(now) });
-  }
-}
-
-async function updateBookingLifecycleStatuses() {
-  const todayKey = new Intl.DateTimeFormat("en-CA", { timeZone: TIME_ZONE }).format(new Date());
-
-  const stale = await Booking.find({
-    date: { $lt: todayKey },
-    status: {
-      $in: [
-        Booking.BOOKING_STATUS.PENDING,
-        Booking.BOOKING_STATUS.PENDING_PAYMENT_VERIFICATION,
-        Booking.BOOKING_STATUS.AWAITING_ONLINE_PAYMENT,
-      ],
-    },
-  }).select("_id");
-  if (stale.length) {
-    await Booking.updateMany({ _id: { $in: stale.map((b) => b._id) }, status: { $in: [Booking.BOOKING_STATUS.PENDING, Booking.BOOKING_STATUS.PENDING_PAYMENT_VERIFICATION, Booking.BOOKING_STATUS.AWAITING_ONLINE_PAYMENT] } }, { status: Booking.BOOKING_STATUS.OVERDUE });
   }
 }
 
@@ -262,6 +245,14 @@ async function finalizeBookingFromPayment({ paymentIntentId, metadata, paidPayme
         throw new AppError(e.message || "This time slot is no longer available.", e.status || 409, { slotUnavailable: true });
       }
 
+      const paidHourlyRates = (() => {
+        try {
+          const rates = JSON.parse(metadata.hourlyRates || "[]");
+          return Array.isArray(rates) && rates.length ? rates : pricing.hourlyRates;
+        } catch {
+          return pricing.hourlyRates;
+        }
+      })();
       const newBooking = new Booking({
         guestName: metadata.guestName,
         guestContact: metadata.guestContact || "",
@@ -276,14 +267,8 @@ async function finalizeBookingFromPayment({ paymentIntentId, metadata, paidPayme
         duration: Number(duration),
         amount: Number(metadata.amount),
         roomCharge: Number(metadata.roomCharge) || pricing.roomCharge,
-        hourlyRates: (() => {
-          try {
-            const rates = JSON.parse(metadata.hourlyRates || "[]");
-            return Array.isArray(rates) && rates.length ? rates : pricing.hourlyRates;
-          } catch {
-            return pricing.hourlyRates;
-          }
-        })(),
+        hourlyRates: paidHourlyRates,
+        firstHourPayment: computeDownPayment(paidHourlyRates, 1),
         corkageFee: Number(metadata.corkageFee) || 0,
         paymentMethod: getPaymongoPaymentMethodLabel(paymentMethodType),
         paymentProvider: "paymongo",
@@ -328,5 +313,4 @@ module.exports = {
   releaseLockForSlot,
   bookingStartMs,
   voidExpiredBookings,
-  updateBookingLifecycleStatuses,
 };

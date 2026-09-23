@@ -4,6 +4,9 @@ import { useAuth } from '../context/AuthContext';
 import { bookingsService } from '../services/bookings';
 import { API_BASE_URL } from '../services/api';
 import { openBookingReceipt } from '../utils/receipt';
+import { cancellationAmounts } from '../utils/cancellationPolicy';
+import { reservationPresentation } from '../utils/reservationStatus';
+import { useSiteSettings } from '../hooks/useSiteSettings';
 import PasswordInput from './PasswordInput';
 import { PASSWORD_REQUIREMENTS } from '../utils/password';
 import RescheduleModal, { canRescheduleBooking } from './RescheduleModal';
@@ -15,24 +18,26 @@ const EMPTY_DETAILS = { firstName: '', lastName: '', phone: '', email: '' };
 const EMPTY_PASSWORD = { currentPassword: '', newPassword: '', confirmPassword: '' };
 
 function historyStatusClass(status) {
-  if (['Confirmed', 'Ongoing', 'Done'].includes(status)) return 'completed';
-  if (['Rejected', 'Cancelled', 'Overdue', 'No Show'].includes(status)) return 'cancelled';
+  if (status === 'Done') return 'completed';
+  if (['Rejected', 'Cancelled', 'No Show'].includes(status)) return 'cancelled';
   return 'upcoming';
 }
 
-function paymentBreakdown(booking) {
+function paymentBreakdown(booking, now) {
+  const closed = ['Cancelled', 'Rejected', 'No Show'].includes(reservationPresentation(booking, now).status);
   const total = Math.max(0, Number(booking?.amount) || 0);
   const received = Math.max(0, Number(booking?.paidAmount) || 0, Number(booking?.downPayment) || 0);
   const refunded = Math.min(received, Math.max(0, Number(booking?.refundedAmount) || 0));
   const paid = Math.max(0, received - refunded);
-  const balance = Math.max(0, total - paid);
-  const status = total > 0 && balance <= 0 ? 'Paid' : paid > 0 ? 'Downpayment paid' : 'Payment due';
-  return { total, paid, balance, status };
+  const balance = closed ? 0 : Math.max(0, total - paid);
+  const status = closed ? refunded > 0 ? 'Refund recorded' : paid > 0 ? 'Payment retained' : 'No payment' : total > 0 && balance <= 0 ? 'Paid' : paid > 0 ? 'Downpayment paid' : 'Payment due';
+  return { total, paid, refunded, balance, closed, status };
 }
 
 function ProfileModal({ open, onClose }) {
   const navigate = useNavigate();
   const { user: authUser, revalidate, updateUser, logout } = useAuth();
+  const { settings } = useSiteSettings();
 
   const [user, setUser] = useState(null);
   const [activeTab, setActiveTab] = useState('profile');
@@ -45,6 +50,7 @@ function ProfileModal({ open, onClose }) {
   const [savingPassword, setSavingPassword] = useState(false);
 
   const [bookings, setBookings] = useState([]);
+  const [clockMs, setClockMs] = useState(Date.now);
   const [loadingBookings, setLoadingBookings] = useState(false);
   const [bookingsError, setBookingsError] = useState('');
   const [viewingBooking, setViewingBooking] = useState(null);
@@ -110,7 +116,10 @@ function ProfileModal({ open, onClose }) {
     if (!open) return;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
+    setClockMs(Date.now());
+    const clockHandle = setInterval(() => setClockMs(Date.now()), 15000);
     return () => {
+      clearInterval(clockHandle);
       document.body.style.overflow = previousOverflow;
     };
   }, [open]);
@@ -206,8 +215,8 @@ function ProfileModal({ open, onClose }) {
   const passwordChecks = PASSWORD_REQUIREMENTS.map((req) => ({ ...req, met: req.test(passwordForm.newPassword) }));
   const isNewPasswordValid = passwordChecks.every((c) => c.met);
 
-  const completedBookings = bookings.filter((b) => historyStatusClass(b.status) === 'completed');
-  const totalSpent = completedBookings.reduce((sum, booking) => sum + paymentBreakdown(booking).paid, 0);
+  const completedBookings = bookings.filter((b) => reservationPresentation(b, clockMs).status === 'Done');
+  const totalSpent = bookings.reduce((sum, booking) => sum + paymentBreakdown(booking, clockMs).paid, 0);
 
   return (
     <ModalPortal>
@@ -418,7 +427,8 @@ function ProfileModal({ open, onClose }) {
                 <p className="pf-history-empty">You haven't made any reservations yet.</p>
               )}
               {!loadingBookings && !bookingsError && bookings.map((b) => {
-                const payment = paymentBreakdown(b);
+                const payment = paymentBreakdown(b, clockMs);
+                const presentation = reservationPresentation(b, clockMs);
                 return (
                 <article className="pf-booking-row" key={b._id}>
                   <div className="pf-booking-icon">
@@ -432,7 +442,8 @@ function ProfileModal({ open, onClose }) {
                   </div>
                   <div className="pf-booking-right">
                     <div className="pf-booking-price">₱{Number(b.amount || 0).toLocaleString()}</div>
-                    <span className={`pf-chip pf-chip--${historyStatusClass(b.status)}`}>{b.status}</span>
+                    <span className={`pf-chip pf-chip--${historyStatusClass(presentation.status)}`}>{presentation.status}</span>
+                    {presentation.warning === 'Overdue' && <small className="pf-reservation-warning">Overdue</small>}
                     <span className={`pf-payment-state pf-payment-state--${payment.status === 'Paid' ? 'paid' : payment.paid > 0 ? 'partial' : 'unpaid'}`}>{payment.status}{payment.balance > 0 ? ` · ₱${payment.balance.toLocaleString()} due` : ''}</span>
                   </div>
                   <button
@@ -471,13 +482,28 @@ function ProfileModal({ open, onClose }) {
             </div>
 
             {(() => {
-              const payment = paymentBreakdown(viewingBooking);
+              const payment = paymentBreakdown(viewingBooking, clockMs);
+              const cancellation = cancellationAmounts(viewingBooking);
               return (
                 <section className="pf-payment-breakdown" aria-label="Payment summary">
                   <div><span>Total charge</span><strong>₱{payment.total.toLocaleString()}</strong></div>
-                  <div><span>Paid so far</span><strong>₱{payment.paid.toLocaleString()}</strong></div>
-                  <div className={payment.balance > 0 ? 'has-balance' : 'is-settled'}><span>{payment.balance > 0 ? 'Pay at venue' : 'Balance'}</span><strong>₱{payment.balance.toLocaleString()}</strong></div>
-                  <p>{payment.balance > 0 ? 'Your online downpayment secured the slot. Please settle the remaining balance at the venue.' : 'This reservation is fully paid.'}</p>
+                  <div><span>{payment.closed ? 'Retained payment' : 'Paid so far'}</span><strong>₱{payment.paid.toLocaleString()}</strong></div>
+                  <div className={payment.balance > 0 ? 'has-balance' : 'is-settled'}><span>{payment.closed ? 'Refunded' : payment.balance > 0 ? 'Pay at venue' : 'Balance'}</span><strong>₱{(payment.closed ? payment.refunded : payment.balance).toLocaleString()}</strong></div>
+                  <p>{viewingBooking.status === 'Cancelled' && cancellation.customerCancelled
+                    ? viewingBooking.cancellationRefundException
+                      ? cancellation.refundRemaining > 0
+                        ? `A refund exception was approved. Contact admin to arrange the remaining ₱${cancellation.refundRemaining.toLocaleString()} manual refund.`
+                        : 'The approved refund exception has been recorded.'
+                      : cancellation.refundRemaining > 0
+                        ? `The first-hour charge is retained. Contact admin to arrange the remaining ₱${cancellation.refundRemaining.toLocaleString()} manual refund.`
+                        : payment.refunded > 0
+                          ? `₱${payment.refunded.toLocaleString()} was refunded manually. The first-hour charge was retained.`
+                          : 'The first-hour charge is non-refundable. Contact admin if you need help with a payment issue.'
+                    : payment.closed
+                      ? 'No venue balance is due for this closed reservation.'
+                      : payment.balance > 0
+                        ? 'Your online downpayment secured the slot. Please settle the remaining balance at the venue.'
+                        : 'This reservation is fully paid.'} {viewingBooking.status === 'Cancelled' && cancellation.customerCancelled && cancellation.refundRemaining > 0 && settings?.contact?.messengerUrl && <a href={settings.contact.messengerUrl} target="_blank" rel="noreferrer">Message admin</a>}</p>
                 </section>
               );
             })()}
@@ -549,7 +575,7 @@ function ProfileModal({ open, onClose }) {
               </div>
               <div className="pf-detail-row">
                 <span className="pf-detail-label">Status</span>
-                <span className={`pf-chip pf-chip--${historyStatusClass(viewingBooking.status)}`}>{viewingBooking.status}</span>
+                <span className={`pf-chip pf-chip--${historyStatusClass(reservationPresentation(viewingBooking, clockMs).status)}`}>{reservationPresentation(viewingBooking, clockMs).status}</span>
               </div>
               {viewingBooking.specialRequests && (
                 <div className="pf-detail-row pf-detail-row--block">
@@ -572,7 +598,7 @@ function ProfileModal({ open, onClose }) {
                   <i className="fa-solid fa-calendar-clock"></i> Reschedule
                 </button>
               )}
-              {viewingBooking.status === 'Confirmed' && viewingBooking.cancellationStatus !== 'Requested' && viewingBooking.cancellationStatus !== 'Approved' && (
+              {viewingBooking.status === 'Confirmed' && reservationPresentation(viewingBooking, clockMs).status === 'Confirmed' && viewingBooking.cancellationStatus !== 'Requested' && viewingBooking.cancellationStatus !== 'Approved' && (
                 <button type="button" className="pf-btn pf-btn-ghost pf-btn-danger" onClick={() => setCancellingBooking(viewingBooking)}>
                   <i className="fa-solid fa-ban"></i> Request cancellation
                 </button>
@@ -600,6 +626,7 @@ function ProfileModal({ open, onClose }) {
       {cancellingBooking && (
         <CancellationRequestModal
           booking={cancellingBooking}
+          contactUrl={settings?.contact?.messengerUrl}
           onClose={() => setCancellingBooking(null)}
           onSubmitted={(updated) => {
             setBookings((prev) => prev.map((b) => (b._id === updated._id ? { ...b, ...updated } : b)));
@@ -626,9 +653,10 @@ function ProfileModal({ open, onClose }) {
   );
 }
 
-function CancellationRequestModal({ booking, onClose, onSubmitted, onError }) {
+function CancellationRequestModal({ booking, contactUrl, onClose, onSubmitted, onError }) {
   const [reason, setReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const cancellation = cancellationAmounts(booking, { customerInitiated: true });
 
   async function submit(event) {
     event.preventDefault();
@@ -649,7 +677,7 @@ function CancellationRequestModal({ booking, onClose, onSubmitted, onError }) {
     <div className="pf-overlay open" role="dialog" aria-modal="true" aria-label="Request reservation cancellation">
       <div className="pf-modal pf-modal--compact">
         <div className="pf-modal-head"><h2 className="pf-modal-title">Request cancellation</h2><button className="pf-close" aria-label="Close" onClick={onClose}><i className="fa-solid fa-xmark"></i></button></div>
-        <p className="pf-detail-value">Your request for {booking.reservationCode || 'this reservation'} will be reviewed by the team. Any refund is handled manually after approval.</p>
+        <p className="pf-detail-value">Your request for {booking.reservationCode || 'this reservation'} will be reviewed by the team. The first-hour charge is non-refundable. {cancellation.refundRemaining > 0 ? `If approved, contact admin to arrange a manual refund of the remaining ₱${cancellation.refundRemaining.toLocaleString()}.` : 'No refund is due for a one-hour down payment.'} {contactUrl && <a href={contactUrl} target="_blank" rel="noreferrer">Contact admin</a>}</p>
         <form onSubmit={submit}>
           <div className="pf-field"><label htmlFor="cancel-reason">Reason</label><textarea id="cancel-reason" rows="4" maxLength="500" required value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Tell us why you need to cancel" /></div>
           <div className="pf-modal-actions"><button type="button" className="pf-btn pf-btn-ghost" onClick={onClose}>Keep reservation</button><button type="submit" className="pf-btn pf-btn-solid" disabled={submitting || !reason.trim()}>{submitting ? 'Sending…' : 'Send request'}</button></div>

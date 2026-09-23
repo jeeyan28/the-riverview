@@ -61,6 +61,7 @@ const cancellationRequestSchema = Joi.object({ reason: Joi.string().trim().min(1
 const cancellationReviewSchema = Joi.object({
   decision: Joi.string().valid("approve", "reject").required(),
   refundedAmount: Joi.number().min(0).precision(2),
+  refundException: Joi.boolean(),
   note: Joi.string().trim().allow("").max(500),
 });
 

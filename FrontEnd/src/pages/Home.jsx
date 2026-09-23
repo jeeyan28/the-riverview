@@ -109,11 +109,11 @@ const BOOKING_STEPS = [
 ];
 
 const HELPFUL_INFO_CARDS = [
-  { icon: Wallet, title: 'Down Payment Required', desc: "Online reservations require a down payment. A successful payment confirms the slot automatically." },
+  { icon: Wallet, title: 'Online Payment Required', desc: 'Pay the first hour or the full booking total online. A successful payment confirms the slot automatically.' },
   { icon: Timer, title: '20-Minute Payment Window', desc: 'Complete your online payment within 20 minutes, or the slot is released to other customers.' },
   { icon: Hourglass, title: '1–5 Hour Reservations', desc: 'Online reservations use whole-hour increments, with a one-hour minimum and five-hour maximum.' },
   { icon: DoorOpen, title: 'Arrive On Time', desc: 'A confirmed reservation that passes its scheduled end without completion is recorded as a no-show.' },
-  { icon: FileText, title: 'Cancellation Review', desc: 'Cancellation requests require admin approval. Any approved refund is processed manually; no-show down payments are forfeited.' },
+  { icon: FileText, title: 'Cancellation Review', desc: 'Customer cancellations retain the first-hour charge. If you paid in full, contact admin to arrange a manual refund of the rest after approval.' },
   { icon: Clock3, title: 'Open Daily', desc: '7AM to midnight, every day of the week.' },
   { icon: MessageCircle, title: 'Need Help?', desc: 'Questions or issues? Message our official Facebook page "The Riverview" we\u2019re happy to help.' },
 ];

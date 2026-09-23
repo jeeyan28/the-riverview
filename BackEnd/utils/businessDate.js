@@ -7,6 +7,10 @@ function businessDate(value = new Date()) {
   return new Intl.DateTimeFormat('en-CA', { timeZone: TIME_ZONE, year: 'numeric', month: '2-digit', day: '2-digit' }).format(date);
 }
 
+function isBeforeReservationDay(reservationDate, now = new Date()) {
+  return validDateKey(reservationDate) && reservationDate > businessDate(now);
+}
+
 function validDateKey(value) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value || '')) return false;
   const parsed = new Date(`${value}T00:00:00Z`);
@@ -24,4 +28,4 @@ function dateRange(from, to, maxDays = 92) {
   return { from, to, days, start: new Date(`${from}T00:00:00+08:00`), end: new Date(`${addDays(to, 1)}T00:00:00+08:00`) };
 }
 
-module.exports = { businessDate, validDateKey, addDays, dateRange };
+module.exports = { businessDate, isBeforeReservationDay, validDateKey, addDays, dateRange };

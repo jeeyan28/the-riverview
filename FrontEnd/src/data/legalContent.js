@@ -1,4 +1,4 @@
-export const LAST_UPDATED = 'August 6, 2026';
+export const LAST_UPDATED = 'September 23, 2026';
 
 export const TERMS_CONTENT = {
   en: {
@@ -15,8 +15,8 @@ export const TERMS_CONTENT = {
         heading: '2. Booking & Reservation Process',
         list: [
           'Reservations are processed on a first-come, first-served basis through our official booking page.',
-          'A down payment equivalent to the 1-hour rental rate is required to secure your slot.',
-          'You have 30 minutes to complete the down payment after selecting a slot. If payment isn\'t completed in that time, the slot is released back for other customers to book.',
+          'Pay the first-hour rental rate or the full booking total online to secure your slot.',
+          'You have 20 minutes to complete the online payment after selecting a slot. If payment isn\'t completed in that time, the slot is released back for other customers to book.',
           'A single transaction can book a maximum of 5 hours.',
         ],
       },
@@ -29,15 +29,16 @@ export const TERMS_CONTENT = {
       {
         heading: '4. Arrival & No-Show Policy',
         list: [
-          'Your down payment covers your first hour, so please arrive at least 20 minutes before that first hour ends.',
+          'Your first-hour payment covers your first hour, so please arrive at least 20 minutes before that first hour ends.',
           'If you haven\'t arrived within that window, your booking is automatically canceled and the slot may be offered to walk-in customers.',
         ],
       },
       {
         heading: '5. Cancellations & Refunds',
         paragraphs: [
-          'Down payments are generally non-refundable, including for no-shows, late arrivals beyond the 20-minute window, or customer-initiated cancellations. This helps us hold your slot exclusively for you and manage availability fairly for other customers.',
-          'We\'ll refund your down payment if: the booking was affected by a verified system or payment-processing error, you were charged more than once for the same booking, or we cancel your reservation on our end (e.g. facility closure or unavailability).',
+          'For customer-initiated cancellations and no-shows, the first-hour rental charge is non-refundable because the slot was held for you.',
+          'If you paid the full booking total, the amount paid beyond the first-hour rental charge can be refunded after cancellation approval. Contact our team to arrange this refund manually; cancellation does not trigger an automatic refund.',
+          'We\'ll refund your payment if: the booking was affected by a verified system or payment-processing error, you were charged more than once for the same booking, or we cancel your reservation on our end (e.g. facility closure or unavailability).',
           'To request a reschedule, message us on our official Facebook Page or reach us at the contact details below. Rescheduling is subject to availability and facility approval.',
         ],
       },
@@ -89,8 +90,8 @@ export const TERMS_CONTENT = {
         heading: '2. Proseso ng Booking',
         list: [
           'Ang mga reserbasyon ay pinoproseso base sa first-come, first-served sa aming opisyal na booking page.',
-          'Kailangan ng down payment na katumbas ng 1-hour rental rate para ma-secure ang iyong slot.',
-          'May 30 minuto ka para kumpletuhin ang down payment matapos pumili ng slot. Kung hindi nakumpleto sa oras na ito, ire-release ang slot para maibook ng ibang customer.',
+          'Bayaran online ang unang oras ng rental o ang buong halaga ng booking para ma-secure ang iyong slot.',
+          'May 20 minuto ka para kumpletuhin ang online payment matapos pumili ng slot. Kung hindi nakumpleto sa oras na ito, ire-release ang slot para ma-book ng ibang customer.',
           'Maximum na 5 oras ang maaaring i-book sa isang transaksyon.',
         ],
       },
@@ -103,15 +104,16 @@ export const TERMS_CONTENT = {
       {
         heading: '4. Pagdating & Patakaran sa No-Show',
         list: [
-          'Ang iyong down payment ay sakop ang unang oras, kaya siguraduhing dumating ka nang hindi bababa sa 20 minuto bago matapos ang unang oras na iyon.',
+          'Ang bayad mo para sa unang oras ay sakop ang unang oras, kaya siguraduhing dumating ka nang hindi bababa sa 20 minuto bago matapos ang unang oras na iyon.',
           'Kung hindi ka dumating sa loob ng oras na ito, awtomatikong maka-cancel ang iyong booking at maaaring maialok ang slot sa walk-in na customer.',
         ],
       },
       {
         heading: '5. Cancellation & Refund',
         paragraphs: [
-          'Sa pangkalahatan, hindi na-rerefund ang down payment, kabilang ang para sa no-show, huling pagdating lampas sa 20-minutong window, o cancellation mula sa customer. Tumutulong ito para ma-hold namin ang iyong slot nang eksklusibo, at patas na mapamahalaan ang availability para sa ibang customer.', 
-          'I-rerefund namin ang iyong down payment kung: apektado ang booking ng napatunayang system o payment-processing error, sinisingil ka nang mahigit sa isang beses para sa parehong booking, o kami mismo ang nag-cancel ng iyong reserbasyon (hal. pagsara ng pasilidad o hindi availability).',
+          'Para sa cancellation mula sa customer at no-show, hindi na-rerefund ang bayad para sa unang oras dahil nakareserba ang slot para sa iyo.',
+          'Kung binayaran mo nang buo ang booking, maaaring i-refund ang halagang lampas sa bayad para sa unang oras pagkatapos maaprubahan ang cancellation. Kontakin ang aming team para asikasuhin ang refund nang manu-mano; walang awtomatikong refund sa pag-cancel.',
+          'I-rerefund namin ang iyong bayad kung: apektado ang booking ng napatunayang system o payment-processing error, siningil ka nang mahigit sa isang beses para sa parehong booking, o kami mismo ang nag-cancel ng iyong reserbasyon (hal. pagsara ng pasilidad o hindi availability).',
           'Para mag-request ng reschedule, mag-message sa aming opisyal na Facebook Page o kontakin kami sa detalyeng nasa ibaba. Ang reschedule ay subject sa availability at approval ng pasilidad.',
         ],
       },
@@ -186,7 +188,7 @@ export const PRIVACY_CONTENT = {
           'We don\'t sell or rent your personal information. We share it only:',
         ],
         list: [
-          'With PayMongo, solely to process your down payment.',
+          'With PayMongo, solely to process your online payment.',
           'With Google, to the extent needed to support Google Sign-In, if you choose that option.',
           'If required by law, regulation, or a valid legal process.',
         ],
@@ -257,7 +259,7 @@ export const PRIVACY_CONTENT = {
           'Hindi namin ibinebenta o nirerentahan ang iyong personal na impormasyon. Ibinabahagi lamang namin ito:',
         ],
         list: [
-          'Sa PayMongo, para lamang sa pagproseso ng iyong down payment.',
+          'Sa PayMongo, para lamang sa pagproseso ng iyong online payment.',
           'Sa Google, hangga\'t kinakailangan para suportahan ang Google Sign-In, kung pipiliin mo ang opsyong ito.',
           'Kung hinihiling ng batas, regulasyon, o wastong legal na proseso.',
         ],

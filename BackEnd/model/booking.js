@@ -3,7 +3,6 @@ const mongoose = require("mongoose");
 const MIN_DURATION_HOURS = 1 / 3600;
 const MAX_DURATION_HOURS = 24;
 const MAX_RESCHEDULES = 2;
-const RESCHEDULE_CUTOFF_HOURS = 3;
 
 const BOOKING_STATUS = {
   PENDING: "Pending",
@@ -62,8 +61,12 @@ const bookingSchema = new mongoose.Schema({
   cancellationReviewedAt: { type: Date },
   cancellationReviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
   cancellationReviewNote: { type: String, default: "", maxlength: 500 },
+  cancellationRefundNote: { type: String, default: "", maxlength: 500 },
+  cancellationSource: { type: String, enum: ["customer", "admin"] },
+  cancellationRefundException: { type: Boolean, default: false },
   noShowAt: { type: Date },
   downPaymentHours:  { type: Number, default: 1, min: 1 },
+  firstHourPayment:  { type: Number, min: 0 },
   rescheduleCount:   { type: Number, default: 0, min: 0 },
   paymentScreenshot: { type: String, default: "" },
   paymentMethod: { type: String, default: "Cash", trim: true },
@@ -84,6 +87,5 @@ module.exports = mongoose.model("Booking", bookingSchema);
 module.exports.MIN_DURATION_HOURS = MIN_DURATION_HOURS;
 module.exports.MAX_DURATION_HOURS = MAX_DURATION_HOURS;
 module.exports.MAX_RESCHEDULES = MAX_RESCHEDULES;
-module.exports.RESCHEDULE_CUTOFF_HOURS = RESCHEDULE_CUTOFF_HOURS;
 module.exports.BOOKING_STATUS = BOOKING_STATUS;
 module.exports.PAYMENT_STATUS = PAYMENT_STATUS;

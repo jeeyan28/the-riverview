@@ -3,6 +3,7 @@ import { useSiteSettings } from '../hooks/useSiteSettings';
 import { bookingsService } from '../services/bookings';
 import { roomsService } from '../services/rooms';
 import { formatHour } from '../utils/receipt';
+import { businessDate } from '../utils/businessDate';
 import ModalPortal from './ModalPortal';
 import {
   dateKey,
@@ -22,18 +23,12 @@ const MONTHS = [
 ];
 
 export const RESCHEDULE_MAX_USES = 2;
-export const RESCHEDULE_CUTOFF_HOURS = 3;
-
-export function bookingStartMs(dateStr, timeIn) {
-  const [y, m, d] = String(dateStr).split('-').map(Number);
-  const hour = parseInt(String(timeIn).split(':')[0], 10) || 0;
-  return new Date(y, (m || 1) - 1, d || 1, hour).getTime();
-}
 
 export function canRescheduleBooking(booking) {
   if (!booking || booking.status !== 'Confirmed') return false;
+  if (booking.cancellationStatus === 'Requested') return false;
   if ((booking.rescheduleCount || 0) >= RESCHEDULE_MAX_USES) return false;
-  return bookingStartMs(booking.date, booking.timeIn) - Date.now() >= RESCHEDULE_CUTOFF_HOURS * 3600000;
+  return booking.date > businessDate();
 }
 
 function formatDateLabel(dStr) {
@@ -263,7 +258,7 @@ function RescheduleModal({ booking, onClose, onRescheduled }) {
         {step !== 'success' && (
           <div className="bk-lock-banner">
             <i className="fa-solid fa-circle-info"></i>
-            Rescheduling keeps your room, option, and {duration}-hour duration — only the date and time change. You have {usesLeft} reschedule{usesLeft === 1 ? '' : 's'} left for this booking.
+            Reschedule before your reservation day. Your room, option, and {duration}-hour duration stay the same — only the date and time change. You have {usesLeft} reschedule{usesLeft === 1 ? '' : 's'} left for this booking.
           </div>
         )}
 
