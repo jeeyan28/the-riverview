@@ -28,6 +28,8 @@ export const bookingsService = {
 
   update: (id, payload) => apiRequest(`${BASE}/${id}`, { method: 'PUT', body: payload, fallbackMessage: 'Failed to update booking.' }),
 
+  markDone: (id) => apiRequest(`${BASE}/${id}/mark-done`, { method: 'PUT', fallbackMessage: 'Failed to mark the reservation done.' }),
+
   approve: (id) => apiRequest(`${BASE}/${id}/approve`, { method: 'PUT', fallbackMessage: 'Failed to approve booking.' }),
 
   reject: (id) => apiRequest(`${BASE}/${id}/reject`, { method: 'PUT', fallbackMessage: 'Failed to reject booking.' }),

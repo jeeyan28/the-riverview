@@ -6,7 +6,7 @@ const router = express.Router();
 const User = require("../model/user");
 const LoginHistory = require("../model/loginHistory");
 const PendingRegistration = require("../model/pendingRegistration");
-const { loginLimiter, forgotPasswordLimiter, registerOtpLimiter, guestCreationLimiter, guestRecoveryLoginLimiter } = require("../middleware/rateLimiter");
+const { loginLimiter, forgotPasswordLimiter, verifyResetOtpLimiter, resetPasswordLimiter, registerOtpLimiter, guestCreationLimiter, guestRecoveryLoginLimiter } = require("../middleware/rateLimiter");
 const { ensureAuthenticated } = require("../middleware/adminAuth");
 const { sendOtpEmail } = require("../utils/mailer");
 const {
@@ -853,7 +853,7 @@ router.post("/forgot-password", forgotPasswordLimiter, validate(emailSchema), as
   }
 });
 
-router.post("/verify-otp", forgotPasswordLimiter, validate(emailOtpSchema), async (req, res) => {
+router.post("/verify-otp", verifyResetOtpLimiter, validate(emailOtpSchema), async (req, res) => {
   try {
     const { email, otp } = req.body;
     if (!email || !otp) {
@@ -904,7 +904,7 @@ router.post("/verify-otp", forgotPasswordLimiter, validate(emailOtpSchema), asyn
   }
 });
 
-router.post("/reset-password", forgotPasswordLimiter, validate(resetPasswordSchema), async (req, res) => {
+router.post("/reset-password", resetPasswordLimiter, validate(resetPasswordSchema), async (req, res) => {
   try {
     const { resetSessionToken, password } = req.body;
 

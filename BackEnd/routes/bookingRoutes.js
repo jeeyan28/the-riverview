@@ -4,7 +4,7 @@ const Booking = require("../model/booking");
 const Settings = require("../model/settings");
 const BookingLock = require("../model/bookingLock");
 const { RoomSession } = require("../model/monitoring");
-const { bookingCollected, bookingStartMs, financialFields, reviewCancellationFields } = require("../utils/bookingLifecycle");
+const { bookingCollected, bookingStartMs, completeReservationFields, financialFields, reviewCancellationFields } = require("../utils/bookingLifecycle");
 const { LOCK_DURATION_MINUTES } = BookingLock;
 const { requirePermission, ensureAuthenticated } = require("../middleware/adminAuth");
 const { paymentProofUpload } = require("../middleware/upload");
@@ -425,6 +425,23 @@ router.put("/:id/reject", requirePermission(PERMISSIONS.BOOKING_MANAGE), validat
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Server error." });
+  }
+});
+
+router.put("/:id/mark-done", requirePermission(PERMISSIONS.BOOKING_MANAGE), validate(bookingIdParamsSchema, "params"), validate(emptyBodySchema), async (req, res) => {
+  try {
+    const booking = await runInTransaction(async (session) => {
+      const existing = await Booking.findById(req.params.id).session(session);
+      if (!existing) throw new AppError(404, "Booking not found.");
+      const hasMonitorSession = Boolean(await RoomSession.exists({ booking: existing._id, status: { $in: ["Active", "Finished"] } }).session(session));
+      const update = completeReservationFields(existing, { hasMonitorSession });
+      return Booking.findByIdAndUpdate(existing._id, update, { returnDocument: "after", runValidators: true, session });
+    });
+    await logAudit({ category: "Booking", action: "updated", description: `marked booking ${booking.reservationCode} done for ${booking.guestName}`, user: req.user });
+    res.json(booking);
+  } catch (err) {
+    console.error(err);
+    res.status(err.status || 500).json({ message: err.message || "Could not mark this reservation done." });
   }
 });
 

@@ -21,6 +21,11 @@ async function requestReset(email) {
     body: JSON.stringify({ email }),
   });
   const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const error = new Error(data.message || 'Could not send a verification code. Please try again.');
+    error.status = res.status;
+    throw error;
+  }
   return data.message || DEFAULT_SENT_COPY;
 }
 
@@ -52,6 +57,7 @@ function ForgotPasswordModal({ open, onClose, onReturnToLogin }) {
   const [email, setEmail] = useState('');
   const [emailError, setEmailError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [resending, setResending] = useState(false);
   const [sent, setSent] = useState(false);
   const [sentCopy, setSentCopy] = useState(DEFAULT_SENT_COPY);
   const [sentEmail, setSentEmail] = useState('');
@@ -138,6 +144,7 @@ function ForgotPasswordModal({ open, onClose, onReturnToLogin }) {
 
   async function handleSubmit(e) {
     e.preventDefault();
+    if (loading) return;
 
     const trimmed = email.trim();
     const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed);
@@ -153,14 +160,16 @@ function ForgotPasswordModal({ open, onClose, onReturnToLogin }) {
       setResendAvailableAt(Date.now() + RESEND_COOLDOWN_SECONDS * 1000);
       setOtpExpiresAt(Date.now() + OTP_EXPIRY_SECONDS * 1000);
     } catch (err) {
-      showToast('Could not reach the server. Is it running?', 'error');
+      if (err.status) setEmailError(err.message);
+      else showToast('Could not reach the server. Is it running?', 'error');
     } finally {
       setLoading(false);
     }
   }
 
   async function handleResend() {
-    if (!sentEmail || now < resendAvailableAt) return;
+    if (!sentEmail || now < resendAvailableAt || resending) return;
+    setResending(true);
     try {
       const message = await requestReset(sentEmail);
       setOtp(Array(OTP_LENGTH).fill(''));
@@ -170,7 +179,9 @@ function ForgotPasswordModal({ open, onClose, onReturnToLogin }) {
       setOtpBoxKey((k) => k + 1);
       showToast(message, 'success');
     } catch (err) {
-      showToast('Could not reach the server. Is it running?', 'error');
+      setOtpError(err.status ? err.message : 'Could not reach the server. Is it running?');
+    } finally {
+      setResending(false);
     }
   }
 
@@ -289,7 +300,7 @@ function ForgotPasswordModal({ open, onClose, onReturnToLogin }) {
                 <button type="button" className="btn-cancel" onClick={onClose}>
                   Cancel
                 </button>
-                <button type="submit" className={`btn-submit${loading ? ' loading' : ''}`}>
+                <button type="submit" className={`btn-submit${loading ? ' loading' : ''}`} disabled={loading}>
                   <span className="btn-text">Send verification code</span>
                   <span className="btn-spinner">
                     <span className="spinner-ring"></span>
@@ -420,7 +431,7 @@ function ForgotPasswordModal({ open, onClose, onReturnToLogin }) {
                 type="button"
                 className="link-button"
                 onClick={handleResend}
-                disabled={secondsUntilResend > 0}
+                disabled={secondsUntilResend > 0 || resending}
               >
                 {secondsUntilResend > 0 ? `Resend code (${secondsUntilResend}s)` : 'Resend code'}
               </button>
