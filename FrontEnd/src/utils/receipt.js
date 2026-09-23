@@ -160,7 +160,7 @@ function receiptHtml(fields) {
 
       <div class="cost-card">
         <div class="cost-row total"><span class="cost-label">Total Amount</span><span class="cost-value">&#8369;${amount.toLocaleString()}</span></div>
-        <div class="cost-row"><span class="cost-label">Downpayment Paid</span><span class="cost-value paid">&#8369;${downPayment.toLocaleString()}</span></div>
+        <div class="cost-row"><span class="cost-label">Paid Online</span><span class="cost-value paid">&#8369;${downPayment.toLocaleString()}</span></div>
         <div class="cost-row"><span class="cost-label">Remaining Balance</span><span class="cost-value balance">&#8369;${remaining.toLocaleString()}</span></div>
       </div>
 

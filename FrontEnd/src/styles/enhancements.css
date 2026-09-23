@@ -19,8 +19,17 @@
         transition-duration: .001ms !important;
         scroll-behavior: auto !important;
     }
-    .reveal { opacity: 1 !important; transform: none !important; }
+    .reveal,
+    .reveal-left,
+    .reveal-right,
+    .reveal-scale {
+        opacity: 1 !important;
+        transform: none !important;
+    }
+    .reveal-stagger > * { opacity: 1 !important; transform: none !important; }
     .hero-bg, .hero-carousel, .hero-intro-avatar { transform: none !important; }
+    .bk-day--selected,
+    .bk-slot--selected { animation: none; }
 }
 
 html { scroll-behavior: smooth; scroll-padding-top: calc(var(--header-h, 68px) + var(--guest-banner-h, 0px) + 16px); }
@@ -208,10 +217,19 @@ nav a:hover::after, nav a.active::after { width: 20px; }
                 transform .15s var(--ease-out), box-shadow .15s var(--ease-out) !important;
 }
 .bk-slot {
-    transition: background .1s var(--ease-out), border-color .1s var(--ease-out), color .1s var(--ease-out) !important;
+    transition: background .1s var(--ease-out), border-color .1s var(--ease-out), color .1s var(--ease-out),
+                transform .12s var(--ease-out) !important;
 }
 .bk-slot:hover:not(.bk-slot--reserved):not(.bk-slot--insufficient) { box-shadow: none; }
-.bk-day--selected, .bk-slot--selected { animation: none; }
+.bk-slot:not(.bk-slot--reserved):not(.bk-slot--insufficient):active { transform: scale(.97); }
+@keyframes rv-select-pop {
+    0% { transform: scale(.96); }
+    100% { transform: scale(1); }
+}
+.bk-day--selected,
+.bk-slot--selected {
+    animation: rv-select-pop 140ms var(--ease-out);
+}
 
 .bk-back-btn {
     transition: background var(--dur-fast) var(--ease-out),

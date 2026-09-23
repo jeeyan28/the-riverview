@@ -356,7 +356,7 @@ function Home() {
   }
 
   useEffect(() => {
-    const els = document.querySelectorAll('.reveal, .reveal-stagger');
+    const els = document.querySelectorAll('.reveal, .reveal-left, .reveal-right, .reveal-scale, .reveal-stagger');
     if (!els.length) return;
 
     const io = new IntersectionObserver(

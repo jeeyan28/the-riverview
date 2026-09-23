@@ -313,6 +313,9 @@ router.put("/:id/reschedule", ensureAuthenticated, bookingActionLimiter, validat
         });
 
         const financial = financialFields(pricing.amount, bookingCollected(existing), existing.refundedAmount || 0);
+        if (financial.paidAmount - financial.refundedAmount > financial.amount) {
+          throw new AppError(409, "The new slot costs less than the amount already collected. Choose an equal or higher-priced slot, or contact the venue.");
+        }
         return Booking.findByIdAndUpdate(
           req.params.id,
           {

@@ -4,7 +4,7 @@ const Booking = require("../model/booking");
 const { ensureAdmin, requirePermission, requireAnyPermission } = require("../middleware/adminAuth");
 const { PERMISSIONS, hasPermission } = require("../utils/permissions");
 const { bookingCollected, financialFields, extendSessionFields, endSessionFields } = require("../utils/bookingLifecycle");
-const { calculateBookingPrice, parsePaxCapacity } = require("../utils/roomPricing");
+const { calculateBookingPrice, calculateSessionExtension, parsePaxCapacity } = require("../utils/roomPricing");
 const { TIME_ZONE } = require("../utils/constants");
 const { getMonitorReport } = require("../utils/monitorReport");
 const { createWorkbook, addMonitoringGridSheets, addSummarySheet, addActivitySheet, addRoomTypeSheet } = require("../utils/reportWorkbook");
@@ -388,19 +388,11 @@ sessionsRouter.put("/:id/extend", requirePermission(PERMISSIONS.ROOM_OPERATE), v
     }
 
     const room = await MonitorRoom.findById(session.room);
-    const pricing = calculateBookingPrice({
-      variant: room || { price: session.rate },
-      timeIn: `${String(currentBusinessHour(session.startTime)).padStart(2, "0")}:00`,
-      duration: newDuration,
-      guestCount: session.guestCount,
-      hasCorkage: Number(session.corkageFee) > 0,
-    });
+    const pricing = calculateSessionExtension({ session, room, addedHours, startHour: currentBusinessHour(session.startTime) });
     const fields = extendSessionFields(session, addedHours, pricing.amount);
     session.duration = fields.duration;
     session.amount = fields.amount;
-    session.rate = pricing.unitPrice;
     session.hourlyRates = pricing.hourlyRates;
-    session.corkageFee = pricing.corkageFee;
     session.paidAmount = fields.paidAmount;
     session.refundedAmount = fields.refundedAmount;
     session.paymentStatus = fields.paymentStatus;

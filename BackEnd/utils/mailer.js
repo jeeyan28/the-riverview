@@ -181,12 +181,12 @@ async function sendReceiptEmail(booking) {
                 </table>
 
                 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 8px;">
-                  <tr><td style="padding:8px 0; font-size:14px; color:#8A9BB0;">Downpayment Paid</td><td style="padding:8px 0; font-size:14px; color:#00C9A7; text-align:right; font-weight:700;">₱${downPayment.toLocaleString()}</td></tr>
+                  <tr><td style="padding:8px 0; font-size:14px; color:#8A9BB0;">Paid Online</td><td style="padding:8px 0; font-size:14px; color:#00C9A7; text-align:right; font-weight:700;">₱${downPayment.toLocaleString()}</td></tr>
                   <tr><td style="padding:8px 0; font-size:14px; color:#8A9BB0;">Remaining Balance</td><td style="padding:8px 0; font-size:14px; color:#e0a940; text-align:right; font-weight:700;">₱${remaining.toLocaleString()}</td></tr>
                 </table>
 
                 <p style="margin:0; padding-top:20px; border-top:1px solid rgba(255,255,255,0.08); font-size:13px; line-height:1.6; color:#8A9BB0;">
-                  Please keep this receipt for your records. The remaining balance is paid upon arrival.
+                  ${remaining > 0 ? 'Please keep this receipt for your records. The remaining balance is paid upon arrival.' : 'Please keep this receipt for your records. Your booking is fully paid.'}
                 </p>
               </td>
             </tr>
@@ -205,7 +205,7 @@ async function sendReceiptEmail(booking) {
   </html>
   `;
 
-  const text = `Booking Receipt\n\n${rows.map(([label, value]) => `${label}: ${value}`).join("\n")}\nDownpayment Paid: ₱${downPayment.toLocaleString()}\nRemaining Balance: ₱${remaining.toLocaleString()}`;
+  const text = `Booking Receipt\n\n${rows.map(([label, value]) => `${label}: ${value}`).join("\n")}\nPaid Online: ₱${downPayment.toLocaleString()}\nRemaining Balance: ₱${remaining.toLocaleString()}`;
 
   const recipients = new Set();
   if (booking.guestEmail && EMAIL_RE.test(booking.guestEmail)) recipients.add(booking.guestEmail);

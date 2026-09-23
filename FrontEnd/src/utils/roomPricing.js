@@ -29,8 +29,9 @@ export function calculateBookingPrice({ variant, startHour = 0, duration = 1, gu
   const hourlyRates = Array.from({ length: hours }, (_, index) => roomRateForHour(variant, (Number(startHour) + index) % 24, guestCount));
   const roomCharge = roundMoney(hourlyRates.reduce((sum, rate) => sum + rate, 0));
   const corkageFee = hasCorkage ? CORKAGE_FEE : 0;
-  const downPayment = roundMoney(hourlyRates.slice(0, Math.max(1, Number(downPaymentHours) || 1)).reduce((sum, rate) => sum + rate, 0));
-  return { hourlyRates, roomCharge, corkageFee, amount: roundMoney(roomCharge + corkageFee), downPayment };
+  const amount = roundMoney(roomCharge + corkageFee);
+  const downPayment = Number(downPaymentHours) === hours ? amount : hourlyRates[0];
+  return { hourlyRates, roomCharge, corkageFee, amount, downPayment };
 }
 
 function formatTime(value) {

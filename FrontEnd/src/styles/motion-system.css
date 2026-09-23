@@ -6,7 +6,7 @@
   --dur-drawer: 300ms;
 }
 
-.page-transition { min-width: 0; }
+.page-transition { min-width: 0; will-change: opacity, transform; }
 .page-transition--admin { width: 100%; }
 
 /* Dialogs render into a shell-level layer, outside animated page containers. */
@@ -147,7 +147,7 @@
   opacity: 1;
   visibility: visible;
   pointer-events: auto;
-  animation: none;
+  animation: rv-backdrop-enter 180ms var(--ease-out) both;
 }
 .bk-modal,
 .pf-modal {
@@ -157,7 +157,11 @@
   transition: opacity var(--dur-medium) var(--ease-out),transform var(--dur-medium) var(--ease-out);
   animation: none;
 }
-:is(.bk-overlay,.pf-overlay).open :is(.bk-modal,.pf-modal) { opacity: 1; transform: none; }
+:is(.bk-overlay,.pf-overlay).open :is(.bk-modal,.pf-modal) {
+  opacity: 1;
+  transform: none;
+  animation: rv-dialog-enter var(--dur-medium) var(--ease-out) both;
+}
 
 /* Conditionally mounted generic dialogs use the same entrance language. */
 .modal-bg.open { animation: rv-backdrop-enter 180ms var(--ease-out) both; }
@@ -224,7 +228,9 @@
   .rv-loader-ball { animation: none; transform: translate3d(var(--loader-rest),0,0); }
   .rv-loader-line i { animation: none; opacity: .72; transform: scaleX(.72); }
   :is(.bk-overlay,.pf-overlay),
+  :is(.bk-overlay,.pf-overlay).open,
   :is(.bk-modal,.pf-modal),
+  :is(.bk-overlay,.pf-overlay).open :is(.bk-modal,.pf-modal),
   .modal-bg.open,
   .modal-bg.open .modal-box,
   .public-site .mobile-nav-backdrop,

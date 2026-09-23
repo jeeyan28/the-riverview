@@ -282,7 +282,7 @@ function BookingSummaryContents({
                       <span>₱{subtotal.toLocaleString()}</span>
                     </div>
                     <div className="bk-summary-panel-cost-row bk-summary-panel-cost-row--accent">
-                      <span>Down payment due now</span>
+                      <span>{remainingBalance > 0 ? 'Down payment due now' : 'Full payment due now'}</span>
                       <span>₱{downPayment.toLocaleString()}</span>
                     </div>
                     <div className="bk-summary-panel-cost-row bk-summary-panel-cost-row--total">
@@ -293,7 +293,7 @@ function BookingSummaryContents({
                 )}
               </div>
               {timeLabel ? (
-                <p className="bk-summary-panel-note">Your down payment confirms the booking. Pay the venue balance when you arrive.</p>
+                <p className="bk-summary-panel-note">{remainingBalance > 0 ? 'Your down payment confirms the booking. Pay the venue balance when you arrive.' : 'Your full payment confirms the booking. No balance is due at the venue.'}</p>
               ) : (
                 <p className="bk-summary-panel-note">Choose a start time to see the total and payment breakdown.</p>
               )}
@@ -1292,13 +1292,12 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
   const subtotalAmount = priceBreakdown.amount;
   const downPaymentAmount = priceBreakdown.downPayment;
   const remainingBalanceAmount = Math.max(0, subtotalAmount - downPaymentAmount);
-  const downPaymentOptions = Array.from({ length: Math.max(1, selectedDuration || 1) }, (_, i) => {
-    const hours = i + 1;
-    const amount = priceBreakdown.hourlyRates
-      .slice(0, hours)
-      .reduce((sum, rate) => sum + Number(rate || 0), 0);
-    return { hours, amount };
-  });
+  const downPaymentOptions = selectedDuration === 1
+    ? [{ hours: 1, label: 'Full payment', amount: subtotalAmount }]
+    : [
+        { hours: 1, label: '1 hour', amount: priceBreakdown.hourlyRates[0] || 0 },
+        { hours: selectedDuration, label: 'Full payment', amount: subtotalAmount },
+      ];
   const visiblePaymentMethods = allowedPaymentMethodKeys
     ? PAYMENT_METHODS.filter((m) => allowedPaymentMethodKeys.includes(m.key))
     : PAYMENT_METHODS;
@@ -1763,18 +1762,20 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
                 </div>
 
                 <div className="bk-downpayment-card">
-                  <p className="bk-summary-label">Down payment</p>
+                  <p className="bk-summary-label">{remainingBalanceAmount > 0 ? 'Down payment' : 'Full payment'}</p>
                   <p className="bk-downpayment-amount">
                     ₱{downPaymentAmount.toLocaleString()}
                   </p>
-                  <p className="bk-downpayment-duration">Pays for {downPaymentHours} of {selectedDuration} hour{selectedDuration === 1 ? '' : 's'} and confirms your reservation. Balance due at venue: ₱{remainingBalanceAmount.toLocaleString()}.</p>
+                  <p className="bk-downpayment-duration">{remainingBalanceAmount > 0
+                    ? `Pays for the first hour and confirms your reservation. Balance due at venue: ₱${remainingBalanceAmount.toLocaleString()}.`
+                    : 'Pays the full booking total and confirms your reservation. No balance due at venue.'}</p>
                 </div>
 
                 <div className="bk-payment-methods">
                   <span className="bk-payment-methods-label" id="bk-payment-hours-label">Pay now</span>
-                  <p className="bk-payment-methods-help">Choose how many reservation hours to cover today.</p>
+                  <p className="bk-payment-methods-help">{selectedDuration === 1 ? 'Pay the full booking total today.' : 'Choose 1 hour or pay the full booking total today.'}</p>
                   <div className="bk-payment-methods-grid bk-payment-duration-grid" role="group" aria-labelledby="bk-payment-hours-label">
-                    {downPaymentOptions.map(({ hours, amount }) => (
+                    {downPaymentOptions.map(({ hours, label, amount }) => (
                       <button
                         key={hours}
                         type="button"
@@ -1788,7 +1789,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
                         onClick={() => setDownPaymentHours(hours)}
                       >
                         <span className="bk-payment-choice-copy">
-                          <strong>{hours} hour{hours === 1 ? '' : 's'}</strong>
+                          <strong>{label}</strong>
                           <small>₱{amount.toLocaleString()}</small>
                         </span>
                         <span className="bk-payment-choice-check" aria-hidden="true">

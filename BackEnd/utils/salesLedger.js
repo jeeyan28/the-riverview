@@ -87,7 +87,9 @@ function salesRows(bookings, sessions) {
       duration, rate, rateLabel: rateLabel(hourlyRates, rate), hourlyRates,
       amount, paidAmount, refundedAmount, collected, balance,
       paymentTiming: session?.paymentTiming || (balance > 0 ? 'After' : 'Before'),
-      paymentStatus: balance === 0 && paidAmount > 0 ? 'Paid' : paidAmount > 0 ? 'Partial' : 'Unpaid',
+      paymentStatus: closed && refundedAmount > 0
+        ? collected === 0 ? 'Refunded' : 'Partial refund'
+        : balance === 0 && paidAmount > 0 ? 'Paid' : paidAmount > 0 ? 'Partial' : 'Unpaid',
       financialReviewRequired: warnings.length > 0, warnings,
     };
   }

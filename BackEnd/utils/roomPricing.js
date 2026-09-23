@@ -79,10 +79,27 @@ function computeDownPayment(hourlyRatesOrPrice, hours = 1) {
   return roundMoney(Math.max(0, Number(hourlyRatesOrPrice) || 0) * requestedHours);
 }
 
+function calculateSessionExtension({ session, room, addedHours, startHour }) {
+  const existingRates = Array.isArray(session.hourlyRates) ? session.hourlyRates.map(Number) : [];
+  if (!existingRates.length && Number.isInteger(Number(session.duration))) {
+    existingRates.push(...Array(Number(session.duration)).fill(Number(session.rate) || 0));
+  }
+  const fallbackRate = existingRates.at(-1) || Number(session.rate) || 0;
+  const variant = room && !room.isTemporary ? room : { price: fallbackRate };
+  const addedRates = Array.from({ length: addedHours }, (_, index) =>
+    rateForHour(variant, (startHour + Number(session.duration) + index) % 24, session.guestCount)
+  );
+  return {
+    amount: roundMoney(Number(session.amount) + addedRates.reduce((sum, rate) => sum + rate, 0)),
+    hourlyRates: [...existingRates, ...addedRates],
+  };
+}
+
 module.exports = {
   CORKAGE_FEE,
   calculateBookingPrice,
   computeDownPayment,
+  calculateSessionExtension,
   parsePaxCapacity,
   rateForHour,
 };
