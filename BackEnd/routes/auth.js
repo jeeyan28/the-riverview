@@ -88,11 +88,11 @@ function handleGoogleAuthError(err, res) {
 
   if (oauthError === "unauthorized_client" || oauthError === "invalid_client") {
     return res.status(503).json({
-      message: "Google sign-in is temporarily unavailable. Please use email sign-in.",
+      message: "Google login is temporarily unavailable. Please use email and password.",
     });
   }
 
-  return res.status(401).json({ message: "Google sign-in failed." });
+  return res.status(401).json({ message: "Google login failed." });
 }
 
 async function logLoginAttempt(req, { user, email, status, reason = "", method = "password" }) {
@@ -304,7 +304,7 @@ router.post("/register/verify-otp", registerOtpLimiter, validate(emailOtpSchema)
 
     await PendingRegistration.deleteOne({ _id: pending._id });
 
-    res.json({ message: "Your account has been created successfully. You can now sign in." });
+    res.json({ message: "Your account is ready. You can now log in." });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Server error." });
@@ -404,7 +404,7 @@ router.post("/verify-account-otp", registerOtpLimiter, validate(emailOtpSchema),
     user.verifyOtpAttempts = 0;
     await user.save();
 
-    res.json({ message: "Your email has been verified. You can now sign in." });
+    res.json({ message: "Your email has been verified. You can now log in." });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Server error." });
@@ -721,7 +721,10 @@ async function handlePasswordLogin(req, res) {
     if (!user) {
       await bcrypt.compare(password, DUMMY_HASH);
       await logLoginAttempt(req, { email, status: "failed", reason: "No account found" });
-      return res.status(401).json({ message: "Invalid email or password." });
+      return res.status(401).json({
+        message: "No account found with this email. Check the address or create an account.",
+        field: "email",
+      });
     }
 
     if (user.lockUntil && user.lockUntil.getTime() > Date.now()) {
@@ -739,7 +742,7 @@ async function handlePasswordLogin(req, res) {
     if (!user.isVerified) {
       await logLoginAttempt(req, { user, status: "failed", reason: "Email not verified" });
       return res.status(403).json({
-        message: "Please verify your email before signing in.",
+        message: "Verify your email before logging in.",
         unverified: true,
       });
     }
@@ -748,7 +751,7 @@ async function handlePasswordLogin(req, res) {
     if (!match) {
       await user.registerFailedLogin();
       await logLoginAttempt(req, { user, status: "failed", reason: "Wrong password" });
-      return res.status(401).json({ message: "Invalid email or password." });
+      return res.status(401).json({ message: "Incorrect password. Try again or reset it.", field: "password" });
     }
 
     await user.registerSuccessfulLogin();

@@ -10,7 +10,7 @@ const roomVariantSchema = Joi.object({
   label: Joi.string().trim().min(1).max(100).required(),
   price: Joi.number().min(0).precision(2).required(),
   pax: Joi.string().trim().allow("").max(80),
-  startingRoomNumber: Joi.number().integer().min(1).max(99999).default(1),
+  startingRoomNumber: Joi.number().integer().valid(1).default(1),
   roomCount: Joi.number().integer().min(1).max(100).default(1),
   status: Joi.string().valid("Available", "Maintenance", "Unavailable").default("Available"),
   image: Joi.string().trim().allow("").max(1000),

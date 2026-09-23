@@ -3,34 +3,47 @@ dns.setServers(["1.1.1.1", "8.8.8.8"]);
 
 require("dotenv").config();
 const mongoose = require("mongoose");
+const Room = require("../model/room");
+const { syncRoomInventory } = require("../utils/syncRoomInventory");
 
 async function run() {
+  const apply = process.argv.includes("--apply");
   await mongoose.connect(process.env.MONGO_URI);
-  const collection = mongoose.connection.db.collection("rooms");
+  try {
+    const collection = mongoose.connection.db.collection("rooms");
+    const rooms = await collection.find({ "variants.0": { $exists: true } }).toArray();
+    let changed = 0;
 
-  const rooms = await collection.find({ "variants.0": { $exists: true } }).toArray();
-  console.log(`Found ${rooms.length} facility/facilities with room types to check.`);
+    for (const room of rooms) {
+      const needsUpdate = room.variants.some((variant) =>
+        Number(variant.startingRoomNumber) !== 1 || Object.hasOwn(variant, "roomNumber"));
+      if (!needsUpdate) continue;
 
-  let updatedFacilities = 0;
-  let updatedVariants = 0;
+      const variants = room.variants.map((variant) => {
+        const { roomNumber, ...rest } = variant;
+        return { ...rest, startingRoomNumber: 1 };
+      });
+      changed++;
+      console.log(`${room.name}: reset room numbering to 1 for ${variants.length} room type(s)`);
+      if (!apply) continue;
 
-  for (const room of rooms) {
-    const newVariants = room.variants.map((variant) => {
-      const legacy = variant.roomNumber;
-      const parsed = parseInt(legacy, 10);
-      const startingRoomNumber = Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
-      updatedVariants++;
-      console.log(`  ${room.name} / ${variant.label || "(untitled)"}: roomNumber="${legacy ?? ""}" -> startingRoomNumber=${startingRoomNumber}`);
-      const { roomNumber, ...rest } = variant;
-      return { ...rest, startingRoomNumber };
-    });
+      const session = await mongoose.startSession();
+      try {
+        await session.withTransaction(async () => {
+          await collection.updateOne({ _id: room._id }, { $set: { variants } }, { session });
+          const updatedRoom = await Room.findById(room._id).session(session);
+          await syncRoomInventory(updatedRoom, null, session);
+        });
+      } finally {
+        await session.endSession();
+      }
+    }
 
-    await collection.updateOne({ _id: room._id }, { $set: { variants: newVariants }, $unset: { status: "" } });
-    updatedFacilities++;
+    console.log(`${apply ? "Updated" : "Would update"} ${changed} facility/facilities.`);
+    if (!apply && changed) console.log("Run with --apply to update the catalog and monitoring inventory.");
+  } finally {
+    await mongoose.disconnect();
   }
-
-  console.log(`Done. Updated ${updatedVariants} room type(s) across ${updatedFacilities} facility/facilities.`);
-  await mongoose.disconnect();
 }
 
 run().catch((err) => {

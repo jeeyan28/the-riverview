@@ -67,7 +67,7 @@ function sessionRow(session) {
 function buildMonitorReport(sessions, { from, to, maxDays = 366 }) {
   dateRange(from, to, maxDays);
   const rows = sessions.map(sessionRow)
-    .filter((row) => row.date >= from && row.date <= to)
+    .filter((row) => row.date >= from && row.date <= to && row.status === 'Finished' && row.paymentStatus === 'Paid' && row.balance === 0)
     .sort((a, b) => new Date(b.startTime) - new Date(a.startTime));
   const summary = {
     sessions: rows.length,

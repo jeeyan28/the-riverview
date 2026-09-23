@@ -63,7 +63,6 @@ function SessionBalance({ session }) {
     <div className={`rm-card-balance${due ? ' is-due' : ' is-paid'}`}>
       <span>{due ? 'Balance due' : 'Paid in full'}</span>
       <strong>{money(due ? payment.balance : payment.total)}</strong>
-      <small>{money(payment.collected)} received of {money(payment.total)}</small>
     </div>
   );
 }
@@ -78,7 +77,7 @@ function getBookingRoomTarget(booking) {
   return {
     facilityName,
     roomName,
-    startingRoomNumber: variant?.startingRoomNumber != null ? Number(variant.startingRoomNumber) : null,
+    startingRoomNumber: 1,
     roomCount: variant?.roomCount != null ? Number(variant.roomCount) : null,
   };
 }
@@ -719,7 +718,7 @@ function Monitor() {
                         <div className={`rm-timer-big${isWarning ? ' warn' : ''}${(isPastEnd || isCritical) ? ' expired' : ''}`}>
                           {formatTimeRemaining(remaining, isPastEnd)}
                         </div>
-                        <div className="rm-timer-caption">Time left · ends {formatEndTime(occupancy)}</div>
+                        <div className="rm-timer-caption">Time left</div>
                       </div>
                     </div>
                     <div className="rm-session-meta">
@@ -843,24 +842,17 @@ function guestInitials(name) {
 }
 
 function FinishSessionModal({ session, disabled, onClose, onSubmit }) {
-  const [collectBalance, setCollectBalance] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
   const payment = paymentSummary(session);
   const isFullyPaid = !!session && payment.balance === 0;
 
-  useEffect(() => {
-    if (session) setCollectBalance(true);
-  }, [session?._id]);
-
   async function handleSubmit(event) {
     event.preventDefault();
-    const received = isFullyPaid || collectBalance
-      ? Number(session.amount || 0) + Number(session.refundedAmount || 0)
-      : Number(session.paidAmount || 0);
+    const received = Math.max(Number(session.paidAmount || 0), Number(session.amount || 0) + Number(session.refundedAmount || 0));
     setSubmitting(true);
     try {
-      await onSubmit({ paid: Number(session.amount) > 0 && received - Number(session.refundedAmount || 0) >= Number(session.amount), paidAmount: received });
+      await onSubmit({ paid: Number(session.amount) > 0, paidAmount: received });
     } catch (err) {
       alert(err.message || 'Could not finish this session.');
     } finally {
@@ -884,13 +876,10 @@ function FinishSessionModal({ session, disabled, onClose, onSubmit }) {
                 <div><span>Already received</span><strong>{money(payment.collected)}</strong></div>
                 <div><span>Balance due</span><strong>{money(payment.balance)}</strong></div>
               </div>
-              <div className="session-collection-options session-settlement-options" role="group" aria-label="Finish payment">
-                <button type="button" className={collectBalance ? 'active' : ''} aria-pressed={collectBalance} onClick={() => setCollectBalance(true)}><strong>Collect full balance</strong><small>Record {money(payment.balance)} received after play</small></button>
-                <button type="button" className={!collectBalance ? 'active' : ''} aria-pressed={!collectBalance} onClick={() => setCollectBalance(false)}><strong>Leave balance due</strong><small>Finish without recording another payment</small></button>
-              </div>
+              <p className="mfield-note">Collect the full {money(payment.balance)} balance before finishing. This will record it as paid.</p>
             </>
           )}
-          <div className="modal-actions"><button type="button" className="btn-cancel" onClick={onClose}>Keep active</button><button type="submit" className="btn-confirm" disabled={disabled || submitting}>{submitting ? 'Saving…' : 'Finish session'}</button></div>
+          <div className="modal-actions"><button type="button" className="btn-cancel" onClick={onClose}>Keep active</button><button type="submit" className="btn-confirm" disabled={disabled || submitting}>{submitting ? 'Saving…' : isFullyPaid ? 'Finish session' : 'Record full payment & finish'}</button></div>
         </form>
       )}
     </Modal>
@@ -913,7 +902,7 @@ function RoomDetailModal({ room, view, onClose, canManage, canOperate, onExtend,
             <>
               <div className={`rmd-timer-block${view.isWarning ? ' warn' : ''}${(view.isPastEnd || view.isCritical) ? ' expired' : ''}`}>
                 <div className="rmd-timer-value">{formatTimeRemaining(view.remaining, view.isPastEnd)}</div>
-                <div className="rmd-timer-caption">Time left · ends {formatEndTime(view.occupancy)}</div>
+                <div className="rmd-timer-caption">Time left</div>
               </div>
 
               {view.occupancy.guestName && (
@@ -1121,8 +1110,8 @@ function RoomFormModal({ open, onClose, onSubmit, existingFacilities, rooms, ini
       return;
     }
     const trimmedPrice = price.trim();
-    if (trimmedPrice && (Number.isNaN(Number(trimmedPrice)) || Number(trimmedPrice) < 0)) {
-      alert('Rate must be a valid non-negative number.');
+    if (!trimmedPrice || !Number.isFinite(Number(trimmedPrice)) || Number(trimmedPrice) <= 0) {
+      alert('Enter a rate greater than ₱0 per hour.');
       return;
     }
     const numberTaken = rooms.some((r) => r.roomName === trimmedRoomName && String(r.roomNumber) === trimmedRoomNumber && r._id !== initialRoom?._id);
@@ -1132,7 +1121,7 @@ function RoomFormModal({ open, onClose, onSubmit, existingFacilities, rooms, ini
     }
     setSubmitting(true);
     try {
-      await onSubmit({ facilityName: trimmedFacility, roomName: trimmedRoomName, roomNumber: trimmedRoomNumber, price: trimmedPrice ? Number(trimmedPrice) : 0 });
+      await onSubmit({ facilityName: trimmedFacility, roomName: trimmedRoomName, roomNumber: trimmedRoomNumber, price: Number(trimmedPrice) });
       onClose();
     } catch (err) {
       console.error(err);
@@ -1172,7 +1161,7 @@ function RoomFormModal({ open, onClose, onSubmit, existingFacilities, rooms, ini
         </div>
         <div className="mfield">
           <label>Rate (₱/hr)</label>
-          <input type="number" min="0" step="1" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="e.g. 150" />
+          <input type="number" min="0.01" step="0.01" required value={price} onChange={(e) => setPrice(e.target.value)} placeholder="e.g. 150" />
         </div>
       </div>
       <div className="modal-actions">
@@ -1245,6 +1234,10 @@ function SessionModal({ modal, onClose, onSubmit }) {
   async function handleSubmit() {
     const totalHours = duration;
     setFormError('');
+    if (!isExtend && !fromBooking && !(Number(modal?.fixedRoom?.price) > 0)) {
+      setFormError('Set this table’s hourly rate before starting a session.');
+      return;
+    }
     if (!Number.isInteger(totalHours) || totalHours < 1) {
       setFormError(isExtend ? 'Choose at least one whole hour to add.' : 'Choose a duration of at least one whole hour.');
       return;
@@ -1287,7 +1280,9 @@ function SessionModal({ modal, onClose, onSubmit }) {
     : modal?.roomTarget
       ? `${modal.roomTarget.roomName} — ${modal.previewNumber ? `Table No. ${modal.previewNumber} ` : ''}(${modal.roomTarget.facilityName}) — will be created`
       : '';
-  const fixedRoomRate = modal?.fixedRoom ? variantRateLabel(modal.fixedRoom) : modal?.roomTarget ? 'From reservation' : '';
+  const fixedRoomRate = modal?.fixedRoom
+    ? Number(modal.fixedRoom.price) > 0 ? variantRateLabel(modal.fixedRoom) : 'Rate not set'
+    : modal?.roomTarget ? 'From reservation' : '';
   const title = isExtend ? `Extend Session — ${modal?.fixedRoom?.roomName || ''}` : fromBooking ? 'Start Session from Reservation' : 'Start Session';
 
   return (
@@ -1357,7 +1352,7 @@ function SessionModal({ modal, onClose, onSubmit }) {
 
           {!isExtend && !reservationPaidInFull && (
             <div className="session-collection-options" role="group" aria-label="Payment collection">
-              <button type="button" className={collectionMode === 'later' ? 'active' : ''} aria-pressed={collectionMode === 'later'} onClick={() => setCollectionMode('later')}><strong>Pay after play</strong><small>{fromBooking ? `${money(outstanding)} balance stays due` : 'Collect the full charge when the session ends'}</small></button>
+              <button type="button" className={collectionMode === 'later' ? 'active' : ''} aria-pressed={collectionMode === 'later'} onClick={() => setCollectionMode('later')}><strong>Pay after play</strong><small>{fromBooking ? `${money(outstanding)} balance stays due` : `Collect ${money(totalCharge)} when the session ends`}</small></button>
               <button type="button" className={collectionMode === 'full' ? 'active' : ''} aria-pressed={collectionMode === 'full'} onClick={() => setCollectionMode('full')}><strong>Pay before play</strong><small>{fromBooking ? `Collect the full ${money(outstanding)} balance now` : `Collect ${money(totalCharge)} now`}</small></button>
             </div>
           )}
@@ -1370,14 +1365,6 @@ function SessionModal({ modal, onClose, onSubmit }) {
                 <option value="GCash">GCash</option>
                 <option value="Maya">Maya</option>
               </select>
-            </div>
-          )}
-
-          {!isExtend && !fromBooking && walkInPricing && (
-            <div className="session-charge-preview">
-              <span>{modal.fixedRoom.roomName} · {duration} whole hour{duration === 1 ? '' : 's'}</span>
-              <strong>{money(totalCharge)}</strong>
-              <small>{variantRateLabel(modal.fixedRoom)}{hasCorkage ? ` · includes ${money(CORKAGE_FEE)} corkage` : ''}</small>
             </div>
           )}
 

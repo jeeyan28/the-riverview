@@ -93,31 +93,23 @@
 #app .session-collection-options button strong { font-size: .75rem; }
 #app .session-collection-options button small { color: var(--muted); font-size: .64rem; line-height: 1.35; }
 #app .session-collection-options button.active { border-color: var(--teal); background: var(--teal-soft); color: var(--teal); }
-#app .session-charge-preview { display: grid; grid-template-columns: 1fr auto; gap: 3px 12px; margin-top: 12px; padding: 13px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--navy3); }
-#app .session-charge-preview span { color: var(--muted); font-size: .7rem; }
-#app .session-charge-preview strong { color: var(--text); font-size: 1rem; }
-#app .session-charge-preview small { grid-column: 1/-1; color: var(--muted); font-size: .65rem; }
 #app .session-form-error { margin: 12px 0 0; color: var(--red); font-size: .74rem; }
 
 #app .monitor-report { display: flex; flex-direction: column; gap: 16px; }
-#app .monitor-report-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; padding: 20px 22px; border: 1px solid var(--border); border-radius: 12px; background: var(--navy2); }
-#app .monitor-report-head h2 { margin: 0 0 4px; color: var(--text); font-size: 1.05rem; font-weight: 760; letter-spacing: -.02em; }
-#app .monitor-report-head p { max-width: 68ch; margin: 0; color: var(--muted); font-size: .75rem; }
-#app .monitor-report-head .save-btn { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 7px; }
 #app .monitor-report-filters { display: flex; align-items: end; justify-content: space-between; gap: 14px; padding: 14px 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--navy2); }
-#app .monitor-report-summary { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 1px; overflow: hidden; border: 1px solid var(--border); border-radius: 12px; background: var(--border); }
+#app .monitor-report-filter-actions { display: flex; align-items: center; gap: 8px; }
+#app .monitor-report-summary { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 1px; overflow: hidden; border: 1px solid var(--border); border-radius: 12px; background: var(--border); }
 #app .monitor-report-summary > div { display: grid; gap: 3px; padding: 15px 16px; background: var(--navy2); }
 #app .monitor-report-summary span { color: var(--muted); font-size: .66rem; }
 #app .monitor-report-summary strong { color: var(--text); font-size: 1.2rem; font-variant-numeric: tabular-nums; }
 #app .monitor-report-summary small { color: var(--muted); font-size: .64rem; }
-#app .monitor-report-summary .has-balance strong { color: var(--amber); }
 #app .monitor-report-layout { display: grid; grid-template-columns: minmax(0,1fr); gap: 16px; align-items: start; }
 #app .monitor-report-table-card { overflow: hidden; }
 #app .monitor-report-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; padding: 16px 18px; border-bottom: 1px solid var(--border); }
 #app .monitor-report-card-head h3 { margin: 0 0 3px; color: var(--text); font-size: .84rem; }
 #app .monitor-report-card-head p { margin: 0; color: var(--muted); font-size: .67rem; }
 #app .monitor-report-card-head > span { color: var(--muted); font-size: .68rem; }
-#app .monitor-report-table { min-width: 1080px; }
+#app .monitor-report-table { min-width: 960px; }
 #app .monitor-payment-pill { display: inline-flex; min-height: 24px; align-items: center; padding: 2px 8px; border: 1px solid var(--border); border-radius: 12px; font-size: .65rem; font-weight: 700; }
 #app .monitor-payment-pill.paid { color: var(--green); }
 #app .monitor-payment-pill.partial { color: var(--amber); }
@@ -177,6 +169,7 @@
   #app .monitor-section-tabs { grid-template-columns: repeat(2,minmax(0,1fr)); }
   #app .monitor-report-summary { grid-template-columns: repeat(2,minmax(0,1fr)); }
   #app .monitor-report-filters { align-items: stretch; flex-direction: column; }
+  #app .monitor-report-filter-actions { justify-content: flex-end; }
   #app .set-tabs { display: flex; width: 100%; flex: none; overflow-x: auto; }
   #app .set-tab { min-width: 190px; flex: 1 0 auto; }
 }
@@ -200,8 +193,7 @@
   #app .session-payment-ledger { grid-template-columns: 1fr; }
   #app .finish-payment-ledger { grid-template-columns: 1fr; }
   #app .session-collection-options { grid-template-columns: 1fr; }
-  #app .monitor-report-head { align-items: stretch; flex-direction: column; }
-  #app .monitor-report-head .save-btn { width: 100%; justify-content: center; }
+  #app .monitor-report-filter-actions > button { flex: 1; justify-content: center; }
   #app .monitor-report-summary { grid-template-columns: 1fr; }
   #app .monitor-room-total-list { grid-template-columns: 1fr; }
   #app .monitor-room-total-list > div:nth-child(odd) { border-right: 0; }

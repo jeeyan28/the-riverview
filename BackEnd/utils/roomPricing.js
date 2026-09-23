@@ -85,7 +85,7 @@ function calculateSessionExtension({ session, room, addedHours, startHour }) {
     existingRates.push(...Array(Number(session.duration)).fill(Number(session.rate) || 0));
   }
   const fallbackRate = existingRates.at(-1) || Number(session.rate) || 0;
-  const variant = room && !room.isTemporary ? room : { price: fallbackRate };
+  const variant = room && !room.isTemporary && Number(room.price) > 0 ? room : { price: fallbackRate };
   const addedRates = Array.from({ length: addedHours }, (_, index) =>
     rateForHour(variant, (startHour + Number(session.duration) + index) % 24, session.guestCount)
   );

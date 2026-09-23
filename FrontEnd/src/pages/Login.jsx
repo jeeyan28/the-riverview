@@ -12,6 +12,7 @@ function Login() {
   const [searchParams] = useSearchParams();
   const [isLogin, setIsLogin] = useState(() => searchParams.get('mode') !== 'register');
   const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [resetLogin, setResetLogin] = useState(null);
   const { stage, beginMorph, retry } = useAuthMorph();
   const isMorphing = stage !== 'idle';
   const returnTo = searchParams.get('returnTo') || '';
@@ -49,7 +50,7 @@ function Login() {
             <span>Enjoy the rest.</span>
           </h1>
           <p>
-            One secure sign-in for reservations and assigned staff access — with
+            One secure login for reservations and assigned staff access — with
             payments, confirmations, and booking history in one place.
           </p>
           {!isMorphing && (
@@ -70,12 +71,7 @@ function Login() {
               {isLogin ? (
                 <>
                   <div className="login-avatar"><User size={18} /></div>
-                  <h2>Continue to The Riverview</h2>
-                  <p>
-                    {hasReservationIntent
-                      ? 'Sign in, create an account, or book as a guest.'
-                      : 'Sign in to a customer or staff account, create a customer account, or book as a guest.'}
-                  </p>
+                  <h2>Log in to The Riverview</h2>
                 </>
               ) : (
                 <>
@@ -98,6 +94,7 @@ function Login() {
             <div className="auth-card-body">
               <AuthForm
                 mode={isLogin ? 'login' : 'register'}
+                resetLogin={resetLogin}
                 onSwitchMode={() => setIsLogin((v) => !v)}
                 onForgotPassword={() => setShowForgotPassword(true)}
                 onAuthSuccess={handleAuthSuccess}
@@ -113,7 +110,9 @@ function Login() {
       <ForgotPasswordModal
         open={showForgotPassword}
         onClose={() => setShowForgotPassword(false)}
-        onReturnToLogin={() => {
+        onReturnToLogin={(email) => {
+          setIsLogin(true);
+          setResetLogin({ email });
           setShowForgotPassword(false);
           requestAnimationFrame(() => document.getElementById('email')?.focus());
         }}

@@ -9,6 +9,7 @@ const {
 
 test('three code requests are allowed; the fourth is blocked without blocking later reset stages', async () => {
   const app = express();
+  app.use(express.json());
   let codesSent = 0;
   app.post('/forgot-password', forgotPasswordLimiter, (_req, res) => {
     codesSent += 1;
@@ -24,18 +25,20 @@ test('three code requests are allowed; the fourth is blocked without blocking la
 
   try {
     for (let i = 0; i < 3; i += 1) {
-      const response = await fetch(`${baseUrl}/forgot-password`, { method: 'POST' });
+      const response = await fetch(`${baseUrl}/forgot-password`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: 'member@example.com' }) });
       assert.equal(response.status, 200);
       assert.equal(response.headers.get('ratelimit-remaining'), String(2 - i));
     }
 
-    const blocked = await fetch(`${baseUrl}/forgot-password`, { method: 'POST' });
+    const blocked = await fetch(`${baseUrl}/forgot-password`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: 'member@example.com' }) });
     assert.equal(blocked.status, 429);
     assert.match((await blocked.json()).message, /limit of 3 password reset code requests per hour/);
     assert.equal(codesSent, 3);
 
-    assert.equal((await fetch(`${baseUrl}/verify-otp`, { method: 'POST' })).status, 200);
-    assert.equal((await fetch(`${baseUrl}/reset-password`, { method: 'POST' })).status, 200);
+    const otherEmail = await fetch(`${baseUrl}/forgot-password`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: 'other@example.com' }) });
+    assert.equal(otherEmail.status, 200);
+    assert.equal((await fetch(`${baseUrl}/verify-otp`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: 'member@example.com' }) })).status, 200);
+    assert.equal((await fetch(`${baseUrl}/reset-password`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ resetSessionToken: 'verified-session' }) })).status, 200);
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }

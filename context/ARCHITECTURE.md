@@ -118,10 +118,10 @@ sequenceDiagram
 - Client polls `GET /monitor-rooms` and `GET /room-sessions` every **2 seconds** (`LOBBY_POLL_MS`) while the lobby/monitor view is open.
 - A local 1-second tick drives visual countdowns (e.g. time remaining) between polls without hitting the server every second.
 - An overdue-session alert (audible beep) re-fires at most every 30 seconds to avoid alert fatigue.
-- Staff starts a walk-in with `POST /api/room-sessions`, choosing 1–24 whole hours, guest/corkage details, amount collected, and whether payment is before or after play. The API calculates the exact hourly charge from the chosen `MonitorRoom` pricing snapshot.
+- Staff starts a walk-in with `POST /api/room-sessions`, choosing 1–5 whole hours, guest/corkage details, and full payment before or after play. The API calculates the exact hourly charge from the chosen `MonitorRoom` pricing snapshot. Legacy tables with a zero rate use a uniquely matching facility catalog variant; sessions cannot start if the rate is still unknown.
 - Starting a due reservation uses the same endpoint with `bookingId`. The API assigns an available physical unit, copies the reservation charge, preserves the verified deposit, derives `Paid`/`Partial`/`Unpaid`, and changes the booking to `Ongoing`.
-- Extending, finishing, cancelling, and correcting sessions preserve the financial trail. Finish records the money actually received; it can leave a valid balance instead of forcing a paid state.
-- `GET /api/room-sessions/report?from=YYYY-MM-DD&to=YYYY-MM-DD` returns the independent played-session report. `/report/export` opens with facility monitoring-grid sheets that mirror the venue's familiar per-table Time In / Time Out / No. of Hrs workbook, followed by Summary, Played sessions, and Room totals sheets.
+- Extending, finishing, cancelling, and correcting sessions preserve the financial trail. Finishing a charged session requires full payment; older unpaid records retain their original amounts.
+- `GET /api/room-sessions/report?from=YYYY-MM-DD&to=YYYY-MM-DD` returns finished, fully paid sessions only. `/report/export` uses the same filter and opens with facility monitoring-grid sheets that mirror the venue's familiar per-table Time In / Time Out / No. of Hrs workbook, followed by Summary, Played sessions, and Room totals sheets.
 - **This is the final approach, not a placeholder.** 2-second polling meets the "near-live" requirement without the added complexity of a WebSocket/SSE layer. Do not introduce a push-based layer without a documented reason — it's not a "todo."
 
 ## 6. Data Flow: Revenue Forecasting
@@ -160,7 +160,7 @@ flowchart LR
 
 - `helmet` for HTTP security headers.
 - `cors` with an explicit allow-list (`APP_BASE_URL`), not a wildcard.
-- Rate limiting (`express-rate-limit`) on sensitive routes (booking actions, payment intents).
+- Rate limiting (`express-rate-limit`) on sensitive routes (booking actions, payment intents). Password reset code and verification limits are scoped to the normalized email, and password updates to the verified reset token, so customers sharing a network do not consume each other's reset attempts.
 - `Joi` validation on all mutating routes via `validate()` middleware — reject malformed input before it reaches business logic.
 - `bcryptjs` for password hashing.
 - Audit log (`auditLog` model) and login history (`loginHistory` model) for traceability of admin actions.

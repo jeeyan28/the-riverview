@@ -3,7 +3,7 @@ const MANILA_OFFSET = '+08:00';
 const MINUTE_MS = 60_000;
 const HOUR_MS = 60 * MINUTE_MS;
 
-export const RESERVATION_STATUS_FILTERS = ['Pending', 'Confirmed', 'Overdue', 'In Use', 'Done', 'Cancelled', 'No Show', 'Rejected'];
+export const RESERVATION_STATUS_FILTERS = ['Confirmed', 'Overdue', 'In Use', 'Done', 'Cancelled', 'No Show'];
 
 export function reservationWindow(booking) {
   const { date, timeIn } = booking || {};

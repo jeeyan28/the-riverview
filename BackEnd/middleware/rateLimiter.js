@@ -1,4 +1,5 @@
 const rateLimit = require("express-rate-limit");
+const crypto = require("crypto");
 const { ipKeyGenerator } = rateLimit;
 const { GUEST_CREATION_LIMIT_WINDOW_MS, GUEST_CREATION_LIMIT_MAX } = require("../utils/constants");
 
@@ -11,21 +12,35 @@ const loginLimiter = rateLimit({
   message: { message: "Too many login attempts from this network. Please try again later." },
 });
 
-function passwordResetLimiter(message, max = 5) {
+function resetKey(value) {
+  if (!value || typeof value !== "string") return "invalid-reset-request";
+  return crypto.createHash("sha256").update(value).digest("hex");
+}
+
+function resetEmailKey(req) {
+  const email = req.body?.email;
+  return resetKey(typeof email === "string" ? email.trim().toLowerCase() : null);
+}
+
+function resetSessionKey(req) {
+  return resetKey(req.body?.resetSessionToken);
+}
+
+function passwordResetLimiter(message, max = 5, keyGenerator = resetEmailKey) {
   return rateLimit({
     windowMs: 60 * 60 * 1000,
     max,
     standardHeaders: true,
     legacyHeaders: false,
+    keyGenerator,
     message: { message },
   });
 }
 
-// Three code requests are allowed per hour. Verification and password updates
-// have separate safety limits so they never use up those three code requests.
-const forgotPasswordLimiter = passwordResetLimiter("This network has reached the limit of 3 password reset code requests per hour. Please try again later.", 3);
+// Limit each email separately so accounts sharing a network do not block one another.
+const forgotPasswordLimiter = passwordResetLimiter("This email has reached the limit of 3 password reset code requests per hour. Please try again later.", 3);
 const verifyResetOtpLimiter = passwordResetLimiter("Too many verification attempts. Please try again later.");
-const resetPasswordLimiter = passwordResetLimiter("Too many password update attempts. Please try again later.");
+const resetPasswordLimiter = passwordResetLimiter("Too many password update attempts. Please try again later.", 5, resetSessionKey);
 
 const registerOtpLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,

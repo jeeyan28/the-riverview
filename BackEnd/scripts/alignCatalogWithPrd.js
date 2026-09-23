@@ -87,7 +87,7 @@ function buildVariant(definition, existing, fallback) {
     label: definition.label,
     price: definition.price,
     pax: definition.pax ?? source.pax ?? "",
-    startingRoomNumber: Math.max(1, Number(source.startingRoomNumber) || 1),
+    startingRoomNumber: 1,
     roomCount: Math.max(1, Number(source.roomCount) || 1),
     status: source.status || "Available",
     image: source.image || "",

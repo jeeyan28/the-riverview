@@ -187,6 +187,7 @@ function ForgotPasswordModal({ open, onClose, onReturnToLogin }) {
 
   async function handleVerifySubmit(e) {
     e.preventDefault();
+    if (verifying) return;
 
     const code = otp.join('');
     if (code.length !== OTP_LENGTH) {
@@ -224,6 +225,7 @@ function ForgotPasswordModal({ open, onClose, onReturnToLogin }) {
 
   async function handlePasswordSubmit(e) {
     e.preventDefault();
+    if (resetting) return;
 
     if (!passwordValid) {
       setPasswordError('Password does not meet all requirements.');
@@ -321,7 +323,7 @@ function ForgotPasswordModal({ open, onClose, onReturnToLogin }) {
               <button
                 type="button"
                 className="btn-submit"
-                onClick={() => (onReturnToLogin ? onReturnToLogin() : onClose?.())}
+                onClick={() => (onReturnToLogin ? onReturnToLogin(sentEmail) : onClose?.())}
               >
                 <span className="btn-text">Return to Login</span>
               </button>
@@ -417,7 +419,7 @@ function ForgotPasswordModal({ open, onClose, onReturnToLogin }) {
                 <button type="button" className="btn-cancel" onClick={onClose}>
                   Cancel
                 </button>
-                <button type="submit" className={`btn-submit${verifying ? ' loading' : ''}`}>
+                <button type="submit" className={`btn-submit${verifying ? ' loading' : ''}`} disabled={verifying}>
                   <span className="btn-text">Verify code</span>
                   <span className="btn-spinner">
                     <span className="spinner-ring"></span>

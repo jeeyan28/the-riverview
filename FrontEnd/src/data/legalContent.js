@@ -1,152 +1,161 @@
 export const LAST_UPDATED = 'September 23, 2026';
+export const TERMS_LAST_UPDATED = 'September 24, 2026';
 
 export const TERMS_CONTENT = {
   en: {
     intro:
-      'These Terms of Service govern your use of The Riverview\'s online reservations. By creating an account or making a booking, you agree to these Terms.',
+      'These Terms of Service govern your use of The Riverview online reservation and room monitoring platform. By creating an account, reserving a slot, or making a booking, you agree to these Terms.',
     sections: [
       {
         heading: '1. Eligibility',
         paragraphs: [
-          'You must be at least 18 years old, or using the platform with the consent and supervision of a parent or guardian, to create an account or make a booking.',
+          'You must be at least 18 years old, or use the platform with the consent and supervision of a parent or guardian, to create an account or make a booking.',
         ],
       },
       {
-        heading: '2. Booking & Reservation Process',
+        heading: '2. Booking and Reservation Times',
         list: [
-          'Reservations are processed on a first-come, first-served basis through our official booking page.',
-          'Pay the first-hour rental rate or the full booking total online to secure your slot.',
-          'You have 20 minutes to complete the online payment after selecting a slot. If payment isn\'t completed in that time, the slot is released back for other customers to book.',
-          'A single transaction can book a maximum of 5 hours.',
+          'Online reservations are subject to availability and are confirmed when payment succeeds. Staff may also enter walk-in or other manual reservations, with payment handled at the venue.',
+          'Bookings start on the hour and run for 1 to 5 consecutive whole hours per transaction. Slots can follow one another without an automatic gap.',
+          'Please use only your reserved time. Staff may need about 2 to 3 minutes at the start of a session to clean and prepare the room or equipment after the previous guest.',
         ],
       },
       {
-        heading: '3. Payments',
-        paragraphs: [
-          'Online payments (GCash, Maya, Credit/Debit Card) are processed securely through our third-party payment provider, PayMongo. Your reservation is only finalized once PayMongo confirms successful payment.',
-        ],
-      },
-      {
-        heading: '4. Arrival & No-Show Policy',
+        heading: '3. Payment',
         list: [
-          'Your first-hour payment covers your first hour, so please arrive at least 20 minutes before that first hour ends.',
-          'If you haven\'t arrived within that window, your booking is automatically canceled and the slot may be offered to walk-in customers.',
+          'For an online reservation, pay either the first-hour rental charge or the full booking total through PayMongo. Available checkout methods include GCash, Maya, QR Ph, and credit or debit card.',
+          'A selected slot is held for 20 minutes while you complete payment. If the hold expires before successful payment, the slot becomes available to others. A booking is confirmed only after successful payment is verified.',
+          'If you pay only the first hour online, the remaining booking balance is payable at the venue. Staff-created walk-in or manual reservations may use payment methods accepted by the facility.',
         ],
       },
       {
-        heading: '5. Cancellations & Refunds',
-        paragraphs: [
-          'For customer-initiated cancellations and no-shows, the first-hour rental charge is non-refundable because the slot was held for you.',
-          'If you paid the full booking total, the amount paid beyond the first-hour rental charge can be refunded after cancellation approval. Contact our team to arrange this refund manually; cancellation does not trigger an automatic refund.',
-          'We\'ll refund your payment if: the booking was affected by a verified system or payment-processing error, you were charged more than once for the same booking, or we cancel your reservation on our end (e.g. facility closure or unavailability).',
-          'To request a reschedule, message us on our official Facebook Page or reach us at the contact details below. Rescheduling is subject to availability and facility approval.',
+        heading: '4. Rescheduling',
+        list: [
+          'You may reschedule a confirmed online booking through your account up to two times, before the calendar day of your reservation in Philippine time. A request on the reservation day cannot be completed through the online reschedule flow.',
+          'The new slot must be available, must keep the original booking duration, and must not conflict with another reservation. A new slot costing less than the amount already collected cannot be selected through the online flow; contact the venue for help.',
+          'For assistance with a reschedule, contact our official Facebook Page or the email below. A request is not an approved change until the booking is updated.',
         ],
       },
       {
-        heading: '6. Facility Rules & Conduct',
-        paragraphs: [
-          'Please treat the facility, equipment (cues, balls, tables, court surfaces), and staff with respect. We may decline service or ask guests to leave for violations of house rules, disruptive behavior, or damage to equipment.',
-          'Guests are financially responsible for deliberate or negligent damage caused to equipment or property during their booked time.',
+        heading: '5. Arrival and No-Shows',
+        list: [
+          'Please arrive in time for your reserved start. Bookings are scheduled back-to-back, so arriving late does not extend your reserved end time.',
+          'If a confirmed booking remains unfinished when its scheduled end passes, the system records it as a no-show. The first-hour payment is forfeited. If you attended but your booking was marked incorrectly, contact staff promptly.',
         ],
       },
       {
-        heading: '7. Service Availability',
+        heading: '6. Cancellations and Refunds',
         paragraphs: [
-          'We work to keep the booking system available and reliable, but we can\'t guarantee it will always be free of interruptions caused by things outside our reasonable control — network outages, third-party payment provider downtime, or similar events. If one of these affects your booking, contact us and we\'ll work with you to make it right (see Section 5).',
-          'Our liability for any claim relating to a booking is limited to the amount you paid for that booking. We\'re not liable for indirect or consequential losses.',
+          'You may submit a cancellation request for a confirmed booking through your account. Staff review the request before the booking is cancelled. Submitting a request does not cancel or refund the booking automatically.',
+          'For a customer-initiated cancellation, the first-hour rental charge is non-refundable because the slot was held for you. If you paid more than the first-hour charge, the remaining amount may be refunded after cancellation approval. Approved refunds are arranged manually; the platform does not issue an instant PayMongo refund.',
+          'If an unforeseen accident or serious medical emergency prevents you from attending, contact our support team promptly and provide valid supporting documents, such as a medical certificate or incident report. Once verified, we will offer a full refund or reschedule. Staff handle this exception manually, including requests made after the online reschedule cutoff.',
+          'A verified duplicate charge or payment error, or a cancellation caused by facility closure or unavailability, may qualify for a full refund after review. Contact support so the team can arrange and record the refund manually.',
         ],
       },
       {
-        heading: '8. Changes to These Terms',
+        heading: '7. Facility Rules and Damage',
         paragraphs: [
-          'We may update these Terms from time to time, for example to reflect changes in how the system works. We\'ll update the "Last updated" date above when we do. Continuing to use the platform after changes take effect means you accept the updated Terms.',
+          'Treat the facility, equipment, and staff with care and respect. Please inspect your room and equipment on arrival and report any existing damage to staff before use.',
+          'You may be charged reasonable repair or replacement costs for damage or loss caused during your session by deliberate action, negligence, or improper use. Staff will assess the issue and explain any charge.',
         ],
       },
       {
-        heading: '9. Governing Law',
+        heading: '8. Service Availability and Liability',
         paragraphs: [
+          'We work to keep the platform available, but network problems, third-party payment outages, maintenance, or other disruptions may interrupt service. Contact support if a disruption affects your booking or payment.',
+          'To the extent permitted by Philippine law, our liability for a claim about the online booking service is limited to the amount paid for the affected booking. Nothing in these Terms limits rights or remedies that cannot lawfully be excluded.',
+        ],
+      },
+      {
+        heading: '9. Changes to Terms and Governing Law',
+        paragraphs: [
+          'We may update these Terms to reflect changes in the system or facility policies. We will update the date above when the Terms change.',
           'These Terms are governed by the laws of the Republic of the Philippines.',
         ],
       },
       {
         heading: '10. Contact Us',
         paragraphs: [
-          'Questions about these Terms, duplicate charges, or booking issues? Reach us via our official Facebook Page or email us at support@theriverview.com.',
+          'For rescheduling, refund requests, supporting documents, billing questions, or a booking marked incorrectly, contact our official Facebook Page or email support@theriverview.com.',
         ],
       },
     ],
   },
   fil: {
     intro:
-      'Ang Mga Tuntunin sa Serbisyong ito ang sumasaklaw sa paggamit mo ng online booking system ng The Riverview para sa reserbasyon ng court at billiard table. Sa paggawa ng account o pag-book, sumasang-ayon ka sa Mga Tuntuning ito.',
+      'Saklaw ng Mga Tuntunin sa Serbisyong ito ang paggamit mo ng online reservation at room monitoring platform ng The Riverview. Sa paggawa ng account, pagpili ng slot, o pag-book, sumasang-ayon ka sa Mga Tuntuning ito.',
     sections: [
       {
         heading: '1. Kwalipikasyon',
         paragraphs: [
-          'Dapat ay 18 taong gulang pataas ka, o gumagamit ng platform nang may pahintulot at pangangasiwa ng magulang o guardian, para makagawa ng account o makapag-book.',
+          'Dapat ay 18 taong gulang ka pataas, o gumagamit ng platform nang may pahintulot at pangangasiwa ng magulang o guardian, para makagawa ng account o makapag-book.',
         ],
       },
       {
-        heading: '2. Proseso ng Booking',
+        heading: '2. Booking at Oras ng Reserbasyon',
         list: [
-          'Ang mga reserbasyon ay pinoproseso base sa first-come, first-served sa aming opisyal na booking page.',
-          'Bayaran online ang unang oras ng rental o ang buong halaga ng booking para ma-secure ang iyong slot.',
-          'May 20 minuto ka para kumpletuhin ang online payment matapos pumili ng slot. Kung hindi nakumpleto sa oras na ito, ire-release ang slot para ma-book ng ibang customer.',
-          'Maximum na 5 oras ang maaaring i-book sa isang transaksyon.',
+          'Ang online reservation ay nakadepende sa availability at nakukumpirma kapag matagumpay ang bayad. Maaari ring maglagay ang staff ng walk-in o iba pang manual reservation na babayaran sa pasilidad.',
+          'Nagsisimula ang booking sa eksaktong oras at tumatagal ng 1 hanggang 5 magkakasunod na buong oras bawat transaksyon. Maaaring magkasunod ang mga slot nang walang awtomatikong pagitan.',
+          'Gamitin lamang ang nakalaang oras mo. Maaaring kailanganin ng staff ang humigit-kumulang 2 hanggang 3 minuto sa simula ng session para linisin at ihanda ang kuwarto o kagamitan matapos ang naunang guest.',
         ],
       },
       {
         heading: '3. Pagbabayad',
-        paragraphs: [
-          'Ang mga online na bayad (GCash, Maya, Credit/Debit Card) ay ligtas na pinoproseso sa pamamagitan ng aming third-party payment provider na PayMongo. Ang iyong reserbasyon ay ma-finalize lamang kapag kinumpirma ng PayMongo ang matagumpay na bayad.',
-        ],
-      },
-      {
-        heading: '4. Pagdating & Patakaran sa No-Show',
         list: [
-          'Ang bayad mo para sa unang oras ay sakop ang unang oras, kaya siguraduhing dumating ka nang hindi bababa sa 20 minuto bago matapos ang unang oras na iyon.',
-          'Kung hindi ka dumating sa loob ng oras na ito, awtomatikong maka-cancel ang iyong booking at maaaring maialok ang slot sa walk-in na customer.',
+          'Para sa online reservation, bayaran ang unang oras ng rental o ang buong halaga ng booking sa PayMongo. Kabilang sa mga available na paraan ng pagbabayad ang GCash, Maya, QR Ph, at credit o debit card.',
+          'Nakahold ang napiling slot nang 20 minuto habang kinukumpleto mo ang bayad. Kapag nag-expire ang hold bago makumpirma ang bayad, maaari na itong piliin ng iba. Nakukumpirma lamang ang booking kapag na-verify ang matagumpay na bayad.',
+          'Kung unang oras lamang ang binayaran mo online, babayaran sa pasilidad ang natitirang balanse. Para sa walk-in o manual reservation na ginawa ng staff, maaaring gamitin ang mga paraan ng pagbabayad na tinatanggap ng pasilidad.',
         ],
       },
       {
-        heading: '5. Cancellation & Refund',
-        paragraphs: [
-          'Para sa cancellation mula sa customer at no-show, hindi na-rerefund ang bayad para sa unang oras dahil nakareserba ang slot para sa iyo.',
-          'Kung binayaran mo nang buo ang booking, maaaring i-refund ang halagang lampas sa bayad para sa unang oras pagkatapos maaprubahan ang cancellation. Kontakin ang aming team para asikasuhin ang refund nang manu-mano; walang awtomatikong refund sa pag-cancel.',
-          'I-rerefund namin ang iyong bayad kung: apektado ang booking ng napatunayang system o payment-processing error, siningil ka nang mahigit sa isang beses para sa parehong booking, o kami mismo ang nag-cancel ng iyong reserbasyon (hal. pagsara ng pasilidad o hindi availability).',
-          'Para mag-request ng reschedule, mag-message sa aming opisyal na Facebook Page o kontakin kami sa detalyeng nasa ibaba. Ang reschedule ay subject sa availability at approval ng pasilidad.',
+        heading: '4. Paglipat ng Iskedyul',
+        list: [
+          'Maaari mong ilipat sa iyong account ang kumpirmadong online booking nang hanggang dalawang beses bago ang araw ng reserbasyon ayon sa oras sa Pilipinas. Hindi maaaring gamitin ang online reschedule flow sa mismong araw ng reserbasyon.',
+          'Dapat available ang bagong slot, pareho ang haba ng booking, at hindi ito sumasalungat sa ibang reserbasyon. Hindi maaaring pumili online ng bagong slot na mas mababa ang halaga kaysa sa nabayaran na; kontakin ang pasilidad para sa tulong.',
+          'Para sa tulong sa reschedule, kontakin ang aming opisyal na Facebook Page o ang email sa ibaba. Hindi pa aprubado ang pagbabago hangga\'t hindi naa-update ang booking.',
         ],
       },
       {
-        heading: '6. Mga Alituntunin sa Pasilidad',
-        paragraphs: [
-          'Pakitrato nang may respeto ang pasilidad, kagamitan (mga cue, bola, mesa, court surface), at staff. Maaari naming tanggihan ang serbisyo o hilingin sa guest na umalis kung may paglabag sa house rules, nakakagambalang asal, o pinsala sa kagamitan.',
-          'Managot nang pinansyal ang guest sa sadya o pabaya na pinsala sa kagamitan o ari-arian sa panahon ng kanilang naka-book na oras.',
+        heading: '5. Pagdating at No-Show',
+        list: [
+          'Dumating nang nasa oras para sa simula ng iyong reserbasyon. Magkakasunod ang mga booking, kaya hindi nadaragdagan ang oras ng pagtatapos kapag nahuli ka.',
+          'Kung hindi pa nakukumpleto ang kumpirmadong booking pagkalipas ng nakatakdang oras ng pagtatapos, itatala ito ng system bilang no-show. Mawawala ang bayad para sa unang oras. Kung dumalo ka ngunit mali ang pagkakatala, kontakin agad ang staff.',
         ],
       },
       {
-        heading: '7. Availability ng Serbisyo',
+        heading: '6. Pagkansela at Refund',
         paragraphs: [
-          'Pinagsisikapan naming panatilihing available at maaasahan ang booking system, pero hindi namin magagarantiya na palaging walang abala dulot ng mga bagay na wala sa aming makatwirang kontrol — network outage, downtime ng third-party payment provider, o katulad. Kung naapektuhan nito ang iyong booking, kontakin kami at aayusin namin ito (tingnan ang Seksyon 5).',
-          'Ang aming pananagutan sa anumang claim na may kaugnayan sa booking ay limitado sa halagang binayaran mo para sa booking na iyon. Hindi kami mananagot sa hindi direktang pinsala.',
+          'Maaari kang magpadala sa iyong account ng cancellation request para sa kumpirmadong booking. Susuriin muna ito ng staff bago makansela ang booking. Hindi awtomatikong nagkakansela o nagre-refund ang pagpapadala ng request.',
+          'Sa pagkanselang sinimulan ng customer, hindi mare-refund ang bayad para sa unang oras dahil nireserba ang slot para sa iyo. Kung higit sa unang oras ang binayaran mo, maaaring i-refund ang natitirang halaga kapag naaprubahan ang pagkansela. Manu-manong inaayos ang aprubadong refund; walang agarang PayMongo refund mula sa platform.',
+          'Kung hindi ka makadalo dahil sa hindi inaasahang aksidente o seryosong medikal na emergency, kontakin agad ang support team at magbigay ng wastong dokumento, tulad ng medical certificate o incident report. Kapag napatunayan, mag-aalok kami ng buong refund o reschedule. Manu-manong inaasikaso ng staff ang exception na ito, kahit lampas na sa online reschedule cutoff.',
+          'Ang napatunayang dobleng singil o error sa bayad, o pagkansela dahil sarado o hindi available ang pasilidad, ay maaaring maging dahilan para sa buong refund matapos suriin. Kontakin ang support para manu-manong maayos at maitala ang refund.',
         ],
       },
       {
-        heading: '8. Mga Pagbabago sa Tuntuning Ito',
+        heading: '7. Mga Alituntunin sa Pasilidad at Pinsala',
         paragraphs: [
-          'Maaari naming i-update ang Mga Tuntuning ito paminsan-minsan, halimbawa para maisama ang mga pagbabago sa sistema. I-uupdate namin ang petsa ng "Last updated" sa itaas kapag ginawa ito. Ang patuloy na paggamit ng platform matapos magkabisa ang pagbabago ay nangangahulugang tinatanggap mo ang na-update na Tuntunin.',
+          'Ingatan at respetuhin ang pasilidad, kagamitan, at staff. Suriin ang kuwarto at kagamitan pagdating at ipaalam sa staff ang anumang dati nang pinsala bago gamitin.',
+          'Maaari kang singilin ng makatwirang gastos sa pagkukumpuni o pagpapalit para sa pinsala o pagkawala sa oras ng iyong session na dulot ng sinadyang kilos, kapabayaan, o maling paggamit. Susuriin ng staff ang pangyayari at ipapaliwanag ang anumang singil.',
         ],
       },
       {
-        heading: '9. Namamahalang Batas',
+        heading: '8. Availability ng Serbisyo at Pananagutan',
         paragraphs: [
-          'Ang Mga Tuntuning ito ay sinasakupan ng batas ng Republika ng Pilipinas.',
+          'Sinisikap naming panatilihing available ang platform, ngunit maaaring maantala ang serbisyo dahil sa problema sa network, outage ng third-party payment provider, maintenance, o iba pang abala. Kontakin ang support kung naapektuhan ang iyong booking o bayad.',
+          'Hangga\'t pinahihintulutan ng batas ng Pilipinas, ang aming pananagutan sa claim tungkol sa online booking service ay limitado sa halagang binayaran para sa apektadong booking. Walang bahagi ng Mga Tuntuning ito ang naglilimita sa mga karapatan o remedyo na hindi maaaring alisin ayon sa batas.',
+        ],
+      },
+      {
+        heading: '9. Pagbabago sa Mga Tuntunin at Namamahalang Batas',
+        paragraphs: [
+          'Maaari naming i-update ang Mga Tuntuning ito kapag nagbago ang system o patakaran ng pasilidad. Ia-update namin ang petsa sa itaas kapag nagbago ang Mga Tuntunin.',
+          'Ang Mga Tuntuning ito ay pinamamahalaan ng mga batas ng Republika ng Pilipinas.',
         ],
       },
       {
         heading: '10. Makipag-ugnayan sa Amin',
         paragraphs: [
-          'May tanong tungkol sa Tuntuning ito, duplicate charge, o isyu sa booking? Kontakin kami sa aming opisyal na Facebook Page o mag-email sa support@theriverview.com.',
+          'Para sa reschedule, refund request, patunay, tanong sa singil, o booking na mali ang pagkakatala, kontakin ang aming opisyal na Facebook Page o mag-email sa support@theriverview.com.',
         ],
       },
     ],

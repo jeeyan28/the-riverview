@@ -71,33 +71,18 @@ test('customer payment copy uses the same first-hour deduction before the cancel
 });
 
 test('a cancelled full-payment receipt shows the manual refund still to arrange', async () => {
-  const { openBookingReceipt } = await import('../../FrontEnd/src/utils/receipt.js');
+  const { getBookingReceiptData } = await import('../../FrontEnd/src/utils/receipt.js');
   const booking = { ...reservation(1300), ...reviewCancellationFields(reservation(1300), { decision: 'approve' }, 'admin') };
-  let html = '';
-  global.window = {
-    open: () => ({ document: { write: value => { html = value; }, close: () => {} } }),
-  };
-  try {
-    openBookingReceipt(booking);
-  } finally {
-    delete global.window;
-  }
-  assert.match(html, /Reservation Cancelled/);
-  assert.match(html, /Refund to Arrange/);
-  assert.match(html, /&#8369;1,000/);
-  assert.doesNotMatch(html, /Remaining Balance/);
+  const receipt = getBookingReceiptData(booking);
+  assert.equal(receipt.title, 'Reservation Cancelled');
+  assert.equal(receipt.costRows.find((row) => row.label === 'Refund to arrange')?.value, 1000);
+  assert.equal(receipt.costRows.some((row) => row.label === 'Remaining balance'), false);
 });
 
 test('a refund exception receipt does not claim the first hour was retained', async () => {
-  const { openBookingReceipt } = await import('../../FrontEnd/src/utils/receipt.js');
+  const { getBookingReceiptData } = await import('../../FrontEnd/src/utils/receipt.js');
   const booking = { ...reservation(1300), ...reviewCancellationFields(reservation(1300), { decision: 'approve', refundedAmount: 1300, refundException: true, note: 'Venue closed' }, 'admin') };
-  let html = '';
-  global.window = { open: () => ({ document: { write: value => { html = value; }, close: () => {} } }) };
-  try {
-    openBookingReceipt(booking);
-  } finally {
-    delete global.window;
-  }
-  assert.match(html, /refund exception was approved/);
-  assert.doesNotMatch(html, /first-hour charge is non-refundable/);
+  const receipt = getBookingReceiptData(booking);
+  assert.match(receipt.notes.join(' '), /refund exception was approved/);
+  assert.doesNotMatch(receipt.notes.join(' '), /first-hour charge is non-refundable/);
 });

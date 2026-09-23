@@ -68,6 +68,7 @@ function endSessionFields(session, { paid = false, paidAmount } = {}, now = new 
   if (received < Number(session.paidAmount || 0)) throw new AppError(400, "Received payments cannot be removed; record a refund separately.");
   const fields = fullOrDeferredPaymentFields(session.amount, session.paidAmount || 0, received, session.refundedAmount || 0);
   if (paid && fields.paymentStatus !== "Paid") throw new AppError(400, "The outstanding balance has not been fully received.");
+  if (Number(session.amount) > 0 && fields.paymentStatus !== "Paid") throw new AppError(409, "Collect the full balance before finishing this session.");
   return { ...fields, status: "Finished", endedAt: now };
 }
 

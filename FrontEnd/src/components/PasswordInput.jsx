@@ -17,6 +17,8 @@ function PasswordInput({ id, name, placeholder, autoComplete, value, onChange, o
           onChange={onChange}
           onPaste={onPaste}
           onDrop={onDrop}
+          aria-invalid={Boolean(error)}
+          aria-describedby={error ? `${id}-error` : undefined}
         />
         <Lock size={18} className="input-icon" />
         <button
@@ -29,7 +31,7 @@ function PasswordInput({ id, name, placeholder, autoComplete, value, onChange, o
         </button>
       </div>
       {children}
-      <span className="field-error" style={{ display: error ? 'block' : 'none' }}>
+      <span id={`${id}-error`} className="field-error" style={{ display: error ? 'block' : 'none' }}>
         {error}
       </span>
     </>

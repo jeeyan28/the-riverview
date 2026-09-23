@@ -218,7 +218,7 @@ function addSummarySheet(workbook, { title, range, metrics, notes = [] }) {
   return sheet;
 }
 
-function addActivitySheet(workbook, rows, { name = 'Sessions', includeReview = false } = {}) {
+function addActivitySheet(workbook, rows, { name = 'Sessions', includeReview = false, includeBalance = true } = {}) {
   const sheet = workbook.addWorksheet(name, { views: [{ state: 'frozen', ySplit: 1, showGridLines: false }] });
   const columns = [
     { header: 'Date', key: 'date', width: 13 },
@@ -233,7 +233,7 @@ function addActivitySheet(workbook, rows, { name = 'Sessions', includeReview = f
     { header: 'Rate / hour', key: 'rateLabel', width: 24 },
     { header: 'Charge', key: 'amount', width: 14 },
     { header: 'Paid', key: 'collected', width: 14 },
-    { header: 'Balance', key: 'balance', width: 14 },
+    ...(includeBalance ? [{ header: 'Balance', key: 'balance', width: 14 }] : []),
     { header: 'Payment', key: 'paymentStatus', width: 13 },
     { header: 'Timing', key: 'paymentTiming', width: 13 },
     { header: 'Session status', key: 'status', width: 15 },
@@ -253,7 +253,7 @@ function addActivitySheet(workbook, rows, { name = 'Sessions', includeReview = f
   })));
   styleHeading(sheet.getRow(1));
   sheet.autoFilter = { from: 'A1', to: `${String.fromCharCode(64 + columns.length)}1` };
-  for (const key of ['amount', 'collected', 'balance']) sheet.getColumn(key).numFmt = '"₱"#,##0.00';
+  for (const key of ['amount', 'collected', ...(includeBalance ? ['balance'] : [])]) sheet.getColumn(key).numFmt = '"₱"#,##0.00';
   sheet.getColumn('duration').numFmt = '0.00';
   sheet.eachRow((row, index) => {
     if (index === 1) return;
@@ -264,7 +264,7 @@ function addActivitySheet(workbook, rows, { name = 'Sessions', includeReview = f
   return sheet;
 }
 
-function addRoomTypeSheet(workbook, rows, name = 'Room totals') {
+function addRoomTypeSheet(workbook, rows, name = 'Room totals', { includeBalance = true } = {}) {
   const sheet = workbook.addWorksheet(name, { views: [{ state: 'frozen', ySplit: 1, showGridLines: false }] });
   sheet.columns = [
     { header: 'Facility', key: 'facilityName', width: 24 },
@@ -273,11 +273,11 @@ function addRoomTypeSheet(workbook, rows, name = 'Room totals') {
     { header: 'Hours', key: 'hours', width: 12 },
     { header: 'Charges', key: 'charged', width: 16 },
     { header: 'Collected', key: 'collected', width: 16 },
-    { header: 'Balance', key: 'outstanding', width: 16 },
+    ...(includeBalance ? [{ header: 'Balance', key: 'outstanding', width: 16 }] : []),
   ];
   sheet.addRows(rows);
   styleHeading(sheet.getRow(1), COLORS.teal);
-  for (const key of ['charged', 'collected', 'outstanding']) sheet.getColumn(key).numFmt = '"₱"#,##0.00';
+  for (const key of ['charged', 'collected', ...(includeBalance ? ['outstanding'] : [])]) sheet.getColumn(key).numFmt = '"₱"#,##0.00';
   return sheet;
 }
 

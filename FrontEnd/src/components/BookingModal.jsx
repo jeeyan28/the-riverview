@@ -23,7 +23,7 @@ import {
   getSlotState,
   getLatestStartTime,
   buildHourCounts,
-  getBookableStartCount,
+  getDayAvailability,
   getTimePeriod,
 } from '../utils/rooms';
 import { CORKAGE_FEE, calculateBookingPrice, variantRateLabel } from '../utils/roomPricing';
@@ -1272,9 +1272,8 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
       const closedDay = !isOperatingDay(thisDate, settings?.operatingHours);
       const past = dStr < todayKey;
 
-      const availableStarts = getBookableStartCount(monthBookings[dStr], openHour, closeHour, totalRooms, selectedDuration, dStr);
+      const { availableStarts, nearlyFull } = getDayAvailability(monthBookings[dStr], openHour, closeHour, totalRooms, selectedDuration, dStr);
       const fullyBooked = availableStarts === 0;
-      const nearlyFull = !fullyBooked && availableStarts <= 2;
       const unavailable = holiday || closedDay;
       const blocked = unavailable || fullyBooked;
 
@@ -1286,10 +1285,10 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
           title = holiday ? 'Closed for a holiday/closure' : 'Closed on this day of the week';
         } else if (fullyBooked) {
           variant = 'full';
-          title = `No ${selectedDuration}-hour start times available for this room`;
+          title = 'Full — no rooms or start times left for this duration';
         } else if (nearlyFull) {
           variant = 'few';
-          title = `Only ${availableStarts} start time${availableStarts === 1 ? '' : 's'} left for ${selectedDuration} hour${selectedDuration === 1 ? '' : 's'}`;
+          title = 'Nearly full — few rooms or start times left';
         } else {
           variant = 'available';
         }
@@ -1345,10 +1344,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
   return (
     <ModalPortal>
       <div className={`bk-overlay${open ? ' open' : ''}`} id="booking-modal" role="dialog" aria-modal="true" aria-labelledby="booking-modal-title">
-        <div className={'bk-modal' + (showSummaryPanel ? '' : ' bk-modal--compact')}>
-          <button type="button" className="bk-close" aria-label="Close reservation" onClick={handleClose}>
-            <X size={18} aria-hidden="true" />
-          </button>
+        <div className={'bk-modal' + (showSummaryPanel ? '' : ' bk-modal--compact') + (step === 'paymongoReturn' && pmReturn.phase === 'loading' ? ' bk-modal--payment-loading' : '')}>
           <div className="bk-header">
           <button type="button" className="bk-modal-back" aria-label="Go back" onClick={handleBack}>
             <ArrowLeft size={18} aria-hidden="true" />
@@ -1360,6 +1356,9 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
               <h2 id="booking-modal-title">{step === 'paymongoReturn' ? 'Online payment' : room?.name}</h2>
             </div>
           </div>
+          <button type="button" className="bk-close" aria-label="Close reservation" onClick={handleClose}>
+            <X size={20} aria-hidden="true" />
+          </button>
         </div>
 
         {step !== 'paymongoReturn' && <BookingStepper step={step} onStepClick={handleStepClick} steps={visibleSteps} />}
@@ -1415,7 +1414,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
           </div>
         )}
 
-        <div className="bk-content">
+        <div className={'bk-content' + (step === 'paymongoReturn' && pmReturn.phase === 'loading' ? ' bk-content--payment-loading' : '')}>
           <div className="bk-body">
             {step === 'price' && room && (
               <div className="bk-step" id="bkStepPrice">
@@ -1515,9 +1514,9 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
 
                     <div className="bk-legend">
                       <span><i className="bk-dot bk-dot--available"></i> Available</span>
-                      <span><i className="bk-dot bk-dot--few"></i> Few slots</span>
-                      <span><i className="bk-dot bk-dot--full"></i> No times available</span>
-                      <span><i className="bk-dot bk-dot--unavailable"></i> Unavailable</span>
+                      <span><i className="bk-dot bk-dot--few"></i> Nearly full</span>
+                      <span><i className="bk-dot bk-dot--full"></i> Full</span>
+                      <span><i className="bk-dot bk-dot--unavailable"></i> Closed</span>
                     </div>
                   </>
                 )}
@@ -1798,9 +1797,10 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
                     ₱{downPaymentAmount.toLocaleString()}
                   </p>
                   <p className="bk-downpayment-duration">{remainingBalanceAmount > 0
-                    ? `Pays for the first hour and confirms your reservation. Balance due at venue: ₱${remainingBalanceAmount.toLocaleString()}.`
-                    : 'Pays the full booking total and confirms your reservation. No balance due at venue.'}</p>
-                  <p className="bk-downpayment-duration">If you cancel, the first-hour charge of ₱{(priceBreakdown.hourlyRates[0] || 0).toLocaleString()} is non-refundable. {downPaymentAmount > (priceBreakdown.hourlyRates[0] || 0) ? `Contact admin after cancellation approval to arrange a manual refund of the remaining ₱${(downPaymentAmount - (priceBreakdown.hourlyRates[0] || 0)).toLocaleString()}.` : 'A one-hour down payment has no refundable balance.'}</p>
+                    ? `Confirms your booking. ₱${remainingBalanceAmount.toLocaleString()} due at the venue. First hour is non-refundable if you cancel.`
+                    : downPaymentAmount > (priceBreakdown.hourlyRates[0] || 0)
+                      ? 'Confirms your booking. If you cancel, contact admin for a refund minus the first hour.'
+                      : 'Confirms your booking. Non-refundable if you cancel.'}</p>
                 </div>
 
                 <div className="bk-payment-methods">
@@ -2005,7 +2005,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
             )}
 
             {step === 'paymongoReturn' && (
-              <div className="bk-step" id="bkStepPaymongoReturn">
+              <div className="bk-step" id="bkStepPaymongoReturn" role={pmReturn.phase === 'loading' ? 'status' : undefined} aria-live={pmReturn.phase === 'loading' ? 'polite' : undefined}>
                 {pmReturn.phase === 'confirmed' ? (
                   <BookingSuccess
                     booking={pmReturn.booking}

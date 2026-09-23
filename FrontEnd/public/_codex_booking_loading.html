@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Reservation loading preview</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
+  <link rel="stylesheet" href="/src/styles/style.css">
+  <link rel="stylesheet" href="/src/styles/customer-v3.css">
+  <link rel="stylesheet" href="/src/styles/responsive.css">
+  <link rel="stylesheet" href="/src/styles/responsive-content.css">
+  <link rel="stylesheet" href="/src/styles/system-refinement.css">
+  <link rel="stylesheet" href="/src/styles/mobile-density.css">
+</head>
+<body>
+  <div class="public-site">
+    <div class="bk-overlay open" role="dialog" aria-modal="true" aria-labelledby="booking-modal-title">
+      <div class="bk-modal bk-modal--compact bk-modal--payment-loading">
+        <div class="bk-header">
+          <button type="button" class="bk-modal-back"><span>←</span> Back</button>
+          <div class="bk-header-identity"><div><p class="bk-eyebrow">Reservation</p><h2 id="booking-modal-title">Online payment</h2></div></div>
+          <button type="button" class="bk-close" aria-label="Close reservation">×</button>
+        </div>
+        <div class="bk-content bk-content--payment-loading">
+          <div class="bk-body">
+            <div class="bk-step" id="bkStepPaymongoReturn" role="status" aria-live="polite">
+              <div class="bk-confirm-icon"><i class="fa-solid fa-spinner fa-spin"></i></div>
+              <h3>Confirming your payment…</h3>
+              <p>Please wait a moment.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
