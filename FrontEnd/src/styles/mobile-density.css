@@ -452,7 +452,19 @@
   .public-site .footer-legal-links { justify-content: center; gap: 0; }
   .public-site .footer-legal-links a { min-height: 44px; display: inline-flex; align-items: center; font-size: .8125rem; }
   .public-site .footer-legal-links a + a::before { content: '·'; margin: 0 12px; color: var(--text-muted-light); }
-  .public-site > footer .footer-back-top { display: none; }
+  .public-site > footer .footer-back-top {
+    min-height: 44px;
+    margin-top: var(--space-4);
+    padding: 0 var(--space-4);
+    align-self: center;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--teal-text);
+    font-size: .8125rem;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+  }
 
   .public-site #announcements-panel-mobile {
     top: calc(var(--header-h) + var(--guest-banner-h) + 8px);
