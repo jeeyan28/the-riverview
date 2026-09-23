@@ -1,4 +1,5 @@
 const AppError = require("./appError");
+const { MAX_MONITOR_SESSION_HOURS } = require("./constants");
 
 function money(value) {
   const number = Number(value);
@@ -24,6 +25,14 @@ function financialFields(amount, paidAmount, refundedAmount = 0) {
   return { amount, paidAmount, refundedAmount, paymentStatus };
 }
 
+function fullOrDeferredPaymentFields(amount, previousPaid, nextPaid, refundedAmount = 0) {
+  const fields = financialFields(amount, nextPaid, refundedAmount);
+  if (Number(nextPaid) > Number(previousPaid) && fields.paymentStatus !== "Paid") {
+    throw new AppError(400, "Collect the full remaining balance or leave it due; partial collection is unavailable.");
+  }
+  return fields;
+}
+
 function bookingStartMs(date, time) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(String(date)) || !/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(String(time))) return NaN;
   const result = Date.parse(`${date}T${time}:00+08:00`);
@@ -36,7 +45,7 @@ function extendSessionFields(session, addedHours, nextAmount) {
   const hours = Number(addedHours);
   if (!Number.isInteger(hours) || hours <= 0) throw new AppError(400, "Hours to add must be a positive whole number.");
   const duration = Number(session.duration) + hours;
-  if (duration > 24) throw new AppError(400, "Total session duration cannot exceed 24 hours.");
+  if (duration > MAX_MONITOR_SESSION_HOURS) throw new AppError(400, `Total session duration cannot exceed ${MAX_MONITOR_SESSION_HOURS} hours.`);
   const amount = nextAmount === undefined ? money(session.amount) + money(session.rate) * hours : money(nextAmount);
   return { duration, ...financialFields(amount, session.paidAmount || 0, session.refundedAmount || 0) };
 }
@@ -45,7 +54,7 @@ function endSessionFields(session, { paid = false, paidAmount } = {}, now = new 
   if (session.status !== "Active") throw new AppError(409, "Only active sessions can be ended.");
   const received = paidAmount === undefined ? (paid ? money(session.amount) + money(session.refundedAmount || 0) : session.paidAmount || 0) : money(paidAmount);
   if (received < Number(session.paidAmount || 0)) throw new AppError(400, "Received payments cannot be removed; record a refund separately.");
-  const fields = financialFields(session.amount, received, session.refundedAmount || 0);
+  const fields = fullOrDeferredPaymentFields(session.amount, session.paidAmount || 0, received, session.refundedAmount || 0);
   if (paid && fields.paymentStatus !== "Paid") throw new AppError(400, "The outstanding balance has not been fully received.");
   return { ...fields, status: "Finished", endedAt: now };
 }
@@ -102,4 +111,4 @@ function reviewCancellationFields(booking, { decision, refundedAmount = booking.
   };
 }
 
-module.exports = { money, bookingCollected, financialFields, bookingStartMs, extendSessionFields, endSessionFields, firstHourCharge, cancellationRefundLimit, reviewCancellationFields };
+module.exports = { money, bookingCollected, financialFields, fullOrDeferredPaymentFields, bookingStartMs, extendSessionFields, endSessionFields, firstHourCharge, cancellationRefundLimit, reviewCancellationFields };

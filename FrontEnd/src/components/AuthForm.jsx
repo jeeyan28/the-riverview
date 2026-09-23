@@ -5,13 +5,16 @@ import PasswordRequirementsList from './PasswordRequirementsList';
 import Toast from './Toast';
 import OtpInput from './OtpInput';
 import Modal from './Modal';
+import LegalDocument from './LegalDocument';
 import { useToast } from '../hooks/useToast';
 import { useGoogleAuth } from '../hooks/useGoogleAuth';
+import { getExternalBrowserUrl } from '../utils/embeddedBrowser';
 import { useCountdownClock } from '../hooks/useCountdownClock';
 import { useAuth } from '../context/AuthContext';
 import { OTP_LENGTH, OTP_EXPIRY_SECONDS, RESEND_COOLDOWN_SECONDS, formatCountdown } from '../utils/otp';
 import { isPasswordStrongEnough } from '../utils/password';
 import { validateName, normalizeName } from '../utils/name';
+import { TERMS_CONTENT, PRIVACY_CONTENT, LAST_UPDATED } from '../data/legalContent';
 
 function maskEmail(email) {
   const [local, domain] = String(email || '').split('@');
@@ -84,10 +87,15 @@ function AuthForm({ mode, onSwitchMode, onForgotPassword, onAuthSuccess }) {
 
   const { triggerSignIn, embeddedBrowser } = useGoogleAuth(handleGoogleCredential);
   const [linkCopied, setLinkCopied] = useState(false);
+  const [showBrowserHandoff, setShowBrowserHandoff] = useState(false);
+  const externalBrowserUrl = embeddedBrowser
+    ? getExternalBrowserUrl(window.location.href)
+    : null;
 
   function handleGoogleClick() {
     if (embeddedBrowser) {
-      showToast(`Open this page in Chrome or Safari to continue with Google.`, 'error');
+      setShowBrowserHandoff(true);
+      if (externalBrowserUrl) window.location.assign(externalBrowserUrl);
       return;
     }
     const ok = triggerSignIn();
@@ -99,7 +107,11 @@ function AuthForm({ mode, onSwitchMode, onForgotPassword, onAuthSuccess }) {
   async function copyPageLink() {
     const pageUrl = window.location.href;
     try {
-      await navigator.clipboard.writeText(pageUrl);
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(pageUrl);
+      } else {
+        throw new Error('Clipboard API unavailable');
+      }
     } catch {
       const input = document.createElement('textarea');
       input.value = pageUrl;
@@ -108,21 +120,28 @@ function AuthForm({ mode, onSwitchMode, onForgotPassword, onAuthSuccess }) {
       input.style.opacity = '0';
       document.body.appendChild(input);
       input.select();
-      document.execCommand('copy');
+      const copied = typeof document.execCommand === 'function' && document.execCommand('copy');
       input.remove();
+      if (!copied) {
+        showToast('Could not copy the link. Use the browser menu to open this page.', 'error');
+        return;
+      }
     }
     setLinkCopied(true);
-    showToast('Page link copied. Open it in Chrome or Safari.', 'success');
+    showToast('Link copied. Open it in your browser to continue with Google.', 'success');
   }
 
-  function EmbeddedBrowserNotice() {
-    if (!embeddedBrowser) return null;
+  function renderBrowserHandoff() {
+    if (!embeddedBrowser || !showBrowserHandoff) return null;
     return (
-      <div className="embedded-browser-notice" role="note" aria-label={`${embeddedBrowser.name} browser notice`}>
+      <div className="google-browser-handoff" role="status">
         <ExternalLink size={18} aria-hidden="true" />
         <div>
-          <strong>Google sign-in needs Chrome or Safari</strong>
-          <p>{embeddedBrowser.instruction} You can also continue as a guest below.</p>
+          <strong>Continue Google sign-in in your browser</strong>
+          <p>{embeddedBrowser.instruction}</p>
+          {externalBrowserUrl && (
+            <a href={externalBrowserUrl}>Open in browser</a>
+          )}
           <button type="button" onClick={copyPageLink}>
             <Copy size={14} aria-hidden="true" /> {linkCopied ? 'Link copied' : 'Copy page link'}
           </button>
@@ -240,6 +259,7 @@ function AuthForm({ mode, onSwitchMode, onForgotPassword, onAuthSuccess }) {
   const [regPassword, setRegPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [terms, setTerms] = useState(false);
+  const [legalDoc, setLegalDoc] = useState(null);
   const [regLoading, setRegLoading] = useState(false);
 
   const [stage, setStage] = useState('form');
@@ -613,8 +633,6 @@ function AuthForm({ mode, onSwitchMode, onForgotPassword, onAuthSuccess }) {
 
           <div className="divider">or</div>
 
-          <EmbeddedBrowserNotice />
-
           <button type="button" className="btn-social" onClick={handleGoogleClick}>
             <span className="btn-social-label">
               <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true" >
@@ -627,6 +645,7 @@ function AuthForm({ mode, onSwitchMode, onForgotPassword, onAuthSuccess }) {
             </span>
             <ArrowRight size={16} className="btn-social-arrow" />
           </button>
+          {renderBrowserHandoff()}
           <button
             type="button"
             className="btn-guest"
@@ -853,11 +872,11 @@ function AuthForm({ mode, onSwitchMode, onForgotPassword, onAuthSuccess }) {
               />
             </svg>
           </div>
-          <label htmlFor="terms-input" className="terms-label">
+          <span className="terms-label">
             I agree to the{' '}
-            <a href="/terms" target="_blank" rel="noreferrer">Terms of Service</a> and{' '}
-            <a href="/privacy" target="_blank" rel="noreferrer">Privacy Policy</a>.
-          </label>
+            <button type="button" onClick={() => setLegalDoc('terms')}>Terms of Service</button> and{' '}
+            <button type="button" onClick={() => setLegalDoc('privacy')}>Privacy Policy</button>.
+          </span>
         </div>
         <span
           className="field-error"
@@ -878,8 +897,6 @@ function AuthForm({ mode, onSwitchMode, onForgotPassword, onAuthSuccess }) {
         </button>
 
         <div className="divider">or</div>
-
-        <EmbeddedBrowserNotice />
 
         <button type="button" className="btn-social" onClick={handleGoogleClick}>
           <span className="btn-social-label">
@@ -905,6 +922,7 @@ function AuthForm({ mode, onSwitchMode, onForgotPassword, onAuthSuccess }) {
           </span>
           <ArrowRight size={16} className="btn-social-arrow" />
         </button>
+        {renderBrowserHandoff()}
 
         <div className="login-row">
           Already have an account?{' '}
@@ -914,6 +932,20 @@ function AuthForm({ mode, onSwitchMode, onForgotPassword, onAuthSuccess }) {
         </div>
 
       </form>
+
+      <Modal
+        open={legalDoc !== null}
+        onClose={() => setLegalDoc(null)}
+        title={legalDoc === 'terms' ? 'Terms of Service' : 'Privacy Policy'}
+        className="legal-review-modal"
+      >
+        <LegalDocument
+          content={legalDoc === 'terms' ? TERMS_CONTENT : PRIVACY_CONTENT}
+          lastUpdated={LAST_UPDATED}
+          embedded
+          onClose={() => setLegalDoc(null)}
+        />
+      </Modal>
 
       <Toast {...toast} />
     </div>

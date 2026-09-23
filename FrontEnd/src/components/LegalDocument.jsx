@@ -1,27 +1,30 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
+import '../styles/legal-page.css';
 
 const LANGUAGES = [
   { code: 'en', label: 'English' },
   { code: 'fil', label: 'Filipino' },
 ];
 
-function LegalDocument({ title, content, lastUpdated }) {
+function LegalDocument({ title, content, lastUpdated, embedded = false, onClose }) {
   const [lang, setLang] = useState('en');
   const doc = content[lang] || content.en;
 
   return (
-    <section className="legal-page">
+    <section className={`legal-page${embedded ? ' legal-page--embedded' : ''}`}>
       <div className="legal-inner">
-        <Link to="/" className="legal-back">
-          <ArrowLeft size={16} />
-          Back to home
-        </Link>
+        {!embedded && (
+          <Link to="/" className="legal-back">
+            <ArrowLeft size={16} />
+            Back to home
+          </Link>
+        )}
 
         <div className="legal-header">
           <div>
-            <h1>{title}</h1>
+            {!embedded && <h1>{title}</h1>}
             <span className="legal-updated">Last updated: {lastUpdated}</span>
           </div>
 
@@ -63,6 +66,11 @@ function LegalDocument({ title, content, lastUpdated }) {
             )}
           </div>
         ))}
+        {embedded && (
+          <button type="button" className="legal-return" onClick={onClose}>
+            <ArrowLeft size={16} /> Back to sign up
+          </button>
+        )}
       </div>
     </section>
   );

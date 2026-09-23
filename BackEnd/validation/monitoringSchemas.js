@@ -1,8 +1,9 @@
 const { Joi } = require("../middleware/validate");
+const { MAX_MONITOR_SESSION_HOURS } = require("../utils/constants");
 
 const objectId = Joi.string().trim().hex().length(24);
 const money = Joi.number().min(0).precision(2);
-const duration = Joi.number().integer().min(1).max(24);
+const duration = Joi.number().integer().min(1).max(MAX_MONITOR_SESSION_HOURS);
 const paymentStatus = Joi.string().valid("Paid", "Partial", "Unpaid");
 const paymentTiming = Joi.string().valid("Before", "After");
 
@@ -39,7 +40,7 @@ const sessionCreateSchema = Joi.object({
   bookingId: objectId,
   duration: duration.required(),
   paymentMethod: Joi.string().trim().allow("").max(60),
-  paymentStatus,
+  paymentStatus: Joi.string().valid("Paid", "Unpaid"),
   paidAmount: money,
   paymentTiming,
   guestName: Joi.string().trim().allow("").max(120),
@@ -49,7 +50,7 @@ const sessionCreateSchema = Joi.object({
 
 const sessionExtendSchema = Joi.object({
   addedHours: duration.required(),
-  paymentStatus,
+  paymentStatus: Joi.string().valid("Paid"),
   paymentMethod: Joi.string().trim().allow("").max(60),
 });
 

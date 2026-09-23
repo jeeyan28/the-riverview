@@ -112,3 +112,34 @@
         font-size:1.6rem;
     }
 }
+.login-page .modal-box.legal-review-modal {
+    width:min(760px, 100%);
+    max-width:760px;
+}
+@media (min-width:768px) {
+    .login-page .modal-box.legal-review-modal {
+        max-height:min(760px, calc(100dvh - 64px));
+    }
+}
+.legal-page--embedded {
+    min-height:0;
+    padding:0;
+    background:transparent;
+}
+.legal-page--embedded .legal-inner { max-width:none; }
+.legal-page--embedded .legal-header {
+    margin-bottom:1.25rem;
+    padding-bottom:1rem;
+}
+.legal-return {
+    display:inline-flex;
+    align-items:center;
+    gap:.4rem;
+    padding:.7rem 1rem;
+    border:1px solid var(--border);
+    border-radius:10px;
+    background:var(--card-light);
+    color:var(--text-main);
+    font-weight:600;
+    cursor:pointer;
+}

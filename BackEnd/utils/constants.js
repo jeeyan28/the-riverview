@@ -1,4 +1,5 @@
 const TIME_ZONE = "Asia/Manila";
+const MAX_MONITOR_SESSION_HOURS = 5;
 const LOGIN_LOCKOUT_MAX_ATTEMPTS = 5;
 const LOGIN_LOCKOUT_DURATION_MS = 15 * 60 * 1000;
 const GUEST_EMAIL_DOMAIN = "guest.internal";
@@ -11,6 +12,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 module.exports = {
   TIME_ZONE,
+  MAX_MONITOR_SESSION_HOURS,
   LOGIN_LOCKOUT_MAX_ATTEMPTS,
   LOGIN_LOCKOUT_DURATION_MS,
   GUEST_EMAIL_DOMAIN,

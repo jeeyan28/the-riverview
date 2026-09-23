@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Modal from '../../components/Modal';
 import DataTable from '../../components/DataTable';
-import Pagination from '../../components/Pagination';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import { useConfirm } from '../../hooks/useConfirm';
 import { useAuth } from '../../context/AuthContext';
@@ -25,6 +24,11 @@ import {
 const FACILITY_ICONS = { Billiards: 'bi-disc', KTV: 'bi-mic', Court: 'bi-trophy' };
 const FACILITY_ICON_DEFAULT = 'bi-building';
 const DUE_BOOKINGS_POLL_MS = 20 * 1000;
+const MAX_SESSION_HOURS = 5;
+
+function canExtendSession(session) {
+  return MAX_SESSION_HOURS - Number(session?.duration) >= 1;
+}
 
 function paymentSummary(record, isBooking = false) {
   const total = Math.max(0, Number(record?.amount) || 0);
@@ -36,23 +40,30 @@ function paymentSummary(record, isBooking = false) {
   const refunded = Math.max(0, Number(record?.refundedAmount) || 0);
   const collected = Math.max(0, paid - refunded);
   const balance = Math.max(0, Math.round((total - collected) * 100) / 100);
-  return { total, collected, balance, status: balance === 0 ? 'Paid' : collected > 0 ? 'Partially paid' : 'Unpaid' };
+  return { total, collected, balance };
 }
 
 const money = (value) => `₱${Number(value || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 function SessionPayment({ session }) {
   const payment = paymentSummary(session);
-  const state = payment.balance === 0 ? 'paid' : payment.collected > 0 ? 'partial' : 'unpaid';
-  const detail = state === 'paid'
-    ? `${money(payment.collected)} collected`
-    : state === 'partial'
-      ? `${money(payment.collected)} paid · ${money(payment.balance)} due`
-      : `${money(payment.balance)} due`;
+  const state = payment.balance === 0 ? 'paid' : 'unpaid';
   return (
     <div className="rm-payment-summary">
-      <span className={`pay-timing-tag ${state}`}>{payment.status}</span>
-      <span className={`rm-payment-detail ${state}`}>{detail}</span>
+      <span className={`pay-timing-tag ${state}`}>{payment.balance === 0 ? 'Paid' : 'Balance due'}</span>
+      <span className={`rm-payment-detail ${state}`}>{payment.balance === 0 ? `${money(payment.collected)} collected` : `${money(payment.balance)} due · ${money(payment.collected)} paid`}</span>
+    </div>
+  );
+}
+
+function SessionBalance({ session }) {
+  const payment = paymentSummary(session);
+  const due = payment.balance > 0;
+  return (
+    <div className={`rm-card-balance${due ? ' is-due' : ' is-paid'}`}>
+      <span>{due ? 'Balance due' : 'Paid in full'}</span>
+      <strong>{money(due ? payment.balance : payment.total)}</strong>
+      <small>{money(payment.collected)} received of {money(payment.total)}</small>
     </div>
   );
 }
@@ -127,8 +138,6 @@ function Monitor() {
   const [sortBy, setSortBy] = useState('default');
   const [detailRoomId, setDetailRoomId] = useState(null);
   const [dueBookings, setDueBookings] = useState([]);
-  const [gridPage, setGridPage] = useState(1);
-  const [gridPageSize, setGridPageSize] = useState(10);
   async function fetchDueBookings() {
     if (!canStartFromBooking) return;
     try {
@@ -146,10 +155,6 @@ function Monitor() {
     const handle = setInterval(fetchDueBookings, DUE_BOOKINGS_POLL_MS);
     return () => clearInterval(handle);
   }, []);
-
-  useEffect(() => {
-    setGridPage(1);
-  }, [facilityFilter, roomNameFilter, sortBy, viewMode, rooms.length]);
 
   function selectFacilityFilter(name) {
     setFacilityFilter(name);
@@ -281,12 +286,9 @@ function Monitor() {
     }
     return list;
   })();
-  const gridTotalPages = Math.max(1, Math.ceil(visibleRooms.length / gridPageSize));
-  const safeGridPage = Math.min(gridPage, gridTotalPages);
-  const pagedGridRooms = visibleRooms.slice((safeGridPage - 1) * gridPageSize, safeGridPage * gridPageSize);
   const facilityGroups = [];
   const groupIndex = new Map();
-  pagedGridRooms.forEach((r) => {
+  visibleRooms.forEach((r) => {
     if (!groupIndex.has(r.facilityName)) {
       groupIndex.set(r.facilityName, []);
       facilityGroups.push([r.facilityName, groupIndex.get(r.facilityName)]);
@@ -395,7 +397,7 @@ function Monitor() {
             {occupancy ? (
               canOperate && !refreshError ? (
                 <>
-                  <button className="rm-btn" onClick={() => openExtendModal(occupancy, r)}><i className="bi bi-clock-history"></i>Extend</button>
+                  {canExtendSession(occupancy) && <button className="rm-btn" onClick={() => openExtendModal(occupancy, r)}><i className="bi bi-clock-history"></i>Extend</button>}
                   <button className="rm-btn rm-btn--success" onClick={() => endSession(occupancy)}><i className="bi bi-check2-circle"></i>Finish</button>
                   <button className="rm-btn danger" onClick={() => cancelSession(occupancy._id, r._id)}><i className="bi bi-x-circle"></i>Cancel</button>
                 </>
@@ -713,32 +715,28 @@ function Monitor() {
                 {occupancy ? (
                   <>
                     <div className="rm-timer-row">
-                      <span className={`rm-ico ico-${(isPastEnd || isCritical) ? 'red' : isWarning ? 'amber' : 'green'}`}>
-                        <i className={`bi ${(isCritical || isPastEnd) ? 'bi-exclamation-triangle-fill' : 'bi-clock'}`}></i>
-                      </span>
                       <div>
                         <div className={`rm-timer-big${isWarning ? ' warn' : ''}${(isPastEnd || isCritical) ? ' expired' : ''}`}>
                           {formatTimeRemaining(remaining, isPastEnd)}
                         </div>
-                        <div className="rm-timer-caption">Time left</div>
+                        <div className="rm-timer-caption">Time left · ends {formatEndTime(occupancy)}</div>
                       </div>
                     </div>
-                    <div className="rm-foot">
-                      <div className="rm-foot-info">
-                        <i className="bi bi-person"></i>{occupancy.guestName || 'Walk-in guest'}
-                      </div>
-                      <div className="rm-foot-price">₱{r.price}/hr</div>
+                    <div className="rm-session-meta">
+                      <span><i className="bi bi-person" aria-hidden="true"></i>{occupancy.guestName || 'Walk-in guest'}</span>
+                      <span>{money(Number(occupancy.rate) || r.price)}/hr</span>
                     </div>
-                    <SessionPayment session={occupancy} />
+                    <SessionBalance session={occupancy} />
+                    <button type="button" className="rm-card-details" onClick={(event) => { event.stopPropagation(); setDetailRoomId(r._id); }}>View details <i className="bi bi-arrow-right" aria-hidden="true"></i></button>
                     {canOperate && !refreshError && (
-                      <div className="rm-quick-actions">
-                        <button
+                      <div className={`rm-quick-actions${canExtendSession(occupancy) ? '' : ' rm-quick-actions--no-extend'}`}>
+                        {canExtendSession(occupancy) && <button
                           type="button"
                           className="rm-btn"
                           onClick={(e) => { e.stopPropagation(); openExtendModal(occupancy, r); }}
                         >
                           <i className="bi bi-clock-history"></i>Extend
-                        </button>
+                        </button>}
                         <button
                           type="button"
                           className="rm-btn rm-btn--success"
@@ -782,14 +780,6 @@ function Monitor() {
               </div>
             </div>
           ))}
-          <Pagination
-            page={safeGridPage}
-            pageSize={gridPageSize}
-            totalItems={visibleRooms.length}
-            onPageChange={setGridPage}
-            onPageSizeChange={(n) => { setGridPageSize(n); setGridPage(1); }}
-            itemLabel="rooms"
-          />
         </>
       ) : (
         <div className="card card-flush rm-table-wrap">
@@ -804,6 +794,7 @@ function Monitor() {
             }}
             emptyMessage="No rooms match the current filters."
             itemLabel="rooms"
+            paginate={false}
           />
         </div>
       )}
@@ -852,32 +843,24 @@ function guestInitials(name) {
 }
 
 function FinishSessionModal({ session, disabled, onClose, onSubmit }) {
-  const [paidAmount, setPaidAmount] = useState('0');
+  const [collectBalance, setCollectBalance] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
   const payment = paymentSummary(session);
-  const isFullyPaid = !!session && payment.total > 0 && payment.balance === 0;
-  const isPartial = payment.collected > 0 && payment.balance > 0;
-  const isUnpaid = payment.collected === 0 && payment.balance > 0;
+  const isFullyPaid = !!session && payment.balance === 0;
 
   useEffect(() => {
-    if (session) setPaidAmount(String(session.paidAmount ?? 0));
-  }, [session]);
+    if (session) setCollectBalance(true);
+  }, [session?._id]);
 
   async function handleSubmit(event) {
     event.preventDefault();
-    const received = isFullyPaid ? Number(session?.paidAmount || session?.amount || 0) : Number(paidAmount);
-    if (!Number.isFinite(received) || received < 0) {
-      alert('Amount collected must be a valid non-negative number.');
-      return;
-    }
-    if (received > Number(session?.amount || 0)) {
-      alert('Amount collected cannot exceed the session charge.');
-      return;
-    }
+    const received = isFullyPaid || collectBalance
+      ? Number(session.amount || 0) + Number(session.refundedAmount || 0)
+      : Number(session.paidAmount || 0);
     setSubmitting(true);
     try {
-      await onSubmit({ paid: received >= Number(session?.amount || 0), paidAmount: received });
+      await onSubmit({ paid: Number(session.amount) > 0 && received - Number(session.refundedAmount || 0) >= Number(session.amount), paidAmount: received });
     } catch (err) {
       alert(err.message || 'Could not finish this session.');
     } finally {
@@ -897,22 +880,13 @@ function FinishSessionModal({ session, disabled, onClose, onSubmit }) {
             </div>
           ) : (
             <>
-              {isUnpaid && (
-                <div className="finish-session-notice finish-session-notice--unpaid" role="alert">
-                  <i className="bi bi-exclamation-triangle-fill" aria-hidden="true"></i>
-                  <span><strong>This session has not been paid</strong><small>{money(payment.balance)} is still due. Record any payment received before finishing.</small></span>
-                </div>
-              )}
-              {isPartial && (
-                <div className="finish-payment-ledger" aria-label="Current payment balance">
-                  <div><span>Currently paid</span><strong>{money(payment.collected)}</strong></div>
-                  <div><span>Remaining balance</span><strong>{money(payment.balance)}</strong></div>
-                </div>
-              )}
-              <div className="mfield">
-                <label htmlFor="finish-paid-amount">Total amount collected (₱)</label>
-                <input id="finish-paid-amount" type="number" min={session.paidAmount || 0} max={session.amount || 0} step="0.01" value={paidAmount} onChange={(event) => setPaidAmount(event.target.value)} disabled={disabled} autoFocus />
-                <p className="mfield-note">Enter the total money received for this session. You can finish with a partial or unpaid balance, and it will remain in the session history.</p>
+              <div className="finish-payment-ledger" aria-label="Current payment balance">
+                <div><span>Already received</span><strong>{money(payment.collected)}</strong></div>
+                <div><span>Balance due</span><strong>{money(payment.balance)}</strong></div>
+              </div>
+              <div className="session-collection-options session-settlement-options" role="group" aria-label="Finish payment">
+                <button type="button" className={collectBalance ? 'active' : ''} aria-pressed={collectBalance} onClick={() => setCollectBalance(true)}><strong>Collect full balance</strong><small>Record {money(payment.balance)} received after play</small></button>
+                <button type="button" className={!collectBalance ? 'active' : ''} aria-pressed={!collectBalance} onClick={() => setCollectBalance(false)}><strong>Leave balance due</strong><small>Finish without recording another payment</small></button>
               </div>
             </>
           )}
@@ -932,7 +906,7 @@ function RoomDetailModal({ room, view, onClose, canManage, canOperate, onExtend,
         <>
           <div className="rmd-top">
             <span className={`rm-status-pill status-${view.stateClass}`}><span className="dot"></span>{view.statusLabel}</span>
-            {view.occupancy && <span className="rm-foot-price">₱{room.price}/hr</span>}
+            {view.occupancy && <span className="rm-foot-price">{money(Number(view.occupancy.rate) || room.price)}/hr</span>}
           </div>
 
           {view.occupancy ? (
@@ -958,9 +932,11 @@ function RoomDetailModal({ room, view, onClose, canManage, canOperate, onExtend,
                   <div className="val">{view.occupancy.paymentTiming === 'After' ? 'Pay After' : 'Pay Before'}</div>
                 </div>
                 <div className="rmd-stat-box">
-                  <div className="lbl">Amount</div>
-                  <div className="val">₱{(view.occupancy.amount || 0).toFixed(2)}</div>
+                  <div className="lbl">Total charge</div>
+                  <div className="val">{money(view.occupancy.amount)}</div>
                 </div>
+                <div className="rmd-stat-box"><div className="lbl">Received</div><div className="val">{money(paymentSummary(view.occupancy).collected)}</div></div>
+                <div className="rmd-stat-box"><div className="lbl">Balance due</div><div className="val">{money(paymentSummary(view.occupancy).balance)}</div></div>
               </div>
             </>
           ) : (
@@ -977,7 +953,7 @@ function RoomDetailModal({ room, view, onClose, canManage, canOperate, onExtend,
                 <>
                   <button className="rm-btn rm-btn--success rm-btn--block" onClick={onEndSessionPaid}><i className="bi bi-check2-circle"></i>Finish Session</button>
                   <div className="rmd-actions-row">
-                    <button className="rm-btn" onClick={onExtend}><i className="bi bi-clock-history"></i>Extend</button>
+                    {canExtendSession(view.occupancy) && <button className="rm-btn" onClick={onExtend}><i className="bi bi-clock-history"></i>Extend</button>}
                     <button className="rm-btn danger" onClick={onCancelSession}><i className="bi bi-x-circle"></i>Cancel Session</button>
                   </div>
                 </>
@@ -1220,7 +1196,6 @@ function SessionModal({ modal, onClose, onSubmit }) {
   const [hours, setHours] = useState(1);
   const [paymentMethod, setPaymentMethod] = useState('Cash');
   const [collectionMode, setCollectionMode] = useState('later');
-  const [partialAmount, setPartialAmount] = useState('');
   const [guestName, setGuestName] = useState('');
   const [guestCount, setGuestCount] = useState('1');
   const [hasCorkage, setHasCorkage] = useState(false);
@@ -1246,7 +1221,6 @@ function SessionModal({ modal, onClose, onSubmit }) {
       setHours(1);
       setPaymentMethod('Cash');
       setCollectionMode('later');
-      setPartialAmount('');
       setGuestName('');
       setGuestCount('1');
       setHasCorkage(false);
@@ -1255,7 +1229,8 @@ function SessionModal({ modal, onClose, onSubmit }) {
   }, [modal]);
 
   const duration = Math.max(1, Math.round(Number(hours) || 1));
-  const maxHours = isExtend ? Math.max(1, 24 - Math.ceil(Number(modal?.session?.duration) || 0)) : 24;
+  const maxHours = isExtend ? Math.max(0, Math.floor(MAX_SESSION_HOURS - Number(modal?.session?.duration || 0))) : MAX_SESSION_HOURS;
+  const bookedLengthExceedsLimit = fromBooking && duration > maxHours;
   const walkInPricing = !isExtend && !fromBooking && modal?.fixedRoom
     ? calculateBookingPrice({ variant: modal.fixedRoom, startHour: manilaHour(), duration, guestCount: Number(guestCount) || 1, hasCorkage })
     : null;
@@ -1265,7 +1240,7 @@ function SessionModal({ modal, onClose, onSubmit }) {
   const reservationPaidInFull = fromBooking && totalCharge > 0 && outstanding === 0;
   const paidAmount = fromBooking
     ? collectionMode === 'full' ? totalCharge : alreadyCollected
-    : collectionMode === 'full' ? totalCharge : collectionMode === 'partial' ? Math.max(0, Number(partialAmount) || 0) : 0;
+    : collectionMode === 'full' ? totalCharge : 0;
 
   async function handleSubmit() {
     const totalHours = duration;
@@ -1314,7 +1289,6 @@ function SessionModal({ modal, onClose, onSubmit }) {
       : '';
   const fixedRoomRate = modal?.fixedRoom ? variantRateLabel(modal.fixedRoom) : modal?.roomTarget ? 'From reservation' : '';
   const title = isExtend ? `Extend Session — ${modal?.fixedRoom?.roomName || ''}` : fromBooking ? 'Start Session from Reservation' : 'Start Session';
-  const isPresetDuration = HOUR_PRESETS.includes(duration);
 
   return (
     <Modal open={!!modal} onClose={onClose} title={title} size="lg">
@@ -1330,30 +1304,23 @@ function SessionModal({ modal, onClose, onSubmit }) {
           <div className="mfield-section-label">Session details</div>
           <div className="mfield">
             <label>{isExtend ? 'Whole hours to add' : 'Session length'}</label>
-            <div className="session-hour-picker" role="group" aria-label={isExtend ? 'Hours to add' : 'Session length'}>
-              {HOUR_PRESETS.filter((value) => value <= maxHours).map((value) => (
-                <button key={value} type="button" className={`session-hour-option${duration === value ? ' active' : ''}`} aria-pressed={duration === value} disabled={fromBooking} onClick={() => setHours(value)}>{value}<small>hr</small></button>
-              ))}
-              {!fromBooking && (
-                <label className={`session-hour-custom${isPresetDuration ? '' : ' active'}`}>
-                  <span>Other time</span>
-                  <span className="session-hour-custom-control">
-                    <input type="number" min="1" max={maxHours} step="1" value={isPresetDuration ? '' : hours} placeholder={`1–${maxHours}`} onChange={(event) => setHours(event.target.value)} aria-label="Custom whole hours" />
-                    <small>hrs</small>
-                  </span>
-                </label>
-              )}
-            </div>
-            {fromBooking && (
-              <p className="mfield-note">This {duration}-hour length comes from the confirmed reservation.</p>
+            {fromBooking ? (
+              <div className="session-fixed-length"><strong>{duration} hour{duration === 1 ? '' : 's'}</strong><small>Fixed by the confirmed reservation</small></div>
+            ) : (
+              <div className="session-hour-picker" role="group" aria-label={isExtend ? 'Hours to add' : 'Session length'}>
+                {HOUR_PRESETS.filter((value) => value <= maxHours).map((value) => (
+                  <button key={value} type="button" className={`session-hour-option${duration === value ? ' active' : ''}`} aria-pressed={duration === value} onClick={() => setHours(value)}>{value}<small>hr</small></button>
+                ))}
+              </div>
             )}
-            {isExtend && <p className="mfield-note">The original charge stays fixed. Only the added hours are charged at their current rates.</p>}
+            {bookedLengthExceedsLimit && <p className="session-form-error" role="alert">This reservation exceeds the five-hour session limit. Update its booked length before starting the session.</p>}
+            {isExtend && <p className="mfield-note">Up to {MAX_SESSION_HOURS} hours total. The original charge stays fixed; added hours use their current rates.</p>}
           </div>
 
           {!isExtend && (
             <div className="mfield">
               <label>Guest Name{fromBooking ? '' : ' (optional)'}</label>
-              <input type="text" value={guestName} onChange={(e) => setGuestName(e.target.value)} placeholder="e.g. Juan Dela Cruz" />
+              <input type="text" value={guestName} onChange={(e) => setGuestName(e.target.value)} placeholder="e.g. Juan Dela Cruz" readOnly={fromBooking} />
             </div>
           )}
 
@@ -1390,16 +1357,8 @@ function SessionModal({ modal, onClose, onSubmit }) {
 
           {!isExtend && !reservationPaidInFull && (
             <div className="session-collection-options" role="group" aria-label="Payment collection">
-              <button type="button" className={collectionMode === 'later' ? 'active' : ''} aria-pressed={collectionMode === 'later'} onClick={() => setCollectionMode('later')}><strong>{fromBooking ? 'Keep balance due' : 'Pay after play'}</strong><small>{fromBooking ? `${money(outstanding)} stays visible to staff` : 'Start now with no payment collected'}</small></button>
-              <button type="button" className={collectionMode === 'full' ? 'active' : ''} aria-pressed={collectionMode === 'full'} onClick={() => setCollectionMode('full')}><strong>{fromBooking ? 'Collect balance now' : 'Collect full amount'}</strong><small>{fromBooking ? `Record ${money(outstanding)} more` : `Record ${money(totalCharge)} before play`}</small></button>
-              {!fromBooking && <button type="button" className={collectionMode === 'partial' ? 'active' : ''} aria-pressed={collectionMode === 'partial'} onClick={() => setCollectionMode('partial')}><strong>Collect part now</strong><small>Keep the rest as a visible balance</small></button>}
-            </div>
-          )}
-
-          {!isExtend && !fromBooking && collectionMode === 'partial' && (
-            <div className="mfield">
-              <label>Amount collected now</label>
-              <input type="number" min="0" max={totalCharge} step="0.01" value={partialAmount} onChange={(event) => setPartialAmount(event.target.value)} placeholder="0.00" />
+              <button type="button" className={collectionMode === 'later' ? 'active' : ''} aria-pressed={collectionMode === 'later'} onClick={() => setCollectionMode('later')}><strong>Pay after play</strong><small>{fromBooking ? `${money(outstanding)} balance stays due` : 'Collect the full charge when the session ends'}</small></button>
+              <button type="button" className={collectionMode === 'full' ? 'active' : ''} aria-pressed={collectionMode === 'full'} onClick={() => setCollectionMode('full')}><strong>Pay before play</strong><small>{fromBooking ? `Collect the full ${money(outstanding)} balance now` : `Collect ${money(totalCharge)} now`}</small></button>
             </div>
           )}
 
@@ -1426,7 +1385,7 @@ function SessionModal({ modal, onClose, onSubmit }) {
 
           <div className="modal-actions">
             <button type="button" className="btn-cancel" onClick={onClose}>Cancel</button>
-            <button type="button" className="btn-confirm" disabled={submitting} onClick={handleSubmit}>
+            <button type="button" className="btn-confirm" disabled={submitting || maxHours < 1 || bookedLengthExceedsLimit} onClick={handleSubmit}>
               {submitting ? (isExtend ? 'Extending…' : 'Starting…') : (isExtend ? `Add ${duration} hour${duration === 1 ? '' : 's'}` : 'Start session')}
             </button>
           </div>
