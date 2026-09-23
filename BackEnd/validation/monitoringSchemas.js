@@ -14,7 +14,7 @@ const monitorRoomCreateSchema = Joi.object({
   facilityName: Joi.string().trim().min(1).max(100).required(),
   roomName: Joi.string().trim().min(1).max(100).required(),
   roomNumber: Joi.string().trim().min(1).max(40).required(),
-  price: money.default(0),
+  price: money.greater(0).required(),
   status: Joi.string().valid("Available", "Occupied", "Under Maintenance", "Inactive").default("Available"),
 });
 
@@ -22,7 +22,7 @@ const monitorRoomUpdateSchema = Joi.object({
   facilityName: Joi.string().trim().min(1).max(100),
   roomName: Joi.string().trim().min(1).max(100),
   roomNumber: Joi.string().trim().min(1).max(40),
-  price: money,
+  price: money.greater(0),
   status: Joi.string().valid("Available", "Occupied", "Under Maintenance", "Inactive"),
 }).min(1);
 
@@ -30,7 +30,7 @@ const roomTargetSchema = Joi.object({
   facilityName: Joi.string().trim().min(1).max(100).required(),
   roomName: Joi.string().trim().min(1).max(100).required(),
   roomNumber: Joi.string().trim().min(1).max(40),
-  startingRoomNumber: Joi.number().integer().min(1).allow(null),
+  startingRoomNumber: Joi.number().integer().valid(1).allow(null),
   roomCount: Joi.number().integer().min(1).max(100).allow(null),
 });
 

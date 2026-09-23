@@ -69,7 +69,7 @@ Documenting what's already consistent in the codebase, so new code matches:
 ## 10. Booking, Monitoring, and Finance Invariants
 
 - Use `utils/roomPricing.js` for every customer booking, walk-in session, and extension charge. Frontend totals are previews; the backend result is authoritative.
-- Accept whole-hour inputs only: 1–5 hours for bookings and 1–24 hours for Live Monitor sessions/extensions.
+- Accept whole-hour inputs only: 1–5 hours for bookings and Live Monitor sessions/extensions.
 - Never infer collected revenue from `paymentStatus` alone. Persist and report explicit `paidAmount` and `refundedAmount` values.
 - Preserve a reservation's verified downpayment when its session starts. Do not add it twice when the booking and session are linked.
 - Keep charges, collected revenue, refunds, and outstanding balances distinct in API responses, UI labels, and exports.

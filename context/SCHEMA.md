@@ -10,8 +10,8 @@ The implementation now enforces the context decisions that affect booking, monit
 2. **Operating hours:** the default schedule is `07:00–00:00` every day, and the Settings screen can update the singleton schedule. Existing deployments use the backed-up `align:prd:apply` migration to replace the legacy default.
 3. **Cancellation and no-show:** cancellation is requested, reviewed by an admin, and manually refunded when appropriate. A missed confirmed booking becomes `No Show` after its scheduled end and forfeits the downpayment.
 4. **Canonical finance:** linked booking and room-session records are folded into one ledger row; explicit payment and refund amounts drive collected and outstanding totals. Legacy `Paid` flags without an amount are review-only and are excluded from collected revenue.
-5. **Partial payment:** both bookings and room sessions support `Partial`. A verified online downpayment remains a recorded payment while the rest is payable at the venue.
-6. **Whole-hour operations:** booking mutations accept 1–5 whole hours; Live Monitor sessions and extensions accept 1–24 whole hours.
+5. **Partial payment:** a verified online downpayment remains recorded on its booking and active room session while the rest is payable at the venue. Walk-ins pay in full before or after play, and a charged session can finish only after full payment.
+6. **Whole-hour operations:** booking mutations and Live Monitor sessions/extensions accept 1–5 whole hours.
 
 ## 1. Entity Relationship Diagram
 

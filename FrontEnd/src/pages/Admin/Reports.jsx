@@ -83,12 +83,8 @@ function Reports() {
         </button>
       </RevenueFilters>
 
-      <div className="card no-print">
-        <div className="card-head"><span className="card-title">Revenue and payment report</span><span className="finance-meta">{displayDate(from)} – {displayDate(to)}</span></div>
-        <p className="rep-card-desc">Each charge stays tied to its facility, room type, hourly rate, and played or reserved hours. Linked reservations and sessions appear once.</p>
-        {exportError && <div className="finance-error" role="alert">{exportError}</div>}
-        {error && <div className="finance-error" role="alert">{error}</div>}
-      </div>
+      {exportError && <div className="finance-error" role="alert">{exportError}</div>}
+      {error && <div className="finance-error" role="alert">{error}</div>}
 
       <p className="finance-basis">Report basis: recorded payments less manual refunds, grouped by service date in Asia/Manila. Transactions with incomplete legacy payment data are marked for review.</p>
       <RevenueSummary summary={data?.summary} loading={loading} />

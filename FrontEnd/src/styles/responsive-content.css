@@ -56,6 +56,23 @@
 
 /* Profile exposes its routine fields first and keeps account security secondary. */
 .public-site .pf-modal { width: min(680px, 100%); }
+
+@media (min-width: 901px) {
+  .public-site .bk-modal,
+  .public-site .bk-modal.bk-modal--compact {
+    width: min(1040px, calc(100vw - 48px));
+    max-width: none;
+    height: min(800px, calc(100dvh - 48px));
+    max-height: calc(100dvh - 48px);
+  }
+
+  .public-site .pf-modal {
+    width: min(700px, calc(100vw - 48px));
+    max-width: none;
+    height: min(720px, calc(100dvh - 48px));
+    max-height: calc(100dvh - 48px);
+  }
+}
 .public-site .pf-profile-body { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 20px; }
 .public-site .pf-avatar-col { padding: 16px 12px; }
 .public-site .pf-avatar { width: 72px; height: 72px; font-size: 1.45rem; }

@@ -83,7 +83,7 @@ function FacilityIcon({ name, size = 20 }) {
 
 function emptyVariant() {
   return {
-    label: '', price: '', pax: '', startingRoomNumber: '', roomCount: 1,
+    label: '', price: '', pax: '', startingRoomNumber: 1, roomCount: 1,
     status: 'Available', image: '', features: [], pricingMode: 'flat',
     eveningPrice: '', eveningStartTime: '17:00', includedGuests: 0, extraGuestFee: 0,
   };
@@ -95,10 +95,10 @@ function emptyFacilityForm(name = '') {
   return {
     name,
     description: preset?.description || '',
-    variants: variants.map((variant, index) => ({
+    variants: variants.map((variant) => ({
       ...emptyVariant(),
       ...variant,
-      startingRoomNumber: index + 1,
+      startingRoomNumber: 1,
       roomCount: 1,
       features: [...(variant.features || [])],
     })),
@@ -114,9 +114,8 @@ function lowestRoomPrice(variants) {
 }
 
 function roomNumberRangeLabel(v) {
-  const start = Math.max(1, Number(v.startingRoomNumber) || 1);
   const count = Math.max(1, Number(v.roomCount) || 1);
-  return count > 1 ? `Rooms ${start}–${start + count - 1}` : `Room ${start}`;
+  return count > 1 ? `Rooms 1–${count}` : 'Room 1';
 }
 
 function statusCounts(variants) {
@@ -230,7 +229,7 @@ function RoomManagement() {
     if (!guardPermission('room:manage')) return;
     const variants = (room.variants || []).map((v) => ({
       ...v,
-      startingRoomNumber: v.startingRoomNumber ?? '',
+      startingRoomNumber: 1,
       roomCount: v.roomCount ?? 1,
       status: v.status || 'Available',
       pricingMode: v.pricingMode || 'flat',
@@ -374,17 +373,6 @@ function RoomManagement() {
       return;
     }
     const cleanVariantEntries = form.variants.map((v, originalIndex) => ({ v, originalIndex }));
-    const invalidRoomNumber = cleanVariantEntries.find(({ v }) => {
-      if (v.startingRoomNumber === '' || v.startingRoomNumber === null || v.startingRoomNumber === undefined) return false;
-      const parsed = Number(v.startingRoomNumber);
-      return !Number.isFinite(parsed) || parsed <= 0;
-    });
-    if (invalidRoomNumber) {
-      setFormStep('rooms');
-      setActiveRoomIndex(invalidRoomNumber.originalIndex);
-      setFormError(`Starting room number for “${invalidRoomNumber.v.label || 'Untitled room'}” must be greater than 0.`);
-      return;
-    }
     const invalidVariant = cleanVariantEntries.find(({ v }) => {
       const price = Number(v.price);
       const eveningPrice = Number(v.eveningPrice);
@@ -401,7 +389,7 @@ function RoomManagement() {
       label: v.label.trim(),
       price: Number(v.price) || 0,
       pax: (v.pax || '').trim(),
-      startingRoomNumber: Math.max(1, Number(v.startingRoomNumber) || 1),
+      startingRoomNumber: 1,
       roomCount: Math.max(1, Number(v.roomCount) || 1),
       status: v.status || 'Available',
       image: v.image || '',
@@ -537,11 +525,9 @@ function RoomManagement() {
     <div className="panel active" id="panel-room-management">
       <header className="facility-command-bar">
         <div className="facility-heading-lockup">
-          <span className="facility-heading-icon"><Building2 size={24} aria-hidden="true" /></span>
           <div>
-            <span className="facility-kicker">FACILITIES &amp; INVENTORY</span>
-            <h2>Manage your spaces</h2>
-            <p>Keep guest-facing details, room inventory, hourly rates, and availability in one place.</p>
+            <h2>Facilities &amp; rooms</h2>
+            <p>Manage room details, rates, and availability.</p>
           </div>
         </div>
         <div className="facility-command-stats" aria-label="Facility inventory summary">
@@ -904,17 +890,8 @@ function RoomManagement() {
                 <div className="fm-section">
                   <div className="fm-section-title"><DoorOpen size={16} aria-hidden="true" /> Availability &amp; Status</div>
                   <div className="ffield">
-                    <label className="flabel">Starting Room No.</label>
-                    <span className="flabel-hint">Combined with Available Units, defines the range of table/room numbers used in Room Monitoring (e.g. start 101 + 3 units = 101, 102, 103).</span>
-                    <input
-                      type="number" min="1" placeholder="e.g. 101"
-                      value={activeRoom.startingRoomNumber} onChange={(e) => updateVariant(activeRoomIndex, 'startingRoomNumber', e.target.value)}
-                    />
-                  </div>
-
-                  <div className="ffield">
                     <label className="flabel">Available Units</label>
-                    <span className="flabel-hint">How many identical rooms of this type exist, for reservation availability.</span>
+                    <span className="flabel-hint">How many rooms of this type can be reserved. Numbering starts at 1.</span>
                     <input
                       type="number" min="1"
                       value={activeRoom.roomCount ?? 1}
@@ -1024,7 +1001,7 @@ function RoomManagement() {
           </div>
 
           <details className="fm-preview-col" open>
-            <summary><Eye size={17} aria-hidden="true" /><span>Customer preview</span><small>See the result while you edit</small><ChevronDown size={16} aria-hidden="true" /></summary>
+            <summary><Eye size={17} aria-hidden="true" /><span>Customer preview</span><small>Updates as you edit</small><ChevronDown size={16} aria-hidden="true" /></summary>
             <div className="fm-preview-content">
             {formStep === 'rooms' && activeRoomIndex !== null ? (
               <>
@@ -1034,6 +1011,7 @@ function RoomManagement() {
                     option={{ ...previewFacility.variants[activeRoomIndex] }}
                     room={previewFacility}
                     preview
+                    showSelectionIndicator={false}
                   />
                 </div>
               </>
@@ -1046,7 +1024,7 @@ function RoomManagement() {
                   ) : (
                     previewFacility.variants
                       .filter((v) => v.label?.trim())
-                      .map((v, i) => <RoomOptionCard key={i} option={v} room={previewFacility} preview />)
+                      .map((v, i) => <RoomOptionCard key={i} option={v} room={previewFacility} preview showSelectionIndicator={false} />)
                   )}
                 </div>
               </>

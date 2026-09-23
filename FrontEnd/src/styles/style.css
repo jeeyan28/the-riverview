@@ -1161,7 +1161,7 @@ body.has-guest-banner {
 }
 .bk-slot:disabled { opacity: 1; }
 .bk-slot--reserved { background: var(--ovl-03); border-color: var(--border); color: var(--text-muted-light); cursor: not-allowed; }
-.bk-slot--reserved .bk-slot-status { color: var(--text-muted-light); }
+.bk-slot--reserved .bk-slot-status { color: var(--danger); }
 .bk-slot--insufficient { background: rgba(224,161,58,.08); border-color: rgba(224,161,58,.22); color: #8a7550; cursor: not-allowed; }
 .bk-slot--insufficient .bk-slot-status { color: #e0a13a; }
 .bk-slot--selected {

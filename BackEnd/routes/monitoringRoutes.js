@@ -1,10 +1,13 @@
 const express = require("express");
 const { MonitorRoom, RoomSession } = require("../model/monitoring");
+const Room = require("../model/room");
 const Booking = require("../model/booking");
 const { ensureAdmin, requirePermission, requireAnyPermission } = require("../middleware/adminAuth");
 const { PERMISSIONS, hasPermission } = require("../utils/permissions");
 const { bookingCollected, financialFields, fullOrDeferredPaymentFields, extendSessionFields, endSessionFields } = require("../utils/bookingLifecycle");
 const { calculateBookingPrice, calculateSessionExtension, parsePaxCapacity } = require("../utils/roomPricing");
+const { pricedMonitorRoom } = require("../utils/monitorRoomRate");
+const { releasedMonitorStatus } = require("../utils/syncRoomInventory");
 const { TIME_ZONE, MAX_MONITOR_SESSION_HOURS } = require("../utils/constants");
 const { getMonitorReport } = require("../utils/monitorReport");
 const { createWorkbook, addMonitoringGridSheets, addSummarySheet, addActivitySheet, addRoomTypeSheet } = require("../utils/reportWorkbook");
@@ -42,6 +45,18 @@ async function syncBookingFromSession(session, status) {
   }, { runValidators: true });
 }
 
+async function releaseSessionRoom(roomId, currentRoom) {
+  const room = currentRoom || await MonitorRoom.findById(roomId);
+  if (!room) return;
+  const catalog = room.isTemporary
+    ? null
+    : await Room.findOne({ name: room.facilityName }).select("variants").lean();
+  await MonitorRoom.updateOne(
+    { _id: roomId, status: "Occupied" },
+    { $set: { status: releasedMonitorStatus(room, catalog) } }
+  );
+}
+
 const roomsRouter = express.Router();
 
 roomsRouter.get("/", ensureAdmin, async (req, res) => {
@@ -49,7 +64,12 @@ roomsRouter.get("/", ensureAdmin, async (req, res) => {
     const filter = {};
     if (req.query.status) filter.status = String(req.query.status);
     const rooms = await MonitorRoom.find(filter).sort({ facilityName: 1, roomNumber: 1 });
-    res.json(rooms);
+    const missingPriceNames = [...new Set(rooms.filter((room) => !(Number(room.price) > 0)).map((room) => room.facilityName))];
+    const catalog = missingPriceNames.length
+      ? await Room.find({ name: { $in: missingPriceNames } }).select("name variants").lean()
+      : [];
+    const catalogByName = new Map(catalog.map((room) => [room.name.toLowerCase(), room]));
+    res.json(rooms.map((room) => pricedMonitorRoom(room, catalogByName.get(room.facilityName.toLowerCase()))));
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Server error." });
@@ -60,7 +80,8 @@ roomsRouter.get("/:id", ensureAdmin, validate(idParamsSchema, "params"), async (
   try {
     const room = await MonitorRoom.findById(req.params.id);
     if (!room) return res.status(404).json({ message: "Room not found." });
-    res.json(room);
+    const catalogRoom = Number(room.price) > 0 ? null : await Room.findOne({ name: room.facilityName }).select("name variants").lean();
+    res.json(pricedMonitorRoom(room, catalogRoom));
   } catch (err) {
     console.error(err);
     res.status(400).json({ message: "Invalid room id." });
@@ -79,7 +100,7 @@ roomsRouter.post("/", requirePermission(PERMISSIONS.ROOM_MANAGE), validate(monit
       facilityName,
       roomName,
       roomNumber,
-      price: Number(price) || 0,
+      price: Number(price),
       status: status || "Available",
     });
 
@@ -146,17 +167,15 @@ sessionsRouter.get("/report/export", ensureAdmin, async (req, res) => {
       title: "The Riverview — Live monitor report",
       range: report.range,
       metrics: [
-        { label: "Sessions", value: report.summary.sessions },
+        { label: "Paid sessions", value: report.summary.sessions },
         { label: "Occupied hours", value: report.summary.hours, format: "hours" },
         { label: "Charges", value: report.summary.charged, format: "money" },
         { label: "Collected", value: report.summary.collected, format: "money" },
-        { label: "Outstanding balance", value: report.summary.outstanding, format: "money" },
-        { label: "Paid / partial / unpaid", value: `${report.summary.paid} / ${report.summary.partial} / ${report.summary.unpaid}` },
       ],
-      notes: ["Each row is one played session. Charges are calculated from the exact facility and room type for each whole hour."],
+      notes: ["Only finished sessions paid in full are included. Charges use each facility and room type's hourly rate."],
     });
-    addActivitySheet(workbook, report.rows, { name: "Played sessions" });
-    addRoomTypeSheet(workbook, report.byRoomType);
+    addActivitySheet(workbook, report.rows, { name: "Played sessions", includeBalance: false });
+    addRoomTypeSheet(workbook, report.byRoomType, "Room totals", { includeBalance: false });
     const filename = `Riverview-Live-Monitor_${report.range.from}_to_${report.range.to}.xlsx`;
     res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
@@ -227,9 +246,9 @@ sessionsRouter.post("/", requireAnyPermission(PERMISSIONS.ROOM_OPERATE, PERMISSI
       if (!facilityName || !roomName) {
         return res.status(400).json({ message: "roomTarget requires facilityName and roomName." });
       }
-      const startingRoomNumber = parseInt(roomTarget.startingRoomNumber, 10);
+      const startingRoomNumber = 1;
       const roomCount = parseInt(roomTarget.roomCount, 10);
-      const hasValidRange = Number.isFinite(startingRoomNumber) && startingRoomNumber > 0 && Number.isFinite(roomCount) && roomCount > 0;
+      const hasValidRange = Number.isFinite(roomCount) && roomCount > 0;
 
       if (hasValidRange) {
         const rangeEnd = startingRoomNumber + roomCount - 1;
@@ -284,12 +303,17 @@ sessionsRouter.post("/", requireAnyPermission(PERMISSIONS.ROOM_OPERATE, PERMISSI
     }
 
     const guestCount = booking ? booking.guestCount : Math.max(1, Number(requestedGuestCount) || 1);
-    const roomCapacity = parsePaxCapacity(room.pax);
+    const catalogRoom = booking || Number(room.price) > 0 ? null : await Room.findOne({ name: room.facilityName }).select("name variants").lean();
+    const pricedRoom = booking ? room : pricedMonitorRoom(room, catalogRoom);
+    if (!booking && !(Number(pricedRoom.price) > 0)) {
+      return res.status(400).json({ message: "Set this table's hourly rate before starting a session." });
+    }
+    const roomCapacity = parsePaxCapacity(pricedRoom.pax);
     if (!booking && roomCapacity && guestCount > roomCapacity) {
       return res.status(400).json({ message: `This room accommodates up to ${roomCapacity} guest(s).` });
     }
     const directPricing = booking ? null : calculateBookingPrice({
-      variant: room,
+      variant: pricedRoom,
       timeIn: `${String(currentBusinessHour()).padStart(2, "0")}:00`,
       duration,
       guestCount,
@@ -439,7 +463,7 @@ sessionsRouter.put("/:id/end", requirePermission(PERMISSIONS.ROOM_OPERATE), vali
 
     await session.save();
 
-    await MonitorRoom.updateOne({ _id: session.room, status: "Occupied" }, { $set: { status: "Available" } });
+    await releaseSessionRoom(session.room, room);
     await syncBookingFromSession(session, Booking.BOOKING_STATUS.DONE);
 
     let roomDeleted = false;
@@ -501,7 +525,7 @@ sessionsRouter.delete("/:id", requirePermission(PERMISSIONS.ROOM_OPERATE), valid
     session.endedAt = new Date();
     session.cancellationReason = String(req.body?.reason || "Session cancelled by staff").slice(0, 500);
     await session.save();
-    await MonitorRoom.updateOne({ _id: session.room, status: "Occupied" }, { $set: { status: "Available" } });
+    await releaseSessionRoom(session.room);
     if (session.booking) await Booking.findByIdAndUpdate(session.booking, { status: Booking.BOOKING_STATUS.CONFIRMED });
     res.json({ message: "Session cancelled.", session });
   } catch (err) {

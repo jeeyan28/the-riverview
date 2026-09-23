@@ -4,7 +4,7 @@ const variantSchema = new mongoose.Schema({
   label: { type: String, trim: true },
   price: { type: Number, min: 0 },
   pax:   { type: String, trim: true },
-  startingRoomNumber: { type: Number, min: 1, default: 1 },
+  startingRoomNumber: { type: Number, min: 1, max: 1, default: 1 },
   roomCount: { type: Number, min: 1, default: 1,},
   status: { type: String, enum: ["Available", "Maintenance", "Unavailable"], default: "Available" },
   image:       { type: String, default: "" },

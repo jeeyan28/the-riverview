@@ -1,4 +1,4 @@
-import { API_BASE_URL } from '../services/api';
+import { API_BASE_URL } from '../services/api.js';
 
 export function dateKey(y, m, d) {
   return `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
@@ -218,15 +218,30 @@ export function getFreeHourCount(dayBookings, openHour, closeHour, totalRooms) {
   return count;
 }
 
-export function getBookableStartCount(dayBookings, openHour, closeHour, totalRooms, duration, dateStr, nowMs = Date.now()) {
+export function getDayAvailability(dayBookings, openHour, closeHour, totalRooms, duration, dateStr, nowMs = Date.now()) {
   const reserved = buildHourCounts(dayBookings);
-  let count = 0;
+  let availableStarts = 0;
+  let mostRoomsAvailable = 0;
   for (let hour = openHour; hour < Math.min(closeHour, 24); hour++) {
     const start = dateStr ? Date.parse(`${dateStr}T${String(hour).padStart(2, '0')}:00:00+08:00`) : null;
     if (dateStr && (!Number.isFinite(start) || start <= nowMs)) continue;
-    if (getSlotState(hour, duration, closeHour, reserved, totalRooms) === 'available') count++;
+    if (getSlotState(hour, duration, closeHour, reserved, totalRooms) !== 'available') continue;
+    availableStarts++;
+    mostRoomsAvailable = Math.max(
+      mostRoomsAvailable,
+      getAvailableRoomCountForDuration(reserved, totalRooms, hour, duration)
+    );
   }
-  return count;
+  return {
+    availableStarts,
+    nearlyFull: availableStarts > 0 && (
+      availableStarts <= 2 || (mostRoomsAvailable <= 2 && mostRoomsAvailable < totalRooms)
+    ),
+  };
+}
+
+export function getBookableStartCount(dayBookings, openHour, closeHour, totalRooms, duration, dateStr, nowMs = Date.now()) {
+  return getDayAvailability(dayBookings, openHour, closeHour, totalRooms, duration, dateStr, nowMs).availableStarts;
 }
 
 export function getTimePeriod(hour) {

@@ -28,9 +28,9 @@ test('an existing reservation deposit remains valid, but new collection must set
   assert.throws(() => fullOrDeferredPaymentFields(900, 300, 500), /partial collection is unavailable/);
 });
 
-test('finishing cannot add a partial payment', () => {
+test('finishing requires the full balance', () => {
   const session = { status: 'Active', amount: 900, paidAmount: 300, refundedAmount: 0 };
-  assert.equal(endSessionFields(session, { paidAmount: 300 }).paymentStatus, 'Partial');
+  assert.throws(() => endSessionFields(session, { paidAmount: 300 }), /Collect the full balance/);
   assert.equal(endSessionFields(session, { paid: true, paidAmount: 900 }).paymentStatus, 'Paid');
   assert.throws(() => endSessionFields(session, { paidAmount: 500 }), /partial collection is unavailable/);
 });

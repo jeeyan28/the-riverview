@@ -45,17 +45,17 @@ Room/table/court **inventory (counts) is admin-configurable**, not hardcoded —
 
 ### 5.1 Live Session Rules
 - Live Monitor represents actual use of one physical room, table, or court unit. Every session keeps the exact facility, room type, unit number, hourly-rate snapshot, scheduled time in/out, and whole hours played.
-- Staff can start a walk-in as **Unpaid**, **Partial**, or **Paid**. A guest may pay before play or after play; prepayment is not required to occupy a room.
-- A confirmed online reservation can start directly from Live Monitor. Its verified downpayment carries into the session once, and staff sees the remaining amount to collect before starting it.
-- Sessions and extensions use whole-hour increments only. Customer reservations remain limited to 1–5 hours; an on-site session may run from 1–24 hours.
-- Ending a session records the amount actually collected. A zero or partial collection preserves an outstanding balance and does not rewrite the session as fully paid.
-- Payment state and balance must remain visible on occupied-room cards, due-reservation rows, finish flows, corrections, and session reports.
+- Staff can start a walk-in as **Unpaid** or **Paid**. A guest may pay the full charge before play or after play; prepayment is not required to occupy a room.
+- A confirmed online reservation can start directly from Live Monitor. Its verified downpayment carries into the session once, and staff sees the remaining amount due before or after play.
+- Sessions and extensions use whole-hour increments only, up to five hours total.
+- Finishing a charged session requires the full balance to be collected. Older unpaid or partially paid finished sessions retain their recorded state.
+- Payment state and balance remain visible on occupied-room cards, due-reservation rows, finish flows, and corrections.
 
 ### 5.2 Revenue and Reporting Rules
 - **Charges**, **collected revenue**, **refunds**, and **outstanding balances** are separate values. Revenue means money actually collected, after recorded refunds.
 - The room charge is calculated per whole hour from the exact room/facility type used. Time-based court rates are calculated hour by hour; corkage stays a separate flat add-on.
 - A reservation linked to a played session appears once in finance totals. The played session supplies the final charge while the reservation supplies its previously verified deposit.
-- Reports has a dedicated Live Monitor session report for a day, month, or custom inclusive range. It shows time in/out, hours, rate, charge, collected amount, balance, source, payment timing/status, and totals by room type.
+- Reports has a dedicated Live Monitor session report for a day, month, or custom inclusive range. It shows only finished, fully paid sessions, with time in/out, hours, rate, charge, collected amount, source, payment timing/status, and totals by room type. Older unpaid sessions are hidden from this report and its Excel export, without changing their stored payment state.
 - The main sales report uses the same ledger and offers Today, Last 7 days, This month, and simple From/To service-date controls. Excel exports contain a concise Summary, activity/transactions, room totals, and daily totals where applicable.
 
 ## 6. MVP Feature Set

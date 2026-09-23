@@ -13,7 +13,7 @@ import {
   isOperatingDay,
   getSlotState,
   getTimePeriod,
-  getBookableStartCount,
+  getDayAvailability,
   getAvailableRoomCountForDuration,
 } from '../utils/rooms';
 
@@ -149,7 +149,7 @@ function RescheduleModal({ booking, onClose, onRescheduled }) {
     const holiday = isHolidayDate(dStr, settings.holidays);
     const closedDay = !isOperatingDay(dateObj, settings.operatingHours);
     const dayList = excludeOwnSlotFromDayList(monthBookings[dStr], booking);
-    const availableStarts = getBookableStartCount(dayList, openHour, closeHour, totalRooms, duration, dStr);
+    const { availableStarts, nearlyFull } = getDayAvailability(dayList, openHour, closeHour, totalRooms, duration, dStr);
     const fullyBooked = availableStarts === 0;
     const unavailable = holiday || closedDay;
     const disabled = isPast || unavailable || fullyBooked;
@@ -162,10 +162,10 @@ function RescheduleModal({ booking, onClose, onRescheduled }) {
       title = holiday ? 'Closed for a holiday' : 'Closed on this day';
     } else if (fullyBooked) {
       variant = 'full';
-      title = `No ${duration}-hour times available`;
-    } else if (availableStarts <= 2) {
+      title = 'Full — no rooms or start times left for this duration';
+    } else if (nearlyFull) {
       variant = 'few';
-      title = `Only ${availableStarts} start time${availableStarts === 1 ? '' : 's'} left`;
+      title = 'Nearly full — few rooms or start times left';
     } else {
       variant = 'available';
     }
@@ -332,8 +332,8 @@ function RescheduleModal({ booking, onClose, onRescheduled }) {
 
                 <div className="bk-legend">
                   <span><i className="bk-dot bk-dot--available"></i> Available</span>
-                  <span><i className="bk-dot bk-dot--few"></i> Few slots</span>
-                  <span><i className="bk-dot bk-dot--full"></i> Fully booked</span>
+                  <span><i className="bk-dot bk-dot--few"></i> Nearly full</span>
+                  <span><i className="bk-dot bk-dot--full"></i> Full</span>
                   <span><i className="bk-dot bk-dot--unavailable"></i> Closed</span>
                 </div>
               </div>
@@ -391,7 +391,7 @@ function RescheduleModal({ booking, onClose, onRescheduled }) {
                                 onKeyDown={state === 'available' ? (e) => { if (e.key === 'Enter' || e.key === ' ') handleSelectHour(hour); } : undefined}
                               >
                                 <span className="bk-slot-time">{formatHour(hour)}</span>
-                                <span className={`bk-slot-status${statusTone}`}>{state === 'available' ? 'Available' : 'Reserved'}</span>
+                                <span className={`bk-slot-status${statusTone}`}>{state === 'available' ? 'Available' : 'Unavailable'}</span>
                               </div>
                             );
                           })}

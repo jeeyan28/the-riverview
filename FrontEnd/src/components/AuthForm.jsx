@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Mail, User, ArrowRight, Shield, Lock, ShieldCheck, Copy, ExternalLink } from 'lucide-react';
 import PasswordInput from './PasswordInput';
 import PasswordRequirementsList from './PasswordRequirementsList';
@@ -14,7 +14,7 @@ import { useAuth } from '../context/AuthContext';
 import { OTP_LENGTH, OTP_EXPIRY_SECONDS, RESEND_COOLDOWN_SECONDS, formatCountdown } from '../utils/otp';
 import { isPasswordStrongEnough } from '../utils/password';
 import { validateName, normalizeName } from '../utils/name';
-import { TERMS_CONTENT, PRIVACY_CONTENT, LAST_UPDATED } from '../data/legalContent';
+import { TERMS_CONTENT, PRIVACY_CONTENT, LAST_UPDATED, TERMS_LAST_UPDATED } from '../data/legalContent';
 
 function maskEmail(email) {
   const [local, domain] = String(email || '').split('@');
@@ -22,7 +22,7 @@ function maskEmail(email) {
   return `${local[0]}***@${domain}`;
 }
 
-function AuthForm({ mode, onSwitchMode, onForgotPassword, onAuthSuccess }) {
+function AuthForm({ mode, resetLogin, onSwitchMode, onForgotPassword, onAuthSuccess }) {
   const isLogin = mode === 'login';
   const {
     login,
@@ -73,7 +73,7 @@ function AuthForm({ mode, onSwitchMode, onForgotPassword, onAuthSuccess }) {
   async function handleGoogleCredential(response) {
     if (!response.code) {
       if (response.error && response.error !== 'access_denied') {
-        showToast('Google sign-in failed.', 'error');
+        showToast('Google login failed.', 'error');
       }
       return;
     }
@@ -81,7 +81,7 @@ function AuthForm({ mode, onSwitchMode, onForgotPassword, onAuthSuccess }) {
       const user = await loginWithGoogle(response.code);
       onAuthSuccess?.(user);
     } catch (err) {
-      showToast(err.message || 'Google sign-in failed.', 'error');
+      showToast(err.message || 'Google login failed.', 'error');
     }
   }
 
@@ -100,7 +100,7 @@ function AuthForm({ mode, onSwitchMode, onForgotPassword, onAuthSuccess }) {
     }
     const ok = triggerSignIn();
     if (!ok) {
-      showToast('Google sign-in is still loading — try again in a second.', 'error');
+      showToast('Google login is still loading. Try again in a moment.', 'error');
     }
   }
 
@@ -137,7 +137,7 @@ function AuthForm({ mode, onSwitchMode, onForgotPassword, onAuthSuccess }) {
       <div className="google-browser-handoff" role="status">
         <ExternalLink size={18} aria-hidden="true" />
         <div>
-          <strong>Continue Google sign-in in your browser</strong>
+          <strong>Continue with Google in your browser</strong>
           <p>{embeddedBrowser.instruction}</p>
           {externalBrowserUrl && (
             <a href={externalBrowserUrl}>Open in browser</a>
@@ -156,6 +156,14 @@ function AuthForm({ mode, onSwitchMode, onForgotPassword, onAuthSuccess }) {
   const [passwordError, setPasswordError] = useState('');
   const [loading, setLoading] = useState(false);
 
+  useEffect(() => {
+    if (!resetLogin) return;
+    setEmail(resetLogin.email || '');
+    setPassword('');
+    setEmailError('');
+    setPasswordError('');
+  }, [resetLogin]);
+
   const [unverifiedEmail, setUnverifiedEmail] = useState('');
   const [codeSent, setCodeSent] = useState(false);
   const [sendingCode, setSendingCode] = useState(false);
@@ -169,13 +177,14 @@ function AuthForm({ mode, onSwitchMode, onForgotPassword, onAuthSuccess }) {
 
   async function handleLoginSubmit(e) {
     e.preventDefault();
+    if (loading) return;
 
     const trimmedEmail = email.trim();
     const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail);
-    const passOk = password.length >= 8;
+    const passOk = password.length > 0;
 
-    setEmailError(emailOk ? '' : 'Enter a valid email address.');
-    setPasswordError(passOk ? '' : 'Password must be at least 8 characters.');
+    setEmailError(!trimmedEmail ? 'Enter your email address.' : emailOk ? '' : 'Enter a valid email address, like name@example.com.');
+    setPasswordError(passOk ? '' : 'Enter your password.');
     if (!emailOk || !passOk) return;
 
     setLoading(true);
@@ -191,6 +200,12 @@ function AuthForm({ mode, onSwitchMode, onForgotPassword, onAuthSuccess }) {
           setOtpError('');
           setResendAvailableAt(0);
           setOtpExpiresAt(0);
+        } else if (err.status === 401 && err.field === 'email') {
+          setEmailError(err.message || 'No account found with this email.');
+        } else if (err.status === 401 && err.field === 'password') {
+          setPasswordError(err.message || 'Incorrect password. Try again.');
+        } else if (err.status === 401) {
+          setPasswordError(err.message || 'Could not log in. Check your details and try again.');
         } else {
           showToast(err.message, 'error');
         }
@@ -237,7 +252,7 @@ function AuthForm({ mode, onSwitchMode, onForgotPassword, onAuthSuccess }) {
     setVerifyingOtp(true);
     try {
       await verifyAccountOtp(unverifiedEmail, code);
-      showToast('Email verified! You can now sign in.', 'success');
+      showToast('Email verified! You can now log in.', 'success');
       setUnverifiedEmail('');
       setCodeSent(false);
     } catch (err) {
@@ -369,7 +384,7 @@ function AuthForm({ mode, onSwitchMode, onForgotPassword, onAuthSuccess }) {
     setRegOtpError('');
     try {
       await verifyRegistrationOtp(verificationEmail, code);
-      showToast('Your account has been created successfully. You can now sign in.', 'success');
+      showToast('Your account is ready. You can now log in.', 'success');
       setTimeout(() => {
         onSwitchMode();
       }, 1200);
@@ -464,7 +479,7 @@ function AuthForm({ mode, onSwitchMode, onForgotPassword, onAuthSuccess }) {
       <>
         <div className="login-card-header">
           <h2>Verify your email</h2>
-          <p>Please verify your email before signing in.</p>
+          <p>Verify your email before logging in.</p>
         </div>
 
         {!codeSent ? (
@@ -551,15 +566,18 @@ function AuthForm({ mode, onSwitchMode, onForgotPassword, onAuthSuccess }) {
                 placeholder="you@email.com"
                 autoComplete="email"
                 value={email}
+                aria-invalid={Boolean(emailError)}
+                aria-describedby={emailError ? 'email-error' : undefined}
                 onChange={(e) => {
                   setEmail(e.target.value);
                   setEmailError('');
+                  setPasswordError('');
                 }}
               />
               <Mail size={18} className="input-icon" />
             </div>
-            <span className="field-error" style={{ display: emailError ? 'block' : 'none' }}>
-              {emailError || 'Enter a valid email address.'}
+            <span id="email-error" className="field-error" role="alert" style={{ display: emailError ? 'block' : 'none' }}>
+              {emailError}
             </span>
           </div>
 
@@ -584,9 +602,9 @@ function AuthForm({ mode, onSwitchMode, onForgotPassword, onAuthSuccess }) {
             />
           </div>
 
-          <button type="submit" className={`btn-submit${loading ? ' loading' : ''}`}>
+          <button type="submit" className={`btn-submit${loading ? ' loading' : ''}`} disabled={loading}>
             <span className="btn-text">
-              Sign in
+              Log in
               <ArrowRight size={17} />
             </span>
             <span className="btn-spinner">
@@ -904,7 +922,7 @@ function AuthForm({ mode, onSwitchMode, onForgotPassword, onAuthSuccess }) {
       >
         <LegalDocument
           content={legalDoc === 'terms' ? TERMS_CONTENT : PRIVACY_CONTENT}
-          lastUpdated={LAST_UPDATED}
+          lastUpdated={legalDoc === 'terms' ? TERMS_LAST_UPDATED : LAST_UPDATED}
           embedded
           onClose={() => setLegalDoc(null)}
         />

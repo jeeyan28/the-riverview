@@ -98,6 +98,7 @@ export function AuthProvider({ children }) {
       const err = new Error(data.message || 'Login failed.');
       err.status = res.status;
       err.unverified = !!data.unverified;
+      err.field = data.field;
       throw err;
     }
     setUser(data.user);
