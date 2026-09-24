@@ -21,7 +21,7 @@ function deviceLabel(value = '') {
 }
 
 function loginTime(value) {
-  return new Intl.DateTimeFormat('en-PH', { timeZone: 'Asia/Manila', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }).format(new Date(value));
+  return new Intl.DateTimeFormat('en-PH', { timeZone: 'Asia/Manila', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(value));
 }
 
 function statusPill(entry) {
@@ -101,7 +101,7 @@ function LoginHistory() {
   const failedCount = entries.filter((entry) => entry.status === 'failed').length;
 
   return (
-    <div className="panel active" id="panel-login-history">
+    <div className="login-history-embedded" id="panel-login-history">
       <div className="login-history-intro">
         <div><h2>Account access history</h2><p>Review successful and failed sign-ins, including the device and network address recorded for each attempt.</p></div>
         <ShieldCheck size={24} aria-hidden="true" />

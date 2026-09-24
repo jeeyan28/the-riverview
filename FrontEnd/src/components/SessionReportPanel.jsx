@@ -3,6 +3,7 @@ import { Download } from 'lucide-react';
 import DateRangePicker from './DateRangePicker';
 import { roomSessionsService } from '../services/monitoring';
 import { businessDate } from '../utils/businessDate';
+import { formatTime12 } from '../utils/time';
 
 const money = (value) => `₱${Number(value || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -74,13 +75,13 @@ function SessionReportPanel() {
       <div className="monitor-report-layout">
         <div className="card card-flush monitor-report-table-card">
           <div className="monitor-report-card-head"><div><h3>Session activity</h3><p>Finished sessions paid in full.</p></div><span>{report?.rows?.length ?? 0} rows</span></div>
-          <div className="admin-table-scroll" tabIndex={0} role="region" aria-label="Live monitor session report">
+          <div className="admin-table-scroll" tabIndex={0} role="region" aria-label="Room monitoring session report">
             <table className="tbl monitor-report-table">
               <thead><tr><th>Date / time</th><th>Facility / room</th><th>Guest</th><th>Source</th><th>Hours</th><th>Rate</th><th>Charge</th><th>Paid</th><th>Payment</th></tr></thead>
               <tbody>
                 {!hasRange ? <tr><td colSpan="9" className="finance-empty">Choose service dates to load paid sessions.</td></tr> : loading && !report ? <tr><td colSpan="9" className="finance-empty">Loading paid sessions…</td></tr> : report?.rows?.length ? report.rows.map((row) => (
                   <tr key={row.id}>
-                    <td><strong>{row.date}</strong><div className="finance-meta">{row.timeIn} – {row.timeOut}</div></td>
+                    <td><strong>{row.date}</strong><div className="finance-meta">{formatTime12(row.timeIn)} – {formatTime12(row.timeOut)}</div></td>
                     <td>{row.facilityName}<div className="finance-meta">{row.roomType}{row.unitNumber ? ` · Unit ${row.unitNumber}` : ''}</div></td>
                     <td>{row.guestName}</td>
                     <td>{row.source === 'booking' ? 'Reservation' : 'Walk-in'}</td>

@@ -125,7 +125,7 @@ async function sendOtpEmail(user, otp, purpose = "reset") {
   });
 }
 
-async function sendReceiptEmail(booking) {
+function buildReceiptEmail(booking) {
   const fullName = booking.guestName || "—";
   const contact = booking.guestContact && !String(booking.guestContact).includes("@") ? booking.guestContact : "N/A";
   const email = booking.guestEmail || "—";
@@ -133,12 +133,13 @@ async function sendReceiptEmail(booking) {
     ? new Date(`${booking.date}T00:00:00`).toLocaleDateString("en-PH", { month: "long", day: "numeric", year: "numeric" })
     : "—";
   const bookedOnLabel = booking.createdAt
-    ? new Date(booking.createdAt).toLocaleString("en-PH", { month: "long", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" })
+    ? new Date(booking.createdAt).toLocaleString("en-PH", { timeZone: "Asia/Manila", month: "long", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", hour12: true })
     : "—";
   const amount = Math.max(0, Number(booking.amount || 0));
-  const downPayment = Math.max(0, Number(booking.paidAmount || 0), Number(booking.downPayment || 0));
-  const paidLater = Math.max(0, downPayment - Number(booking.downPayment || 0));
-  const remaining = Math.max(0, amount - downPayment);
+  const paid = Math.max(0, Number(booking.paidAmount || 0), Number(booking.downPayment || 0));
+  const paidOnline = Math.max(0, Number(booking.downPayment || 0));
+  const paidLater = Math.max(0, paid - paidOnline);
+  const remaining = Math.max(0, amount - paid);
   const startHour = parseInt(String(booking.timeIn || "0").split(":")[0], 10) || 0;
   const durationHours = Number(booking.duration) || 0;
   const timeLabel = `${formatHour(startHour)} – ${formatHour(startHour + durationHours)}`;
@@ -159,11 +160,19 @@ async function sendReceiptEmail(booking) {
 
   const costRows = [
     ["Total amount", amount],
-    ["Paid online", downPayment],
+    ["Paid online", paidOnline],
     ...(paidLater > 0 ? [["Paid later", paidLater]] : []),
     ["Remaining balance", remaining],
   ];
 
+  const infoPairs = [
+    [rows[1], rows[2]],
+    [rows[3]],
+    [rows[4], rows[5]],
+    [rows[6], rows[7]],
+    [rows[8]],
+  ];
+  const infoHtml = infoPairs.map((pair) => `<tr>${pair.map(([label, value]) => `<td width="50%" valign="top" style="padding:11px 16px 9px 0; vertical-align:top;"><div style="margin-bottom:8px; color:#667085; font-size:10px; font-weight:700; letter-spacing:.04em; text-transform:uppercase;">${escapeHtml(label)}</div><div style="color:#172b35; font-size:15px; font-weight:600; line-height:1.35; overflow-wrap:anywhere;">${escapeHtml(value)}</div></td>`).join("")}${pair.length === 1 ? '<td width="50%"></td>' : ''}</tr>`).join("");
   const html = `
   <!DOCTYPE html>
   <html lang="en">
@@ -172,45 +181,35 @@ async function sendReceiptEmail(booking) {
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Booking Receipt</title>
   </head>
-  <body style="margin:0; padding:0; background-color:#ffffff; font-family:Helvetica, Arial, sans-serif;">
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#ffffff; padding:40px 16px;">
+  <body style="margin:0; padding:0; background-color:#f4f8f7; font-family:Arial, Helvetica, sans-serif;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f8f7; padding:24px 12px;">
       <tr>
         <td align="center">
-          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px; background-color:#0f1e35; border-radius:14px; overflow:hidden; border:1px solid rgba(255,255,255,0.08);">
-
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px; background-color:#ffffff; border:1px solid #dce8e4; border-radius:14px; overflow:hidden;">
             <tr>
-              <td style="padding:32px 40px 24px; text-align:center; border-bottom:1px solid rgba(255,255,255,0.08);">
-                <span style="font-family:Georgia, 'Times New Roman', serif; font-size:22px; font-weight:700; color:#ffffff; letter-spacing:.02em;">The Riverview</span>
+              <td style="padding:30px 30px 22px; background-color:#0b7067; color:#ffffff;">
+                <div style="color:#dcfff7; font-size:13px; font-weight:700; letter-spacing:.08em;">THE RIVERVIEW</div>
+                <h1 style="margin:25px 0 12px; color:#ffffff; font-size:27px; line-height:1.2;">Booking Confirmed</h1>
+                <p style="margin:0 0 18px; color:#ffffff; font-size:14px; line-height:1.4;">Your reservation has been successfully created.</p>
+                <div style="color:#ffffff; font-size:13px; font-weight:700;">${escapeHtml(facility)}</div>
               </td>
             </tr>
-
             <tr>
-              <td style="padding:40px;">
-                <p style="margin:0 0 6px; font-size:11px; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:#00C9A7;">Booking Confirmed</p>
-                <h1 style="margin:0 0 8px; font-family:Georgia, 'Times New Roman', serif; font-size:26px; line-height:1.25; color:#ffffff; font-weight:700;">Booking Confirmed</h1>
-                <p style="margin:0 0 20px; font-size:14px; line-height:1.5; color:#8A9BB0;">Your reservation has been successfully created.</p>
-                <p style="margin:0 0 20px; font-size:15px; font-weight:700; color:#ffffff;">${escapeHtml(facility)}</p>
-
-                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 20px;">
-                  ${rows.map(([label, value]) => `<tr><td style="padding:8px 0; font-size:14px; color:#8A9BB0; border-bottom:1px solid rgba(255,255,255,0.08);">${escapeHtml(label)}</td><td style="padding:8px 0; font-size:14px; color:#ffffff; text-align:right; font-weight:600; border-bottom:1px solid rgba(255,255,255,0.08);">${escapeHtml(value)}</td></tr>`).join("")}
+              <td style="padding:19px 30px 14px; background-color:#e9f8f5;">
+                <div style="color:#496963; font-size:11px; font-weight:700; letter-spacing:.04em;">RESERVATION CODE</div>
+                <div style="margin-top:8px; color:#075f55; font-size:18px; font-weight:700;">${escapeHtml(booking.reservationCode || "—")}</div>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:27px 30px 32px; background-color:#ffffff;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0">${infoHtml}</table>
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:18px 0 24px; background-color:#f1f6f5;">
+                  ${costRows.map(([label, value]) => `<tr><td style="padding:11px 16px; font-size:14px; color:#52626a;">${escapeHtml(label)}</td><td align="right" style="padding:11px 16px; font-size:16px; color:${label === "Remaining balance" ? "#a15f08" : "#0b7067"}; font-weight:700; white-space:nowrap;">₱${Number(value || 0).toLocaleString("en-PH", { maximumFractionDigits: 2 })}</td></tr>`).join("")}
                 </table>
-
-                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 8px;">
-                  ${costRows.map(([label, value]) => `<tr><td style="padding:8px 0; font-size:14px; color:#8A9BB0;">${escapeHtml(label)}</td><td style="padding:8px 0; font-size:14px; color:${label === "Remaining balance" && value > 0 ? "#e0a940" : "#00C9A7"}; text-align:right; font-weight:700;">₱${Number(value || 0).toLocaleString()}</td></tr>`).join("")}
-                </table>
-
-                <p style="margin:0; padding-top:20px; border-top:1px solid rgba(255,255,255,0.08); font-size:13px; line-height:1.6; color:#8A9BB0;">
-                  Please keep this receipt for your records. ${remaining > 0 ? 'The remaining balance is paid upon arrival.' : 'Your booking is fully paid.'}
-                </p>
+                <p style="margin:0 0 10px; color:#52626a; font-size:13px; line-height:1.5;">A booking confirmation was sent to ${escapeHtml(email)}.</p>
+                <p style="margin:0; color:#87939a; font-size:12px;">Keep this receipt for your records.</p>
               </td>
             </tr>
-
-            <tr>
-              <td style="padding:20px 40px 32px; text-align:center;">
-                <p style="margin:0; font-size:12px; color:#4a5d72;">© ${new Date().getFullYear()} The Riverview</p>
-              </td>
-            </tr>
-
           </table>
         </td>
       </tr>
@@ -220,6 +219,12 @@ async function sendReceiptEmail(booking) {
   `;
 
   const text = `Booking Confirmed\n\nYour reservation has been successfully created.\nFacility: ${facility}\n\n${rows.map(([label, value]) => `${label}: ${value}`).join("\n")}\n\n${costRows.map(([label, value]) => `${label}: ₱${Number(value || 0).toLocaleString()}`).join("\n")}\n\nPlease keep this receipt for your records. ${remaining > 0 ? 'The remaining balance is paid upon arrival.' : 'Your booking is fully paid.'}`;
+
+  return { html, text };
+}
+
+async function sendReceiptEmail(booking) {
+  const { html, text } = buildReceiptEmail(booking);
 
   const recipients = new Set();
   if (booking.guestEmail && EMAIL_RE.test(booking.guestEmail)) recipients.add(booking.guestEmail);
@@ -235,4 +240,4 @@ async function sendReceiptEmail(booking) {
   });
 }
 
-module.exports = { sendOtpEmail, sendReceiptEmail };
+module.exports = { sendOtpEmail, sendReceiptEmail, buildReceiptEmail };

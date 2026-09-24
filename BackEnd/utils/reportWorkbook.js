@@ -15,6 +15,13 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const MANILA_OFFSET_MS = 8 * 60 * 60 * 1000;
 const EXCEL_EPOCH_OFFSET = 25569;
 
+function formatActivityTime(value) {
+  const match = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(String(value || ''));
+  if (!match) return value || '';
+  const hour = Number(match[1]);
+  return `${hour % 12 || 12}:${match[2]} ${hour < 12 ? 'AM' : 'PM'}`;
+}
+
 function unitKey({ facilityName, roomType, unitNumber }) {
   return `${facilityName || 'Other'}\u0000${roomType || 'Standard'}\u0000${unitNumber ?? ''}`;
 }
@@ -243,9 +250,10 @@ function addActivitySheet(workbook, rows, { name = 'Sessions', includeReview = f
   sheet.columns = columns;
   sheet.addRows(rows.map((row) => ({
     ...row,
+    timeIn: formatActivityTime(row.timeIn),
+    timeOut: formatActivityTime(row.timeOut),
     roomType: row.roomType || row.roomName || '',
     unitNumber: row.unitNumber || '',
-    timeOut: row.timeOut || '',
     sourceLabel: row.source === 'booking' ? 'Reservation' : 'Walk-in',
     rateLabel: row.rateLabel || (row.duration ? `₱${(Number(row.amount || 0) / Number(row.duration)).toFixed(2)}/hr` : ''),
     paymentTiming: row.paymentTiming || '',

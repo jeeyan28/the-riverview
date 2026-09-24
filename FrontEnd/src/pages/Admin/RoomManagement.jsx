@@ -683,7 +683,7 @@ function RoomManagement() {
                 <div className="fm-section">
                 <div className="ffield">
                   <label className="flabel" htmlFor="facility-name"><Tags size={15} aria-hidden="true" /> Facility name</label>
-                  <span className="flabel-hint">Use any unique guest-facing name, such as Pickleball, Function Hall, or Darts. It will also appear in Live Monitor and reports.</span>
+                  <span className="flabel-hint">Use any unique guest-facing name, such as Pickleball, Function Hall, or Darts. It will also appear in Room Monitoring and reports.</span>
                   <input
                     id="facility-name"
                     type="text"

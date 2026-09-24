@@ -40,24 +40,42 @@ function fakeBrowser(userAgent) {
   return { document, navigator: { userAgent }, links };
 }
 
-test('receipt downloads as an image without opening a new tab', () => {
+test('receipt offers image and PDF downloads on the current page', async () => {
   const originalNavigator = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
   const originalDocument = globalThis.document;
   const originalWindow = globalThis.window;
+  const originalCreateObjectURL = URL.createObjectURL;
+  const originalRevokeObjectURL = URL.revokeObjectURL;
   const browser = fakeBrowser('Mozilla/5.0 Chrome');
+  let pdfBlob;
+  URL.createObjectURL = (blob) => { pdfBlob = blob; return 'blob:receipt-pdf'; };
+  URL.revokeObjectURL = () => {};
   Object.defineProperty(globalThis, 'navigator', { configurable: true, value: browser.navigator });
   globalThis.document = browser.document;
   globalThis.window = { open() { throw new Error('A receipt must not open a new tab.'); } };
   try {
     openBookingReceipt(booking);
-    assert.equal(browser.links.length, 1);
+    assert.equal(browser.links.length, 0);
+    const overlay = browser.document.body.children.find((item) => item.className === 'receipt-preview-overlay');
+    assert.ok(overlay);
+    const actions = overlay.children[0].children[3];
+    actions.children[0].click();
     assert.equal(browser.links[0].download, 'Riverview-Receipt-BIL-123.png');
     assert.match(browser.links[0].href, /^data:image\/png/);
+    actions.children[1].click();
+    assert.equal(browser.links[1].download, 'Riverview-Receipt-BIL-123.pdf');
+    assert.equal(browser.links[1].href, 'blob:receipt-pdf');
+    assert.equal(pdfBlob.type, 'application/pdf');
+    assert.match(await pdfBlob.text(), /^%PDF-1\.4/);
+    actions.children[2].click();
+    assert.equal(overlay.removed, true);
   } finally {
     if (originalNavigator) Object.defineProperty(globalThis, 'navigator', originalNavigator);
     else delete globalThis.navigator;
     globalThis.document = originalDocument;
     globalThis.window = originalWindow;
+    URL.createObjectURL = originalCreateObjectURL;
+    URL.revokeObjectURL = originalRevokeObjectURL;
   }
 });
 
@@ -74,10 +92,10 @@ test('Messenger keeps the receipt and a back action on the current page', () => 
     const overlay = browser.document.body.children.find((item) => item.className === 'receipt-preview-overlay');
     assert.ok(overlay);
     const [heading, instruction, image, actions] = overlay.children[0].children;
-    assert.equal(heading.textContent, 'Save your receipt');
+    assert.equal(heading.textContent, 'Download your receipt');
     assert.match(instruction.textContent, /press and hold/);
     assert.match(image.src, /^data:image\/png/);
-    actions.children[1].click();
+    actions.children[2].click();
     assert.equal(overlay.removed, true);
     assert.equal(browser.document.activeElement, originalFocus);
   } finally {

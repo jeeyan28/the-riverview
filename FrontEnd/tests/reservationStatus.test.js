@@ -13,7 +13,7 @@ test('confirmed reservation becomes overdue at 1:01 and no-show at 2:00', () => 
 });
 
 test('active sessions and pending cancellation requests do not become no-shows', () => {
-  assert.deepEqual(reservationPresentation({ ...booking, status: 'Ongoing' }, at('14:00')), { status: 'In Use', warning: '' });
+  assert.deepEqual(reservationPresentation({ ...booking, status: 'Ongoing' }, at('14:00')), { status: 'Ongoing', warning: '' });
   assert.deepEqual(reservationPresentation({ ...booking, cancellationStatus: 'Requested' }, at('14:00')), { status: 'Confirmed', warning: '' });
 });
 

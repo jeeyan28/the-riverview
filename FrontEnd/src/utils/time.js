@@ -15,3 +15,10 @@ export function timeAgo(date) {
 
   return new Date(date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
+
+export function formatTime12(value, fallback = '—') {
+  const match = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(String(value || ''));
+  if (!match) return fallback;
+  const hour = Number(match[1]);
+  return `${hour % 12 || 12}:${match[2]} ${hour < 12 ? 'AM' : 'PM'}`;
+}

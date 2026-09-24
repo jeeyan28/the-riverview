@@ -277,14 +277,14 @@ function BookingSummaryContents({
                       <span>₱{downPayment.toLocaleString()}</span>
                     </div>
                     <div className="bk-summary-panel-cost-row bk-summary-panel-cost-row--total">
-                      <span>Balance due at venue</span>
+                      <span>Balance remaining at venue</span>
                       <span>₱{remainingBalance.toLocaleString()}</span>
                     </div>
                   </>
                 )}
               </div>
               {timeLabel ? (
-                <p className="bk-summary-panel-note">{remainingBalance > 0 ? 'Your down payment confirms the booking. Pay the venue balance when you arrive.' : 'Your full payment confirms the booking. No balance is due at the venue.'}</p>
+                <p className="bk-summary-panel-note">{remainingBalance > 0 ? 'Your down payment confirms the booking. Pay the remaining balance when you arrive.' : 'Your full payment confirms the booking. No balance remains at the venue.'}</p>
               ) : (
                 <p className="bk-summary-panel-note">Choose a start time to see the total and payment breakdown.</p>
               )}
@@ -323,12 +323,14 @@ function BookingSuccess({ booking, room, selectedVariant, onDone, onViewBooking 
   const timeLabel = `${formatHour(startHour)} – ${formatHour(startHour + duration)} (${duration} hour${duration === 1 ? '' : 's'})`;
 
   const bookedOnLabel = booking.createdAt
-    ? new Date(booking.createdAt).toLocaleString(undefined, {
+    ? new Date(booking.createdAt).toLocaleString('en-PH', {
+        timeZone: 'Asia/Manila',
         month: 'long',
         day: 'numeric',
         year: 'numeric',
         hour: 'numeric',
         minute: '2-digit',
+        hour12: true,
       })
     : '—';
 
@@ -401,7 +403,7 @@ function BookingSuccess({ booking, room, selectedVariant, onDone, onViewBooking 
             <span className="bk-success-paid">₱{downPayment.toLocaleString()}</span>
           </div>
           <div className="bk-success-item">
-            <span className="bk-summary-label">Balance due at venue</span>
+            <span className="bk-summary-label">Balance remaining at venue</span>
             <span className="bk-success-balance">₱{remaining.toLocaleString()}</span>
           </div>
         </div>
@@ -1803,7 +1805,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
                     ₱{downPaymentAmount.toLocaleString()}
                   </p>
                   <p className="bk-downpayment-duration">{remainingBalanceAmount > 0
-                    ? `Confirms your booking. ₱${remainingBalanceAmount.toLocaleString()} due at the venue. First hour is non-refundable if you cancel.`
+                    ? `Confirms your booking. ₱${remainingBalanceAmount.toLocaleString()} remains to pay at the venue. First hour is non-refundable if you cancel.`
                     : downPaymentAmount > (priceBreakdown.hourlyRates[0] || 0)
                       ? 'Confirms your booking. If you cancel, contact admin for a refund minus the first hour.'
                       : 'Confirms your booking. Non-refundable if you cancel.'}</p>

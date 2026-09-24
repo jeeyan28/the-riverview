@@ -1,6 +1,6 @@
 import '../../styles/admin/monitor.css';
 import '../../styles/admin/finance.css';
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Modal from '../../components/Modal';
 import DataTable from '../../components/DataTable';
@@ -15,7 +15,6 @@ import {
   useRoomMonitorData,
   sessionEnd,
   formatStartTime,
-  formatEndTime,
   formatTimeRemaining,
   findRoomOccupancy,
   buildRoomView,
@@ -44,14 +43,17 @@ function paymentSummary(record, isBooking = false) {
 }
 
 const money = (value) => `₱${Number(value || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const boardClock = (date) => date.toLocaleTimeString('en-US', { timeZone: 'Asia/Manila', hour: 'numeric', minute: '2-digit', hour12: true });
+const scheduleDate = (date) => new Date(`${date}T12:00:00+08:00`).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', month: 'long', day: 'numeric', year: 'numeric' });
 
 function SessionPayment({ session }) {
   const payment = paymentSummary(session);
-  const state = payment.balance === 0 ? 'paid' : 'unpaid';
+  const hasBalance = payment.balance > 0;
   return (
-    <div className="rm-payment-summary">
-      <span className={`pay-timing-tag ${state}`}>{payment.balance === 0 ? 'Paid' : 'Balance due'}</span>
-      <span className={`rm-payment-detail ${state}`}>{payment.balance === 0 ? `${money(payment.collected)} collected` : `${money(payment.balance)} due · ${money(payment.collected)} paid`}</span>
+    <div className={`rm-payment-summary${hasBalance ? ' has-balance' : ' is-paid'}`}>
+      <span className="rm-payment-label">{hasBalance ? 'Balance remaining' : 'Paid in full'}</span>
+      <strong className="rm-payment-amount">{money(hasBalance ? payment.balance : payment.collected)}</strong>
+      {hasBalance && <span className="rm-payment-detail">{payment.collected > 0 ? `${money(payment.collected)} paid` : 'No payment recorded'}</span>}
     </div>
   );
 }
@@ -61,7 +63,7 @@ function SessionBalance({ session }) {
   const due = payment.balance > 0;
   return (
     <div className={`rm-card-balance${due ? ' is-due' : ' is-paid'}`}>
-      <span>{due ? 'Balance due' : 'Paid in full'}</span>
+      <span>{due ? 'Balance remaining' : 'Paid in full'}</span>
       <strong>{money(due ? payment.balance : payment.total)}</strong>
     </div>
   );
@@ -311,68 +313,60 @@ function Monitor() {
 
   const detailRoom = detailRoomId ? rooms.find((r) => r._id === detailRoomId) || null : null;
   const detailView = detailRoom ? buildRoomView(detailRoom, sessions) : null;
+  const scheduleToday = businessDate();
+  const scheduledBookings = [...dueBookings].sort((a, b) => b.date.localeCompare(a.date) || String(a.timeIn || '').localeCompare(String(b.timeIn || '')));
 
   const roomTableColumns = [
     {
+      key: 'rate',
+      label: 'Rate',
+      sortable: true,
+      sortValue: (r) => Number(buildRoomView(r, sessions).occupancy?.rate) || Number(r.price) || 0,
+      render: (r) => {
+        const { occupancy } = buildRoomView(r, sessions);
+        const rate = Number(occupancy?.rate) || Number(r.price) || 0;
+        return <div className="rm-board-rate"><strong>{money(rate)}</strong><small>per hour</small></div>;
+      },
+    },
+    {
       key: 'room',
-      label: 'Table',
+      label: 'Table #',
       sortable: true,
       sortValue: (r) => Number(r.roomNumber) || r.roomNumber,
       render: (r) => (
         <>
-          <div className="rm-name">Table {r.roomNumber}</div>
+          <div className="rm-name">{r.facilityName === 'Billiards' ? 'Table' : 'Room'} {r.roomNumber}</div>
           <div className="rm-type">{r.facilityName}{r.hasCustomName ? ` · ${r.roomName}` : ''}</div>
         </>
       ),
     },
     {
-      key: 'status',
-      label: 'Status',
-      render: (r) => {
-        const { stateClass, statusLabel } = buildRoomView(r, sessions);
-        return <span className={`rm-status-pill status-${stateClass}`}><span className="dot"></span>{statusLabel}</span>;
-      },
-    },
-    {
-      key: 'guest',
-      label: 'Guest',
-      sortable: true,
-      sortValue: (r) => buildRoomView(r, sessions).occupancy?.guestName || '',
-      render: (r) => buildRoomView(r, sessions).occupancy?.guestName || '—',
-    },
-    {
       key: 'start',
-      label: 'Start',
+      label: 'Time-in',
       render: (r) => {
         const { occupancy } = buildRoomView(r, sessions);
-        return occupancy ? formatStartTime(occupancy) : '—';
+        if (!occupancy) return <span className="rm-board-empty">—</span>;
+        const start = new Date(occupancy.startTime);
+        return <span className="rm-board-time"><strong>{boardClock(start)}</strong></span>;
       },
     },
     {
       key: 'end',
-      label: 'End',
+      label: 'Time-out',
       render: (r) => {
-        const { occupancy } = buildRoomView(r, sessions);
-        return occupancy ? formatEndTime(occupancy) : '—';
+        const { occupancy, remaining, isPastEnd, isCritical, isWarning } = buildRoomView(r, sessions);
+        if (!occupancy) return <span className="rm-board-empty">—</span>;
+        const end = sessionEnd(occupancy);
+        return <div className="rm-board-time"><strong>{boardClock(end)}</strong><small className={`rm-timer${isWarning ? ' warn' : ''}${(isPastEnd || isCritical) ? ' expired' : ''}`}>{isPastEnd ? 'Overdue' : `${formatTimeRemaining(remaining, false)} left`}</small></div>;
       },
     },
     {
-      key: 'remaining',
-      label: 'Remaining',
-      sortable: true,
-      sortValue: (r) => {
-        const { occupancy } = buildRoomView(r, sessions);
-        return occupancy ? sessionEnd(occupancy).getTime() : Number.POSITIVE_INFINITY;
-      },
+      key: 'status',
+      label: 'Status / Guest',
       render: (r) => {
-        const { occupancy, remaining, isPastEnd, isCritical, isWarning } = buildRoomView(r, sessions);
+        const { occupancy, stateClass, statusLabel } = buildRoomView(r, sessions);
         return (
-          <span className={`rm-timer${isWarning ? ' warn' : ''}${(isPastEnd || isCritical) ? ' expired' : ''}`}>
-            {occupancy && (isCritical || isPastEnd) && (
-              <i className="bi bi-exclamation-triangle-fill rm-timer-warn-ico"></i>
-            )}
-            {occupancy ? formatTimeRemaining(remaining, isPastEnd) : '—'}
-          </span>
+          <div className="rm-board-status"><span className={`rm-status-pill status-${stateClass}`}><span className="dot"></span>{statusLabel}</span>{occupancy && <small>{occupancy.guestName || 'Walk-in guest'}</small>}</div>
         );
       },
     },
@@ -459,7 +453,7 @@ function Monitor() {
             <i className="bi bi-wifi-off" aria-hidden="true"></i>
             <span>
               <strong>Monitor is reconnecting</strong>
-              <small>{lastUpdatedAt ? `Last checked at ${new Date(lastUpdatedAt).toLocaleTimeString([], { timeZone: 'Asia/Manila', hour: '2-digit', minute: '2-digit', second: '2-digit' })}.` : 'Availability is temporarily unknown.'} Controls resume after a successful refresh.</small>
+              <small>{lastUpdatedAt ? `Last checked at ${new Date(lastUpdatedAt).toLocaleTimeString('en-US', { timeZone: 'Asia/Manila', hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true })}.` : 'Availability is temporarily unknown.'} Controls resume after a successful refresh.</small>
             </span>
           </div>
           <button type="button" className="rm-btn" onClick={fetchMonitorSessions}><i className="bi bi-arrow-clockwise" aria-hidden="true"></i>Retry</button>
@@ -490,7 +484,7 @@ function Monitor() {
       {canStartFromBooking && dueBookings.length > 0 && (
         <div className="card card-flush rm-table-wrap rm-due-wrap">
           <div className="rm-due-head">
-            <span className="card-title"><i className="bi bi-alarm"></i>Reservations Due</span>
+            <div className="rm-schedule-heading"><span className="card-title"><i className="bi bi-calendar-check"></i>Reservation schedule</span><span className="rm-schedule-today">Today · {scheduleDate(scheduleToday)}</span></div>
             <span className="rm-group-count">{dueBookings.length}</span>
           </div>
           <table className="rm-table">
@@ -498,26 +492,26 @@ function Monitor() {
               <tr>
                 <th>Guest</th>
                 <th>Facility / Table</th>
-                <th>Scheduled</th>
+                <th>Time</th>
                 <th>Payment collected</th>
                 <th>Status</th>
                 <th>Action</th>
               </tr>
             </thead>
             <tbody>
-              {dueBookings
-                .slice()
-                .sort((a, b) => String(a.timeIn || '').localeCompare(String(b.timeIn || '')))
-                .map((b) => {
+              {scheduledBookings.map((b, index) => {
                   const roomTarget = getBookingRoomTarget(b);
                   const { matchedRoom, previewNumber } = matchRoomForTarget(rooms, roomTarget);
                   const scheduledStart = new Date(`${b.date}T${String(b.timeIn).padStart(5, '0')}:00+08:00`);
                   const isDue = scheduledStart.getTime() <= Date.now();
+                  const isOverdue = scheduledStart.getTime() + Number(b.duration || 1) * 60 * 60 * 1000 <= Date.now();
                   const occupancy = matchedRoom ? findRoomOccupancy(matchedRoom._id, sessions) : null;
                   const hasConflict = matchedRoom && occupancy;
                   const payment = paymentSummary(b, true);
                   return (
-                    <tr key={b._id} className={isDue ? 'blink-expired' : ''}>
+                    <Fragment key={b._id}>
+                    {b.date !== scheduleToday && (index === 0 || scheduledBookings[index - 1].date !== b.date) && <tr className="rm-schedule-date-row"><td colSpan={6}>{scheduleDate(b.date)}</td></tr>}
+                    <tr className={`rm-schedule-row--${isOverdue ? 'overdue' : isDue ? 'due' : 'upcoming'}`}>
                       <td><span className="rm-guest-name">{b.guestName}</span></td>
                       <td>
                         <div className="rm-name">{b.roomLabel}</div>
@@ -531,7 +525,7 @@ function Monitor() {
                               : 'No matching Table Monitor table'}
                         </div>
                       </td>
-                      <td>{scheduledStart.toLocaleString([], { timeZone: 'Asia/Manila', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</td>
+                      <td className="rm-schedule-time">{boardClock(scheduledStart)}</td>
                       <td>
                         <div className="rm-amount">{money(payment.collected)}</div>
                         <div className={`rm-amount-sub${payment.balance === 0 ? ' paid' : ''}`}>
@@ -539,8 +533,8 @@ function Monitor() {
                         </div>
                       </td>
                       <td>
-                        <span className={`rm-status-pill ${isDue ? 'status-expired' : 'status-warning'}`}>
-                          <span className="dot"></span>{isDue ? 'Due Now' : 'Upcoming'}
+                        <span className={`rm-status-pill ${isOverdue ? 'status-expired' : isDue ? 'status-warning' : 'status-occupied'}`}>
+                          <span className="dot"></span>{isOverdue ? 'Overdue' : isDue ? 'Due now' : 'Upcoming'}
                         </span>
                         {hasConflict && (
                           <div className="rm-conflict-note">
@@ -559,6 +553,7 @@ function Monitor() {
                         </button>
                       </td>
                     </tr>
+                    </Fragment>
                   );
                 })}
             </tbody>
@@ -781,7 +776,7 @@ function Monitor() {
           ))}
         </>
       ) : (
-        <div className="card card-flush rm-table-wrap">
+        <div className="card card-flush rm-table-wrap rm-board-wrap">
           <DataTable
             tableClassName="tbl rm-table"
             columns={roomTableColumns}
@@ -874,7 +869,7 @@ function FinishSessionModal({ session, disabled, onClose, onSubmit }) {
             <>
               <div className="finish-payment-ledger" aria-label="Current payment balance">
                 <div><span>Already received</span><strong>{money(payment.collected)}</strong></div>
-                <div><span>Balance due</span><strong>{money(payment.balance)}</strong></div>
+                <div><span>Balance remaining</span><strong>{money(payment.balance)}</strong></div>
               </div>
               <p className="mfield-note">Collect the full {money(payment.balance)} balance before finishing. This will record it as paid.</p>
             </>
@@ -917,15 +912,15 @@ function RoomDetailModal({ room, view, onClose, canManage, canOperate, onExtend,
 
               <div className="rmd-stat-grid">
                 <div className="rmd-stat-box">
-                  <div className="lbl">Timing</div>
-                  <div className="val">{view.occupancy.paymentTiming === 'After' ? 'Pay After' : 'Pay Before'}</div>
+                  <div className="lbl">Session type</div>
+                  <div className="val">{view.occupancy.booking ? 'Reserved' : 'Walk-in'}</div>
                 </div>
                 <div className="rmd-stat-box">
                   <div className="lbl">Total charge</div>
                   <div className="val">{money(view.occupancy.amount)}</div>
                 </div>
                 <div className="rmd-stat-box"><div className="lbl">Received</div><div className="val">{money(paymentSummary(view.occupancy).collected)}</div></div>
-                <div className="rmd-stat-box"><div className="lbl">Balance due</div><div className="val">{money(paymentSummary(view.occupancy).balance)}</div></div>
+                <div className="rmd-stat-box"><div className="lbl">Balance remaining</div><div className="val">{money(paymentSummary(view.occupancy).balance)}</div></div>
               </div>
             </>
           ) : (
@@ -1132,7 +1127,7 @@ function RoomFormModal({ open, onClose, onSubmit, existingFacilities, rooms, ini
   }
 
   return (
-    <Modal open={open} onClose={onClose} title={isEdit ? 'Edit Table — Table Monitoring' : 'New Table — Table Monitoring'}>
+    <Modal open={open} onClose={onClose} title={isEdit ? 'Edit Table — Room Monitoring' : 'New Table — Room Monitoring'}>
       <div className="mfield-section-label">Table identity</div>
       <PresetDropdown
         label="Facility"
@@ -1339,7 +1334,7 @@ function SessionModal({ modal, onClose, onSubmit }) {
               <div className="session-payment-ledger">
                 <div><span>Total charge</span><strong>{money(totalCharge)}</strong></div>
                 <div><span>Payment received</span><strong>{money(alreadyCollected)}</strong></div>
-                <div className={outstanding > 0 ? 'balance-due' : 'balance-paid'}><span>Balance due</span><strong>{money(outstanding)}</strong></div>
+                <div className={outstanding > 0 ? 'balance-due' : 'balance-paid'}><span>Balance remaining</span><strong>{money(outstanding)}</strong></div>
               </div>
               {reservationPaidInFull && (
                 <div className="session-payment-complete" role="status">
@@ -1352,7 +1347,7 @@ function SessionModal({ modal, onClose, onSubmit }) {
 
           {!isExtend && !reservationPaidInFull && (
             <div className="session-collection-options" role="group" aria-label="Payment collection">
-              <button type="button" className={collectionMode === 'later' ? 'active' : ''} aria-pressed={collectionMode === 'later'} onClick={() => setCollectionMode('later')}><strong>Pay after play</strong><small>{fromBooking ? `${money(outstanding)} balance stays due` : `Collect ${money(totalCharge)} when the session ends`}</small></button>
+              <button type="button" className={collectionMode === 'later' ? 'active' : ''} aria-pressed={collectionMode === 'later'} onClick={() => setCollectionMode('later')}><strong>Pay after play</strong><small>{fromBooking ? `${money(outstanding)} remains to collect` : `Collect ${money(totalCharge)} when the session ends`}</small></button>
               <button type="button" className={collectionMode === 'full' ? 'active' : ''} aria-pressed={collectionMode === 'full'} onClick={() => setCollectionMode('full')}><strong>Pay before play</strong><small>{fromBooking ? `Collect the full ${money(outstanding)} balance now` : `Collect ${money(totalCharge)} now`}</small></button>
             </div>
           )}

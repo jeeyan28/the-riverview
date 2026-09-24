@@ -28,7 +28,7 @@ const STATUS_PILL_CLASS = {
   'No Show': 'pill-overdue',
   Confirmed: 'pill-active',
   Overdue: 'pill-overdue',
-  'In Use': 'pill-active',
+  Ongoing: 'pill-active',
   Rejected: 'pill-overdue',
 };
 const PAYMENT_METHODS = ['Cash', 'GCash', 'Maya', 'QR Ph', 'Credit / Debit Card'];
@@ -85,8 +85,8 @@ function paymentPlanLabel(b) {
   if (refunded > 0) return `${formatPeso(refunded)} refunded · ${formatPeso(paid)} retained`;
   if (['Cancelled', 'Rejected', 'No Show'].includes(reservationPresentation(b).status)) return paid > 0 ? `${formatPeso(paid)} retained` : 'No payment retained';
   if (isFullPayment(b)) return `Paid ${formatPeso(paid)}`;
-  if (paid > 0) return `${formatPeso(paid)} paid · ${formatPeso(balance)} due`;
-  return `${formatPeso(balance)} due`;
+  if (paid > 0) return `${formatPeso(paid)} paid · ${formatPeso(balance)} remaining`;
+  return `${formatPeso(balance)} remaining`;
 }
 
 function paymentPlanPillClass(b) {
@@ -635,7 +635,7 @@ function Bookings() {
                   <div className="bd-grid bd-financial-grid">
                     <div className="bd-field"><label>Total charge</label><p>{formatPeso(detailBooking.amount)}</p></div>
                     <div className="bd-field"><label>Payment received</label><p>{formatPeso(netCollected(detailBooking))}</p></div>
-                    <div className="bd-field"><label>Balance due</label><p>{formatPeso(outstandingBalance(detailBooking))}</p></div>
+                    <div className="bd-field"><label>Balance remaining</label><p>{formatPeso(outstandingBalance(detailBooking))}</p></div>
                   </div>
                 </div>
               </div>
@@ -646,9 +646,9 @@ function Bookings() {
                   <div className="bd-field"><label>Facility Name</label><p>{facilityName(detailBooking)}</p></div>
                   <div className="bd-field"><label>Room</label><p>{detailBooking.variantLabel || '—'}</p></div>
                   <div className="bd-field"><label>Reservation Date</label><p>{detailBooking.date || '—'}</p></div>
-                  <div className="bd-field"><label>Check-in Time</label><p>{detailBooking.timeIn || '—'}</p></div>
+                  <div className="bd-field"><label>Check-in Time</label><p>{formatTime(detailBooking.timeIn)}</p></div>
                   <div className="bd-field"><label>Duration</label><p>{detailBooking.duration ? `${detailBooking.duration} hr${detailBooking.duration > 1 ? 's' : ''}` : '—'}</p></div>
-                  <div className="bd-field"><label>Reserved On</label><p>{detailBooking.createdAt ? new Date(detailBooking.createdAt).toLocaleString(undefined, { month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }) : '—'}</p></div>
+                  <div className="bd-field"><label>Reserved On</label><p>{detailBooking.createdAt ? new Date(detailBooking.createdAt).toLocaleString('en-PH', { timeZone: 'Asia/Manila', month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true }) : '—'}</p></div>
                 </div>
               </div>
 

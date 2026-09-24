@@ -190,7 +190,7 @@ function Users() {
     label: 'Last Login',
     sortable: true,
     sortValue: (u) => (u.lastLoginAt ? new Date(u.lastLoginAt).getTime() : 0),
-    render: (u) => (u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleString() : 'Never'),
+    render: (u) => (u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleString('en-PH', { timeZone: 'Asia/Manila', hour12: true }) : 'Never'),
   };
 
   const actionsColumn = {
@@ -652,7 +652,7 @@ function RecoverGuestModal({ user, onClose, onRecovered }) {
           <CopyField label="Temporary email" value={result.tempEmail} />
           <CopyField label="Temporary password" value={result.tempPassword} />
           <div style={{ fontSize: '.72rem', color: 'var(--muted)' }}>
-            Expires {new Date(result.expiresAt).toLocaleString()}
+            Expires {new Date(result.expiresAt).toLocaleString('en-PH', { timeZone: 'Asia/Manila', hour12: true })}
           </div>
         </div>
       )}

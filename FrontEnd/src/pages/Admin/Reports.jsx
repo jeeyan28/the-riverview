@@ -9,6 +9,7 @@ import { useRevenueReport } from '../../hooks/useRevenueReport';
 import { businessDate } from '../../utils/businessDate';
 import { reportsService } from '../../services/reports';
 import { formatPeso } from '../../utils/currency';
+import { formatTime12 } from '../../utils/time';
 
 function displayDate(value) {
   if (!value) return '—';
@@ -102,7 +103,7 @@ function Reports() {
 
       {data?.byFacility?.length > 0 && (
         <div className="report-room-types" aria-label="Revenue by room type">
-          {data.byFacility.map((item) => <div key={item.name}><span><strong>{item.roomType || item.name}</strong><small>{item.facilityName || ''} · {item.bookedHours}h</small></span><span><strong>{formatPeso(item.collected)}</strong><small>{formatPeso(item.outstanding)} due</small></span></div>)}
+          {data.byFacility.map((item) => <div key={item.name}><span><strong>{item.roomType || item.name}</strong><small>{item.facilityName || ''} · {item.bookedHours}h</small></span><span><strong>{formatPeso(item.collected)}</strong><small>{formatPeso(item.outstanding)} remaining</small></span></div>)}
         </div>
       )}
 
@@ -123,7 +124,7 @@ function Reports() {
               <tbody>
                 {loading && !data ? <tr><td colSpan="9" className="finance-empty">Loading report…</td></tr> : visibleRows.length ? visibleRows.map((row) => (
                   <tr key={row.id}>
-                    <td>{displayDate(row.date)}<div className="finance-meta">{row.timeIn || '—'}{row.timeOut ? ` – ${row.timeOut}` : ''} · {row.reference}</div></td>
+                    <td>{displayDate(row.date)}<div className="finance-meta">{formatTime12(row.timeIn)}{row.timeOut ? ` – ${formatTime12(row.timeOut)}` : ''} · {row.reference}</div></td>
                     <td>{row.facilityName}<div className="finance-meta">{row.roomType || row.roomName}{row.unitNumber ? ` · Unit ${row.unitNumber}` : ''}</div></td>
                     <td>{row.guestName}<div className="finance-meta">{row.source === 'booking' ? 'Reservation' : 'Walk-in'}</div></td>
                     <td className="finance-value">{row.duration}h</td>
@@ -139,7 +140,7 @@ function Reports() {
           </div>
           <table className="finance-print-table">
             <thead><tr><th>Date / time</th><th>Facility / room</th><th>Guest / source</th><th>Hours</th><th>Rate</th><th>Charge</th><th>Paid</th><th>Balance</th><th>Payment / status</th></tr></thead>
-            <tbody>{visibleRows.map((row) => <tr key={`print-${row.id}`}><td>{displayDate(row.date)} {row.timeIn || ''} {row.timeOut ? `– ${row.timeOut}` : ''}<br />{row.reference}</td><td>{row.facilityName} {row.roomType || row.roomName || ''}</td><td>{row.guestName}<br />{row.source === 'booking' ? 'Reservation' : 'Walk-in'}</td><td>{row.duration}h</td><td>{row.rateLabel || formatPeso(row.rate)}</td><td>{formatPeso(row.amount)}</td><td>{formatPeso(row.collected)}</td><td>{formatPeso(row.balance)}</td><td>{row.paymentStatus} / {row.status}</td></tr>)}</tbody>
+            <tbody>{visibleRows.map((row) => <tr key={`print-${row.id}`}><td>{displayDate(row.date)} {row.timeIn ? formatTime12(row.timeIn) : ''} {row.timeOut ? `– ${formatTime12(row.timeOut)}` : ''}<br />{row.reference}</td><td>{row.facilityName} {row.roomType || row.roomName || ''}</td><td>{row.guestName}<br />{row.source === 'booking' ? 'Reservation' : 'Walk-in'}</td><td>{row.duration}h</td><td>{row.rateLabel || formatPeso(row.rate)}</td><td>{formatPeso(row.amount)}</td><td>{formatPeso(row.collected)}</td><td>{formatPeso(row.balance)}</td><td>{row.paymentStatus} / {row.status}</td></tr>)}</tbody>
           </table>
         </div>
       </div>

@@ -20,7 +20,7 @@ export const roomSessionsService = {
 
   report(from, to) {
     const query = new URLSearchParams({ from, to });
-    return apiRequest(`${SESSIONS_BASE}/report?${query}`, { fallbackMessage: 'Failed to load the live monitor report.' });
+    return apiRequest(`${SESSIONS_BASE}/report?${query}`, { fallbackMessage: 'Failed to load the room monitoring report.' });
   },
 
   async exportReport(from, to) {
@@ -28,7 +28,7 @@ export const roomSessionsService = {
     const response = await fetch(`${API_BASE_URL}${SESSIONS_BASE}/report/export?${query}`, { credentials: 'include' });
     if (!response.ok) {
       const body = await response.json().catch(() => ({}));
-      throw new Error(body.message || 'Failed to generate the live monitor report.');
+      throw new Error(body.message || 'Failed to generate the room monitoring report.');
     }
     const blob = await response.blob();
     const disposition = response.headers.get('Content-Disposition') || '';
