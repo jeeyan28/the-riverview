@@ -8,6 +8,7 @@ const { bookingCollected, financialFields, fullOrDeferredPaymentFields, extendSe
 const { calculateBookingPrice, calculateSessionExtension, parsePaxCapacity } = require("../utils/roomPricing");
 const { pricedMonitorRoom } = require("../utils/monitorRoomRate");
 const { releasedMonitorStatus } = require("../utils/syncRoomInventory");
+const { logAudit } = require("../utils/auditLog");
 const { TIME_ZONE, MAX_MONITOR_SESSION_HOURS } = require("../utils/constants");
 const { getMonitorReport } = require("../utils/monitorReport");
 const { createWorkbook, addMonitoringGridSheets, addSummarySheet, addActivitySheet, addRoomTypeSheet } = require("../utils/reportWorkbook");
@@ -26,6 +27,12 @@ const {
 
 function currentBusinessHour(value = new Date()) {
   return Number(new Intl.DateTimeFormat("en-US", { timeZone: TIME_ZONE, hour: "2-digit", hourCycle: "h23" }).format(new Date(value)));
+}
+
+async function logSessionPayment(session, previousPaid, user) {
+  const received = Number(session.paidAmount || 0) - Number(previousPaid || 0);
+  if (received <= 0) return;
+  await logAudit({ category: "Booking", action: "updated", description: `recorded payment of ₱${received.toFixed(2)} for session ${session._id} (${session.guestName || "walk-in"})`, user });
 }
 
 async function syncBookingFromSession(session, status) {
@@ -373,6 +380,7 @@ sessionsRouter.post("/", requireAnyPermission(PERMISSIONS.ROOM_OPERATE, PERMISSI
       throw err;
     }
 
+    const previousPaid = booking ? bookingCollected(booking) : 0;
     if (booking) {
       booking.status = Booking.BOOKING_STATUS.ONGOING;
       booking.paidAmount = paidAmount;
@@ -381,6 +389,8 @@ sessionsRouter.post("/", requireAnyPermission(PERMISSIONS.ROOM_OPERATE, PERMISSI
       if (paymentMethod) booking.paymentMethod = paymentMethod;
       await booking.save();
     }
+
+    await logSessionPayment(session, previousPaid, req.user);
 
     res.status(201).json(session);
   } catch (err) {
@@ -405,6 +415,7 @@ sessionsRouter.put("/:id/extend", requirePermission(PERMISSIONS.ROOM_OPERATE), v
     if (session.status !== "Active") {
       return res.status(400).json({ message: "Only active sessions can be extended." });
     }
+    const previousPaid = Number(session.paidAmount) || 0;
 
     if (!session.rate) {
       const room = await MonitorRoom.findById(session.room);
@@ -435,6 +446,7 @@ sessionsRouter.put("/:id/extend", requirePermission(PERMISSIONS.ROOM_OPERATE), v
 
     await session.save();
     await syncBookingFromSession(session, Booking.BOOKING_STATUS.ONGOING);
+    await logSessionPayment(session, previousPaid, req.user);
     res.json(session);
   } catch (err) {
     console.error(err);
@@ -451,6 +463,7 @@ sessionsRouter.put("/:id/end", requirePermission(PERMISSIONS.ROOM_OPERATE), vali
     if (session.status !== "Active") {
       return res.status(400).json({ message: "Only active sessions can be ended." });
     }
+    const previousPaid = Number(session.paidAmount) || 0;
 
     const room = await MonitorRoom.findById(session.room);
     if (!session.rate) {
@@ -465,6 +478,7 @@ sessionsRouter.put("/:id/end", requirePermission(PERMISSIONS.ROOM_OPERATE), vali
 
     await releaseSessionRoom(session.room, room);
     await syncBookingFromSession(session, Booking.BOOKING_STATUS.DONE);
+    await logSessionPayment(session, previousPaid, req.user);
 
     let roomDeleted = false;
     // Temporary rooms remain as history anchors; inventory cleanup is explicit.
@@ -498,6 +512,7 @@ sessionsRouter.put("/:id", requirePermission(PERMISSIONS.ROOM_OPERATE), validate
     if (session.status !== "Finished") {
       return res.status(400).json({ message: "Only finished sessions can be corrected." });
     }
+    const previousPaid = Number(session.paidAmount) || 0;
 
     if (amount !== undefined) session.amount = amount;
     if (paidAmount !== undefined) session.paidAmount = paidAmount;
@@ -509,6 +524,7 @@ sessionsRouter.put("/:id", requirePermission(PERMISSIONS.ROOM_OPERATE), validate
 
     await session.save();
     await syncBookingFromSession(session, Booking.BOOKING_STATUS.DONE);
+    await logSessionPayment(session, previousPaid, req.user);
     res.json(session);
   } catch (err) {
     console.error(err);

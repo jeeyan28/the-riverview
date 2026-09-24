@@ -219,9 +219,30 @@ function Dashboard() {
             <span>Refunded: <strong>{formatPeso(financial.refunded)}</strong></span>
             <span>Unpaid sessions: <strong>{summary.unpaidSessions || 0}</strong></span>
           </div>
-          <p className="finance-basis">{summary.revenueBasis}</p>
         </>
       )}
+
+      <div className="card">
+        <div className="card-head"><span className="card-title">Quick Actions</span></div>
+        <div className="qa-row">
+          <button className="qa-btn" onClick={() => navigate('/admin/bookings?openManualBooking=1')}>
+            <span className="qa-ico"><i className="ti ti-plus"></i></span>
+            <span className="qa-label">Add Reservation</span>
+          </button>
+          <button className="qa-btn" onClick={() => navigate('/admin/monitor')}>
+            <span className="qa-ico"><i className="ti ti-device-desktop-analytics"></i></span>
+            <span className="qa-label">Monitor Rooms</span>
+          </button>
+          <button className="qa-btn" onClick={() => navigate('/admin/reports')}>
+            <span className="qa-ico"><i className="ti ti-download"></i></span>
+            <span className="qa-label">Export Report</span>
+          </button>
+          <button className="qa-btn" onClick={() => navigate('/admin/settings?tab=login')}>
+            <span className="qa-ico"><i className="ti ti-lock-access"></i></span>
+            <span className="qa-label">Login History</span>
+          </button>
+        </div>
+      </div>
 
       <div className="dash-grid">
         <div className="card">
@@ -268,27 +289,6 @@ function Dashboard() {
         </div>
       </div>
 
-      <div className="card">
-        <div className="card-head"><span className="card-title">Quick Actions</span></div>
-        <div className="qa-row">
-          <button className="qa-btn" onClick={() => navigate('/admin/bookings?openManualBooking=1')}>
-            <span className="qa-ico"><i className="ti ti-plus"></i></span>
-            <span className="qa-label">Add Reservation</span>
-          </button>
-          <button className="qa-btn" onClick={() => navigate('/admin/monitor')}>
-            <span className="qa-ico"><i className="ti ti-device-desktop-analytics"></i></span>
-            <span className="qa-label">Monitor Rooms</span>
-          </button>
-          <button className="qa-btn" onClick={() => navigate('/admin/reports')}>
-            <span className="qa-ico"><i className="ti ti-download"></i></span>
-            <span className="qa-label">Export Report</span>
-          </button>
-          <button className="qa-btn" onClick={() => navigate('/admin/settings?tab=login')}>
-            <span className="qa-ico"><i className="ti ti-lock-access"></i></span>
-            <span className="qa-label">Login History</span>
-          </button>
-        </div>
-      </div>
     </div>
   );
 }
