@@ -22,9 +22,9 @@ const Analytics = lazy(() => import('./pages/Admin/Analytics'));
 const Users = lazy(() => import('./pages/Admin/Users'));
 const Reports = lazy(() => import('./pages/Admin/Reports'));
 const Settings = lazy(() => import('./pages/Admin/Settings'));
+const AuditTrail = lazy(() => import('./pages/Admin/AuditTrail'));
 const RoomManagement = lazy(() => import('./pages/Admin/RoomManagement'));
 const Forecasting = lazy(() => import('./pages/Admin/Forecasting'));
-const LoginHistory = lazy(() => import('./pages/Admin/LoginHistory'));
 
 
 function RequirePermission({ permission, children }) {
@@ -81,7 +81,8 @@ function App() {
         <Route path="reports" element={<RequirePermission permission="reports:view"><Reports /></RequirePermission>} />
         <Route path="forecasting" element={<RequirePermission permission="forecasting:view"><Forecasting /></RequirePermission>} />
         <Route path="users" element={<RequirePermission permission="admin:manage"><Users /></RequirePermission>} />
-        <Route path="logs" element={<RequirePermission permission="admin:manage"><LoginHistory /></RequirePermission>} />
+        <Route path="logs" element={<RequirePermission permission="admin:manage"><Navigate to="/admin/settings?tab=login" replace /></RequirePermission>} />
+        <Route path="audit-trail" element={<RequirePermission permission="settings:view"><AuditTrail /></RequirePermission>} />
         <Route path="room-management" element={<RequirePermission permission="room:manage"><RoomManagement /></RequirePermission>} />
         <Route path="settings" element={<RequirePermission permission="settings:view"><Settings /></RequirePermission>} />
         <Route path="*" element={<AdminLanding />} />

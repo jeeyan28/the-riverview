@@ -448,18 +448,26 @@
   max-width: none;
 }
 .public-site #bkStepPrice .bk-room-list {
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 440px), 1fr));
+  align-items: stretch;
+  gap: 16px;
 }
-.public-site #bkStepPrice .bk-room-option-collapsed { min-height: 150px; padding: 14px; }
-.public-site #bkStepPrice .bk-room-option-img { width: 150px; height: 118px; flex-basis: 150px; }
+.public-site #bkStepPrice .bk-room-option { min-width: 0; height: 100%; }
+.public-site #bkStepPrice .bk-room-list--has-selection .bk-room-option:not(.bk-room-option--selected) { opacity: 1; transform: none; }
+.public-site #bkStepPrice .bk-room-option-collapsed { flex: 1; min-height: 168px; align-items: stretch; gap: 16px; padding: 16px; }
+.public-site #bkStepPrice .bk-room-option-img { width: 136px; height: 112px; flex-basis: 136px; align-self: flex-start; }
+.public-site #bkStepPrice .bk-room-option-body { justify-content: flex-start; gap: 8px; }
+.public-site #bkStepPrice .bk-room-option-bottom-row { margin-top: auto; padding-top: 8px; flex-wrap: nowrap; }
+.public-site #bkStepPrice .bk-room-option-details-btn { min-height: 40px; }
 .public-site #bkStepPrice .bk-room-option-name { font-size: 1.05rem; }
 .public-site #bkStepPrice .bk-room-option-price { font-size: 1rem; }
 .public-site #bkStepPrice .bk-info-bar { max-width: none; }
 
-@media (max-width: 700px) {
+@media (max-width: 640px) {
   .public-site #bkStepPrice .bk-room-list { grid-template-columns: 1fr; }
-  .public-site #bkStepPrice .bk-room-option-img { width: 112px; height: 92px; flex-basis: 112px; }
+  .public-site #bkStepPrice .bk-room-option-collapsed { min-height: 152px; gap: 12px; padding: 12px; }
+  .public-site #bkStepPrice .bk-room-option-img { width: 96px; height: 96px; flex-basis: 96px; }
+  .public-site #bkStepPrice .bk-room-option-bottom-row { flex-wrap: wrap; }
 }
 
 /* Show browser handoff help only after an embedded browser user requests Google sign-in. */
@@ -552,7 +560,7 @@
   position: sticky;
   bottom: 0;
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
   padding: 14px 18px max(14px, env(safe-area-inset-bottom));
   border-top: 1px solid #e1e9e7;
@@ -560,7 +568,28 @@
 }
 .receipt-preview-actions button { min-height: 44px; border: 1px solid #b8ceca; border-radius: 9px; background: #fff; color: #17312d; font: 700 .85rem Arial, sans-serif; cursor: pointer; }
 .receipt-preview-actions button:first-child { border-color: #009c84; background: #009c84; color: #fff; }
+.receipt-preview-actions button:nth-child(2) { border-color: #0b7067; color: #0b7067; }
 .receipt-preview-actions button:focus-visible { outline: 3px solid #009c84; outline-offset: 2px; }
+
+/* Keep account details scannable and give the cancellation request its own compact dialog. */
+@media (min-width: 901px) {
+  .public-site .pf-modal--account { height: min(640px, calc(100dvh - 48px)); }
+}
+.public-site .pf-modal--cancellation { width: min(600px, 100%); height: auto; max-height: calc(100dvh - 32px); overflow-y: auto; }
+.public-site .pf-modal--cancellation .pf-modal-head { margin-bottom: 12px; }
+.public-site .pf-cancel-reference { margin: 0 0 16px; color: var(--text-muted-light); font-size: .8rem; }
+.public-site .pf-cancel-reference strong { color: var(--text-main); }
+.public-site .pf-cancel-policy { display: grid; gap: 5px; margin-bottom: 18px; padding: 14px 16px; border: 1px solid color-mix(in srgb, var(--warning) 30%, var(--border)); border-radius: var(--radius-md); background: color-mix(in srgb, var(--warning) 8%, var(--surface)); }
+.public-site .pf-cancel-policy strong { color: var(--text-main); font-size: .84rem; }
+.public-site .pf-cancel-policy p { margin: 0; color: var(--text-muted-light); font-size: .78rem; line-height: 1.5; }
+.public-site .pf-cancel-policy a { color: var(--teal-strong); font-weight: 700; }
+.public-site .pf-modal--cancellation textarea { width: 100%; min-height: 110px; resize: vertical; }
+.public-site .pf-modal--cancellation .pf-modal-actions { margin-top: 18px; }
+@media (max-width: 640px) {
+  .public-site .pf-modal--account .pf-avatar-col { flex-wrap: wrap; }
+  .public-site .pf-modal--account .pf-avatar-stats { width: 100%; min-width: 0; margin: 8px 0 0; padding: 10px 0 0; border-top: 1px solid var(--border); }
+  .public-site .pf-modal--cancellation .pf-modal-actions > button { flex: 1; }
+}
 
 @media (max-width: 380px) {
   .receipt-preview-actions { grid-template-columns: 1fr; }

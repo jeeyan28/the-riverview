@@ -7,6 +7,7 @@ import RevenueSummary from '../../components/RevenueSummary';
 import { useRevenueReport } from '../../hooks/useRevenueReport';
 import { businessDate } from '../../utils/businessDate';
 import { formatPeso } from '../../utils/currency';
+import { formatTime12 } from '../../utils/time';
 
 function displayDate(value) {
   if (!value) return '—';
@@ -152,7 +153,7 @@ function Analytics() {
         <div className="card-head"><span className="card-title">Recent transactions</span><span className="finance-meta">{rows.length} in selected range</span></div>
         <div className="admin-table-scroll" tabIndex={0} role="region" aria-label="Recent sales table">
           <table className="tbl"><thead><tr><th>Date</th><th>Reference</th><th>Guest</th><th>Facility</th><th>Status</th><th>Collected</th><th>Balance</th></tr></thead><tbody>
-            {rows.length ? rows.slice(0, 20).map((row) => <tr key={row.id}><td>{displayDate(row.date)}<div className="finance-meta">{row.timeIn || '—'}</div></td><td>{row.reference}</td><td>{row.guestName}</td><td>{row.facilityName}</td><td><span className={`pill ${row.status === 'Done' || row.status === 'Finished' ? 'pill-done' : row.status === 'Cancelled' || row.status === 'No Show' ? 'pill-overdue' : 'pill-active'}`}>{row.status}</span></td><td>{formatPeso(row.collected)}</td><td>{formatPeso(row.balance)}</td></tr>) : <tr><td colSpan="7" className="finance-empty">No transactions in this period.</td></tr>}
+            {rows.length ? rows.slice(0, 20).map((row) => <tr key={row.id}><td>{displayDate(row.date)}<div className="finance-meta">{formatTime12(row.timeIn)}</div></td><td>{row.reference}</td><td>{row.guestName}</td><td>{row.facilityName}</td><td><span className={`pill ${row.status === 'Done' || row.status === 'Finished' ? 'pill-done' : row.status === 'Cancelled' || row.status === 'No Show' ? 'pill-overdue' : 'pill-active'}`}>{row.status}</span></td><td>{formatPeso(row.collected)}</td><td>{formatPeso(row.balance)}</td></tr>) : <tr><td colSpan="7" className="finance-empty">No transactions in this period.</td></tr>}
           </tbody></table>
         </div>
       </div>

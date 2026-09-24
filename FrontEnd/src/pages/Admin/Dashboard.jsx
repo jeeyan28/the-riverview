@@ -10,6 +10,7 @@ import { formatPeso } from '../../utils/currency';
 import { businessDate } from '../../utils/businessDate';
 import { buildRoomView, formatTimeRemaining } from '../../hooks/useRoomMonitorData';
 import { reservationPresentation } from '../../utils/reservationStatus';
+import { formatTime12 } from '../../utils/time';
 
 const STATUS_PILL_CLASS = {
   Pending: 'pill-pending',
@@ -17,7 +18,7 @@ const STATUS_PILL_CLASS = {
   Cancelled: 'pill-done',
   Confirmed: 'pill-active',
   Overdue: 'pill-overdue',
-  'In Use': 'pill-active',
+  Ongoing: 'pill-active',
   Rejected: 'pill-overdue',
   'No Show': 'pill-overdue',
 };
@@ -156,7 +157,7 @@ function Dashboard() {
       ),
     },
     { key: 'roomLabel', label: 'Room' },
-    { key: 'timeIn', label: 'Time In' },
+    { key: 'timeIn', label: 'Time In', render: (b) => formatTime12(b.timeIn) },
     {
       key: 'status',
       label: 'Status',
@@ -168,7 +169,6 @@ function Dashboard() {
   ];
 
   const bookingsDelta = summary?.todayBookings?.deltaVsYesterday ?? 0;
-  const revenuePercent = summary?.todayRevenue?.percentVsAvg ?? 0;
   const overdueCount = summary?.overdueRooms?.count ?? 0;
   const financial = summary?.financial;
 
@@ -203,39 +203,12 @@ function Dashboard() {
           )}
         </div>
         <div className="mc">
-          <div className="mc-label"><i className="ti ti-cash"></i>Today's Net Collected</div>
-          <div className="mc-val">{summaryLoading ? '—' : summaryError ? '—' : formatPeso(summary.todayRevenue.amount)}</div>
-          {!summaryLoading && !summaryError && (
-            <div className={`mc-sub ${summary.todayRevenue.direction === 'up' ? 'up' : summary.todayRevenue.direction === 'down' ? 'dn' : ''}`}>
-              {summary.todayRevenue.direction !== 'flat' && (
-                <i className={`ti ${summary.todayRevenue.direction === 'up' ? 'ti-trending-up' : 'ti-trending-down'}`}></i>
-              )}
-              {summary.todayRevenue.direction === 'flat' ? 'On par with avg' : `${revenuePercent > 0 ? '+' : ''}${revenuePercent}% vs avg`}
-            </div>
-          )}
-        </div>
-        <div className="mc">
           <div className="mc-label"><i className="ti ti-alert-triangle"></i>Overdue Rooms</div>
           <div className="mc-val">{summaryLoading ? '—' : summaryError ? '—' : overdueCount}</div>
           {!summaryLoading && !summaryError && (
             <div className={`mc-sub ${overdueCount > 0 ? 'dn' : 'up'}`}>{overdueCount > 0 ? 'Needs attention' : 'All caught up'}</div>
           )}
         </div>
-      </div>
-
-      <div className="finance-queue">
-        <button type="button" onClick={() => navigate('/admin/bookings?status=Pending')}>
-          <span><strong>{summaryLoading ? '—' : summary?.pendingReservations ?? 0}</strong><br /><span className="finance-meta">Reservations needing review</span></span>
-          <i className="ti ti-chevron-right" aria-hidden="true" />
-        </button>
-        <button type="button" onClick={() => navigate('/admin/bookings?cancellationStatus=Requested')}>
-          <span><strong>{summaryLoading ? '—' : summary?.cancellationRequests ?? 0}</strong><br /><span className="finance-meta">Cancellation requests</span></span>
-          <i className="ti ti-chevron-right" aria-hidden="true" />
-        </button>
-        <button type="button" onClick={() => navigate('/admin/reports')}>
-          <span><strong>{summaryLoading ? '—' : formatPeso(financial?.outstanding)}</strong><br /><span className="finance-meta">Outstanding today</span></span>
-          <i className="ti ti-chevron-right" aria-hidden="true" />
-        </button>
       </div>
 
       {!summaryLoading && financial && (
@@ -310,9 +283,9 @@ function Dashboard() {
             <span className="qa-ico"><i className="ti ti-download"></i></span>
             <span className="qa-label">Export Report</span>
           </button>
-          <button className="qa-btn" onClick={() => navigate('/admin/logs')}>
+          <button className="qa-btn" onClick={() => navigate('/admin/settings?tab=login')}>
             <span className="qa-ico"><i className="ti ti-lock-access"></i></span>
-            <span className="qa-label">Login Logs</span>
+            <span className="qa-label">Login History</span>
           </button>
         </div>
       </div>

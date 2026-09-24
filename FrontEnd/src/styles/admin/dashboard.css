@@ -16,7 +16,7 @@
 #panel-dashboard .dash-reservation-status .dash-status-warning{color:var(--red);font-weight:600;}
 
 /* Metric cards — icon badges, per-card accent color, soft depth + hover lift */
-#panel-dashboard .metric-row{gap:14px;}
+#app #panel-dashboard .metric-row{grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;}
 #panel-dashboard .mc{
   position:relative;overflow:hidden;border-radius:16px;
   box-shadow:0 1px 2px rgba(0,0,0,.18),0 10px 24px -18px rgba(0,0,0,.6);
@@ -30,8 +30,7 @@
   box-shadow:0 4px 10px rgba(0,0,0,.22),0 16px 32px -18px rgba(0,0,0,.65);
 }
 #panel-dashboard .metric-row .mc:nth-child(2)::before{background:var(--blue);}
-#panel-dashboard .metric-row .mc:nth-child(3)::before{background:var(--amber);}
-#panel-dashboard .metric-row .mc:nth-child(4)::before{background:var(--red);}
+#panel-dashboard .metric-row .mc:nth-child(3)::before{background:var(--red);}
 
 #panel-dashboard .mc-label{gap:8px;margin-bottom:10px;}
 #panel-dashboard .mc-label i{
@@ -40,8 +39,16 @@
   font-size:13px!important;background:var(--teal-soft);color:var(--teal);
 }
 #panel-dashboard .metric-row .mc:nth-child(2) .mc-label i{background:rgba(55,138,221,.14);color:var(--blue);}
-#panel-dashboard .metric-row .mc:nth-child(3) .mc-label i{background:rgba(239,159,39,.14);color:var(--amber);}
-#panel-dashboard .metric-row .mc:nth-child(4) .mc-label i{background:rgba(255,107,107,.14);color:var(--red);}
+#panel-dashboard .metric-row .mc:nth-child(3) .mc-label i{background:rgba(255,107,107,.14);color:var(--red);}
+
+@media (max-width:900px){
+  #app #panel-dashboard .metric-row{grid-template-columns:repeat(2,minmax(0,1fr));}
+  #app #panel-dashboard .metric-row .mc:nth-child(3){grid-column:1/-1;}
+}
+@media (max-width:640px){
+  #app #panel-dashboard .metric-row{grid-template-columns:minmax(0,1fr);}
+  #app #panel-dashboard .metric-row .mc:nth-child(3){grid-column:auto;}
+}
 #panel-dashboard .mc-val{letter-spacing:-.01em;}
 #panel-dashboard .mc-sub.up{font-weight:500;}
 

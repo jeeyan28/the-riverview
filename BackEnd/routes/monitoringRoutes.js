@@ -164,7 +164,7 @@ sessionsRouter.get("/report/export", ensureAdmin, async (req, res) => {
     const workbook = createWorkbook();
     addMonitoringGridSheets(workbook, report.rows, report.inventory, report.range);
     addSummarySheet(workbook, {
-      title: "The Riverview — Live monitor report",
+      title: "The Riverview — Room monitoring report",
       range: report.range,
       metrics: [
         { label: "Paid sessions", value: report.summary.sessions },
@@ -183,7 +183,7 @@ sessionsRouter.get("/report/export", ensureAdmin, async (req, res) => {
     res.end();
   } catch (err) {
     console.error(err);
-    if (!res.headersSent) res.status(err.status || 500).json({ message: err.status === 400 ? err.message : "Could not generate the live monitor report." });
+    if (!res.headersSent) res.status(err.status || 500).json({ message: err.status === 400 ? err.message : "Could not generate the room monitoring report." });
   }
 });
 

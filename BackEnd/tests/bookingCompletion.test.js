@@ -15,6 +15,6 @@ test('an expired confirmed reservation can be marked done even before the no-sho
   assert.throws(() => completeReservationFields(reservation, { now: at('12:59') }), /before its start time/);
 });
 
-test('linked sessions still finish through Live Monitor', () => {
-  assert.throws(() => completeReservationFields({ ...reservation, status: 'No Show' }, { hasMonitorSession: true }), /Live Monitor/);
+test('linked sessions still finish through Room Monitoring', () => {
+  assert.throws(() => completeReservationFields({ ...reservation, status: 'No Show' }, { hasMonitorSession: true }), /Room Monitoring/);
 });

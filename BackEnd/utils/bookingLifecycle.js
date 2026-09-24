@@ -41,7 +41,7 @@ function bookingStartMs(date, time) {
 }
 
 function completeReservationFields(booking, { now = Date.now(), hasMonitorSession = false } = {}) {
-  if (hasMonitorSession) throw new AppError(409, "Finish the linked session in Live Monitor instead.");
+  if (hasMonitorSession) throw new AppError(409, "Finish the linked session in Room Monitoring instead.");
   if (booking.status === "No Show") return { status: "Done", noShowAt: null };
   if (booking.status === "Confirmed") {
     if (booking.cancellationStatus === "Requested") throw new AppError(409, "Review the cancellation request before completing this reservation.");

@@ -47,10 +47,10 @@ export function sessionEnd(session) {
   return new Date(sessionStart(session).getTime() + session.duration * 60 * 60 * 1000);
 }
 export function formatStartTime(session) {
-  return sessionStart(session).toLocaleString([], { timeZone: 'Asia/Manila', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  return sessionStart(session).toLocaleTimeString('en-US', { timeZone: 'Asia/Manila', hour: 'numeric', minute: '2-digit', hour12: true });
 }
 export function formatEndTime(session) {
-  return sessionEnd(session).toLocaleString([], { timeZone: 'Asia/Manila', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  return sessionEnd(session).toLocaleTimeString('en-US', { timeZone: 'Asia/Manila', hour: 'numeric', minute: '2-digit', hour12: true });
 }
 export function formatTimeRemaining(ms, isPastEnd) {
   if (isPastEnd) return '00:00:00';

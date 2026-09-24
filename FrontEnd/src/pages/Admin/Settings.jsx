@@ -1,20 +1,21 @@
 import '../../styles/admin/settings.css';
 import { useCallback, useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import Modal from '../../components/Modal';
 import PasswordInput from '../../components/PasswordInput';
 import PasswordRequirementsList from '../../components/PasswordRequirementsList';
+import LoginHistory from './LoginHistory';
 import { useAuth } from '../../context/AuthContext';
 import { settingsService } from '../../services/settings';
-import { auditLogService } from '../../services/auditLog';
 import { usersService } from '../../services/users';
 import { PASSWORD_REQUIREMENTS } from '../../utils/password';
-import { BellRing, ScrollText, Settings2, UserRound } from 'lucide-react';
+import { BellRing, History, Settings2, UserRound } from 'lucide-react';
 
 
 const SETTINGS_TABS = [
   { key: 'announcements', label: 'Venue & notices', description: 'Schedule, closures, announcements', icon: BellRing },
   { key: 'profile', label: 'Admin account', description: 'Profile and password', icon: UserRound },
-  { key: 'audit', label: 'Change history', description: 'Administrative activity', icon: ScrollText },
+  { key: 'login', label: 'Login history', description: 'Account access', icon: History },
 ];
 
 const SETTINGS_MANAGE_PERMISSION = 'settings:manage';
@@ -23,7 +24,9 @@ const DEFAULT_CLOSE_TIME = '00:00';
 const DEFAULT_ANNOUNCEMENT_EMOJI = '📣';
 
 function Settings() {
-  const [activeTab, setActiveTab] = useState('announcements');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedTab = searchParams.get('tab');
+  const activeTab = SETTINGS_TABS.some((tab) => tab.key === requestedTab) ? requestedTab : 'announcements';
 
   return (
     <div className="panel active" id="panel-settings">
@@ -37,7 +40,7 @@ function Settings() {
               role="tab"
               aria-selected={activeTab === tab.key}
               className={`set-tab${activeTab === tab.key ? ' active' : ''}`}
-              onClick={() => setActiveTab(tab.key)}
+              onClick={() => setSearchParams(tab.key === 'announcements' ? {} : { tab: tab.key })}
             >
               <tab.icon size={17} aria-hidden="true" /><span><strong>{tab.label}</strong><small>{tab.description}</small></span>
             </button>
@@ -58,8 +61,8 @@ function Settings() {
             )}
           </div>
 
-          <div className={`set-subpanel${activeTab === 'audit' ? ' active' : ''}`} id="set-audit">
-            {activeTab === 'audit' && <AuditLogTab />}
+          <div className={`set-subpanel${activeTab === 'login' ? ' active' : ''}`} id="set-login-history">
+            {activeTab === 'login' && <LoginHistory />}
           </div>
         </div>
       </div>
@@ -79,6 +82,40 @@ const DAY_PILLS = [
 ];
 
 const DEFAULT_OPEN_DAYS_BEFORE_LOAD = [0, 1, 2, 3, 4, 5, 6];
+function ScheduleTimeField({ id, label, value, onChange }) {
+  const hour24 = Number(value.slice(0, 2));
+  const hour12 = hour24 % 12 || 12;
+  const minutes = value.slice(3, 5) || '00';
+  const period = hour24 < 12 ? 'AM' : 'PM';
+  const [draftHour, setDraftHour] = useState(String(hour12));
+
+  useEffect(() => { setDraftHour(String(hour12)); }, [value]);
+
+  function applyTime(hourText, nextPeriod = period) {
+    const hour = Number(hourText);
+    if (!Number.isInteger(hour) || hour < 1 || hour > 12) {
+      setDraftHour(String(hour12));
+      return;
+    }
+    setDraftHour(String(hour));
+    const nextHour = hour % 12 + (nextPeriod === 'PM' ? 12 : 0);
+    onChange(`${String(nextHour).padStart(2, '0')}:${minutes}`);
+  }
+
+  return (
+    <div className="sched-field">
+      <label htmlFor={id}>{label}</label>
+      <div className="sched-time-control">
+        <i className="ti ti-clock" aria-hidden="true"></i>
+        <input id={id} type="text" inputMode="numeric" maxLength={2} value={draftHour} aria-label={`${label} hour, 1 to 12`} onFocus={(event) => event.target.select()} onChange={(event) => { if (/^\d{0,2}$/.test(event.target.value)) setDraftHour(event.target.value); }} onBlur={() => applyTime(draftHour)} onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur(); }} />
+        <span className="sched-time-minutes">:{minutes}</span>
+        <div className="sched-period" role="group" aria-label={`${label} period`}>
+          {['AM', 'PM'].map((choice) => <button key={choice} type="button" aria-pressed={period === choice} className={period === choice ? 'active' : ''} onClick={() => applyTime(draftHour, choice)}>{choice}</button>)}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function formatHolidayDate(dateStr) {
   return new Date(dateStr + 'T00:00:00').toLocaleDateString(undefined, {
@@ -123,7 +160,7 @@ function OperatingScheduleAndHolidays() {
   }, [fetchSettings]);
 
   function toggleDay(day) {
-    setOpenDays((days) => (days.includes(day) ? days.filter((d) => d !== day) : [...days, day]));
+    setOpenDays((days) => (days.includes(day) ? (days.length > 1 ? days.filter((d) => d !== day) : days) : [...days, day]));
   }
 
   async function handleSaveSchedule() {
@@ -179,6 +216,7 @@ function OperatingScheduleAndHolidays() {
   }
 
   const sortedHolidays = [...holidays].sort((a, b) => a.date.localeCompare(b.date));
+  const closesNextDay = Number(closeTime.replace(':', '')) <= Number(openTime.replace(':', ''));
 
   return (
     <>
@@ -189,29 +227,22 @@ function OperatingScheduleAndHolidays() {
           </span>
         </div>
         <div className="sched-2col">
-          <div className="sched-field">
-            <label>Opening Hour</label>
-            <div className="sched-input-wrap">
-              <i className="ti ti-clock"></i>
-              <input type="time" value={openTime} onChange={(e) => setOpenTime(e.target.value)} />
-            </div>
-          </div>
-          <div className="sched-field">
-            <label>Closing Hour</label>
-            <div className="sched-input-wrap">
-              <i className="ti ti-clock"></i>
-              <input type="time" value={closeTime} onChange={(e) => setCloseTime(e.target.value)} />
-            </div>
-          </div>
+          <ScheduleTimeField id="schedule-open-time" label="Opens at" value={openTime} onChange={setOpenTime} />
+          <ScheduleTimeField id="schedule-close-time" label="Closes at" value={closeTime} onChange={setCloseTime} />
         </div>
+        <p className="sched-summary">Type an hour and choose AM or PM · Manila time{closesNextDay ? ' · Closes the next day' : ''}</p>
         <div className="sched-field" style={{ marginTop: 4 }}>
-          <label>Open Days</label>
+          <div className="sched-days-head"><label>Open days</label><div className="sched-day-presets"><button type="button" onClick={() => setOpenDays([0, 1, 2, 3, 4, 5, 6])}>Every day</button><button type="button" onClick={() => setOpenDays([1, 2, 3, 4, 5])}>Weekdays</button></div></div>
           <div className="day-row" id="op-day-row">
             {DAY_PILLS.map((d) => (
               <button
                 key={d.day}
                 type="button"
                 className={`day-pill${openDays.includes(d.day) ? ' on' : ''}`}
+                aria-pressed={openDays.includes(d.day)}
+                aria-label={`${d.label} ${openDays.includes(d.day) ? 'open' : 'closed'}`}
+                disabled={openDays.includes(d.day) && openDays.length === 1}
+                title={openDays.includes(d.day) && openDays.length === 1 ? 'Keep at least one open day' : undefined}
                 onClick={() => toggleDay(d.day)}
               >
                 {d.label}
@@ -477,84 +508,6 @@ function AnnouncementsTab() {
         )}
       </div>
     </>
-  );
-}
-
-function formatAuditTime(dateStr) {
-  return new Date(dateStr).toLocaleString(undefined, {
-    year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
-  });
-}
-
-function auditDotClass(action) {
-  if (action === 'deleted') return 'del';
-  if (action === 'updated' || action === 'recovered') return 'warn';
-  return '';
-}
-
-function AuditLogTab() {
-  const [loading, setLoading] = useState(true);
-  const [logs, setLogs] = useState([]);
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [total, setTotal] = useState(0);
-  const [loadError, setLoadError] = useState('');
-
-  useEffect(() => {
-    let active = true;
-    setLoading(true);
-    setLoadError('');
-    auditLogService.list(page)
-      .then((data) => {
-        if (!active) return;
-        setLogs(data.logs || []);
-        setTotalPages(data.totalPages || 1);
-        setTotal(data.total || 0);
-      })
-      .catch((err) => {
-        console.error(err);
-        if (active) setLoadError(err.message || 'Could not load change history.');
-      })
-      .finally(() => { if (active) setLoading(false); });
-    return () => { active = false; };
-  }, [page]);
-
-  return (
-    <div className="card">
-      <div className="card-head">
-        <span className="card-title">Settings change history</span>
-        <span className="audit-summary">{total ? `${total} recorded changes` : 'Announcements · Rooms · Users'}</span>
-      </div>
-      <div>
-        {loading ? (
-          <div style={{ textAlign: 'center', color: 'var(--muted)', padding: '12px 0' }}>Loading…</div>
-        ) : loadError ? (
-          <div className="settings-form-error" role="alert">{loadError}</div>
-        ) : logs.length === 0 ? (
-          <div style={{ textAlign: 'center', color: 'var(--muted)', padding: '12px 0' }}>No changes recorded yet.</div>
-        ) : (
-          logs.map((entry) => {
-            const dotClass = auditDotClass(entry.action);
-            return (
-              <div className="audit-item" key={entry._id}>
-                <div className={`audit-dot${dotClass ? ` ${dotClass}` : ''}`}></div>
-                <div>
-                  <div className="audit-text"><b>{entry.performedByName}</b> {entry.description}</div>
-                  <div className="audit-time">{formatAuditTime(entry.createdAt)}</div>
-                </div>
-              </div>
-            );
-          })
-        )}
-      </div>
-      {!loading && !loadError && totalPages > 1 && (
-        <div className="audit-pagination" aria-label="Change history pages">
-          <button type="button" className="card-action" disabled={page <= 1} onClick={() => setPage((value) => value - 1)}><i className="ti ti-chevron-left" aria-hidden="true"></i> Previous</button>
-          <span>Page {page} of {totalPages}</span>
-          <button type="button" className="card-action" disabled={page >= totalPages} onClick={() => setPage((value) => value + 1)}>Next <i className="ti ti-chevron-right" aria-hidden="true"></i></button>
-        </div>
-      )}
-    </div>
   );
 }
 

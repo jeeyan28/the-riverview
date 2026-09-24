@@ -3,7 +3,7 @@ const MANILA_OFFSET = '+08:00';
 const MINUTE_MS = 60_000;
 const HOUR_MS = 60 * MINUTE_MS;
 
-export const RESERVATION_STATUS_FILTERS = ['Confirmed', 'Overdue', 'In Use', 'Done', 'Cancelled', 'No Show'];
+export const RESERVATION_STATUS_FILTERS = ['Confirmed', 'Overdue', 'Ongoing', 'Done', 'Cancelled', 'No Show'];
 
 export function reservationWindow(booking) {
   const { date, timeIn } = booking || {};
@@ -21,7 +21,7 @@ export function reservationPresentation(booking, now = Date.now()) {
     if (window && now >= window.end) return { status: 'No Show', warning: '' };
     if (window && now >= window.start + MINUTE_MS && now < window.end) return { status: 'Overdue', warning: '' };
   }
-  if (rawStatus === 'Ongoing') return { status: 'In Use', warning: '' };
+  if (rawStatus === 'Ongoing') return { status: 'Ongoing', warning: '' };
   if (rawStatus === 'Pending Payment Verification') return { status: 'Pending', warning: 'Verify payment' };
   if (rawStatus === 'Awaiting Online Payment') return { status: 'Pending', warning: 'Awaiting payment' };
   // Old records may contain this persisted status. It is no longer produced.

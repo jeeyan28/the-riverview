@@ -6,6 +6,7 @@ import { API_BASE_URL } from '../services/api';
 import { openBookingReceipt } from '../utils/receipt';
 import { cancellationAmounts } from '../utils/cancellationPolicy';
 import { reservationPresentation } from '../utils/reservationStatus';
+import { formatTime12 } from '../utils/time';
 import { useSiteSettings } from '../hooks/useSiteSettings';
 import PasswordInput from './PasswordInput';
 import { PASSWORD_REQUIREMENTS } from '../utils/password';
@@ -30,7 +31,7 @@ function paymentBreakdown(booking, now) {
   const refunded = Math.min(received, Math.max(0, Number(booking?.refundedAmount) || 0));
   const paid = Math.max(0, received - refunded);
   const balance = closed ? 0 : Math.max(0, total - paid);
-  const status = closed ? refunded > 0 ? 'Refund recorded' : paid > 0 ? 'Payment retained' : 'No payment' : total > 0 && balance <= 0 ? 'Paid' : paid > 0 ? 'Downpayment paid' : 'Payment due';
+  const status = closed ? refunded > 0 ? 'Refund recorded' : paid > 0 ? 'Payment retained' : 'No payment' : total > 0 && balance <= 0 ? 'Paid' : paid > 0 ? 'Downpayment paid' : 'Unpaid';
   return { total, paid, refunded, balance, closed, status };
 }
 
@@ -227,9 +228,9 @@ function ProfileModal({ open, onClose }) {
         aria-modal="true"
         aria-labelledby="profile-modal-title"
       >
-        <div className="pf-modal">
+        <div className="pf-modal pf-modal--account">
           <div className="pf-modal-head">
-            <div><h2 className="pf-modal-title" id="profile-modal-title">Your Riverview account</h2><p className="pf-modal-subtitle">Manage your details and every reservation in one place.</p></div>
+            <div><h2 className="pf-modal-title" id="profile-modal-title">Your profile</h2><p className="pf-modal-subtitle">Account details and reservations</p></div>
             <button className="pf-close" id="pfClose" aria-label="Close" onClick={handleClose}>
               <X size={19} aria-hidden="true" />
             </button>
@@ -333,7 +334,7 @@ function ProfileModal({ open, onClose }) {
                     id="pfSaveDetailsBtn"
                     disabled={savingDetails}
                   >
-                    <span className="pf-btn-text">Save</span>
+                    <span className="pf-btn-text">Save changes</span>
                     <span className="pf-spinner"></span>
                   </button>
                 </div>
@@ -446,13 +447,13 @@ function ProfileModal({ open, onClose }) {
                     <div className="pf-booking-title">
                       {b.roomLabel}{b.variantLabel ? ` · ${b.variantLabel}` : ''}
                     </div>
-                    <div className="pf-booking-sub">{b.date} · {b.timeIn}</div>
+                    <div className="pf-booking-sub">{b.date} · {formatTime12(b.timeIn)}</div>
                   </div>
                   <div className="pf-booking-right">
                     <div className="pf-booking-price">₱{Number(b.amount || 0).toLocaleString()}</div>
                     <span className={`pf-chip pf-chip--${historyStatusClass(presentation.status)}`}>{presentation.status}</span>
                     {presentation.warning === 'Overdue' && <small className="pf-reservation-warning">Overdue</small>}
-                    <span className={`pf-payment-state pf-payment-state--${payment.status === 'Paid' ? 'paid' : payment.paid > 0 ? 'partial' : 'unpaid'}`}>{payment.status}{payment.balance > 0 ? ` · ₱${payment.balance.toLocaleString()} due` : ''}</span>
+                    <span className={`pf-payment-state pf-payment-state--${payment.status === 'Paid' ? 'paid' : payment.paid > 0 ? 'partial' : 'unpaid'}`}>{payment.status}{payment.balance > 0 ? ` · ₱${payment.balance.toLocaleString()} remaining` : ''}</span>
                   </div>
                   <button
                     type="button"
@@ -508,7 +509,7 @@ function ProfileModal({ open, onClose }) {
                           ? `₱${payment.refunded.toLocaleString()} was refunded manually. The first-hour charge was retained.`
                           : 'The first-hour charge is non-refundable. Contact admin if you need help with a payment issue.'
                     : payment.closed
-                      ? 'No venue balance is due for this closed reservation.'
+                      ? 'No balance remains at the venue for this closed reservation.'
                       : payment.balance > 0
                         ? 'Your online downpayment secured the slot. Please settle the remaining balance at the venue.'
                         : 'This reservation is fully paid.'} {viewingBooking.status === 'Cancelled' && cancellation.customerCancelled && cancellation.refundRemaining > 0 && settings?.contact?.messengerUrl && <a href={settings.contact.messengerUrl} target="_blank" rel="noreferrer">Message admin</a>}</p>
@@ -549,7 +550,7 @@ function ProfileModal({ open, onClose }) {
               </div>
               <div className="pf-detail-row">
                 <span className="pf-detail-label">Time</span>
-                <span className="pf-detail-value">{viewingBooking.timeIn} · {viewingBooking.duration}h</span>
+                <span className="pf-detail-value">{formatTime12(viewingBooking.timeIn)} · {viewingBooking.duration}h</span>
               </div>
               <div className="pf-detail-row">
                 <span className="pf-detail-label">Guests</span>
@@ -559,12 +560,14 @@ function ProfileModal({ open, onClose }) {
                 <span className="pf-detail-label">Reserved on</span>
                 <span className="pf-detail-value">
                   {viewingBooking.createdAt
-                    ? new Date(viewingBooking.createdAt).toLocaleString(undefined, {
+                    ? new Date(viewingBooking.createdAt).toLocaleString('en-PH', {
+                        timeZone: 'Asia/Manila',
                         month: 'long',
                         day: 'numeric',
                         year: 'numeric',
                         hour: 'numeric',
                         minute: '2-digit',
+                        hour12: true,
                       })
                     : '—'}
                 </span>
@@ -683,11 +686,15 @@ function CancellationRequestModal({ booking, contactUrl, onClose, onSubmitted, o
 
   return (
     <div className="pf-overlay open" role="dialog" aria-modal="true" aria-label="Request reservation cancellation">
-      <div className="pf-modal pf-modal--compact">
+      <div className="pf-modal pf-modal--cancellation">
         <div className="pf-modal-head"><h2 className="pf-modal-title">Request cancellation</h2><button className="pf-close" aria-label="Close" onClick={onClose}><i className="fa-solid fa-xmark"></i></button></div>
-        <p className="pf-detail-value">Your request for {booking.reservationCode || 'this reservation'} will be reviewed by the team. The first-hour charge is non-refundable. {cancellation.refundRemaining > 0 ? `If approved, contact admin to arrange a manual refund of the remaining ₱${cancellation.refundRemaining.toLocaleString()}.` : 'No refund is due for a one-hour down payment.'} {contactUrl && <a href={contactUrl} target="_blank" rel="noreferrer">Contact admin</a>}</p>
+        <p className="pf-cancel-reference">Reservation <strong>{booking.reservationCode || '—'}</strong></p>
+        <div className="pf-cancel-policy">
+          <strong>What happens next</strong>
+          <p>Our team will review your request. The first-hour charge is non-refundable. {cancellation.refundRemaining > 0 ? `If approved, arrange the remaining ₱${cancellation.refundRemaining.toLocaleString()} refund with admin.` : 'This booking has no refundable balance.'} {contactUrl && <a href={contactUrl} target="_blank" rel="noreferrer">Contact admin</a>}</p>
+        </div>
         <form onSubmit={submit}>
-          <div className="pf-field"><label htmlFor="cancel-reason">Reason</label><textarea id="cancel-reason" rows="4" maxLength="500" required value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Tell us why you need to cancel" /></div>
+          <div className="pf-field"><label htmlFor="cancel-reason">Reason for cancellation</label><textarea id="cancel-reason" rows="4" maxLength="500" required value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Tell us why you need to cancel" /></div>
           <div className="pf-modal-actions"><button type="button" className="pf-btn pf-btn-ghost" onClick={onClose}>Keep reservation</button><button type="submit" className="pf-btn pf-btn-solid" disabled={submitting || !reason.trim()}>{submitting ? 'Sending…' : 'Send request'}</button></div>
         </form>
       </div>

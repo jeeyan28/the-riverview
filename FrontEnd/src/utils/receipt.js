@@ -26,7 +26,7 @@ export function getBookingReceiptData(booking, overrides = {}) {
   const duration = Number(booking.duration) || 0;
   const timeLabel = `${formatHour(startHour)} – ${formatHour(startHour + duration)} (${duration} hour${duration === 1 ? '' : 's'})`;
   const bookedOnLabel = booking.createdAt
-    ? new Date(booking.createdAt).toLocaleString('en-PH', { month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
+    ? new Date(booking.createdAt).toLocaleString('en-PH', { timeZone: 'Asia/Manila', month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })
     : '—';
 
   const status = booking.status || 'Confirmed';
@@ -192,19 +192,51 @@ function drawReceiptImage(data) {
   image.width = scratch.width;
   image.height = Math.ceil(y * scale);
   image.getContext('2d').drawImage(scratch, 0, 0, image.width, image.height, 0, 0, image.width, image.height);
-  return image.toDataURL('image/png');
+  return { canvas: image, imageUrl: image.toDataURL('image/png') };
 }
 
-function saveReceiptImage(imageUrl, filename) {
+function saveReceiptFile(url, filename) {
   const link = document.createElement('a');
-  link.href = imageUrl;
+  link.href = url;
   link.download = filename;
   document.body.appendChild(link);
   link.click();
   link.remove();
 }
 
-function showEmbeddedReceipt(imageUrl, filename, browserName) {
+// Embed the exact receipt canvas as one JPEG page, so PNG and PDF keep the same layout.
+function receiptPdf(canvas) {
+  const jpeg = canvas.toDataURL('image/jpeg', 0.92).split(',')[1];
+  const binary = atob(jpeg);
+  const imageBytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+  const pageWidth = 595.28;
+  const pageHeight = Number((pageWidth * canvas.height / canvas.width).toFixed(2));
+  const encoder = new TextEncoder();
+  const chunks = [];
+  const offsets = [0];
+  let length = 0;
+  const append = (bytes) => { chunks.push(bytes); length += bytes.length; };
+  const write = (value) => append(encoder.encode(value));
+  const object = (number, value) => { offsets[number] = length; write(`${number} 0 obj\n${value}\nendobj\n`); };
+
+  write('%PDF-1.4\n');
+  object(1, '<< /Type /Catalog /Pages 2 0 R >>');
+  object(2, '<< /Type /Pages /Kids [3 0 R] /Count 1 >>');
+  object(3, `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageWidth} ${pageHeight}] /Resources << /XObject << /Receipt 4 0 R >> >> /Contents 5 0 R >>`);
+  offsets[4] = length;
+  write(`4 0 obj\n<< /Type /XObject /Subtype /Image /Width ${canvas.width} /Height ${canvas.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${imageBytes.length} >>\nstream\n`);
+  append(imageBytes);
+  write('\nendstream\nendobj\n');
+  const content = `q\n${pageWidth} 0 0 ${pageHeight} 0 0 cm\n/Receipt Do\nQ\n`;
+  object(5, `<< /Length ${encoder.encode(content).length} >>\nstream\n${content}endstream`);
+  const startXref = length;
+  write('xref\n0 6\n0000000000 65535 f \n');
+  for (let number = 1; number <= 5; number++) write(`${String(offsets[number]).padStart(10, '0')} 00000 n \n`);
+  write(`trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n${startXref}\n%%EOF`);
+  return new Blob(chunks, { type: 'application/pdf' });
+}
+
+function showReceiptOptions(imageUrl, canvas, filenameBase, browserName) {
   const previousFocus = document.activeElement;
   const overlay = document.createElement('div');
   overlay.className = 'receipt-preview-overlay';
@@ -212,12 +244,14 @@ function showEmbeddedReceipt(imageUrl, filename, browserName) {
   panel.className = 'receipt-preview-dialog';
   panel.setAttribute('role', 'dialog');
   panel.setAttribute('aria-modal', 'true');
-  panel.setAttribute('aria-label', 'Save your reservation receipt');
+  panel.setAttribute('aria-label', 'Download your reservation receipt');
 
   const heading = document.createElement('h2');
-  heading.textContent = 'Save your receipt';
+  heading.textContent = 'Download your receipt';
   const instruction = document.createElement('p');
-  instruction.textContent = `In ${browserName}, press and hold the receipt image, then choose Save image. You can also try the button below.`;
+  instruction.textContent = browserName
+    ? `Choose an image or PDF. In ${browserName}, you can also press and hold the preview to save the image.`
+    : 'Choose an image or PDF. Both formats show the same receipt.';
   const image = document.createElement('img');
   image.src = imageUrl;
   image.alt = 'Reservation receipt image';
@@ -225,13 +259,22 @@ function showEmbeddedReceipt(imageUrl, filename, browserName) {
   actions.className = 'receipt-preview-actions';
   const saveButton = document.createElement('button');
   saveButton.type = 'button';
-  saveButton.textContent = 'Save image';
-  saveButton.addEventListener('click', () => saveReceiptImage(imageUrl, filename));
+  saveButton.textContent = 'Download image';
+  saveButton.addEventListener('click', () => saveReceiptFile(imageUrl, `${filenameBase}.png`));
+  const pdfButton = document.createElement('button');
+  pdfButton.type = 'button';
+  pdfButton.textContent = 'Download PDF';
+  pdfButton.addEventListener('click', () => {
+    const url = URL.createObjectURL(receiptPdf(canvas));
+    saveReceiptFile(url, `${filenameBase}.pdf`);
+    const releaseTimer = setTimeout(() => URL.revokeObjectURL(url), 30000);
+    releaseTimer?.unref?.();
+  });
   const closeButton = document.createElement('button');
   closeButton.type = 'button';
-  closeButton.textContent = 'Back to reservation';
+  closeButton.textContent = 'Back to booking';
   closeButton.addEventListener('click', close);
-  actions.append(saveButton, closeButton);
+  actions.append(saveButton, pdfButton, closeButton);
   panel.append(heading, instruction, image, actions);
   overlay.appendChild(panel);
 
@@ -264,13 +307,9 @@ function showEmbeddedReceipt(imageUrl, filename, browserName) {
 export function openBookingReceipt(booking, overrides = {}) {
   const data = getBookingReceiptData(booking, overrides);
   if (!data) return;
-  const imageUrl = drawReceiptImage(data);
+  const { canvas, imageUrl } = drawReceiptImage(data);
   const safeCode = String(data.reservationCode).replace(/[^A-Za-z0-9_-]/g, '-');
-  const filename = `Riverview-Receipt-${safeCode}.png`;
+  const filenameBase = `Riverview-Receipt-${safeCode}`;
   const embeddedBrowser = getEmbeddedBrowserInfo();
-  if (embeddedBrowser) {
-    showEmbeddedReceipt(imageUrl, filename, embeddedBrowser.name);
-  } else {
-    saveReceiptImage(imageUrl, filename);
-  }
+  showReceiptOptions(imageUrl, canvas, filenameBase, embeddedBrowser?.name);
 }

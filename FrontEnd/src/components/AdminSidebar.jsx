@@ -35,7 +35,7 @@ const NAV_SECTIONS = [
   {
     label: 'Operations',
     items: [
-      { to: '/admin/monitor', icon: Activity, label: 'Live Monitor' },
+      { to: '/admin/monitor', icon: Activity, label: 'Room Monitoring' },
       { to: '/admin/bookings', icon: CalendarDays, label: 'Reservations' },
       { to: '/admin/reports', icon: FileBarChart, label: 'Reports', permission: 'reports:view' },
       { to: '/admin/forecasting', icon: TrendingUp, label: 'Forecasting', permission: 'forecasting:view' },
@@ -45,7 +45,7 @@ const NAV_SECTIONS = [
     label: 'Management',
     items: [
       { to: '/admin/users', icon: Users, label: 'Team & Users', permission: 'admin:manage' },
-      { to: '/admin/logs', icon: History, label: 'Login History', roles: MANAGER_UP },
+      { to: '/admin/audit-trail', icon: History, label: 'Audit Trail', permission: 'settings:view' },
       { to: '/admin/room-management', icon: Building2, label: 'Facilities', permission: 'room:manage' },
       { to: '/admin/settings', icon: Settings, label: 'Settings', permission: 'settings:view' },
     ],
@@ -60,13 +60,13 @@ const NAV_SECTIONS = [
 
 export const PAGE_TITLES = {
   dashboard: 'Dashboard',
-  monitor: 'Live Monitor',
+  monitor: 'Room Monitoring',
   bookings: 'Reservations',
   analytics: 'Analytics',
   reports: 'Reports',
   forecasting: 'Forecasting',
   users: 'Team & Users',
-  logs: 'Login History',
+  'audit-trail': 'Audit Trail',
   'room-management': 'Facilities',
   settings: 'Settings',
 };
@@ -79,7 +79,7 @@ export const PAGE_CONTEXT = {
   reports: 'Financial records',
   forecasting: 'Revenue planning',
   users: 'Access management',
-  logs: 'Security activity',
+  'audit-trail': 'Administrative activity',
   'room-management': 'Inventory & pricing',
   settings: 'Business configuration',
 };
