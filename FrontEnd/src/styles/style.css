@@ -932,14 +932,43 @@ body.has-guest-banner {
     color: #9470db; background: rgba(148,112,219,.16);
     padding: 1px 4px; border-radius: 5px; line-height: 1.3;
 }
-.bk-day--full::after { content: ''; width: 4px; height: 4px; border-radius: 50%; background: #e2554b; margin-top: 1px; }
-.bk-day--available::after { content: ''; width: 4px; height: 4px; border-radius: 50%; background: var(--teal); margin-top: 1px; }
-.bk-day--few::after { content: ''; width: 4px; height: 4px; border-radius: 50%; background: #e0a13a; margin-top: 1px; }
+.bk-day[data-tooltip]::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    left: 50%;
+    bottom: calc(100% + 8px);
+    z-index: 20;
+    width: max-content;
+    max-width: min(260px, 42vw);
+    padding: 7px 9px;
+    border: 1px solid var(--border-strong, var(--border));
+    border-radius: 8px;
+    background: var(--surface-alt);
+    color: var(--text-main);
+    box-shadow: 0 10px 24px rgba(6,12,24,.22);
+    font-size: .68rem;
+    font-weight: 600;
+    line-height: 1.35;
+    text-align: left;
+    white-space: normal;
+    pointer-events: none;
+    opacity: 0;
+    transform: translate(-50%, 4px);
+    transition: opacity 140ms ease, transform 140ms ease;
+}
+.bk-day[data-tooltip]:hover::after,
+.bk-day[data-tooltip]:focus-visible::after {
+    opacity: 1;
+    transform: translate(-50%, 0);
+}
+.bk-day--full::before { content: ''; width: 4px; height: 4px; border-radius: 50%; background: #e2554b; margin-top: 1px; }
+.bk-day--available::before { content: ''; width: 4px; height: 4px; border-radius: 50%; background: var(--teal); margin-top: 1px; }
+.bk-day--few::before { content: ''; width: 4px; height: 4px; border-radius: 50%; background: #e0a13a; margin-top: 1px; }
 .bk-day--selected {
     background: var(--teal) !important; color: #06251f !important; font-weight: 700;
     border-color: var(--teal-text) !important;
 }
-.bk-day--selected::after { background: #06251f !important; }
+.bk-day--selected::before { background: #06251f !important; }
 .bk-day--today { box-shadow: inset 0 0 0 1px rgba(0,201,167,.5); }
 
 .bk-legend { display: flex; gap: .9rem; margin-top: .85rem; flex-wrap: wrap; justify-content: center; }

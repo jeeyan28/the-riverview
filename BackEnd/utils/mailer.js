@@ -126,29 +126,42 @@ async function sendOtpEmail(user, otp, purpose = "reset") {
 }
 
 async function sendReceiptEmail(booking) {
-  const fullName = escapeHtml(booking.guestName || "Guest");
-  const contact = escapeHtml(booking.guestContact || "—");
-  const email = escapeHtml(booking.guestEmail || "—");
+  const fullName = booking.guestName || "—";
+  const contact = booking.guestContact && !String(booking.guestContact).includes("@") ? booking.guestContact : "N/A";
+  const email = booking.guestEmail || "—";
   const dateLabel = booking.date
-    ? new Date(`${booking.date}T00:00:00`).toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" })
+    ? new Date(`${booking.date}T00:00:00`).toLocaleDateString("en-PH", { month: "long", day: "numeric", year: "numeric" })
     : "—";
-  const downPayment = Number(booking.downPayment || 0);
-  const remaining = Math.max(0, Number(booking.amount || 0) - downPayment);
+  const bookedOnLabel = booking.createdAt
+    ? new Date(booking.createdAt).toLocaleString("en-PH", { month: "long", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" })
+    : "—";
+  const amount = Math.max(0, Number(booking.amount || 0));
+  const downPayment = Math.max(0, Number(booking.paidAmount || 0), Number(booking.downPayment || 0));
+  const paidLater = Math.max(0, downPayment - Number(booking.downPayment || 0));
+  const remaining = Math.max(0, amount - downPayment);
   const startHour = parseInt(String(booking.timeIn || "0").split(":")[0], 10) || 0;
   const durationHours = Number(booking.duration) || 0;
   const timeLabel = `${formatHour(startHour)} – ${formatHour(startHour + durationHours)}`;
+  const facility = booking.roomLabel || "—";
+  const roomName = booking.variantLabel || booking.roomLabel || "—";
 
   const rows = [
     ["Reservation Code", booking.reservationCode || "—"],
-    ["Booked By", fullName],
-    ["Contact No.", contact],
+    ["Booked by", fullName],
+    ["Contact no.", contact],
     ["Email", email],
-    ["Room", booking.variantLabel || booking.roomLabel || "—"],
-    ["Facility", booking.roomLabel || "—"],
-    ["Date", dateLabel],
-    ["Time", timeLabel],
-    ["Duration", `${durationHours} hour(s)`],
+    ["Room", roomName],
     ["Guests", String(booking.guestCount || 1)],
+    ["Booking date", dateLabel],
+    ["Time", `${timeLabel} (${durationHours} hour${durationHours === 1 ? "" : "s"})`],
+    ["Booked on", bookedOnLabel],
+  ];
+
+  const costRows = [
+    ["Total amount", amount],
+    ["Paid online", downPayment],
+    ...(paidLater > 0 ? [["Paid later", paidLater]] : []),
+    ["Remaining balance", remaining],
   ];
 
   const html = `
@@ -174,19 +187,20 @@ async function sendReceiptEmail(booking) {
             <tr>
               <td style="padding:40px;">
                 <p style="margin:0 0 6px; font-size:11px; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:#00C9A7;">Booking Confirmed</p>
-                <h1 style="margin:0 0 20px; font-family:Georgia, 'Times New Roman', serif; font-size:26px; line-height:1.25; color:#ffffff; font-weight:700;">Your Booking Receipt</h1>
+                <h1 style="margin:0 0 8px; font-family:Georgia, 'Times New Roman', serif; font-size:26px; line-height:1.25; color:#ffffff; font-weight:700;">Booking Confirmed</h1>
+                <p style="margin:0 0 20px; font-size:14px; line-height:1.5; color:#8A9BB0;">Your reservation has been successfully created.</p>
+                <p style="margin:0 0 20px; font-size:15px; font-weight:700; color:#ffffff;">${escapeHtml(facility)}</p>
 
                 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 20px;">
-                  ${rows.map(([label, value]) => `<tr><td style="padding:8px 0; font-size:14px; color:#8A9BB0; border-bottom:1px solid rgba(255,255,255,0.08);">${label}</td><td style="padding:8px 0; font-size:14px; color:#ffffff; text-align:right; font-weight:600; border-bottom:1px solid rgba(255,255,255,0.08);">${escapeHtml(value)}</td></tr>`).join("")}
+                  ${rows.map(([label, value]) => `<tr><td style="padding:8px 0; font-size:14px; color:#8A9BB0; border-bottom:1px solid rgba(255,255,255,0.08);">${escapeHtml(label)}</td><td style="padding:8px 0; font-size:14px; color:#ffffff; text-align:right; font-weight:600; border-bottom:1px solid rgba(255,255,255,0.08);">${escapeHtml(value)}</td></tr>`).join("")}
                 </table>
 
                 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 8px;">
-                  <tr><td style="padding:8px 0; font-size:14px; color:#8A9BB0;">Paid Online</td><td style="padding:8px 0; font-size:14px; color:#00C9A7; text-align:right; font-weight:700;">₱${downPayment.toLocaleString()}</td></tr>
-                  <tr><td style="padding:8px 0; font-size:14px; color:#8A9BB0;">Remaining Balance</td><td style="padding:8px 0; font-size:14px; color:#e0a940; text-align:right; font-weight:700;">₱${remaining.toLocaleString()}</td></tr>
+                  ${costRows.map(([label, value]) => `<tr><td style="padding:8px 0; font-size:14px; color:#8A9BB0;">${escapeHtml(label)}</td><td style="padding:8px 0; font-size:14px; color:${label === "Remaining balance" && value > 0 ? "#e0a940" : "#00C9A7"}; text-align:right; font-weight:700;">₱${Number(value || 0).toLocaleString()}</td></tr>`).join("")}
                 </table>
 
                 <p style="margin:0; padding-top:20px; border-top:1px solid rgba(255,255,255,0.08); font-size:13px; line-height:1.6; color:#8A9BB0;">
-                  ${remaining > 0 ? 'Please keep this receipt for your records. The remaining balance is paid upon arrival.' : 'Please keep this receipt for your records. Your booking is fully paid.'}
+                  Please keep this receipt for your records. ${remaining > 0 ? 'The remaining balance is paid upon arrival.' : 'Your booking is fully paid.'}
                 </p>
               </td>
             </tr>
@@ -205,7 +219,7 @@ async function sendReceiptEmail(booking) {
   </html>
   `;
 
-  const text = `Booking Receipt\n\n${rows.map(([label, value]) => `${label}: ${value}`).join("\n")}\nPaid Online: ₱${downPayment.toLocaleString()}\nRemaining Balance: ₱${remaining.toLocaleString()}`;
+  const text = `Booking Confirmed\n\nYour reservation has been successfully created.\nFacility: ${facility}\n\n${rows.map(([label, value]) => `${label}: ${value}`).join("\n")}\n\n${costRows.map(([label, value]) => `${label}: ₱${Number(value || 0).toLocaleString()}`).join("\n")}\n\nPlease keep this receipt for your records. ${remaining > 0 ? 'The remaining balance is paid upon arrival.' : 'Your booking is fully paid.'}`;
 
   const recipients = new Set();
   if (booking.guestEmail && EMAIL_RE.test(booking.guestEmail)) recipients.add(booking.guestEmail);

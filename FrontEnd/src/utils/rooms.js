@@ -144,7 +144,28 @@ export function getAvailableRoomCountForDuration(
 }
 
 export function isHolidayDate(dateStr, holidays) {
-  return (holidays || []).some((h) => h.date === dateStr && h.fullDay);
+  return Boolean(getHolidayForDate(dateStr, holidays));
+}
+
+/**
+ * Return the full-day closure record for a date so calendar views can explain
+ * why a date is unavailable instead of showing a generic holiday label.
+ */
+export function getHolidayForDate(dateStr, holidays) {
+  return (holidays || []).find((holiday) => holiday?.date === dateStr && holiday?.fullDay) || null;
+}
+
+export function holidayReason(dateStr, holidays) {
+  const holiday = getHolidayForDate(dateStr, holidays);
+  if (!holiday) return '';
+  const name = String(holiday.name || holiday.title || '').trim();
+  const note = String(holiday.note || '').trim();
+  const detail = note ? ` — ${note}` : '';
+  return name
+    ? `Closed for ${name}${detail}. No reservations are available on this date.`
+    : note
+      ? `Closed for a venue holiday or closure — ${note}. No reservations are available on this date.`
+    : 'Closed for a holiday or venue closure. No reservations are available on this date.';
 }
 
 export function isOperatingDay(dateObj, operatingHours) {
