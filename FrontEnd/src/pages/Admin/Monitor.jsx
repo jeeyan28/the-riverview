@@ -10,6 +10,7 @@ import { useAuth } from '../../context/AuthContext';
 import { monitorRoomsService, roomSessionsService } from '../../services/monitoring';
 import { bookingsService } from '../../services/bookings';
 import { businessDate } from '../../utils/businessDate';
+import { reservationWindow, showOnRoomMonitor } from '../../utils/reservationStatus';
 import { CORKAGE_FEE, calculateBookingPrice, variantRateLabel } from '../../utils/roomPricing';
 import {
   useRoomMonitorData,
@@ -43,7 +44,7 @@ function paymentSummary(record, isBooking = false) {
 }
 
 const money = (value) => `₱${Number(value || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-const boardClock = (date) => date.toLocaleTimeString('en-US', { timeZone: 'Asia/Manila', hour: 'numeric', minute: '2-digit', hour12: true });
+const boardClock = (date) => date.toLocaleTimeString('en-US', { timeZone: 'Asia/Manila', hour: 'numeric', minute: '2-digit', hour12: true }).replace(/\s+/g, '').toLowerCase();
 const scheduleDate = (date) => new Date(`${date}T12:00:00+08:00`).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', month: 'long', day: 'numeric', year: 'numeric' });
 
 function SessionPayment({ session }) {
@@ -314,7 +315,9 @@ function Monitor() {
   const detailRoom = detailRoomId ? rooms.find((r) => r._id === detailRoomId) || null : null;
   const detailView = detailRoom ? buildRoomView(detailRoom, sessions) : null;
   const scheduleToday = businessDate();
-  const scheduledBookings = [...dueBookings].sort((a, b) => b.date.localeCompare(a.date) || String(a.timeIn || '').localeCompare(String(b.timeIn || '')));
+  const scheduledBookings = dueBookings
+    .filter((booking) => showOnRoomMonitor(booking))
+    .sort((a, b) => b.date.localeCompare(a.date) || String(a.timeIn || '').localeCompare(String(b.timeIn || '')));
 
   const roomTableColumns = [
     {
@@ -481,11 +484,11 @@ function Monitor() {
         </div>
       )}
 
-      {canStartFromBooking && dueBookings.length > 0 && (
+      {canStartFromBooking && scheduledBookings.length > 0 && (
         <div className="card card-flush rm-table-wrap rm-due-wrap">
           <div className="rm-due-head">
             <div className="rm-schedule-heading"><span className="card-title"><i className="bi bi-calendar-check"></i>Reservation schedule</span><span className="rm-schedule-today">Today · {scheduleDate(scheduleToday)}</span></div>
-            <span className="rm-group-count">{dueBookings.length}</span>
+            <span className="rm-group-count">{scheduledBookings.length}</span>
           </div>
           <table className="rm-table">
             <thead>
@@ -504,14 +507,14 @@ function Monitor() {
                   const { matchedRoom, previewNumber } = matchRoomForTarget(rooms, roomTarget);
                   const scheduledStart = new Date(`${b.date}T${String(b.timeIn).padStart(5, '0')}:00+08:00`);
                   const isDue = scheduledStart.getTime() <= Date.now();
-                  const isOverdue = scheduledStart.getTime() + Number(b.duration || 1) * 60 * 60 * 1000 <= Date.now();
+                  const scheduledEnd = new Date(reservationWindow(b).end);
                   const occupancy = matchedRoom ? findRoomOccupancy(matchedRoom._id, sessions) : null;
                   const hasConflict = matchedRoom && occupancy;
                   const payment = paymentSummary(b, true);
                   return (
                     <Fragment key={b._id}>
                     {b.date !== scheduleToday && (index === 0 || scheduledBookings[index - 1].date !== b.date) && <tr className="rm-schedule-date-row"><td colSpan={6}>{scheduleDate(b.date)}</td></tr>}
-                    <tr className={`rm-schedule-row--${isOverdue ? 'overdue' : isDue ? 'due' : 'upcoming'}`}>
+                    <tr className={`rm-schedule-row--${isDue ? 'due' : 'upcoming'}`}>
                       <td><span className="rm-guest-name">{b.guestName}</span></td>
                       <td>
                         <div className="rm-name">{b.roomLabel}</div>
@@ -525,7 +528,7 @@ function Monitor() {
                               : 'No matching Table Monitor table'}
                         </div>
                       </td>
-                      <td className="rm-schedule-time">{boardClock(scheduledStart)}</td>
+                      <td className="rm-schedule-time">{boardClock(scheduledStart)}-{boardClock(scheduledEnd)}</td>
                       <td>
                         <div className="rm-amount">{money(payment.collected)}</div>
                         <div className={`rm-amount-sub${payment.balance === 0 ? ' paid' : ''}`}>
@@ -533,8 +536,8 @@ function Monitor() {
                         </div>
                       </td>
                       <td>
-                        <span className={`rm-status-pill ${isOverdue ? 'status-expired' : isDue ? 'status-warning' : 'status-occupied'}`}>
-                          <span className="dot"></span>{isOverdue ? 'Overdue' : isDue ? 'Due now' : 'Upcoming'}
+                        <span className={`rm-status-pill ${isDue ? 'status-warning' : 'status-occupied'}`}>
+                          <span className="dot"></span>{isDue ? 'Due now' : 'Upcoming'}
                         </span>
                         {hasConflict && (
                           <div className="rm-conflict-note">
@@ -595,7 +598,7 @@ function Monitor() {
                 className={`fac-chip${facilityFilter === 'All' ? ' active' : ''}`}
                 onClick={() => selectFacilityFilter('All')}
               >
-                All Facilities
+                View all ({rooms.length})
               </button>
               {facilities.map((name) => (
                 <button
@@ -672,7 +675,7 @@ function Monitor() {
                 <i className={`bi ${FACILITY_ICONS[facilityName] || FACILITY_ICON_DEFAULT} rm-group-ico`}></i>
                 {facilityName} <span className="rm-group-count">· {facilityRooms.length} Room{facilityRooms.length === 1 ? '' : 's'}</span>
               </div>
-              <div className="room-grid">
+              <div className={`room-grid${facilityFilter === 'All' ? ' room-grid--all' : ''}`}>
                 {facilityRooms.map((r) => {
             const v = buildRoomView(r, sessions);
             const { occupancy, remaining, isPastEnd, isCritical, isWarning, stateClass, statusLabel, blinkClass } = v;

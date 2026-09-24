@@ -104,6 +104,11 @@
 .announcement-btn.danger:hover{background:rgba(225,29,72,.08);}
 
 .audit-item{display:flex;gap:12px;padding:10px 0;border-bottom:1px solid var(--border-soft);}
+.audit-filters{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 16px;}
+.audit-filter{border:1px solid var(--border);border-radius:999px;background:var(--navy3);color:var(--text);padding:8px 12px;font:600 .78rem var(--font-body);cursor:pointer;}
+.audit-filter:hover{background:var(--navy4);}
+.audit-filter.is-active{background:var(--teal);border-color:var(--teal);color:#082522;}
+.audit-filter:focus-visible{outline:2px solid var(--teal-text);outline-offset:2px;}
 .audit-item:last-child{border-bottom:none;}
 .audit-dot{width:8px;height:8px;border-radius:50%;background:var(--teal);margin-top:6px;flex-shrink:0;}
 .audit-dot.warn{background:var(--amber);}

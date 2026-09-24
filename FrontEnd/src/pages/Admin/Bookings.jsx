@@ -112,7 +112,12 @@ function formatTime(timeStr) {
   if (Number.isNaN(h)) return timeStr;
   const period = h >= 12 ? 'PM' : 'AM';
   const hour12 = h % 12 || 12;
-  return `${hour12}:${String(m || 0).padStart(2, '0')} ${period}`;
+  return `${hour12}:${String(m || 0).padStart(2, '0')}${period.toLowerCase()}`;
+}
+
+function formatCheckoutTime(booking) {
+  const window = reservationWindow(booking);
+  return window ? new Date(window.end).toLocaleTimeString('en-US', { timeZone: 'Asia/Manila', hour: 'numeric', minute: '2-digit', hour12: true }).replace(/\s+/g, '').toLowerCase() : '—';
 }
 
 function Bookings() {
@@ -647,6 +652,7 @@ function Bookings() {
                   <div className="bd-field"><label>Room</label><p>{detailBooking.variantLabel || '—'}</p></div>
                   <div className="bd-field"><label>Reservation Date</label><p>{detailBooking.date || '—'}</p></div>
                   <div className="bd-field"><label>Check-in Time</label><p>{formatTime(detailBooking.timeIn)}</p></div>
+                  <div className="bd-field"><label>Check-out Time</label><p>{formatCheckoutTime(detailBooking)}</p></div>
                   <div className="bd-field"><label>Duration</label><p>{detailBooking.duration ? `${detailBooking.duration} hr${detailBooking.duration > 1 ? 's' : ''}` : '—'}</p></div>
                   <div className="bd-field"><label>Reserved On</label><p>{detailBooking.createdAt ? new Date(detailBooking.createdAt).toLocaleString('en-PH', { timeZone: 'Asia/Manila', month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true }) : '—'}</p></div>
                 </div>
@@ -958,17 +964,24 @@ function CancellationReviewModal({ booking, onClose, onSubmit }) {
   return (
     <Modal open={!!booking} onClose={onClose} title={alreadyApproved ? 'Record manual refund' : 'Review cancellation request'}>
       {booking && (
-        <>
-          <p className="mfield-note">{booking.guestName} · {booking.reservationCode || shortBookingId(booking)} · recorded payment {formatPeso(recordedPayment(booking))}</p>
-          {!alreadyApproved && <div className="mfield"><label htmlFor="cancellation-decision">Decision</label><select id="cancellation-decision" value={decision} onChange={(event) => { setDecision(event.target.value); if (event.target.value === 'reject') { setRefundException(false); setRefundedAmount(String(booking.refundedAmount ?? 0)); } }}><option value="approve">Approve cancellation</option><option value="reject">Reject request</option></select></div>}
-          {amounts.customerCancelled && <p className="mfield-note">{booking.cancellationRefundException ? 'Refund exception approved.' : `First-hour charge retained: ${amounts.firstHour === null ? 'needs review' : formatPeso(Math.min(amounts.paid, amounts.firstHour))}.`} Maximum {booking.cancellationRefundException ? 'exception' : 'standard'} refund: {formatPeso(amounts.refundLimit)}.</p>}
+        <div className="cancellation-review">
+          <div className="cancellation-review-summary">
+            <div><span>Guest</span><strong>{booking.guestName}</strong><small>{booking.reservationCode || shortBookingId(booking)}</small></div>
+            <div><span>Recorded payment</span><strong>{formatPeso(recordedPayment(booking))}</strong></div>
+          </div>
+          <div className="cancellation-review-reason"><span>Guest's reason</span><p>{booking.cancellationReason?.trim() || 'No reason provided.'}</p></div>
+          {!alreadyApproved && <fieldset className="cancellation-decision"><legend>Decision</legend><div className="cancellation-decision-options">
+            <button type="button" aria-pressed={decision === 'approve'} className={decision === 'approve' ? 'is-selected' : ''} onClick={() => setDecision('approve')}>Approve cancellation</button>
+            <button type="button" aria-pressed={decision === 'reject'} className={decision === 'reject' ? 'is-selected' : ''} onClick={() => { setDecision('reject'); setRefundException(false); setRefundedAmount(String(booking.refundedAmount ?? 0)); }}>Keep reservation</button>
+          </div></fieldset>}
+          {amounts.customerCancelled && decision === 'approve' && <div className="cancellation-policy"><span>Refund guidance</span><strong>Up to {formatPeso(refundException ? amounts.paid : amounts.refundLimit)}</strong><small>{booking.cancellationRefundException ? 'Refund exception approved.' : `First-hour charge retained: ${amounts.firstHour === null ? 'needs review' : formatPeso(Math.min(amounts.paid, amounts.firstHour))}.`}</small></div>}
           {amounts.customerCancelled && decision === 'approve' && (
             <div className="mfield"><label className="cancellation-exception-label" htmlFor="cancellation-refund-exception"><input id="cancellation-refund-exception" className="cancellation-exception-checkbox" type="checkbox" checked={refundException} onChange={(event) => setRefundException(event.target.checked)} disabled={Boolean(booking.cancellationRefundException)} /> Venue or payment issue exception</label><p className="mfield-note">Use for a venue cancellation, duplicate charge, or verified payment error. Explain it in the note.</p></div>
           )}
-          <div className="mfield"><label htmlFor="cancellation-refund">Total manually refunded (₱)</label><input id="cancellation-refund" type="number" min={amounts.refunded} max={maxRefund} step="0.01" value={refundedAmount} onChange={(event) => setRefundedAmount(event.target.value)} disabled={decision === 'reject'} /><p className="mfield-note">Enter the cumulative amount already sent to the guest. This only records the refund; it does not transfer money through PayMongo.</p></div>
+          {decision === 'approve' && <div className="mfield"><label htmlFor="cancellation-refund">Total manually refunded (₱)</label><input id="cancellation-refund" type="number" min={amounts.refunded} max={maxRefund} step="0.01" value={refundedAmount} onChange={(event) => setRefundedAmount(event.target.value)} /><p className="mfield-note">Enter the cumulative amount already sent to the guest. This records a manual refund; it does not transfer money.</p></div>}
           <div className="mfield"><label htmlFor="cancellation-note">Review note</label><textarea id="cancellation-note" rows="3" value={note} onChange={(event) => setNote(event.target.value)} placeholder="Optional note for the audit trail" /></div>
-          <div className="modal-actions"><button type="button" className="btn-cancel" onClick={onClose}>Close</button><button type="button" className="btn-confirm" disabled={saving || noRefundChange} onClick={submit}>{saving ? 'Saving…' : alreadyApproved ? 'Record refund' : 'Save review'}</button></div>
-        </>
+          <div className="modal-actions cancellation-review-actions"><button type="button" className="btn-cancel" onClick={onClose}>Close</button><button type="button" className="btn-confirm" disabled={saving || noRefundChange} onClick={submit}>{saving ? 'Saving…' : alreadyApproved ? 'Record refund' : decision === 'approve' ? 'Approve request' : 'Keep reservation'}</button></div>
+        </div>
       )}
     </Modal>
   );

@@ -388,7 +388,7 @@ router.put("/:id/cancellation-review", requirePermission(PERMISSIONS.BOOKING_MAN
       await booking.save({ session });
       return { booking, recordedRefund: fields.refundedAmount - previousRefund, wasRequested };
     });
-    await logAudit({ category: "Booking", action: "updated", description: `${wasRequested ? `${req.body.decision}d cancellation` : "updated cancellation refund"} for ${booking.reservationCode}; newly recorded refund ₱${recordedRefund.toFixed(2)}${booking.cancellationRefundException ? "; policy exception" : ""}${req.body.note ? `; note: ${req.body.note}` : ""}`, user: req.user });
+    await logAudit({ category: "Booking", action: "updated", description: `${wasRequested ? `${req.body.decision === "reject" ? "rejected" : "approved"} cancellation` : "updated cancellation refund"} for ${booking.reservationCode}; newly recorded refund ₱${recordedRefund.toFixed(2)}${booking.cancellationRefundException ? "; policy exception" : ""}${req.body.note ? `; note: ${req.body.note}` : ""}`, user: req.user });
     res.json(booking);
   } catch (err) {
     console.error(err);
@@ -454,6 +454,7 @@ router.put("/:id", requirePermission(PERMISSIONS.BOOKING_MANAGE), validate(booki
     } = req.body;
 
     let booking;
+    let auditChanges = [];
     try {
       booking = await runInTransaction(async (session) => {
         const existing = await Booking.findById(req.params.id).session(session);
@@ -499,6 +500,10 @@ router.put("/:id", requirePermission(PERMISSIONS.BOOKING_MANAGE), validate(booki
         const timeChanging = timeIn !== undefined && timeIn !== existing.timeIn;
         const durationChanging = duration !== undefined && Number(duration) !== existing.duration;
         const scheduleChanging = roomChanging || variantChanging || dateChanging || timeChanging || durationChanging;
+        auditChanges = [];
+        if (scheduleChanging) auditChanges.push("rescheduled");
+        if (paidAmount !== undefined && paidAmount > bookingCollected(existing)) auditChanges.push("recorded payment for");
+        if (status === "Cancelled") auditChanges.push("cancelled");
         const pricingChanging = scheduleChanging || guestCount !== undefined || hasCorkage !== undefined;
         const financialChanging = pricingChanging || paidAmount !== undefined;
         if (financialChanging || (status !== undefined && status !== existing.status)) {
@@ -552,7 +557,7 @@ router.put("/:id", requirePermission(PERMISSIONS.BOOKING_MANAGE), validate(booki
       return res.status(e.status || 500).json({ message: e.message || "Server error." });
     }
 
-    await logAudit({ category: "Booking", action: "updated", description: `updated booking ${booking.reservationCode} for ${booking.guestName}`, user: req.user });
+    await logAudit({ category: "Booking", action: "updated", description: `${auditChanges.length ? auditChanges.join(' and ') : 'updated'} booking ${booking.reservationCode} for ${booking.guestName}`, user: req.user });
     res.json(booking);
   } catch (err) {
     console.error(err);

@@ -14,6 +14,11 @@ export function reservationWindow(booking) {
   return { start, end: start + duration * HOUR_MS };
 }
 
+export function showOnRoomMonitor(booking, now = Date.now()) {
+  const window = reservationWindow(booking);
+  return booking?.status === 'Confirmed' && booking?.cancellationStatus !== 'Requested' && !!window && window.end > now;
+}
+
 export function reservationPresentation(booking, now = Date.now()) {
   const rawStatus = booking?.status || 'Pending';
   if (rawStatus === 'Confirmed' && booking?.cancellationStatus !== 'Requested') {
