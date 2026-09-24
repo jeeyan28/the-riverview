@@ -344,6 +344,31 @@
 .public-site .pf-identity { display: grid; gap: 3px; width: 100%; margin-top: 14px; text-align: center; }
 .public-site .pf-identity strong { color: var(--text-main); font-size: .9rem; }
 .public-site .pf-identity span { overflow: hidden; color: var(--text-muted-light); font-size: .72rem; text-overflow: ellipsis; }
+.public-site .pf-account-type {
+  width: fit-content;
+  margin: 5px auto 0;
+  padding: 4px 8px;
+  border: 1px solid color-mix(in srgb,var(--teal) 28%,var(--border));
+  border-radius: 999px;
+  background: color-mix(in srgb,var(--teal) 10%,transparent);
+  color: var(--teal-strong);
+  font-size: .61rem;
+  font-style: normal;
+  font-weight: 760;
+  letter-spacing: .02em;
+}
+.public-site .pf-avatar-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  width: 100%;
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+.public-site .pf-avatar-stats span { display: grid; gap: 2px; text-align: center; }
+.public-site .pf-avatar-stats span + span { border-left: 1px solid var(--border); }
+.public-site .pf-avatar-stats strong { color: var(--text-main); font-size: 1.05rem; line-height: 1; }
+.public-site .pf-avatar-stats small { color: var(--text-muted-light); font-size: .62rem; }
 .public-site :is(.pf-field input, .pf-field textarea, .bk-field-input, .bk-field textarea) { min-height: 46px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text-main); }
 .public-site :is(.pf-btn, .pf-view-btn, .bk-back-btn, .bk-confirm) { display: inline-flex; min-height: 44px; align-items: center; justify-content: center; gap: 7px; border-radius: var(--radius-sm); }
 .public-site .pf-btn-solid { background: var(--teal); color: var(--teal-ink); }
@@ -427,6 +452,8 @@
   .public-site .pf-profile-body { grid-template-columns: 1fr; }
   .public-site .pf-avatar-col { flex-direction: row; justify-content: flex-start; }
   .public-site .pf-identity { width: auto; margin: 0; text-align: left; }
+  .public-site .pf-account-type { margin-left: 0; }
+  .public-site .pf-avatar-stats { width: auto; min-width: 150px; margin: 0 0 0 auto; padding: 0 0 0 18px; border-top: 0; }
   .public-site .pf-booking-row { grid-template-columns: auto minmax(0,1fr) auto; }
   .public-site .pf-booking-right { grid-column: 2/4; grid-row: 2; align-items: flex-start; }
 }
@@ -475,6 +502,11 @@
   .public-site #site-header .logo-name { max-width: 115px; white-space: normal; line-height: 1.05; }
   .public-site .room-card-actions { grid-template-columns: 1fr; }
   .public-site .facility-detail-facts { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 520px) {
+  .public-site .pf-avatar-col { flex-wrap: wrap; }
+  .public-site .pf-avatar-stats { width: 100%; margin: 12px 0 0; padding: 12px 0 0; border-top: 1px solid var(--border); }
 }
 
 @media (prefers-reduced-motion: reduce) {

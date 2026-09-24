@@ -5,6 +5,7 @@ import {
   DoorOpen, CalendarDays, Wallet, FileText, MessageCircle,
   Timer, Hourglass, CheckCircle2,
   HelpCircle, X, ArrowLeft, ArrowRight,
+  ShieldCheck, Music2, UsersRound,
 } from 'lucide-react';
 import { useSiteSettings } from '../hooks/useSiteSettings';
 import { useToast } from '../hooks/useToast';
@@ -116,6 +117,15 @@ const HELPFUL_INFO_CARDS = [
   { icon: FileText, title: 'Cancellation Review', desc: 'Customer cancellations retain the first-hour charge. If you paid in full, contact admin to arrange a manual refund of the rest after approval.' },
   { icon: Clock3, title: 'Open Daily', desc: '7AM to midnight, every day of the week.' },
   { icon: MessageCircle, title: 'Need Help?', desc: 'Questions or issues? Message our official Facebook page "The Riverview" we\u2019re happy to help.' },
+];
+
+const AMENITY_ITEMS = [
+  { icon: DoorOpen, title: 'Room choices for your group', desc: 'Compare shared, solo, VIP, KTV, and court room types in one place.' },
+  { icon: Trophy, title: 'Game-ready court', desc: 'Court rentals include the scoreboard, timer, and sound system for official games.' },
+  { icon: Music2, title: 'Private KTV time', desc: 'KTV rooms include an updated song library for your group.' },
+  { icon: CalendarCheck, title: 'Whole-hour scheduling', desc: 'Reserve one to five whole hours from the live availability calendar.' },
+  { icon: ShieldCheck, title: 'Clear booking totals', desc: 'See the rate, duration, add-ons, and payment total before confirming.' },
+  { icon: UsersRound, title: 'Plan with the team', desc: 'Message us when you need help choosing a room or arranging a visit.' },
 ];
 
 function HeroCarousel() {
@@ -460,6 +470,29 @@ function Home() {
                 onSelect={handleSelectRoom}
               />
             ))}
+        </div>
+      </section>
+
+      <section className="amenities-showcase" aria-labelledby="amenities-heading">
+        <div className="amenities-inner">
+          <div className="amenities-header reveal">
+            <div>
+              <div className="section-label">Good to know</div>
+              <h2 id="amenities-heading">The details that make a visit easy.</h2>
+            </div>
+            <p>Everything you need to choose a space, plan your time, and arrive ready to play.</p>
+          </div>
+          <div className="amenities-grid reveal-stagger">
+            {AMENITY_ITEMS.map(({ icon: Icon, title, desc }) => (
+              <article className="amenity-card" key={title}>
+                <span className="amenity-icon" aria-hidden="true"><Icon size={20} strokeWidth={1.8} /></span>
+                <div>
+                  <h3>{title}</h3>
+                  <p>{desc}</p>
+                </div>
+              </article>
+            ))}
+          </div>
         </div>
       </section>
 

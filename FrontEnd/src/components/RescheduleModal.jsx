@@ -10,6 +10,7 @@ import {
   fetchReservedHours,
   loadMonthAvailability,
   isHolidayDate,
+  holidayReason,
   isOperatingDay,
   getSlotState,
   getTimePeriod,
@@ -159,7 +160,9 @@ function RescheduleModal({ booking, onClose, onRescheduled }) {
     if (isPast) title = 'This date has already passed';
     else if (unavailable) {
       variant = 'unavailable';
-      title = holiday ? 'Closed for a holiday' : 'Closed on this day';
+      title = holiday
+        ? holidayReason(dStr, settings.holidays)
+        : 'Closed on this day. No reservations are available on this date.';
     } else if (fullyBooked) {
       variant = 'full';
       title = 'Full — no rooms or start times left for this duration';
@@ -316,6 +319,8 @@ function RescheduleModal({ booking, onClose, onRescheduled }) {
                             (selectedDateKey === day.dStr ? ' bk-day--selected' : '')
                           }
                           title={day.title || undefined}
+                          aria-label={day.title ? `${day.d}, ${day.title}` : `${day.d}`}
+                          data-tooltip={day.title || undefined}
                           tabIndex={day.disabled ? undefined : 0}
                           role="button"
                           aria-disabled={day.disabled || undefined}

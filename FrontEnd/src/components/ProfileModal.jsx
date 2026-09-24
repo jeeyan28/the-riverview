@@ -266,7 +266,15 @@ function ProfileModal({ open, onClose }) {
                     initial
                   )}
                 </div>
-                <div className="pf-identity"><strong>{`${details.firstName} ${details.lastName}`.trim() || 'Riverview guest'}</strong><span>{details.email || 'Guest account'}</span></div>
+                <div className="pf-identity">
+                  <strong>{`${details.firstName} ${details.lastName}`.trim() || 'Riverview guest'}</strong>
+                  <span>{details.email || 'Guest account'}</span>
+                  <em className="pf-account-type">{authUser?.isGuest ? 'Guest account' : 'Customer account'}</em>
+                </div>
+                <div className="pf-avatar-stats" aria-label="Reservation summary">
+                  <span><strong>{bookings.length}</strong><small>Reservations</small></span>
+                  <span><strong>{completedBookings.length}</strong><small>Completed</small></span>
+                </div>
               </div>
 
               <form id="pfDetailsForm" noValidate className="pf-fields" onSubmit={handleDetailsSubmit}>

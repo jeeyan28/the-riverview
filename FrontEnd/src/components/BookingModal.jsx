@@ -16,6 +16,7 @@ import {
   clearMonthAvailability,
   getAvailableRoomCountForDuration,
   isHolidayDate,
+  holidayReason,
   isOperatingDay,
   priceOptionsFor,
   isHourBooked,
@@ -1282,7 +1283,9 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
       if (!past) {
         if (unavailable) {
           variant = 'unavailable';
-          title = holiday ? 'Closed for a holiday/closure' : 'Closed on this day of the week';
+          title = holiday
+            ? holidayReason(dStr, settings?.holidays)
+            : 'Closed on this day of the week. No reservations are available on this date.';
         } else if (fullyBooked) {
           variant = 'full';
           title = 'Full — no rooms or start times left for this duration';
@@ -1340,11 +1343,12 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
 
   const contactMessengerUrl = settings?.contact?.messengerUrl;
   const contactPhone = settings?.contact?.phone;
+  const isPaymentReturn = step === 'paymongoReturn';
 
   return (
     <ModalPortal>
       <div className={`bk-overlay${open ? ' open' : ''}`} id="booking-modal" role="dialog" aria-modal="true" aria-labelledby="booking-modal-title">
-        <div className={'bk-modal' + (showSummaryPanel ? '' : ' bk-modal--compact') + (step === 'paymongoReturn' && pmReturn.phase === 'loading' ? ' bk-modal--payment-loading' : '')}>
+        <div className={'bk-modal' + (showSummaryPanel ? '' : ' bk-modal--compact') + (isPaymentReturn ? ' bk-modal--payment-return' : '') + (isPaymentReturn && pmReturn.phase === 'loading' ? ' bk-modal--payment-loading' : '')}>
           <div className="bk-header">
           <button type="button" className="bk-modal-back" aria-label="Go back" onClick={handleBack}>
             <ArrowLeft size={18} aria-hidden="true" />
@@ -1414,7 +1418,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
           </div>
         )}
 
-        <div className={'bk-content' + (step === 'paymongoReturn' && pmReturn.phase === 'loading' ? ' bk-content--payment-loading' : '')}>
+        <div className={'bk-content' + (isPaymentReturn ? ' bk-content--payment-return' : '') + (isPaymentReturn && pmReturn.phase === 'loading' ? ' bk-content--payment-loading' : '')}>
           <div className="bk-body">
             {step === 'price' && room && (
               <div className="bk-step" id="bkStepPrice">
@@ -1501,6 +1505,8 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
                                 (day.holiday ? ' bk-day--holiday' : '')
                               }
                               title={day.title || undefined}
+                              aria-label={day.title ? `${day.d}, ${day.title}` : `${day.d}`}
+                              data-tooltip={day.title || undefined}
                               disabled={day.disabled}
                               onClick={!day.disabled ? () => handleSelectDate(day.y, day.m, day.d) : undefined}
                             >
@@ -2005,7 +2011,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
             )}
 
             {step === 'paymongoReturn' && (
-              <div className="bk-step" id="bkStepPaymongoReturn" role={pmReturn.phase === 'loading' ? 'status' : undefined} aria-live={pmReturn.phase === 'loading' ? 'polite' : undefined}>
+              <div className={`bk-step bk-payment-return bk-payment-return--${pmReturn.phase}`} id="bkStepPaymongoReturn" role={pmReturn.phase === 'loading' ? 'status' : undefined} aria-live={pmReturn.phase === 'loading' ? 'polite' : undefined}>
                 {pmReturn.phase === 'confirmed' ? (
                   <BookingSuccess
                     booking={pmReturn.booking}
@@ -2070,6 +2076,13 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
                       {pmReturn.phase === 'pending' &&
                         (pmReturn.message || 'This can take a little longer than usual. You\'ll see your reservation move to "Confirmed" in your profile shortly — no need to pay again.')}
                     </p>
+
+                    {['cancelled', 'expired'].includes(pmReturn.phase) && (
+                      <div className="bk-payment-return-note" role="status">
+                        <i className="fa-solid fa-circle-check" aria-hidden="true"></i>
+                        No charge was completed.
+                      </div>
+                    )}
 
                     {['cancelled', 'expired', 'failed'].includes(pmReturn.phase) && room ? (
                       <div className="bk-success-actions-row">

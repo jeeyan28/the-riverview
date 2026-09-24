@@ -354,6 +354,54 @@
   margin-left: auto;
 }
 
+.public-site .bk-modal.bk-modal--payment-return {
+  width: min(760px, 100%);
+  height: min(620px, calc(100dvh - 48px));
+}
+.public-site .bk-content--payment-return .bk-body {
+  display: grid;
+  place-items: center;
+  padding: 28px;
+}
+.public-site .bk-payment-return {
+  display: flex;
+  width: min(100%, 560px);
+  min-height: 100%;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto;
+  padding: 28px 20px;
+  text-align: center;
+}
+.public-site .bk-payment-return--cancelled .bk-confirm-icon,
+.public-site .bk-payment-return--expired .bk-confirm-icon,
+.public-site .bk-payment-return--failed .bk-confirm-icon {
+  background: color-mix(in srgb, var(--danger) 12%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--danger) 32%, var(--border));
+  color: var(--danger);
+}
+.public-site .bk-payment-return--cancelled h3,
+.public-site .bk-payment-return--expired h3 { letter-spacing: -.02em; }
+.public-site .bk-payment-return-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin: 12px 0 2px;
+  padding: 7px 10px;
+  border: 1px solid color-mix(in srgb, var(--success) 24%, var(--border));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--success) 8%, var(--surface));
+  color: var(--success);
+  font-size: .72rem;
+  font-weight: 700;
+}
+.public-site .bk-payment-return .bk-success-actions-row {
+  width: min(100%, 470px);
+  margin-top: 20px;
+}
+.public-site .bk-payment-return .bk-success-actions-row > * { min-width: 0; }
+
 .public-site .bk-modal.bk-modal--payment-loading {
   width: min(760px, 100%);
   height: min(500px, calc(100dvh - 48px));
@@ -391,6 +439,27 @@
 
 .public-site :is(.btn-select, .fd-primary-button, .fd-room-cta, .btn-primary-hero, .bk-room-option, .bk-confirm) {
   touch-action: manipulation;
+}
+
+/* Give the first booking step a useful canvas: room choices fill the modal
+   instead of sitting in a narrow column beside an empty panel. */
+.public-site #bkStepPrice {
+  width: 100%;
+  max-width: none;
+}
+.public-site #bkStepPrice .bk-room-list {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr));
+  gap: 14px;
+}
+.public-site #bkStepPrice .bk-room-option-collapsed { min-height: 150px; padding: 14px; }
+.public-site #bkStepPrice .bk-room-option-img { width: 150px; height: 118px; flex-basis: 150px; }
+.public-site #bkStepPrice .bk-room-option-name { font-size: 1.05rem; }
+.public-site #bkStepPrice .bk-room-option-price { font-size: 1rem; }
+.public-site #bkStepPrice .bk-info-bar { max-width: none; }
+
+@media (max-width: 700px) {
+  .public-site #bkStepPrice .bk-room-list { grid-template-columns: 1fr; }
+  .public-site #bkStepPrice .bk-room-option-img { width: 112px; height: 92px; flex-basis: 112px; }
 }
 
 /* Show browser handoff help only after an embedded browser user requests Google sign-in. */
@@ -431,6 +500,10 @@
 }
 
 @media (max-width: 599px) {
+  .public-site .bk-modal.bk-modal--payment-return {
+    height: calc(100dvh - 16px);
+    max-height: calc(100dvh - 16px);
+  }
   .public-site .bk-modal.bk-modal--payment-loading {
     height: calc(100dvh - 16px);
     max-height: calc(100dvh - 16px);
