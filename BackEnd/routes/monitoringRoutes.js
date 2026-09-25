@@ -14,6 +14,7 @@ const { getMonitorReport } = require("../utils/monitorReport");
 const { createWorkbook } = require("../utils/reportWorkbook");
 const { addDailyMonitorWorkbook } = require("../utils/dailyMonitorWorkbook");
 const { validate } = require("../middleware/validate");
+const AppError = require("../utils/appError");
 const {
   idParamsSchema,
   emptyBodySchema,
@@ -21,6 +22,7 @@ const {
   monitorRoomUpdateSchema,
   sessionCreateSchema,
   sessionExtendSchema,
+  sessionExtendQuoteSchema,
   sessionEndSchema,
   sessionCorrectionSchema,
   sessionCancelSchema,
@@ -28,6 +30,35 @@ const {
 
 function currentBusinessHour(value = new Date()) {
   return Number(new Intl.DateTimeFormat("en-US", { timeZone: TIME_ZONE, hour: "2-digit", hourCycle: "h23" }).format(new Date(value)));
+}
+
+function currentBusinessClockHour(value) {
+  const parts = new Intl.DateTimeFormat("en-GB", { timeZone: TIME_ZONE, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(new Date(value));
+  const hour = Number(parts.find((part) => part.type === "hour")?.value);
+  const minute = Number(parts.find((part) => part.type === "minute")?.value);
+  return hour + minute / 60;
+}
+
+async function quoteSessionExtension(session, addedHours) {
+  if (session.status !== "Active") throw new AppError(409, "Only active sessions can be extended.");
+  if (Number(session.duration) + Number(addedHours) > MAX_MONITOR_SESSION_HOURS) {
+    throw new AppError(400, `Total session duration cannot exceed ${MAX_MONITOR_SESSION_HOURS} hours.`);
+  }
+  const room = await MonitorRoom.findById(session.room);
+  if (!session.rate) {
+    session.rate = room?.price || 0;
+    if (!session.amount) session.amount = session.rate * session.duration;
+    if (session.paymentStatus === "Paid" && !session.paidAmount) session.paidAmount = session.amount;
+  }
+  const endTime = session.scheduledEndTime
+    ? new Date(session.scheduledEndTime).getTime()
+    : new Date(session.startTime).getTime() + Number(session.duration) * 3600000;
+  const pricingStart = endTime - Number(session.duration) * 3600000;
+  const pricing = calculateSessionExtension({ session, room, addedHours, startHour: currentBusinessClockHour(pricingStart) });
+  if (!(pricing.addedCharge > 0)) throw new AppError(409, "Set a valid room rate before extending this session.");
+  const fields = extendSessionFields(session, addedHours, pricing.amount);
+  const currentBalance = Math.max(0, Number(session.amount) - Number(session.paidAmount || 0) + Number(session.refundedAmount || 0));
+  return { pricing, fields, currentBalance, scheduledEndTime: new Date(endTime + Number(addedHours) * 3600000) };
 }
 
 function sessionAuditLabel(session) {
@@ -419,54 +450,45 @@ sessionsRouter.post("/", requireAnyPermission(PERMISSIONS.ROOM_OPERATE, PERMISSI
   }
 });
 
-sessionsRouter.put("/:id/extend", requirePermission(PERMISSIONS.ROOM_OPERATE), validate(idParamsSchema, "params"), validate(sessionExtendSchema), async (req, res) => {
+sessionsRouter.get("/:id/extend", requirePermission(PERMISSIONS.ROOM_OPERATE), validate(idParamsSchema, "params"), validate(sessionExtendQuoteSchema, "query"), async (req, res) => {
   try {
-    const { addedHours, paymentStatus, paymentMethod } = req.body;
-
-    if (!addedHours || addedHours <= 0) {
-      return res.status(400).json({ message: "addedHours must be greater than 0." });
-    }
-    if (paymentStatus !== undefined && paymentStatus !== "Paid") {
-      return res.status(400).json({ message: "Invalid payment status." });
-    }
-
     const session = await RoomSession.findById(req.params.id);
     if (!session) return res.status(404).json({ message: "Session not found." });
-    if (session.status !== "Active") {
-      return res.status(400).json({ message: "Only active sessions can be extended." });
+    const { pricing, fields, currentBalance, scheduledEndTime } = await quoteSessionExtension(session, req.query.addedHours);
+    res.json({
+      addedHours: req.query.addedHours,
+      addedCharge: pricing.addedCharge,
+      currentBalance,
+      newBalance: Math.round((currentBalance + pricing.addedCharge) * 100) / 100,
+      newAmount: fields.amount,
+      scheduledEndTime,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(err.status || 500).json({ message: err.message || "Server error." });
+  }
+});
+
+sessionsRouter.put("/:id/extend", requirePermission(PERMISSIONS.ROOM_OPERATE), validate(idParamsSchema, "params"), validate(sessionExtendSchema), async (req, res) => {
+  try {
+    const { addedHours, collectNow, expectedCharge, paymentMethod } = req.body;
+    const session = await RoomSession.findById(req.params.id);
+    if (!session) return res.status(404).json({ message: "Session not found." });
+    const { pricing, scheduledEndTime } = await quoteSessionExtension(session, addedHours);
+    if (Math.abs(pricing.addedCharge - expectedCharge) >= 0.01) {
+      return res.status(409).json({ message: "The extension charge changed. Review the updated amount before confirming." });
     }
     const previousPaid = Number(session.paidAmount) || 0;
+    const fields = extendSessionFields(session, addedHours, pricing.amount, { collectNow });
 
-    if (!session.rate) {
-      const room = await MonitorRoom.findById(session.room);
-      session.rate = room?.price || 0;
-      if (!session.amount) session.amount = session.rate * session.duration;
-      if (session.paymentStatus === "Paid" && !session.paidAmount) session.paidAmount = session.amount;
-    }
-
-    const newDuration = Number(session.duration) + Number(addedHours);
-    if (newDuration > MAX_MONITOR_SESSION_HOURS) {
-      return res.status(400).json({ message: `Total session duration cannot exceed ${MAX_MONITOR_SESSION_HOURS} hours.` });
-    }
-
-    const room = await MonitorRoom.findById(session.room);
-    const pricingStart = session.scheduledEndTime
-      ? new Date(session.scheduledEndTime).getTime() - Number(session.duration) * 3600000
-      : session.startTime;
-    const pricing = calculateSessionExtension({ session, room, addedHours, startHour: currentBusinessHour(pricingStart) });
-    const fields = extendSessionFields(session, addedHours, pricing.amount);
     session.duration = fields.duration;
-    if (session.scheduledEndTime) session.scheduledEndTime = new Date(new Date(session.scheduledEndTime).getTime() + Number(addedHours) * 3600000);
+    session.scheduledEndTime = scheduledEndTime;
     session.amount = fields.amount;
     session.hourlyRates = pricing.hourlyRates;
     session.paidAmount = fields.paidAmount;
-    session.refundedAmount = fields.refundedAmount;
     session.paymentStatus = fields.paymentStatus;
-    if (paymentStatus === "Paid") {
-      session.paidAmount = fields.amount;
-      session.paymentStatus = "Paid";
-    }
-    if (paymentMethod !== undefined) session.paymentMethod = paymentMethod;
+    session.paymentTiming = fields.paymentStatus === "Paid" ? "Before" : "After";
+    if (collectNow) session.paymentMethod = paymentMethod;
 
     await session.save();
     await syncBookingFromSession(session, Booking.BOOKING_STATUS.ONGOING);

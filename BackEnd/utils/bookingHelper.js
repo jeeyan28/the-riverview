@@ -207,8 +207,10 @@ async function saveWithReservationCode(booking, facilityName, attempts = 5, sess
   }
 }
 
-async function finalizeBookingFromPayment({ paymentIntentId, metadata, paidPaymentId, paymentMethodType }) {
-  const existing = await Booking.findOne({ paymongoPaymentIntentId: paymentIntentId });
+async function finalizeBookingFromPayment({ paymentIntentId, metadata, paidPaymentId, paymentMethodType, provider = "paymongo" }) {
+  if (!["paymongo", "xendit"].includes(provider)) throw new Error("Unsupported payment provider.");
+  const providerIdField = provider === "xendit" ? "xenditPaymentSessionId" : "paymongoPaymentIntentId";
+  const existing = await Booking.findOne({ [providerIdField]: paymentIntentId });
   if (existing) return existing;
 
   const { roomId, variantLabel, date, timeIn, duration, guestCount } = metadata || {};
@@ -233,7 +235,9 @@ async function finalizeBookingFromPayment({ paymentIntentId, metadata, paidPayme
         });
         room = pricing.room;
       } catch (e) {
-        throw new AppError(e.message || "This time slot is no longer available.", e.status || 409, { slotUnavailable: true });
+        const slotError = new AppError(e.status || 409, e.message || "This time slot is no longer available.");
+        slotError.slotUnavailable = true;
+        throw slotError;
       }
 
       const paidHourlyRates = (() => {
@@ -267,8 +271,10 @@ async function finalizeBookingFromPayment({ paymentIntentId, metadata, paidPayme
         hourlyRates: paidHourlyRates,
         firstHourPayment: computeDownPayment(paidHourlyRates, 1),
         corkageFee: Number(metadata.corkageFee) || 0,
-        paymentMethod: getPaymongoPaymentMethodLabel(paymentMethodType),
-        paymentProvider: "paymongo",
+        paymentMethod: provider === "xendit"
+          ? ({ GCASH: "GCash", PAYMAYA: "Maya" }[paymentMethodType] || "Xendit online payment")
+          : getPaymongoPaymentMethodLabel(paymentMethodType),
+        paymentProvider: provider,
         bookedBy: metadata.bookedBy || undefined,
         source: "online",
         status: "Confirmed",
@@ -276,8 +282,8 @@ async function finalizeBookingFromPayment({ paymentIntentId, metadata, paidPayme
         paymentUpdatedAt: new Date(),
         downPayment: Number(metadata.downPayment) || 0,
         downPaymentHours: Number(metadata.downPaymentHours) || 1,
-        paymongoPaymentIntentId: paymentIntentId,
-        paymongoPaymentId: paidPaymentId || "",
+        [providerIdField]: paymentIntentId,
+        ...(provider === "xendit" ? { xenditPaymentId: paidPaymentId || "" } : { paymongoPaymentId: paidPaymentId || "" }),
       });
 
       await saveWithReservationCode(newBooking, room.name, undefined, session);
@@ -287,8 +293,8 @@ async function finalizeBookingFromPayment({ paymentIntentId, metadata, paidPayme
       return newBooking;
     });
   } catch (err) {
-    if (err.code === 11000 && err.keyPattern?.paymongoPaymentIntentId) {
-      return Booking.findOne({ paymongoPaymentIntentId: paymentIntentId });
+    if (err.code === 11000 && err.keyPattern?.[providerIdField]) {
+      return Booking.findOne({ [providerIdField]: paymentIntentId });
     }
     throw err;
   }

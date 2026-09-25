@@ -40,3 +40,24 @@ test('extending a session keeps its paid hourly rate when the stored monitor rat
   assert.deepEqual(extended.hourlyRates, [400, 400]);
   assert.equal(extended.amount, 800);
 });
+
+test('half-hour extensions charge only the added minutes and respect an evening rate boundary', () => {
+  const session = { rate: 200, hourlyRates: [200], duration: 1, amount: 200, guestCount: 1 };
+  const room = { price: 200, pricingMode: 'time-based', eveningPrice: 300, eveningStartTime: '17:00' };
+  const halfHour = calculateSessionExtension({ session, room, addedHours: 0.5, startHour: 15.5 });
+  assert.equal(halfHour.addedCharge, 100);
+  assert.equal(halfHour.amount, 300);
+  const crossesEvening = calculateSessionExtension({ session, room, addedHours: 1, startHour: 15.5 });
+  assert.equal(crossesEvening.addedCharge, 250);
+  assert.equal(crossesEvening.amount, 450);
+  assert.deepEqual(crossesEvening.hourlyRates, [200, 200, 300]);
+});
+
+test('all extension lengths charge the matching fraction of a flat hourly rate', () => {
+  const session = { rate: 250, hourlyRates: [250], duration: 1, amount: 250, guestCount: 1 };
+  for (const [addedHours, expectedCharge] of [[0.5, 125], [1, 250], [1.5, 375], [2, 500]]) {
+    const quote = calculateSessionExtension({ session, room: { price: 250 }, addedHours, startHour: 10 });
+    assert.equal(quote.addedCharge, expectedCharge);
+    assert.equal(quote.amount, 250 + expectedCharge);
+  }
+});

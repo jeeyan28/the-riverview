@@ -320,7 +320,8 @@
 .rm-stat--overdue{border-left-color:var(--red);}
 .rm-stat--overdue .rm-stat-value{color:var(--red);}
 
-.rm-quick-actions{display:grid;grid-template-columns:minmax(0,1fr) 40px;gap:8px;margin-top:auto;padding-top:14px;}
+.rm-quick-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr)) 40px;gap:8px;margin-top:auto;padding-top:14px;}
+.rm-quick-actions--no-extend{grid-template-columns:minmax(0,1fr) 40px;}
 .rm-quick-actions .rm-btn{min-width:0;justify-content:center;padding:8px 10px;font-size:.78rem;}
 #app .rm-quick-actions .rm-btn--icon{flex:0 0 40px;width:40px;padding:8px 0;}
 .rm-btn--success{background:rgba(22,163,74,.14);border-color:rgba(22,163,74,.4);color:var(--green);}
@@ -362,8 +363,26 @@
 .rmd-actions-row{display:flex;gap:8px;}
 .rmd-actions-row .rm-btn{flex:1;justify-content:center;}
 
+#app .modal-box.extend-session-modal{width:min(520px,100%);max-width:520px;}
+.session-extension{display:flex;flex-direction:column;min-height:420px;}
+.session-extension-options{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:10px 0 16px;}
+.session-extension-option{min-height:48px;padding:8px;border:1px solid var(--border);border-radius:10px;background:var(--navy3);color:var(--text);font-weight:700;}
+.session-extension-option:hover{border-color:var(--teal);}
+.session-extension-option.active{border-color:var(--teal);background:var(--teal-soft);color:var(--teal-text);}
+.session-extension-option:focus-visible{outline:2px solid var(--teal-text);outline-offset:2px;}
+.session-extension-quote-slot{display:grid;align-content:start;min-height:264px;}
+.session-extension-quote-slot > .mfield-note[role="status"]{margin:12px 0;}
+#app .session-extension-summary{grid-template-columns:repeat(2,minmax(0,1fr));}
+.session-extension-method{margin-top:14px;}
+.session-extension-retry{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:12px 0;}
+.session-extension-retry .session-form-error{margin:0;}
+
 @media (max-width:640px){
   .rm-stats-bar{grid-template-columns:repeat(2,1fr);}
+  .session-extension{min-height:0;}
+  .session-extension-options{grid-template-columns:repeat(2,minmax(0,1fr));}
+  .session-extension-quote-slot{min-height:360px;}
+  #app .session-extension-summary{grid-template-columns:1fr;}
 }
 
 .rm-btn--icon{flex:0 0 auto;width:34px;justify-content:center;padding:8px 0;}

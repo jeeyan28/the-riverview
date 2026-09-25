@@ -45,6 +45,10 @@ export const roomSessionsService = {
 
   create: (payload) => apiRequest(SESSIONS_BASE, { method: 'POST', body: payload, fallbackMessage: 'Failed to start the session.' }),
 
+  quoteExtension: (id, addedHours) => apiRequest(`${SESSIONS_BASE}/${id}/extend?addedHours=${addedHours}`, { fallbackMessage: 'Could not calculate the extension charge.' }),
+
+  extend: (id, payload) => apiRequest(`${SESSIONS_BASE}/${id}/extend`, { method: 'PUT', body: payload, fallbackMessage: 'Failed to extend this session.' }),
+
   end: (id, payment) => apiRequest(`${SESSIONS_BASE}/${id}/end`, { method: 'PUT', body: typeof payment === 'boolean' ? { paid: payment } : payment, fallbackMessage: 'Failed to end the session.' }),
 
   editFinished: (id, payload) => apiRequest(`${SESSIONS_BASE}/${id}`, { method: 'PUT', body: payload, fallbackMessage: 'Failed to correct this session record.' }),

@@ -40,6 +40,8 @@ app.use(async (req, res, next) => {
 
 const { webhookHandler } = require("./routes/paymongoRoutes");
 app.post("/api/payments/paymongo/webhook", express.raw({ type: "application/json" }), webhookHandler);
+const { webhookHandler: xenditWebhookHandler } = require("./routes/xenditRoutes");
+app.post("/api/payments/xendit/webhook", express.json({ limit: "100kb" }), xenditWebhookHandler);
 
 app.get("/api/cron/purge-expired-guests", async (req, res) => {
   if (req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`) {
@@ -121,6 +123,7 @@ app.use("/api/forecast", require("./routes/forecastRoutes"));
 app.use("/api/dashboard", require("./routes/dashboardRoutes"));
 app.use("/api/reports", require("./routes/reportRoutes"));
 app.use("/api/payments/paymongo", require("./routes/paymongoRoutes").router);
+app.use("/api/payments/xendit", require("./routes/xenditRoutes").router);
 
 app.use((err, req, res, next) => {
   if (err) {

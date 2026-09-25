@@ -9,7 +9,7 @@ function money(value) {
 
 function bookingCollected(booking) {
   if (booking.paidAmount !== undefined && booking.paidAmount !== null) return money(Math.max(Number(booking.paidAmount) || 0, Number(booking.downPayment) || 0));
-  if (booking.paymentProvider === "paymongo" || Number(booking.downPayment) > 0) return money(booking.downPayment || 0);
+  if (["paymongo", "xendit"].includes(booking.paymentProvider) || Number(booking.downPayment) > 0) return money(booking.downPayment || 0);
   // Legacy records with only a Paid label do not prove how much was collected.
   // Keep them reviewable instead of treating the entire charge as cash received.
   return 0;
@@ -83,14 +83,16 @@ function completeReservationFields(booking, { now = Date.now(), hasMonitorSessio
   throw new AppError(409, "Only a confirmed or no-show reservation can be marked done.");
 }
 
-function extendSessionFields(session, addedHours, nextAmount) {
+function extendSessionFields(session, addedHours, nextAmount, { collectNow = false } = {}) {
   if (session.status !== "Active") throw new AppError(409, "Only active sessions can be extended.");
   const hours = Number(addedHours);
-  if (!Number.isInteger(hours) || hours <= 0) throw new AppError(400, "Hours to add must be a positive whole number.");
+  if (![0.5, 1, 1.5, 2].includes(hours)) throw new AppError(400, "Choose 30 minutes, 1 hour, 1 hour 30 minutes, or 2 hours.");
   const duration = Number(session.duration) + hours;
   if (duration > MAX_MONITOR_SESSION_HOURS) throw new AppError(400, `Total session duration cannot exceed ${MAX_MONITOR_SESSION_HOURS} hours.`);
   const amount = nextAmount === undefined ? money(session.amount) + money(session.rate) * hours : money(nextAmount);
-  return { duration, ...financialFields(amount, session.paidAmount || 0, session.refundedAmount || 0) };
+  const addedCharge = money(amount - money(session.amount));
+  const paidAmount = money((session.paidAmount || 0) + (collectNow ? addedCharge : 0));
+  return { duration, ...financialFields(amount, paidAmount, session.refundedAmount || 0) };
 }
 
 function endSessionFields(session, { paid = false, paidAmount } = {}, now = new Date()) {

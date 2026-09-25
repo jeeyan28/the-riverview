@@ -1,5 +1,5 @@
-export const LAST_UPDATED = 'September 23, 2026';
-export const TERMS_LAST_UPDATED = 'September 25, 2026';
+export const LAST_UPDATED = 'September 26, 2026';
+export const TERMS_LAST_UPDATED = 'September 26, 2026';
 
 export const TERMS_CONTENT = {
   en: {
@@ -23,7 +23,7 @@ export const TERMS_CONTENT = {
       {
         heading: '3. Payment',
         list: [
-          'For an online reservation, pay the first-hour rental charge through PayMongo. For reservations longer than one hour, you may choose to pay the full amount online. A one-hour reservation uses the required one-hour payment, even when that covers its full charge. Available checkout methods include GCash, Maya, QR Ph, and credit or debit card.',
+          'For an online reservation, pay the first-hour rental charge through PayMongo online checkout. If PayMongo cannot start checkout, Xendit may open as a backup with GCash and Maya. For reservations longer than one hour, you may choose to pay the full amount online. A one-hour reservation uses the required one-hour payment, even when that covers its full charge. PayMongo checkout also offers QR Ph and credit or debit card.',
           'A selected slot is held for 20 minutes while you complete payment. If the hold expires before successful payment, the slot becomes available to others. A reservation is confirmed only after successful payment is verified.',
           'If you pay only the first hour online, the remaining reservation balance is payable at the venue. Staff-created walk-in or manual reservations may use payment methods accepted by the facility.',
         ],
@@ -47,7 +47,7 @@ export const TERMS_CONTENT = {
         heading: '6. Cancellations and Refunds',
         paragraphs: [
           'You may submit a cancellation request for a confirmed reservation through your account. Staff review the request before the reservation is cancelled. Submitting a request does not cancel or refund the reservation automatically.',
-          'For a customer-initiated cancellation, the first-hour rental charge is non-refundable because the slot was held for you. If you paid more than the first-hour charge, the remaining amount may be refunded after cancellation approval. Approved refunds are arranged manually; the platform does not issue an instant PayMongo refund.',
+          'For a customer-initiated cancellation, the first-hour rental charge is non-refundable because the slot was held for you. If you paid more than the first-hour charge, the remaining amount may be refunded after cancellation approval. Approved refunds are arranged manually; the platform does not issue an instant online refund.',
           'If an unforeseen accident or serious medical emergency prevents you from attending, contact our support team promptly and provide valid supporting documents, such as a medical certificate or incident report. Once verified, we will offer a full refund or reschedule. Staff handle this exception manually, including requests made after the online reschedule cutoff.',
           'A verified duplicate charge or payment error, or a cancellation caused by facility closure or unavailability, may qualify for a full refund after review. Contact support so the team can arrange and record the refund manually.',
         ],
@@ -102,7 +102,7 @@ export const TERMS_CONTENT = {
       {
         heading: '3. Pagbabayad',
         list: [
-          'Para sa online reservation, bayaran ang unang oras ng rental o ang buong halaga ng reservation sa PayMongo. Kabilang sa mga available na paraan ng pagbabayad ang GCash, Maya, QR Ph, at credit o debit card.',
+          'Para sa online reservation, bayaran ang unang oras ng rental o ang buong halaga sa PayMongo online checkout. Kung hindi makapagsimula ang PayMongo, maaaring magbukas ang Xendit bilang backup gamit ang GCash o Maya. May QR Ph at credit o debit card din sa PayMongo checkout.',
           'Nakahold ang napiling slot nang 20 minuto habang kinukumpleto mo ang bayad. Kapag nag-expire ang hold bago makumpirma ang bayad, maaari na itong piliin ng iba. Nakukumpirma lamang ang reservation kapag na-verify ang matagumpay na bayad.',
           'Kung unang oras lamang ang binayaran mo online, babayaran sa pasilidad ang natitirang balanse. Para sa walk-in o manual reservation na ginawa ng staff, maaaring gamitin ang mga paraan ng pagbabayad na tinatanggap ng pasilidad.',
         ],
@@ -126,7 +126,7 @@ export const TERMS_CONTENT = {
         heading: '6. Pagkansela at Refund',
         paragraphs: [
           'Maaari kang magpadala sa iyong account ng cancellation request para sa kumpirmadong reservation. Susuriin muna ito ng staff bago makansela ang reservation. Hindi awtomatikong nagkakansela o nagre-refund ang pagpapadala ng request.',
-          'Sa pagkanselang sinimulan ng customer, hindi mare-refund ang bayad para sa unang oras dahil nireserba ang slot para sa iyo. Kung higit sa unang oras ang binayaran mo, maaaring i-refund ang natitirang halaga kapag naaprubahan ang pagkansela. Manu-manong inaayos ang aprubadong refund; walang agarang PayMongo refund mula sa platform.',
+          'Sa pagkanselang sinimulan ng customer, hindi mare-refund ang bayad para sa unang oras dahil nireserba ang slot para sa iyo. Kung higit sa unang oras ang binayaran mo, maaaring i-refund ang natitirang halaga kapag naaprubahan ang pagkansela. Manu-manong inaayos ang aprubadong refund; walang agarang online refund mula sa platform.',
           'Kung hindi ka makadalo dahil sa hindi inaasahang aksidente o seryosong medikal na emergency, kontakin agad ang support team at magbigay ng wastong dokumento, tulad ng medical certificate o incident report. Kapag napatunayan, mag-aalok kami ng buong refund o reschedule. Manu-manong inaasikaso ng staff ang exception na ito, kahit lampas na sa online reschedule cutoff.',
           'Ang napatunayang dobleng singil o error sa bayad, o pagkansela dahil sarado o hindi available ang pasilidad, ay maaaring maging dahilan para sa buong refund matapos suriin. Kontakin ang support para manu-manong maayos at maitala ang refund.',
         ],
@@ -173,7 +173,7 @@ export const PRIVACY_CONTENT = {
           'Personal details: name, email address, and phone/mobile number provided during account creation or reservation.',
           'Reservation details: selected date, time, court/table preference, and reservation length.',
           'If you sign in with Google: your name, email address, and profile picture, as shared by Google with your permission.',
-          'Payment information: online payments are processed by PayMongo. We do not store or collect your banking, card, or e-wallet credentials on our servers.',
+          'Payment information: online payments are processed by PayMongo, or by Xendit when backup checkout is used. We do not store or collect your banking, card, or e-wallet credentials on our servers.',
         ],
       },
       {
@@ -188,7 +188,7 @@ export const PRIVACY_CONTENT = {
       {
         heading: '3. Payment Processing & Security',
         paragraphs: [
-          'All digital transactions are processed via PayMongo Philippines, a licensed payment service provider. We apply reasonable technical and organizational safeguards to protect your personal details from unauthorized access, loss, or alteration.',
+          'Digital transactions are processed through PayMongo or, when backup checkout is used, Xendit. We apply reasonable technical and organizational safeguards to protect your personal details from unauthorized access, loss, or alteration.',
         ],
       },
       {
@@ -197,7 +197,7 @@ export const PRIVACY_CONTENT = {
           'We don\'t sell or rent your personal information. We share it only:',
         ],
         list: [
-          'With PayMongo, solely to process your online payment.',
+          'With PayMongo or Xendit, whichever processes your online payment.',
           'With Google, to the extent needed to support Google Sign-In, if you choose that option.',
           'If required by law, regulation, or a valid legal process.',
         ],
@@ -244,7 +244,7 @@ export const PRIVACY_CONTENT = {
           'Personal na detalye: pangalan, email address, at numero ng telepono/mobile na ibinigay sa paggawa ng account o pag-book.',
           'Detalye ng reservation: napiling petsa, oras, kagustuhan sa court/table, at haba ng reserbasyon.',
           'Kung mag-sign in gamit ang Google: ang iyong pangalan, email address, at profile picture, ayon sa ibinahagi ng Google nang may pahintulot mo.',
-          'Impormasyon sa pagbabayad: ang mga online na bayad ay pinoproseso ng PayMongo. Hindi namin iniimbak o kinokolekta ang iyong banking, card, o e-wallet credentials sa aming mga server.',
+          'Impormasyon sa pagbabayad: ang mga online na bayad ay pinoproseso ng PayMongo o Xendit kapag ginamit ang backup checkout. Hindi namin iniimbak o kinokolekta ang iyong banking, card, o e-wallet credentials sa aming mga server.',
         ],
       },
       {
@@ -259,7 +259,7 @@ export const PRIVACY_CONTENT = {
       {
         heading: '3. Proseso ng Pagbabayad at Seguridad',
         paragraphs: [
-          'Lahat ng digital na transaksyon ay pinoproseso sa pamamagitan ng PayMongo Philippines, isang lisensyadong payment service provider. Naglalapat kami ng makatwirang teknikal at organisasyonal na proteksyon para bantayan ang iyong personal na detalye laban sa hindi awtorisadong akses, pagkawala, o pagbabago.',
+          'Ang mga digital na transaksyon ay pinoproseso sa pamamagitan ng PayMongo o Xendit kapag ginamit ang backup checkout. Naglalapat kami ng makatwirang teknikal at organisasyonal na proteksyon para bantayan ang iyong personal na detalye laban sa hindi awtorisadong akses, pagkawala, o pagbabago.',
         ],
       },
       {
@@ -268,7 +268,7 @@ export const PRIVACY_CONTENT = {
           'Hindi namin ibinebenta o nirerentahan ang iyong personal na impormasyon. Ibinabahagi lamang namin ito:',
         ],
         list: [
-          'Sa PayMongo, para lamang sa pagproseso ng iyong online payment.',
+          'Sa PayMongo o Xendit, depende sa ginamit na checkout para sa iyong online payment.',
           'Sa Google, hangga\'t kinakailangan para suportahan ang Google Sign-In, kung pipiliin mo ang opsyong ito.',
           'Kung hinihiling ng batas, regulasyon, o wastong legal na proseso.',
         ],

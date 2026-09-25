@@ -50,9 +50,13 @@ const sessionCreateSchema = Joi.object({
 }).or("roomId", "bookingId");
 
 const sessionExtendSchema = Joi.object({
-  addedHours: duration.required(),
-  paymentStatus: Joi.string().valid("Paid"),
-  paymentMethod: Joi.string().trim().allow("").max(60),
+  addedHours: Joi.number().valid(0.5, 1, 1.5, 2).required(),
+  collectNow: Joi.boolean().required(),
+  expectedCharge: money.required(),
+  paymentMethod: Joi.string().trim().min(1).max(60).when("collectNow", { is: true, then: Joi.required(), otherwise: Joi.forbidden() }),
+});
+const sessionExtendQuoteSchema = Joi.object({
+  addedHours: Joi.number().valid(0.5, 1, 1.5, 2).required(),
 });
 
 const sessionEndSchema = Joi.object({
@@ -79,6 +83,7 @@ module.exports = {
   monitorRoomUpdateSchema,
   sessionCreateSchema,
   sessionExtendSchema,
+  sessionExtendQuoteSchema,
   sessionEndSchema,
   sessionCorrectionSchema,
   sessionCancelSchema,
