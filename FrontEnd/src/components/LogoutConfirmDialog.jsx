@@ -26,7 +26,7 @@ function LogoutConfirmDialog({ open, isGuest, onConfirm, onCancel }) {
       title={isGuest ? 'Delete this guest account?' : 'Log out?'}
       message={
         isGuest
-          ? "You're logging out of a guest account. This will permanently delete the account and its bookings unless you save it first."
+          ? "You're logging out of a guest account. This will permanently delete the account and its reservations unless you save it first."
           : 'Are you sure you want to log out?'
       }
       confirmText={isGuest && secondsLeft > 0 ? `Log out (${secondsLeft})` : 'Log out'}

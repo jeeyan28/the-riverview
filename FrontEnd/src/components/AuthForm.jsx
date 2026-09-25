@@ -633,7 +633,7 @@ function AuthForm({ mode, resetLogin, onSwitchMode, onForgotPassword, onAuthSucc
             onClick={openGuestModal}
             disabled={guestLoading}
           >
-            Book as a guest
+            Reserve as a guest
           </button>
           <div className="signup-row">
             New here?{' '}
@@ -647,14 +647,14 @@ function AuthForm({ mode, resetLogin, onSwitchMode, onForgotPassword, onAuthSucc
         <Modal
           open={guestModalOpen}
           onClose={() => !guestLoading && setGuestModalOpen(false)}
-          title="Book as a guest"
+          title="Reserve as a guest"
           actions={
             <>
               <button type="button" className="cancel-btn" onClick={() => setGuestModalOpen(false)} disabled={guestLoading}>
                 Cancel
               </button>
               <button type="button" className="save-btn" onClick={handleGuestSubmit} disabled={guestLoading}>
-                {guestLoading ? 'Starting…' : 'Continue to booking'}
+                {guestLoading ? 'Starting…' : 'Continue to reservation'}
               </button>
             </>
           }

@@ -65,7 +65,7 @@ router.post("/intent", ensureAuthenticated, paymentIntentLimiter, validate(creat
   try {
     const { guestName, guestContact, guestEmail, guestCount: guestCountRaw, hasCorkage, specialRequests, roomId, variantLabel, date, timeIn, duration, paymentChoice: requestedPaymentChoice, downPaymentHours: legacyPaymentHours, claimDiscount, selectedAddOns = [] } = req.body;
     const guestCount = guestCountRaw || 1;
-    const paymentChoice = requestedPaymentChoice || (duration > 1 && legacyPaymentHours === duration ? "full" : "deposit");
+    const paymentChoice = Number(duration) === 1 ? "deposit" : (requestedPaymentChoice || (legacyPaymentHours === duration ? "full" : "deposit"));
     const downPaymentHours = paymentChoice === "full" ? duration : 1;
 
     if (req.user.isGuest) {

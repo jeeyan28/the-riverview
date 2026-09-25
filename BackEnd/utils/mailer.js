@@ -4,6 +4,21 @@ const { EMAIL_RE } = require("./constants");
 
 const OTP_TTL_MINUTES = Math.round(OTP_TTL_MS / 60000);
 
+function reservationActionUrl(booking, action) {
+  const origins = (process.env.APP_BASE_URL || '').split(',').map((origin) => origin.trim());
+  const configured = process.env.APP_PUBLIC_URL || origins.find((origin) => /^https:\/\//i.test(origin)) || origins[0];
+  try {
+    const url = new URL(configured || 'http://localhost:5500');
+    if (!['http:', 'https:'].includes(url.protocol)) return '';
+    url.pathname = '/';
+    url.search = new URLSearchParams({ reservation: String(booking.reservationCode || booking._id || ''), action }).toString();
+    url.hash = '';
+    return url.toString();
+  } catch {
+    return '';
+  }
+}
+
 const transporter = nodemailer.createTransport({
   service: "gmail",
   auth: {
@@ -145,17 +160,20 @@ function buildReceiptEmail(booking) {
   const timeLabel = `${formatHour(startHour)} – ${formatHour(startHour + durationHours)}`;
   const facility = booking.roomLabel || "—";
   const roomName = booking.variantLabel || booking.roomLabel || "—";
+  const rescheduleUrl = reservationActionUrl(booking, 'reschedule');
+  const cancelUrl = reservationActionUrl(booking, 'cancel');
+  const actionLink = (url, label) => url ? `<a href="${escapeHtml(url)}" style="color:#075f55; font-weight:700; text-decoration:underline;">${label}</a>` : label;
 
   const rows = [
     ["Reservation Code", booking.reservationCode || "—"],
-    ["Booked by", fullName],
+    ["Reserved by", fullName],
     ["Contact no.", contact],
     ["Email", email],
     ["Room", roomName],
     ["Guests", String(booking.guestCount || 1)],
-    ["Booking date", dateLabel],
+    ["Reservation date", dateLabel],
     ["Time", `${timeLabel} (${durationHours} hour${durationHours === 1 ? "" : "s"})`],
-    ["Booked on", bookedOnLabel],
+    ["Reserved on", bookedOnLabel],
   ];
 
   const costRows = [
@@ -164,6 +182,12 @@ function buildReceiptEmail(booking) {
     ...(paidLater > 0 ? [["Paid later", paidLater]] : []),
     ["Remaining balance", remaining],
   ];
+  const venueDiscount = booking.paymentChoice === 'deposit' ? Math.max(0, Number(booking.eligibleDiscount || 0)) : 0;
+  const venueDiscountNote = venueDiscount > 0
+    ? durationHours === 1
+      ? `Room discount ₱${venueDiscount.toLocaleString('en-PH')} is due back to the guest at the facility. Staff: verify this receipt before settling it.`
+      : `Room discount ₱${venueDiscount.toLocaleString('en-PH')} is due against the guest's remaining balance at the facility. Staff: verify this receipt before settling it.`
+    : '';
 
   const infoPairs = [
     [rows[1], rows[2]],
@@ -179,7 +203,7 @@ function buildReceiptEmail(booking) {
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Booking Receipt</title>
+    <title>Reservation Receipt</title>
   </head>
   <body style="margin:0; padding:0; background-color:#f4f8f7; font-family:Arial, Helvetica, sans-serif;">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f8f7; padding:24px 12px;">
@@ -189,7 +213,7 @@ function buildReceiptEmail(booking) {
             <tr>
               <td style="padding:30px 30px 22px; background-color:#0b7067; color:#ffffff;">
                 <div style="color:#dcfff7; font-size:13px; font-weight:700; letter-spacing:.08em;">THE RIVERVIEW</div>
-                <h1 style="margin:25px 0 12px; color:#ffffff; font-size:27px; line-height:1.2;">Booking Confirmed</h1>
+                <h1 style="margin:25px 0 12px; color:#ffffff; font-size:27px; line-height:1.2;">Reservation Confirmed</h1>
                 <p style="margin:0 0 18px; color:#ffffff; font-size:14px; line-height:1.4;">Your reservation has been successfully created.</p>
                 <div style="color:#ffffff; font-size:13px; font-weight:700;">${escapeHtml(facility)}</div>
               </td>
@@ -206,8 +230,15 @@ function buildReceiptEmail(booking) {
                 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:18px 0 24px; background-color:#f1f6f5;">
                   ${costRows.map(([label, value]) => `<tr><td style="padding:11px 16px; font-size:14px; color:#52626a;">${escapeHtml(label)}</td><td align="right" style="padding:11px 16px; font-size:16px; color:${label === "Remaining balance" ? "#a15f08" : "#0b7067"}; font-weight:700; white-space:nowrap;">₱${Number(value || 0).toLocaleString("en-PH", { maximumFractionDigits: 2 })}</td></tr>`).join("")}
                 </table>
-                <p style="margin:0 0 10px; color:#52626a; font-size:13px; line-height:1.5;">A booking confirmation was sent to ${escapeHtml(email)}.</p>
-                <p style="margin:0; color:#87939a; font-size:12px;">Keep this receipt for your records.</p>
+                ${venueDiscountNote ? `<p style="margin:0 0 20px; padding:12px 14px; background-color:#e9f8f5; color:#075f55; font-size:13px; font-weight:700; line-height:1.5;">${escapeHtml(venueDiscountNote)}</p>` : ''}
+                <div style="padding-top:20px; border-top:1px solid #dce8e4; color:#52626a; font-size:13px; line-height:1.6;">
+                  <h2 style="margin:0 0 10px; color:#172b35; font-size:16px;">Reservation Policy &amp; Important Reminder</h2>
+                  <p style="margin:0 0 10px;">Please keep this receipt as proof of your confirmed reservation and present your Reservation Code when requesting assistance.</p>
+                  <p style="margin:0 0 10px;">Guests who wish to ${actionLink(rescheduleUrl, 'reschedule')} must submit a request at least 24 hours before the scheduled reservation time through The Riverview’s official Facebook Page, support email, or the online reservation system. Rescheduling is subject to the availability of the requested new schedule and must not conflict with an existing confirmed reservation.</p>
+                  <p style="margin:0 0 10px;">For ${actionLink(cancelUrl, 'cancellations')} or no-shows, the first-hour rental deposit is non-refundable. If the full reservation amount was paid, any amount exceeding the first-hour rate may be refunded upon approval. Full refunds or full rescheduling may be considered in cases of serious medical emergencies, accidents, verified system/payment errors, or cancellations made by The Riverview, subject to the required proof and approval.</p>
+                  <p style="margin:0 0 10px;">Guests are expected to follow their reserved schedule since reservations are arranged consecutively. A brief 2–3 minute preparation period may occur between sessions for cleaning and preparation of the room or equipment.</p>
+                  <p style="margin:0;">For rescheduling, refund requests, or billing concerns, please contact The Riverview’s official Facebook Page or <a href="mailto:support@theriverview.com" style="color:#075f55;">support@theriverview.com</a>.</p>
+                </div>
               </td>
             </tr>
           </table>
@@ -218,9 +249,9 @@ function buildReceiptEmail(booking) {
   </html>
   `;
 
-  const text = `Booking Confirmed\n\nYour reservation has been successfully created.\nFacility: ${facility}\n\n${rows.map(([label, value]) => `${label}: ${value}`).join("\n")}\n\n${costRows.map(([label, value]) => `${label}: ₱${Number(value || 0).toLocaleString()}`).join("\n")}\n\nPlease keep this receipt for your records. ${remaining > 0 ? 'The remaining balance is paid upon arrival.' : 'Your booking is fully paid.'}`;
+  const text = `Reservation Confirmed\n\nYour reservation has been successfully created.\nFacility: ${facility}\n\n${rows.map(([label, value]) => `${label}: ${value}`).join("\n")}\n\n${costRows.map(([label, value]) => `${label}: ₱${Number(value || 0).toLocaleString()}`).join("\n")}\n\nReservation Policy & Important Reminder\nPlease keep this receipt as proof of your confirmed reservation and present your Reservation Code when requesting assistance.\nGuests who wish to reschedule must submit a request at least 24 hours before the scheduled reservation time. Rescheduling depends on availability and must not conflict with a confirmed reservation.\nReschedule online: ${rescheduleUrl}\nFor cancellations or no-shows, the first-hour rental deposit is non-refundable. If the full reservation amount was paid, any amount exceeding the first-hour rate may be refunded upon approval. Full refunds or full rescheduling may be considered for serious medical emergencies, accidents, verified system/payment errors, or cancellations made by The Riverview, subject to proof and approval.\nRequest cancellation online: ${cancelUrl}\nGuests should follow their reserved schedule because reservations are arranged consecutively. A 2–3 minute preparation period may occur between sessions for cleaning and preparation.\nFor rescheduling, refund requests, or billing concerns, contact The Riverview's official Facebook Page or support@theriverview.com.`;
 
-  return { html, text };
+  return { html, text: venueDiscountNote ? `${text}\n\n${venueDiscountNote}` : text };
 }
 
 async function sendReceiptEmail(booking) {

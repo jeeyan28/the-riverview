@@ -81,7 +81,7 @@ function netCollected(b) {
 }
 
 function outstandingBalance(b) {
-  if (['Cancelled', 'Rejected'].includes(reservationPresentation(b).status)) return 0;
+  if (['Cancelled', 'Rejected', 'No Show'].includes(reservationPresentation(b).status)) return 0;
   return Math.max(0, Number(b?.amount || 0) - netCollected(b));
 }
 
@@ -94,13 +94,15 @@ function paymentPlanLabel(b) {
   const balance = outstandingBalance(b);
   const refunded = Number(b?.refundedAmount) || 0;
   const cancellation = cancellationAmounts(b);
+  if (reservationPresentation(b).status === 'No Show') return paid > 0
+    ? `${formatPeso(paid)} paid${Number(b?.venueDiscountRefunded) > 0 ? ` · ${formatPeso(b.venueDiscountRefunded)} room discount settled` : ''}`
+    : 'No payment';
   if (b?.status === 'Cancelled' && b?.cancellationStatus === 'Approved' && cancellation.customerCancelled && cancellation.refundRemaining > 0) {
     return `${isFullPayment(b) ? 'Paid ' : ''}${formatPeso(paid)} retained · ${formatPeso(cancellation.refundRemaining)} refund to arrange`;
   }
   if (refunded > 0) return `${formatPeso(refunded)} refunded · ${isFullPayment(b) ? 'Paid ' : ''}${formatPeso(paid)} retained`;
-  if (reservationPresentation(b).status === 'No Show') return `${formatPeso(paid)} paid · ${formatPeso(balance)} remaining`;
   if (['Cancelled', 'Rejected'].includes(reservationPresentation(b).status)) return paid > 0 ? `${isFullPayment(b) ? 'Paid ' : ''}${formatPeso(paid)} retained` : 'No payment retained';
-  if (isFullPayment(b)) return `Paid ${formatPeso(paid)}`;
+  if (isFullPayment(b)) return b?.paymentChoice === 'deposit' && Number(b?.duration) === 1 ? `1-hour payment ${formatPeso(paid)}` : `Paid ${formatPeso(paid)}`;
   if (paid > 0) return `${formatPeso(paid)} paid · ${formatPeso(balance)} remaining`;
   return `${formatPeso(balance)} remaining`;
 }
@@ -639,10 +641,11 @@ function Bookings() {
                   <div className="bd-section-title"><i className="ti ti-credit-card"></i> Payment Breakdown</div>
                   <div className="bd-grid bd-financial-grid">
                     <div className="bd-field"><label>Room charge</label><p>{formatPeso(Math.max(0, Number(detailBooking.roomCharge ?? (Number(detailBooking.amount || 0) - Number(detailBooking.corkageFee || 0)))))}</p></div>
-                    {Number(detailBooking.discountAmount) > 0 && <div className="bd-field"><label>Pay-in-full discount ({detailBooking.discountPercent}%)</label><p>−{formatPeso(detailBooking.discountAmount)}</p></div>}
+                    {Number(detailBooking.discountAmount) > 0 && <div className="bd-field"><label>{detailBooking.venueDiscountApplied ? 'Room discount settled at venue' : 'Pay-in-full discount'} ({detailBooking.discountPercent}%)</label><p>−{formatPeso(detailBooking.discountAmount)}</p></div>}
                     {(detailBooking.addOns || []).map((service) => <div className="bd-field" key={service.name}><label>{service.name}</label><p>{formatPeso(service.fee)}</p></div>)}
                     <div className="bd-field"><label>Corkage</label><p>{formatPeso(detailBooking.corkageFee || 0)}</p></div>
-                    {detailBooking.paymentChoice === 'deposit' && Number(detailBooking.eligibleDiscount) > 0 && <div className="bd-field"><label>Discount to arrange at venue</label><p>{formatPeso(detailBooking.eligibleDiscount)}</p></div>}
+                    {detailBooking.paymentChoice === 'deposit' && !detailBooking.venueDiscountApplied && Number(detailBooking.eligibleDiscount) > 0 && <div className="bd-field"><label>{Number(detailBooking.duration) === 1 ? 'Discount to return at venue' : 'Discount to deduct at venue'}</label><p>{formatPeso(detailBooking.eligibleDiscount)}</p></div>}
+                    {Number(detailBooking.venueDiscountRefunded) > 0 && <div className="bd-field"><label>Room discount returned to guest</label><p>{formatPeso(detailBooking.venueDiscountRefunded)}</p></div>}
                     <div className="bd-field bd-field--total"><label>Total charge</label><p>{formatPeso(detailBooking.amount)}</p></div>
                     <div className="bd-field"><label>Payment received</label><p>{formatPeso(netCollected(detailBooking))}</p></div>
                     <div className="bd-field"><label>Balance remaining</label><p>{formatPeso(outstandingBalance(detailBooking))}</p></div>
@@ -983,8 +986,8 @@ function CancellationReviewModal({ booking, onClose, onSubmit }) {
             <div className="cancellation-review-reason"><span>Guest's reason</span><p>{booking.cancellationReason?.trim() || 'No reason provided.'}</p></div>
           </div>
           {!alreadyApproved && <fieldset className="cancellation-decision"><legend>Choose a decision</legend><div className="cancellation-decision-options">
-            <button type="button" aria-pressed={decision === 'approve'} className={decision === 'approve' ? 'is-selected' : ''} onClick={() => setDecision('approve')}><strong>Approve cancellation</strong><small>Cancel the booking and record any refund.</small></button>
-            <button type="button" aria-pressed={decision === 'reject'} className={decision === 'reject' ? 'is-selected' : ''} onClick={() => { setDecision('reject'); setRefundException(false); setRefundedAmount(String(booking.refundedAmount ?? 0)); }}><strong>Keep reservation</strong><small>Decline the request; the booking stays active.</small></button>
+            <button type="button" aria-pressed={decision === 'approve'} className={decision === 'approve' ? 'is-selected' : ''} onClick={() => setDecision('approve')}><strong>Approve cancellation</strong><small>Cancel the reservation and record any refund.</small></button>
+            <button type="button" aria-pressed={decision === 'reject'} className={decision === 'reject' ? 'is-selected' : ''} onClick={() => { setDecision('reject'); setRefundException(false); setRefundedAmount(String(booking.refundedAmount ?? 0)); }}><strong>Keep reservation</strong><small>Decline the request; the reservation stays active.</small></button>
           </div></fieldset>}
           {decision === 'approve' && <div className="cancellation-refund-section">
             {amounts.customerCancelled && <div className="cancellation-policy"><span>Refund limit</span><strong>Up to {formatPeso(maxRefund)}</strong><small>{booking.cancellationRefundException ? 'Refund exception approved.' : `First-hour charge kept: ${amounts.firstHour === null ? 'needs review' : formatPeso(Math.min(amounts.paid, amounts.firstHour))}`}</small></div>}
@@ -1189,7 +1192,7 @@ function EditBookingModal({ booking, rooms, onClose, onSaved, minDuration, maxDu
             <div>
               <div className="bd-section-title"><i className="ti ti-shield-check"></i> Status</div>
               <ReservationStatus booking={booking} />
-              <p className="mfield-note">Use the reservation actions to confirm, complete, or cancel a booking.</p>
+              <p className="mfield-note">Use the reservation actions to confirm, complete, or cancel a reservation.</p>
             </div>
           </div>
 

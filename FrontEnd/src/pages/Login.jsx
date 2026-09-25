@@ -46,12 +46,12 @@ function Login() {
         <div className={`login-copy${isMorphing ? ' is-exiting' : ''}`}>
           <span className="login-badge">THE RIVERVIEW RESERVATIONS</span>
           <h1>
-            <span>Book your time.</span>
+            <span>Reserve your time.</span>
             <span>Enjoy the rest.</span>
           </h1>
           <p>
             One secure login for reservations and assigned staff access — with
-            payments, confirmations, and booking history in one place.
+            payments, confirmations, and reservation history in one place.
           </p>
           {!isMorphing && (
             <div className="login-proof" aria-label="Account benefits">

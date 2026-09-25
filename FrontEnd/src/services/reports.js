@@ -4,7 +4,7 @@ const BASE = '/api/reports';
 
 export const reportsService = {
   getConfirmedBookingTrend(interval) {
-    return apiRequest(`${BASE}/confirmed-booking-trend?interval=${encodeURIComponent(interval)}`, { fallbackMessage: 'Could not load confirmed bookings.' });
+    return apiRequest(`${BASE}/confirmed-booking-trend?interval=${encodeURIComponent(interval)}`, { fallbackMessage: 'Could not load confirmed reservations.' });
   },
   getRange(from, to, source = 'all') {
     const qs = new URLSearchParams({ from, to, source });

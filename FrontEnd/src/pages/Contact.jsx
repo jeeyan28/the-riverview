@@ -63,7 +63,7 @@ function Contact() {
                 </a>
               )}
             >
-              Send the team your reservation code when asking about a booking, cancellation request, or event.
+              Send the team your reservation code when asking about a reservation, cancellation request, or event.
             </ContactCard>
 
             <ContactCard

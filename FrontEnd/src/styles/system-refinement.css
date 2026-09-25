@@ -402,6 +402,7 @@
 .public-site .bk-success-grid { gap: 16px 20px; padding: 16px 0; }
 .public-site .bk-success-grid .bk-summary-value { line-height: 1.4; overflow-wrap: anywhere; }
 .public-site .bk-success-cost { gap: 16px 20px; padding-top: 16px; }
+.public-site .bk-success-discount-note { margin: 16px 0 0; color: var(--teal-text); font-size: .82rem; font-weight: 600; line-height: 1.5; }
 .public-site .bk-payment-return--confirmed .bk-success-actions-row { width: 100%; margin-top: 0; }
 .public-site .bk-payment-return--confirmed .bk-success-note { margin-top: 16px !important; line-height: 1.45; }
 
@@ -490,10 +491,13 @@
 }
 .public-site #bkStepPrice .bk-room-option { min-width: 0; height: 100%; }
 .public-site #bkStepPrice .bk-room-list--has-selection .bk-room-option:not(.bk-room-option--selected) { opacity: 1; transform: none; }
-.public-site #bkStepPrice .bk-room-option-collapsed { flex: 1; min-height: 168px; align-items: stretch; gap: 16px; padding: 16px; }
-.public-site #bkStepPrice .bk-room-option-img { width: 136px; height: 112px; flex-basis: 136px; align-self: flex-start; }
+.public-site #bkStepPrice .bk-room-option-collapsed { flex: 1; min-height: 172px; align-items: stretch; gap: 16px; padding: 16px; }
+.public-site #bkStepPrice .bk-room-option-img { width: 124px; height: 124px; flex-basis: 124px; align-self: flex-start; }
 .public-site #bkStepPrice .bk-room-option-body { justify-content: flex-start; gap: 8px; }
-.public-site #bkStepPrice .bk-room-option-bottom-row { margin-top: auto; padding-top: 8px; flex-wrap: nowrap; }
+.public-site #bkStepPrice .bk-room-option-bottom-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; margin-top: auto; padding-top: 8px; gap: 4px 8px; }
+.public-site #bkStepPrice .bk-room-option-discount { grid-column: 1 / -1; grid-row: 1; margin: 0; font-size: .7rem; line-height: 1.35; }
+.public-site #bkStepPrice .bk-room-option-price { grid-column: 1; grid-row: 2; line-height: 1.35; }
+.public-site #bkStepPrice .bk-room-option-details-btn { grid-column: 2; grid-row: 2; }
 .public-site #bkStepPrice .bk-room-option-details-btn { min-height: 40px; }
 .public-site #bkStepPrice .bk-room-option-name { font-size: 1.05rem; }
 .public-site #bkStepPrice .bk-room-option-price { font-size: 1rem; }
@@ -502,8 +506,10 @@
 @media (max-width: 640px) {
   .public-site #bkStepPrice .bk-room-list { grid-template-columns: 1fr; }
   .public-site #bkStepPrice .bk-room-option-collapsed { min-height: 152px; gap: 12px; padding: 12px; }
-  .public-site #bkStepPrice .bk-room-option-img { width: 96px; height: 96px; flex-basis: 96px; }
-  .public-site #bkStepPrice .bk-room-option-bottom-row { flex-wrap: wrap; }
+  .public-site #bkStepPrice .bk-room-option-img { width: 88px; height: 88px; flex-basis: 88px; }
+  .public-site #bkStepPrice .bk-room-option-bottom-row { grid-template-columns: minmax(0, 1fr); }
+  .public-site #bkStepPrice .bk-room-option-price { grid-row: 2; }
+  .public-site #bkStepPrice .bk-room-option-details-btn { grid-column: 1; grid-row: 3; justify-self: start; }
 }
 
 /* Show browser handoff help only after an embedded browser user requests Google sign-in. */

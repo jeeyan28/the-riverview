@@ -7,7 +7,7 @@ function GuestBanner({ onSave }) {
 
   return (
     <div className="guest-banner">
-      <span>You're browsing as a Guest — logging out will delete this account and its bookings.</span>
+      <span>You're browsing as a Guest — logging out will delete this account and its reservations.</span>
       <button type="button" className="guest-banner-save" onClick={onSave}>
         Save my account
       </button>

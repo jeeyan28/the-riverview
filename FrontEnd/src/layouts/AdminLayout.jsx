@@ -7,6 +7,7 @@ import AdminSidebar, { PAGE_CONTEXT, PAGE_TITLES } from '../components/AdminSide
 import ThemeToggle from '../components/ThemeToggle';
 import PageTransition from '../components/PageTransition';
 import RiverviewLoader from '../components/RiverviewLoader';
+import AdminTimeWarningDock from '../components/AdminTimeWarningDock';
 import { useAuth } from '../context/AuthContext';
 import { AdminAppNavigation } from '../components/MobileAppNavigation';
 import { buildLoginPath } from '../utils/auth';
@@ -143,6 +144,8 @@ function AdminLayout() {
           menuOpen={mobileMenuOpen}
           onOpenMenu={openMobileMenu}
         />
+
+        <AdminTimeWarningDock />
       </div>
       <div className="modal-portal-root" data-modal-portal />
     </div>

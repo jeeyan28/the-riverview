@@ -280,7 +280,7 @@ function Navbar({
               ) : (
                 <>
                   <Link className="mobile-nav-primary" to={buildLoginPath('/rooms', { createAccount: true })} onClick={onCloseMobileNav}><i className="fa-solid fa-user-plus" aria-hidden="true"></i> Create account</Link>
-                  <Link className="mobile-nav-secondary" to={buildLoginPath('/rooms')} onClick={onCloseMobileNav}><i className="fa-regular fa-user" aria-hidden="true"></i> Sign in or book as guest</Link>
+                  <Link className="mobile-nav-secondary" to={buildLoginPath('/rooms')} onClick={onCloseMobileNav}><i className="fa-regular fa-user" aria-hidden="true"></i> Sign in or reserve as guest</Link>
                 </>
               )}
             </div>

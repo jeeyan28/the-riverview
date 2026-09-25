@@ -92,7 +92,6 @@ function LoginHistory() {
       : []),
     { key: 'method', label: 'Method', render: (e) => METHOD_LABELS[e.method] || e.method },
     { key: 'status', label: 'Status', render: statusPill },
-    { key: 'ip', label: 'IP address', render: (e) => e.ip || '—' },
     { key: 'device', label: 'Device', render: (e) => <span title={e.userAgent || undefined}>{deviceLabel(e.userAgent)}</span> },
     { key: 'createdAt', label: 'Date & time', render: (e) => loginTime(e.createdAt) },
   ];
@@ -103,7 +102,7 @@ function LoginHistory() {
   return (
     <div className="login-history-embedded" id="panel-login-history">
       <div className="login-history-intro">
-        <div><h2>Account access history</h2><p>Review successful and failed sign-ins, including the device and network address recorded for each attempt.</p></div>
+        <div><h2>Account access history</h2><p>Review successful and failed sign-ins, including the device used for each attempt.</p></div>
         <ShieldCheck size={24} aria-hidden="true" />
       </div>
 

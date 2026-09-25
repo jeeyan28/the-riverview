@@ -46,6 +46,7 @@ const sessionCreateSchema = Joi.object({
   guestName: Joi.string().trim().allow("").max(120),
   guestCount: Joi.number().integer().min(1).max(100),
   hasCorkage: Joi.boolean().default(false),
+  applyVenueDiscount: Joi.boolean().default(false),
 }).or("roomId", "bookingId");
 
 const sessionExtendSchema = Joi.object({

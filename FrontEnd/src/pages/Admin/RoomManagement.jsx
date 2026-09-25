@@ -34,7 +34,7 @@ import { resolveImageUrl } from '../../utils/resolveImageUrl';
 import { facilityImage } from '../../utils/facilityImage';
 import { useAuth } from '../../context/AuthContext';
 import { roomsService } from '../../services/rooms';
-import { variantRateLabel } from '../../utils/roomPricing';
+import { effectiveDiscountPercent, variantRateLabel } from '../../utils/roomPricing';
 
 const FACILITY_PRESETS = ['Billiards', 'KTV', 'Court'];
 
@@ -159,7 +159,8 @@ function RoomManagement() {
   const [featureInput, setFeatureInput] = useState('');
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
-  const [deleteWarningId, setDeleteWarningId] = useState(null);
+  const [deleteNotice, setDeleteNotice] = useState(null);
+  const [deleteBusyId, setDeleteBusyId] = useState(null);
 
   const fetchRooms = useCallback(async () => {
     setLoading(true);
@@ -470,42 +471,26 @@ function RoomManagement() {
     }
   }
 
-  async function handleRemove() {
-    if (!guardPermission('room:manage')) return;
-    if (!editingId) return closeModal();
-    const savedFacility = rooms.find((room) => room._id === editingId);
-    if (savedFacility?.variants?.length) {
-      setFormStep('rooms');
-      setActiveRoomIndex(null);
-      setFormError('Remove every room and save the facility before deleting it.');
-      return;
-    }
-    if (!window.confirm('Remove this facility? This cannot be undone.')) return;
-    try {
-      await roomsService.remove(editingId);
-      closeModal();
-      await fetchRooms();
-    } catch (err) {
-      console.error(err);
-      alert(err.message || 'Could not delete this facility.');
-    }
-  }
-
   async function quickDelete(id) {
     if (!guardPermission('room:manage')) return;
+    if (deleteBusyId) return;
     const facility = rooms.find((room) => room._id === id);
     if (facility?.variants?.length) {
-      setDeleteWarningId(id);
+      setDeleteNotice({ id, message: `This facility has rooms. Open Manage, remove them, and save before deleting.` });
       return;
     }
-    setDeleteWarningId(null);
+    setDeleteNotice(null);
     if (!window.confirm('Remove this facility? This cannot be undone.')) return;
+    setDeleteBusyId(id);
     try {
       await roomsService.remove(id);
       await fetchRooms();
     } catch (err) {
       console.error(err);
-      alert(err.message || 'Could not delete this facility.');
+      setDeleteNotice({ id, message: err.message || 'Could not delete this facility. Try again.' });
+      if (err.status === 409) await fetchRooms();
+    } finally {
+      setDeleteBusyId(null);
     }
   }
 
@@ -619,6 +604,7 @@ function RoomManagement() {
             const variants = Array.isArray(facility.variants) ? facility.variants : [];
             const counts = statusCounts(variants);
             const totalUnits = counts.available + counts.maintenance + counts.unavailable;
+            const bestDiscount = variants.length ? Math.max(...variants.map((variant) => effectiveDiscountPercent(facility, variant))) : 0;
             return (
               <article className="facility-catalog-row" key={facility._id}>
                 <div className="facility-catalog-media">
@@ -627,19 +613,19 @@ function RoomManagement() {
 
                 <div className="facility-catalog-main">
                   <div className="facility-catalog-title">
-                    <div><h3>{facility.name}</h3><span>{variants.length ? `From ₱${lowestRoomPrice(variants).toLocaleString()}/hr` : 'No rooms available for booking'}</span></div>
+                    <div><h3>{facility.name}</h3><span>{variants.length ? `From ₱${lowestRoomPrice(variants).toLocaleString()}/hr` : 'No rooms available for reservation'}</span></div>
                     <span className={`facility-health ${counts.maintenance || counts.unavailable ? 'facility-health--attention' : ''}`}>
                       {counts.maintenance || counts.unavailable ? `${counts.maintenance + counts.unavailable} need attention` : `${counts.available} ready`}
                     </span>
                   </div>
-                  <p className="facility-compact-summary">{variants.length} room type{variants.length === 1 ? '' : 's'} · {totalUnits} table{totalUnits === 1 ? '' : 's'}{variants.length ? ` · ${variants.slice(0, 2).map((variant) => variant.label).join(', ')}${variants.length > 2 ? ` +${variants.length - 2} more` : ''}` : ''}</p>
-                  {deleteWarningId === facility._id && <div className="facility-delete-warning" role="alert"><AlertCircle size={16} aria-hidden="true" /><span>Remove all rooms in Manage before deleting this facility.</span><button type="button" aria-label="Dismiss warning" onClick={() => setDeleteWarningId(null)}><X size={14} /></button></div>}
+                  <p className="facility-compact-summary">{variants.length} room type{variants.length === 1 ? '' : 's'} · {totalUnits} table{totalUnits === 1 ? '' : 's'}{variants.length ? ` · ${variants.slice(0, 2).map((variant) => variant.label).join(', ')}${variants.length > 2 ? ` +${variants.length - 2} more` : ''}` : ''}{bestDiscount > 0 ? ` · Up to ${bestDiscount}% room discount` : ''}</p>
+                  {deleteNotice?.id === facility._id && <div className="facility-delete-warning" role="alert"><AlertCircle size={16} aria-hidden="true" /><span>{deleteNotice.message}</span><button type="button" aria-label="Dismiss warning" onClick={() => setDeleteNotice(null)}><X size={14} /></button></div>}
                 </div>
 
                 <div className="facility-catalog-actions">
                   {canManage ? <>
                     <button type="button" className="facility-edit-button" onClick={() => openEditModal(facility)}><Pencil size={16} aria-hidden="true" />Manage</button>
-                    <button type="button" className="facility-remove-button" aria-label={`Remove ${facility.name}`} title={variants.length ? 'Remove its rooms first' : `Remove ${facility.name}`} onClick={() => quickDelete(facility._id)}><Trash2 size={16} aria-hidden="true" /></button>
+                    <button type="button" className="facility-remove-button" aria-label={`Remove ${facility.name}`} title={variants.length ? 'Remove its rooms first' : `Remove ${facility.name}`} disabled={!!deleteBusyId} onClick={() => quickDelete(facility._id)}><Trash2 size={16} aria-hidden="true" /></button>
                   </> : <span>View only</span>}
                 </div>
               </article>
@@ -760,7 +746,7 @@ function RoomManagement() {
                 </div>
 
                 <div className="fm-section fm-services-section">
-                  <div className="fm-services-head"><div><div className="fm-section-title"><Plus size={16} aria-hidden="true" /> Optional services</div><p>Flat-fee extras guests can choose during booking.</p></div><button type="button" className="btn-cancel fm-add-service" disabled={(form.addOns || []).length >= 10} onClick={() => setForm((current) => ({ ...current, addOns: [...(current.addOns || []), { name: '', fee: '' }] }))}><Plus size={16} aria-hidden="true" /> Add service</button></div>
+                  <div className="fm-services-head"><div><div className="fm-section-title"><Plus size={16} aria-hidden="true" /> Optional services</div><p>Flat-fee extras guests can choose during reservation.</p></div><button type="button" className="btn-cancel fm-add-service" disabled={(form.addOns || []).length >= 10} onClick={() => setForm((current) => ({ ...current, addOns: [...(current.addOns || []), { name: '', fee: '' }] }))}><Plus size={16} aria-hidden="true" /> Add service</button></div>
                   {(form.addOns || []).length === 0 && <p className="fm-services-empty">No optional services yet. Add one if guests can request extras such as a referee.</p>}
                   {(form.addOns || []).map((addOn, index) => (
                     <div className="frow fm-addon-row" key={index}>
@@ -1072,9 +1058,8 @@ function RoomManagement() {
         </div>
 
         <div className="modal-actions-split">
-          <div>{editingId && <button className="btn-remove" onClick={handleRemove}><Trash2 size={16} aria-hidden="true" />Remove facility</button>}</div>
+          <div><button type="button" className="btn-cancel" onClick={closeModal}>Cancel</button></div>
           <div className="fm-primary-actions">
-            <button type="button" className="btn-cancel" onClick={closeModal}>Cancel</button>
             <button className="btn-save" disabled={saving || !form.name.trim()} onClick={handleSave}>
               {saving ? <><Loader2 size={16} className="spin" aria-hidden="true" />Saving…</> : <><Save size={16} aria-hidden="true" />{editingId ? 'Save changes' : 'Add facility'}</>}
             </button>

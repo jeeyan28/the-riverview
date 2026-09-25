@@ -4,14 +4,15 @@ const Room = require("../model/room");
 const Booking = require("../model/booking");
 const { ensureAdmin, requirePermission, requireAnyPermission } = require("../middleware/adminAuth");
 const { PERMISSIONS, hasPermission } = require("../utils/permissions");
-const { bookingCollected, bookingSessionEnd, financialFields, fullOrDeferredPaymentFields, extendSessionFields, endSessionFields } = require("../utils/bookingLifecycle");
+const { bookingCollected, venueDiscountSettlement, bookingSessionEnd, financialFields, fullOrDeferredPaymentFields, extendSessionFields, endSessionFields } = require("../utils/bookingLifecycle");
 const { calculateBookingPrice, calculateSessionExtension, parsePaxCapacity } = require("../utils/roomPricing");
 const { pricedMonitorRoom } = require("../utils/monitorRoomRate");
 const { releasedMonitorStatus, visibleMonitorRoom } = require("../utils/syncRoomInventory");
 const { logAudit } = require("../utils/auditLog");
 const { TIME_ZONE, MAX_MONITOR_SESSION_HOURS } = require("../utils/constants");
 const { getMonitorReport } = require("../utils/monitorReport");
-const { createWorkbook, addMonitoringGridSheets, addSummarySheet, addActivitySheet, addRoomTypeSheet } = require("../utils/reportWorkbook");
+const { createWorkbook } = require("../utils/reportWorkbook");
+const { addDailyMonitorWorkbook } = require("../utils/dailyMonitorWorkbook");
 const { validate } = require("../middleware/validate");
 const {
   idParamsSchema,
@@ -171,21 +172,10 @@ sessionsRouter.get("/report/export", ensureAdmin, async (req, res) => {
   try {
     const report = await getMonitorReport({ from: req.query.from, to: req.query.to });
     const workbook = createWorkbook();
-    addMonitoringGridSheets(workbook, report.rows, report.inventory, report.range);
-    addSummarySheet(workbook, {
-      title: "The Riverview — Room monitoring report",
-      range: report.range,
-      metrics: [
-        { label: "Paid sessions", value: report.summary.sessions },
-        { label: "Occupied hours", value: report.summary.hours, format: "hours" },
-        { label: "Charges", value: report.summary.charged, format: "money" },
-        { label: "Collected", value: report.summary.collected, format: "money" },
-      ],
-      notes: ["Only finished sessions paid in full are included. Charges use each facility and room type's hourly rate."],
-    });
-    addActivitySheet(workbook, report.rows, { name: "Played sessions", includeBalance: false });
-    addRoomTypeSheet(workbook, report.byRoomType, "Room totals", { includeBalance: false });
-    const filename = `Riverview-Live-Monitor_${report.range.from}_to_${report.range.to}.xlsx`;
+    const currentIds = new Set(report.inventory.map((room) => room.id));
+    addDailyMonitorWorkbook(workbook, report.rows.filter((row) => currentIds.has(row.roomId)), report.inventory, report.range);
+    const fileDate = (value) => { const [year, month, day] = value.split('-'); return `${Number(month)}-${Number(day)}-${year}`; };
+    const filename = `Riverview_Monitor_Daily_${fileDate(report.range.from)}${report.range.from === report.range.to ? '' : `_to_${fileDate(report.range.to)}`}.xlsx`;
     res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
     await workbook.xlsx.write(res);
@@ -210,7 +200,7 @@ sessionsRouter.get("/", ensureAdmin, async (req, res) => {
 
 sessionsRouter.post("/", requireAnyPermission(PERMISSIONS.ROOM_OPERATE, PERMISSIONS.BOOKING_MANAGE), validate(sessionCreateSchema), async (req, res) => {
   try {
-    const { roomId, duration, paymentMethod, paymentStatus, paidAmount: requestedPaidAmount, paymentTiming, guestName, guestCount: requestedGuestCount, hasCorkage, bookingId, roomTarget } = req.body;
+    const { roomId, duration, paymentMethod, paymentStatus, paidAmount: requestedPaidAmount, paymentTiming, guestName, guestCount: requestedGuestCount, hasCorkage, bookingId, roomTarget, applyVenueDiscount } = req.body;
 
     if (!bookingId && !hasPermission(req.user, PERMISSIONS.ROOM_OPERATE)) {
       return res.status(403).json({ message: "You do not have permission to do that." });
@@ -233,11 +223,16 @@ sessionsRouter.post("/", requireAnyPermission(PERMISSIONS.ROOM_OPERATE, PERMISSI
     let scheduledEndTime = null;
     if (bookingId) {
       booking = await Booking.findById(bookingId);
-      if (!booking) return res.status(404).json({ message: "Booking not found." });
+      if (!booking) return res.status(404).json({ message: "Reservation not found." });
       if (booking.status !== Booking.BOOKING_STATUS.CONFIRMED) {
-        return res.status(400).json({ message: "This booking cannot be started (already started or not confirmed)." });
+        return res.status(400).json({ message: "This reservation cannot be started (already started or not confirmed)." });
       }
       scheduledEndTime = bookingSessionEnd(booking);
+    }
+    let venueSettlement = null;
+    if (applyVenueDiscount) venueSettlement = venueDiscountSettlement(booking);
+    if (booking?.paymentChoice === 'deposit' && Number(booking.eligibleDiscount) > 0 && !booking.venueDiscountApplied && !venueSettlement) {
+      return res.status(409).json({ message: 'Settle the room discount with the guest before starting this reservation.' });
     }
 
     const sessionDuration = booking ? Number(booking.duration) : duration;
@@ -331,16 +326,19 @@ sessionsRouter.post("/", requireAnyPermission(PERMISSIONS.ROOM_OPERATE, PERMISSI
       hasCorkage: !!hasCorkage,
     });
     const rate = booking ? (booking.hourlyRates?.[0] || booking.amount / booking.duration) : directPricing.unitPrice;
-    const amount = booking ? booking.amount : directPricing.amount;
+    const discount = venueSettlement?.discount || 0;
+    const amount = booking ? venueSettlement?.amount ?? Number(booking.amount) : directPricing.amount;
+    const alreadyReceived = booking ? bookingCollected(booking) : 0;
+    const cashReturned = venueSettlement?.cashReturned || 0;
+    const refundedAmount = venueSettlement?.refundedAmount ?? (booking ? Number(booking.refundedAmount) || 0 : 0);
 
     let paidAmount;
     let resolvedPaymentStatus;
     if (booking) {
-      const alreadyReceived = bookingCollected(booking);
       paidAmount = requestedPaidAmount === undefined ? alreadyReceived : Number(requestedPaidAmount);
       if (!Number.isFinite(paidAmount) || paidAmount < alreadyReceived) return res.status(400).json({ message: "Received payments cannot be reduced when starting a reservation." });
-      if (paidAmount > amount) return res.status(400).json({ message: "Received payment cannot exceed the session charge." });
-      resolvedPaymentStatus = fullOrDeferredPaymentFields(amount, alreadyReceived, paidAmount, booking.refundedAmount || 0).paymentStatus;
+      if (paidAmount - refundedAmount > amount) return res.status(400).json({ message: "Received payment cannot exceed the session charge." });
+      resolvedPaymentStatus = fullOrDeferredPaymentFields(amount, alreadyReceived, paidAmount, refundedAmount).paymentStatus;
     } else {
       resolvedPaymentStatus = paymentStatus || "Unpaid";
       paidAmount = Number(requestedPaidAmount) || (resolvedPaymentStatus === "Paid" ? amount : 0);
@@ -371,7 +369,7 @@ sessionsRouter.post("/", requireAnyPermission(PERMISSIONS.ROOM_OPERATE, PERMISSI
       corkageFee: booking ? Number(booking.corkageFee) || 0 : directPricing.corkageFee,
       hourlyRates: booking ? booking.hourlyRates || [] : directPricing.hourlyRates,
       paidAmount,
-      refundedAmount: booking ? Number(booking.refundedAmount) || 0 : 0,
+      refundedAmount: booking ? refundedAmount : 0,
       paymentMethod: paymentMethod || (booking ? booking.paymentMethod : "Cash"),
       paymentStatus: resolvedPaymentStatus,
       paymentTiming: paymentTiming || (resolvedPaymentStatus === "Paid" ? "Before" : "After"),
@@ -388,11 +386,19 @@ sessionsRouter.post("/", requireAnyPermission(PERMISSIONS.ROOM_OPERATE, PERMISSI
     const previousPaid = booking ? bookingCollected(booking) : 0;
     if (booking) {
       booking.status = Booking.BOOKING_STATUS.ONGOING;
+      booking.amount = amount;
+      if (discount > 0) {
+        booking.discountAmount = Number(booking.discountAmount || 0) + discount;
+        booking.venueDiscountApplied = true;
+        booking.venueDiscountRefunded = cashReturned;
+        booking.refundedAmount = refundedAmount;
+      }
       booking.paidAmount = paidAmount;
       booking.paymentStatus = resolvedPaymentStatus;
       booking.paymentUpdatedAt = new Date();
       if (paymentMethod) booking.paymentMethod = paymentMethod;
       await booking.save();
+      if (discount > 0) await logAudit({ category: "Booking", action: "updated", description: `applied ₱${discount.toFixed(2)} venue discount to reservation ${booking.reservationCode || booking._id}${cashReturned > 0 ? `, including ₱${cashReturned.toFixed(2)} returned to the guest` : ''}`, user: req.user });
     }
 
     await logSessionPayment(session, previousPaid, req.user);

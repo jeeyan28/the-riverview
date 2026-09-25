@@ -11,7 +11,6 @@ const { paymentProofUpload } = require("../middleware/upload");
 const { PERMISSIONS, isAdminRole } = require("../utils/permissions");
 const { validateAndPriceBooking, computeDownPayment, saveWithReservationCode, runInTransaction } = require("../utils/bookingHelper");
 const { repriceExistingBooking } = require("../utils/roomPricing");
-const { isBeforeReservationDay } = require("../utils/businessDate");
 const { shiftDate, nearbyDates, availabilityRows } = require("../utils/bookingSchedule");
 const { validate } = require("../middleware/validate");
 const {
@@ -206,7 +205,7 @@ router.post("/", requirePermission(PERMISSIONS.BOOKING_MANAGE), paymentProofUplo
     const isAdminBooking = isAdminRole(req.user.role);
     if (!isAdminBooking) {
       return res.status(400).json({
-        message: "Manual payment is no longer available. Please book and pay through the secure online checkout (POST /api/payments/paymongo/checkout).",
+        message: "Manual payment is no longer available. Please reserve and pay through the secure online checkout (POST /api/payments/paymongo/checkout).",
       });
     }
 
@@ -272,7 +271,7 @@ router.get("/mine", ensureAuthenticated, async (req, res) => {
 router.get("/:id", ensureAuthenticated, async (req, res) => {
   try {
     const booking = await Booking.findById(req.params.id).populate("room", "name");
-    if (!booking) return res.status(404).json({ message: "Booking not found." });
+    if (!booking) return res.status(404).json({ message: "Reservation not found." });
 
     if (String(booking.bookedBy) !== String(req.user._id) && !isAdminRole(req.user.role)) {
       return res.status(403).json({ message: "Not allowed." });
@@ -280,7 +279,7 @@ router.get("/:id", ensureAuthenticated, async (req, res) => {
     res.json(booking);
   } catch (err) {
     console.error(err);
-    res.status(400).json({ message: "Invalid booking id." });
+    res.status(400).json({ message: "Invalid reservation id." });
   }
 });
 
@@ -292,19 +291,20 @@ router.put("/:id/reschedule", ensureAuthenticated, bookingActionLimiter, validat
     try {
       booking = await runInTransaction(async (session) => {
         const existing = await Booking.findById(req.params.id).session(session);
-        if (!existing) throw new AppError(404, "Booking not found.");
+        if (!existing) throw new AppError(404, "Reservation not found.");
         if (String(existing.bookedBy) !== String(req.user._id)) {
           throw new AppError(403, "Not allowed.");
         }
         if (existing.status !== Booking.BOOKING_STATUS.CONFIRMED) {
-          throw new AppError(409, "Only confirmed bookings can be rescheduled.");
+          throw new AppError(409, "Only confirmed reservations can be rescheduled.");
         }
         if (existing.cancellationStatus === "Requested") throw new AppError(409, "Wait for the cancellation review before rescheduling.");
         if (existing.rescheduleCount >= Booking.MAX_RESCHEDULES) {
-          throw new AppError(409, "This booking has already been rescheduled the maximum number of times.");
+          throw new AppError(409, "This reservation has already been rescheduled the maximum number of times.");
         }
-        if (!isBeforeReservationDay(existing.date)) {
-          throw new AppError(409, "Reschedule is only available before the day of your reservation.");
+        const originalStart = bookingStartMs(existing.date, existing.timeIn);
+        if (!Number.isFinite(originalStart) || originalStart - Date.now() < 24 * 60 * 60 * 1000) {
+          throw new AppError(409, "Reschedule at least 24 hours before your reservation starts.");
         }
 
         const pricing = await validateAndPriceBooking({
@@ -359,7 +359,7 @@ router.put("/:id/reschedule", ensureAuthenticated, bookingActionLimiter, validat
 router.put("/:id/cancellation-request", ensureAuthenticated, bookingActionLimiter, validate(bookingIdParamsSchema, "params"), validate(cancellationRequestSchema), async (req, res) => {
   try {
     const booking = await Booking.findById(req.params.id);
-    if (!booking) return res.status(404).json({ message: "Booking not found." });
+    if (!booking) return res.status(404).json({ message: "Reservation not found." });
     if (String(booking.bookedBy) !== String(req.user._id) && !isAdminRole(req.user.role)) return res.status(403).json({ message: "Not allowed." });
     if (booking.status !== Booking.BOOKING_STATUS.CONFIRMED) return res.status(409).json({ message: "Only confirmed reservations can be cancelled." });
     if (booking.cancellationStatus === "Requested") return res.status(409).json({ message: "A cancellation request is already waiting for review." });
@@ -380,7 +380,7 @@ router.put("/:id/cancellation-review", requirePermission(PERMISSIONS.BOOKING_MAN
   try {
     const { booking, recordedRefund, wasRequested } = await runInTransaction(async (session) => {
       const booking = await Booking.findById(req.params.id).session(session);
-      if (!booking) throw new AppError(404, "Booking not found.");
+      if (!booking) throw new AppError(404, "Reservation not found.");
       const wasRequested = booking.cancellationStatus === "Requested";
       const alreadyApproved = booking.cancellationStatus === "Approved" && booking.status === "Cancelled";
       if (!wasRequested && !alreadyApproved) throw new AppError(409, "There is no cancellation to review or refund to record.");
@@ -443,7 +443,7 @@ router.put("/:id/mark-done", requirePermission(PERMISSIONS.BOOKING_MANAGE), vali
   try {
     const booking = await runInTransaction(async (session) => {
       const existing = await Booking.findById(req.params.id).session(session);
-      if (!existing) throw new AppError(404, "Booking not found.");
+      if (!existing) throw new AppError(404, "Reservation not found.");
       const hasMonitorSession = Boolean(await RoomSession.exists({ booking: existing._id, status: { $in: ["Active", "Finished"] } }).session(session));
       const update = completeReservationFields(existing, { hasMonitorSession });
       return Booking.findByIdAndUpdate(existing._id, update, { returnDocument: "after", runValidators: true, session });
@@ -470,7 +470,7 @@ router.put("/:id", requirePermission(PERMISSIONS.BOOKING_MANAGE), validate(booki
       booking = await runInTransaction(async (session) => {
         const existing = await Booking.findById(req.params.id).session(session);
         if (!existing) {
-          throw new AppError(404, "Booking not found.");
+          throw new AppError(404, "Reservation not found.");
         }
 
         const update = {};
@@ -584,13 +584,13 @@ router.delete("/:id", requirePermission(PERMISSIONS.BOOKING_MANAGE), validate(bo
   try {
     const booking = await runInTransaction(async (session) => {
       const existing = await Booking.findById(req.params.id).session(session);
-      if (!existing) throw new AppError(404, "Booking not found.");
+      if (!existing) throw new AppError(404, "Reservation not found.");
       if (bookingCollected(existing) > 0 || !["Pending", "Rejected"].includes(existing.status) || await RoomSession.exists({ booking: existing._id }).session(session)) throw new AppError(409, "Keep financial history: cancel this reservation instead of deleting it.");
       await Booking.deleteOne({ _id: existing._id }).session(session);
       return existing;
     });
     await logAudit({ category: "Booking", action: "deleted", description: `deleted booking ${booking.reservationCode} for ${booking.guestName}`, user: req.user });
-    res.json({ message: "Booking deleted." });
+    res.json({ message: "Reservation deleted." });
   } catch (err) {
     console.error(err);
     res.status(err.status || 500).json({ message: err.message || "Server error." });

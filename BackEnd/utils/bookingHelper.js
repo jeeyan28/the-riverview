@@ -81,7 +81,7 @@ async function validateAndPriceBooking({ roomId, variantLabel, date, timeIn, dur
       selectedVariant = room.variants.find(v => v.label === variantLabel);
       if (!selectedVariant) throw new AppError(400, "Selected pricing option not found.");
       if (!isAdminBooking && selectedVariant.status && selectedVariant.status !== "Available") {
-        throw new AppError(409, `This room is currently ${selectedVariant.status.toLowerCase()} and cannot be booked.`);
+        throw new AppError(409, `This room is currently ${selectedVariant.status.toLowerCase()} and cannot be reserved.`);
       }
     } else {
       throw new AppError(400, "Choose a room type or pricing option.");
@@ -125,7 +125,7 @@ async function validateAndPriceBooking({ roomId, variantLabel, date, timeIn, dur
     const hourStart = startMs + hour * HOUR_MS;
     const bookedCount = occupiedCountAt(occupied, hourStart);
     if (bookedCount >= capacity) {
-      throw new AppError(409, "That time slot is fully booked. Please pick another.");
+      throw new AppError(409, "That time slot is fully reserved. Please pick another.");
     }
   }
 

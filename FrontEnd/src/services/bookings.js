@@ -4,7 +4,7 @@ import { BOOKING_STATUS } from '../utils/bookingStatus';
 const BASE = '/api/bookings';
 
 export const bookingsService = {
-  listActive: () => apiRequest(`${BASE}?status=${BOOKING_STATUS.ONGOING}`, { fallbackMessage: 'Failed to load bookings for the room monitor.' }),
+  listActive: () => apiRequest(`${BASE}?status=${BOOKING_STATUS.ONGOING}`, { fallbackMessage: 'Failed to load reservations for the room monitor.' }),
 
   updateStatus: (id, status) => apiRequest(`${BASE}/${id}`, { method: 'PUT', body: { status }, fallbackMessage: 'Failed to end the session.' }),
 
@@ -29,22 +29,22 @@ export const bookingsService = {
     if (params.guestContact) qs.set('guestContact', params.guestContact);
     if (params.guestName) qs.set('guestName', params.guestName);
     const s = qs.toString();
-    return apiRequest(`${BASE}${s ? `?${s}` : ''}`, { fallbackMessage: 'Failed to load bookings.' });
+    return apiRequest(`${BASE}${s ? `?${s}` : ''}`, { fallbackMessage: 'Failed to load reservations.' });
   },
 
-  update: (id, payload) => apiRequest(`${BASE}/${id}`, { method: 'PUT', body: payload, fallbackMessage: 'Failed to update booking.' }),
+  update: (id, payload) => apiRequest(`${BASE}/${id}`, { method: 'PUT', body: payload, fallbackMessage: 'Failed to update reservation.' }),
 
   markDone: (id) => apiRequest(`${BASE}/${id}/mark-done`, { method: 'PUT', fallbackMessage: 'Failed to mark the reservation done.' }),
 
-  approve: (id) => apiRequest(`${BASE}/${id}/approve`, { method: 'PUT', fallbackMessage: 'Failed to approve booking.' }),
+  approve: (id) => apiRequest(`${BASE}/${id}/approve`, { method: 'PUT', fallbackMessage: 'Failed to approve reservation.' }),
 
-  reject: (id) => apiRequest(`${BASE}/${id}/reject`, { method: 'PUT', fallbackMessage: 'Failed to reject booking.' }),
+  reject: (id) => apiRequest(`${BASE}/${id}/reject`, { method: 'PUT', fallbackMessage: 'Failed to reject reservation.' }),
 
   reviewCancellation: (id, payload) => apiRequest(`${BASE}/${id}/cancellation-review`, { method: 'PUT', body: payload, fallbackMessage: 'Failed to review cancellation.' }),
 
-  remove: (id) => apiRequest(`${BASE}/${id}`, { method: 'DELETE', fallbackMessage: 'Failed to delete booking.' }),
+  remove: (id) => apiRequest(`${BASE}/${id}`, { method: 'DELETE', fallbackMessage: 'Failed to delete reservation.' }),
 
-  mine: () => apiRequest(`${BASE}/mine`, { fallbackMessage: 'Failed to load your booking history.' }),
+  mine: () => apiRequest(`${BASE}/mine`, { fallbackMessage: 'Failed to load your reservation history.' }),
 
   reschedule: (id, payload) => apiRequest(`${BASE}/${id}/reschedule`, { method: 'PUT', body: payload, fallbackMessage: 'Failed to reschedule your reservation.' }),
 

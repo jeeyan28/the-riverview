@@ -43,7 +43,7 @@ function Analytics() {
     setTrendError('');
     reportsService.getConfirmedBookingTrend(trendInterval)
       .then((result) => { if (current) setTrend(result); })
-      .catch((err) => { if (current) { setTrend(null); setTrendError(err.message || 'Could not load confirmed bookings.'); } })
+      .catch((err) => { if (current) { setTrend(null); setTrendError(err.message || 'Could not load confirmed reservations.'); } })
       .finally(() => { if (current) setTrendLoading(false); });
     return () => { current = false; };
   }, [trendInterval]);
@@ -106,8 +106,8 @@ function Analytics() {
       <div className="finance-activity" aria-live="polite">
         <span><strong>{summary?.transactions ?? '—'}</strong> transactions</span>
         <span><strong>{summary?.reservations ?? '—'}</strong> online reservations</span>
-        <span><strong>{summary?.walkins ?? '—'}</strong> walk-ins / manual bookings</span>
-        <span><strong>{summary?.bookedHours ?? '—'}h</strong> booked hours</span>
+        <span><strong>{summary?.walkins ?? '—'}</strong> walk-ins / manual reservations</span>
+        <span><strong>{summary?.bookedHours ?? '—'}h</strong> reserved hours</span>
         <span><strong>{summary?.averageDuration ?? '—'}h</strong> average session</span>
         <span>Peak hour: <strong>{peakHour ? `${String(peakHour.hour).padStart(2, '0')}:00` : '—'}</strong></span>
       </div>
@@ -115,18 +115,18 @@ function Analytics() {
       <section className="card confirmed-trend" aria-labelledby="confirmed-trend-title">
         <div className="confirmed-trend-head">
           <div>
-            <h2 id="confirmed-trend-title" className="card-title">Confirmed Booking Trend</h2>
-            <p className="finance-meta">Reservations by booked date · {trendInterval === 'daily' ? 'Last 14 days' : trendInterval === 'weekly' ? 'Last 12 weeks' : 'Last 12 months'}</p>
+            <h2 id="confirmed-trend-title" className="card-title">Confirmed Reservation Trend</h2>
+            <p className="finance-meta">Reservations by date · {trendInterval === 'daily' ? 'Last 14 days' : trendInterval === 'weekly' ? 'Last 12 weeks' : 'Last 12 months'}</p>
           </div>
-          <div className="confirmed-trend-toggle" role="group" aria-label="Booking trend period">
+          <div className="confirmed-trend-toggle" role="group" aria-label="Reservation trend period">
             {['daily', 'weekly', 'monthly'].map((interval) => (
               <button key={interval} type="button" className={trendInterval === interval ? 'active' : ''} aria-pressed={trendInterval === interval} onClick={() => setTrendInterval(interval)}>{interval[0].toUpperCase() + interval.slice(1)}</button>
             ))}
           </div>
         </div>
-        {trendError ? <p className="finance-error" role="alert">{trendError}</p> : trendLoading ? <p className="finance-empty" role="status">Loading booking trend…</p> : trend?.periods?.length ? (
-          <div className="finance-chart confirmed-trend-chart" role="img" aria-label={`Confirmed booking counts by ${trendInterval} period`}><ResponsiveContainer width="100%" height="100%"><BarChart data={trendChartData} margin={{ top: 10, right: 8, bottom: 2, left: -22 }} accessibilityLayer><CartesianGrid vertical={false} stroke={chartGrid} strokeDasharray="3 4" /><XAxis dataKey="label" tick={chartTick} axisLine={false} tickLine={false} minTickGap={18} /><YAxis allowDecimals={false} tick={chartTick} axisLine={false} tickLine={false} /><Tooltip contentStyle={chartTooltip} formatter={(value) => [`${value} confirmed`, 'Bookings']} cursor={{ fill: 'rgba(0,201,167,.08)' }} /><Bar dataKey="bookings" fill="#00C9A7" radius={[5, 5, 0, 0]} maxBarSize={42} /></BarChart></ResponsiveContainer></div>
-        ) : <p className="finance-empty">No booking trend available.</p>}
+        {trendError ? <p className="finance-error" role="alert">{trendError}</p> : trendLoading ? <p className="finance-empty" role="status">Loading reservation trend…</p> : trend?.periods?.length ? (
+          <div className="finance-chart confirmed-trend-chart" role="img" aria-label={`Confirmed reservation counts by ${trendInterval} period`}><ResponsiveContainer width="100%" height="100%"><BarChart data={trendChartData} margin={{ top: 10, right: 8, bottom: 2, left: -22 }} accessibilityLayer><CartesianGrid vertical={false} stroke={chartGrid} strokeDasharray="3 4" /><XAxis dataKey="label" tick={chartTick} axisLine={false} tickLine={false} minTickGap={18} /><YAxis allowDecimals={false} tick={chartTick} axisLine={false} tickLine={false} /><Tooltip contentStyle={chartTooltip} formatter={(value) => [`${value} confirmed`, 'Reservations']} cursor={{ fill: 'rgba(0,201,167,.08)' }} /><Bar dataKey="bookings" fill="#00C9A7" radius={[5, 5, 0, 0]} maxBarSize={42} /></BarChart></ResponsiveContainer></div>
+        ) : <p className="finance-empty">No reservation trend available.</p>}
       </section>
 
       {loading && !data ? <div className="card finance-empty">Loading sales data…</div> : data && (
@@ -143,7 +143,7 @@ function Analytics() {
             <div className="card-head"><span className="card-title">Facility performance</span></div>
             <div className="admin-table-scroll" tabIndex={0} role="region" aria-label="Facility performance table">
               <table className="tbl">
-                <thead><tr><th>Facility</th><th>Transactions</th><th>Booked hours</th><th>Booking value</th><th>Payments received</th></tr></thead>
+                <thead><tr><th>Facility</th><th>Transactions</th><th>Reserved hours</th><th>Reservation value</th><th>Payments received</th></tr></thead>
                 <tbody>
                   {data.byFacility?.length ? data.byFacility.map((facility) => (
                     <tr key={facility.name}><td>{facility.name}</td><td>{facility.transactions}</td><td>{facility.bookedHours}</td><td>{formatPeso(facility.charged)}</td><td>{formatPeso(facility.collected)}</td></tr>

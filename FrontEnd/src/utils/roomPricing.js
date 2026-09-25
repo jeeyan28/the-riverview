@@ -36,11 +36,12 @@ export function calculateBookingPrice({ room, variant, startHour = 0, duration =
   const corkageFee = hasCorkage ? CORKAGE_FEE : 0;
   const discountPercent = claimDiscount ? effectiveDiscountPercent(room, variant) : 0;
   const eligibleDiscount = roundMoney(roomCharge * discountPercent / 100);
-  const discountAmount = paymentChoice === 'full' ? eligibleDiscount : 0;
+  const fullPayment = hours > 1 && paymentChoice === 'full';
+  const discountAmount = fullPayment ? eligibleDiscount : 0;
   const addOns = (room?.addOns || []).filter((item) => selectedAddOns.includes(item.name));
   const addOnFee = roundMoney(addOns.reduce((sum, item) => sum + Number(item.fee || 0), 0));
   const amount = roundMoney(roomCharge - discountAmount + addOnFee + corkageFee);
-  const downPayment = paymentChoice === 'full' ? amount : Math.min(amount, hourlyRates[0]);
+  const downPayment = fullPayment ? amount : Math.min(amount, hourlyRates[0]);
   return { hourlyRates, roomCharge, corkageFee, discountPercent, discountAmount, eligibleDiscount, addOns, addOnFee, amount, downPayment };
 }
 

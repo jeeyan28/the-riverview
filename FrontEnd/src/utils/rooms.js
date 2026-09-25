@@ -180,7 +180,7 @@ export function getFacilityAvailability(reserved, openHour, closeHour, opts = {}
 
   if (totalRooms != null && overlappingConfirmedBookings != null) {
     const availableRooms = totalRooms - overlappingConfirmedBookings;
-    return availableRooms > 0 ? 'Available' : 'Fully Booked';
+    return availableRooms > 0 ? 'Available' : 'Fully Reserved';
   }
 
   const currentHour = Math.max(openHour, now.getHours());
@@ -188,7 +188,7 @@ export function getFacilityAvailability(reserved, openHour, closeHour, opts = {}
   for (let h = currentHour; h < closeHour && fullyBooked; h++) {
     if (!reserved.includes(h)) fullyBooked = false;
   }
-  return fullyBooked ? 'Fully Booked' : 'Available';
+  return fullyBooked ? 'Fully Reserved' : 'Available';
 }
 
 export function computeDownPayment(unitPrice) {

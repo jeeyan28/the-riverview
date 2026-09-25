@@ -1,19 +1,19 @@
 import DateRangePicker from './DateRangePicker';
 
-export default function RevenueFilters({ from, to, source, onRangeChange, onSourceChange, reload, loading, children }) {
+export default function RevenueFilters({ from, to, source, onRangeChange, onSourceChange, reload, loading, children, showSource = true }) {
   return (
     <div className="finance-toolbar no-print">
       <div className="field-stack">
         <DateRangePicker from={from} to={to} onChange={onRangeChange} />
       </div>
-      <label className="field-stack">
+      {showSource && <label className="field-stack">
         <span className="field-label">Source</span>
         <select value={source} onChange={(event) => onSourceChange(event.target.value)}>
           <option value="all">All sales</option>
           <option value="booking">Online reservations</option>
-          <option value="walkin">Walk-ins / manual bookings</option>
+          <option value="walkin">Walk-ins / manual reservations</option>
         </select>
-      </label>
+      </label>}
       <button type="button" className="btn-cancel" disabled={loading || !from || !to} onClick={reload}>Refresh</button>
       {children}
     </div>

@@ -224,7 +224,7 @@ function Dashboard() {
       {!summaryLoading && financial && (
         <>
           <div className="finance-activity">
-            <span>Collected for today's bookings: <strong>{formatPeso(financial.collected)}</strong></span>
+            <span>Collected for today's reservations: <strong>{formatPeso(financial.collected)}</strong></span>
             <span>Charges: <strong>{formatPeso(financial.charged)}</strong></span>
             <span>Refunded: <strong>{formatPeso(financial.refunded)}</strong></span>
             <span>Unpaid sessions: <strong>{summary.unpaidSessions || 0}</strong></span>

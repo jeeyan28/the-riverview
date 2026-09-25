@@ -59,7 +59,7 @@ function AdminAppNavigation({ hasPermission, menuOpen = false, onOpenMenu }) {
   const navRef = useRef(null);
   const candidates = [
     { to: '/admin/monitor', label: 'Monitor', icon: Activity, permission: 'room:view' },
-    { to: '/admin/bookings', label: 'Bookings', icon: CalendarDays, permission: 'booking:view' },
+    { to: '/admin/bookings', label: 'Reservations', icon: CalendarDays, permission: 'booking:view' },
     { to: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard, permission: 'reports:view' },
     { to: '/admin/reports', label: 'Reports', icon: BarChart3, permission: 'reports:view' },
     { to: '/admin/room-management', label: 'Spaces', icon: DoorOpen, permission: 'room:manage' },
@@ -77,7 +77,7 @@ function AdminAppNavigation({ hasPermission, menuOpen = false, onOpenMenu }) {
         {links.map((item) => (
           <NavLink key={item.to} to={item.to} className={({ isActive }) => `app-nav-item${isActive ? ' active' : ''}`}>
             <item.icon size={20} aria-hidden="true" />
-            <span>{item.label === 'Bookings' ? 'Reservations' : item.label}</span>
+            <span>{item.label}</span>
           </NavLink>
         ))}
       </div>
