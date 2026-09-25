@@ -2,7 +2,6 @@
 
 .field-row{display:flex;gap:8px;}
 .field-row--top-gap{margin-top:8px;}
-.field-row--extend-gap{margin-top:10px;}
 .field-col{flex:1;}
 
 .rm-page-head{display:flex;align-items:center;gap:10px;}
@@ -321,8 +320,7 @@
 .rm-stat--overdue{border-left-color:var(--red);}
 .rm-stat--overdue .rm-stat-value{color:var(--red);}
 
-.rm-quick-actions{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) 40px;gap:8px;margin-top:auto;padding-top:14px;}
-.rm-quick-actions--no-extend{grid-template-columns:minmax(0,1fr) 40px;}
+.rm-quick-actions{display:grid;grid-template-columns:minmax(0,1fr) 40px;gap:8px;margin-top:auto;padding-top:14px;}
 .rm-quick-actions .rm-btn{min-width:0;justify-content:center;padding:8px 10px;font-size:.78rem;}
 #app .rm-quick-actions .rm-btn--icon{flex:0 0 40px;width:40px;padding:8px 0;}
 .rm-btn--success{background:rgba(22,163,74,.14);border-color:rgba(22,163,74,.4);color:var(--green);}
