@@ -13,13 +13,6 @@ const ROLE_LABELS = { user: 'User', staff: 'Staff', manager: 'Supervisor', super
 const ROLE_BADGE_CLASS = { super_admin: 'pill-active', manager: 'pill-vacant', staff: 'pill-pending', user: 'pill-done' };
 const METHOD_LABELS = { password: 'Password', google: 'Google' };
 
-function deviceLabel(value = '') {
-  if (!value) return 'Unknown device';
-  const browser = value.includes('Edg/') ? 'Edge' : value.includes('Chrome/') ? 'Chrome' : value.includes('Firefox/') ? 'Firefox' : value.includes('Safari/') ? 'Safari' : 'Browser';
-  const system = value.includes('Windows') ? 'Windows' : value.includes('Android') ? 'Android' : /iPhone|iPad/.test(value) ? 'iOS' : value.includes('Mac OS') ? 'macOS' : 'Device';
-  return `${browser} on ${system}`;
-}
-
 function loginTime(value) {
   return new Intl.DateTimeFormat('en-PH', { timeZone: 'Asia/Manila', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(value));
 }
@@ -92,7 +85,6 @@ function LoginHistory() {
       : []),
     { key: 'method', label: 'Method', render: (e) => METHOD_LABELS[e.method] || e.method },
     { key: 'status', label: 'Status', render: statusPill },
-    { key: 'device', label: 'Device', render: (e) => <span title={e.userAgent || undefined}>{deviceLabel(e.userAgent)}</span> },
     { key: 'createdAt', label: 'Date & time', render: (e) => loginTime(e.createdAt) },
   ];
 
@@ -102,7 +94,7 @@ function LoginHistory() {
   return (
     <div className="login-history-embedded" id="panel-login-history">
       <div className="login-history-intro">
-        <div><h2>Account access history</h2><p>Review successful and failed sign-ins, including the device used for each attempt.</p></div>
+        <div><h2>Account access history</h2><p>Review successful and failed sign-ins for every account.</p></div>
         <ShieldCheck size={24} aria-hidden="true" />
       </div>
 

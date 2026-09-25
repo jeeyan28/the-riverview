@@ -6,6 +6,7 @@ import AdminLayout from './layouts/AdminLayout';
 import { useAuth } from './context/AuthContext';
 import Login from './pages/Login';
 import { isAdminReturnPath } from './utils/auth';
+import PageSkeleton from './components/PageSkeleton';
 
 const Home = lazy(() => import('./pages/Home'));
 const Rooms = lazy(() => import('./pages/Rooms'));
@@ -24,6 +25,7 @@ const Settings = lazy(() => import('./pages/Admin/Settings'));
 const AuditTrail = lazy(() => import('./pages/Admin/AuditTrail'));
 const RoomManagement = lazy(() => import('./pages/Admin/RoomManagement'));
 const Forecasting = lazy(() => import('./pages/Admin/Forecasting'));
+const EmergencyContacts = lazy(() => import('./pages/Admin/EmergencyContacts'));
 
 
 function RequirePermission({ permission, children }) {
@@ -42,10 +44,6 @@ function AdminLanding() {
   return <Navigate to="/" replace />;
 }
 
-function RouteFallback() {
-  return <div className="route-fallback" role="status">Opening page…</div>;
-}
-
 function LegacyAdminLoginRedirect() {
   const returnTo = new URLSearchParams(window.location.search).get('returnTo') || '';
   return <Navigate to={isAdminReturnPath(returnTo) ? returnTo : '/admin'} replace />;
@@ -53,7 +51,7 @@ function LegacyAdminLoginRedirect() {
 
 function App() {
   return (
-    <Suspense fallback={<RouteFallback />}>
+    <Suspense fallback={<PageSkeleton />}>
       <Routes>
       <Route element={<MainLayout />}>
         <Route path="/" element={<Home />} />
@@ -76,6 +74,7 @@ function App() {
         <Route path="dashboard" element={<RequirePermission permission="reports:view"><Dashboard /></RequirePermission>} />
         <Route path="monitor" element={<RequirePermission permission="room:view"><Monitor /></RequirePermission>} />
         <Route path="bookings" element={<RequirePermission permission="booking:view"><Bookings /></RequirePermission>} />
+        <Route path="emergency-contacts" element={<EmergencyContacts />} />
         <Route path="analytics" element={<RequirePermission permission="reports:view"><Analytics /></RequirePermission>} />
         <Route path="reports" element={<RequirePermission permission="reports:view"><Reports /></RequirePermission>} />
         <Route path="forecasting" element={<RequirePermission permission="forecasting:view"><Forecasting /></RequirePermission>} />

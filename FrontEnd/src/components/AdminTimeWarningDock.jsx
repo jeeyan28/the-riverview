@@ -1,16 +1,16 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { CalendarClock, Timer, X } from 'lucide-react';
 import { buildTimeWarnings, useAdminTimeWarnings } from '../hooks/useAdminTimeWarnings';
 
-const MAX_VISIBLE = 3;
+const MAX_VISIBLE = 5;
+const AUTO_DISMISS_MS = 3000;
 
 function AdminTimeWarningDock() {
   const { sessions, bookings } = useAdminTimeWarnings();
   const [dismissed, setDismissed] = useState(() => new Set());
+  const [, forceUpdate] = useState(0);
 
   const warnings = buildTimeWarnings(sessions, bookings).filter((item) => !dismissed.has(item.key));
-  if (!warnings.length) return null;
-
   const visible = warnings.slice(0, MAX_VISIBLE);
   const hidden = warnings.length - visible.length;
 
@@ -21,6 +21,23 @@ function AdminTimeWarningDock() {
       return next;
     });
   }
+
+  useEffect(() => {
+    const criticalKeys = warnings
+      .filter((w) => w.severity === 'critical')
+      .map((w) => w.key);
+    if (!criticalKeys.length) return;
+    const timer = setTimeout(() => {
+      setDismissed((current) => {
+        const next = new Set(current);
+        criticalKeys.forEach((k) => next.add(k));
+        return next;
+      });
+    }, AUTO_DISMISS_MS);
+    return () => clearTimeout(timer);
+  }, [warnings]);
+
+  if (!visible.length) return null;
 
   return (
     <aside className="aw-dock" role="alert" aria-label="Time warnings">

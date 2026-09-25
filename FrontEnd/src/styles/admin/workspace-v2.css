@@ -176,18 +176,15 @@
   border-radius: var(--radius-md);
   background: var(--navy2);
 }
-#app #panel-dashboard .finance-activity { padding: var(--space-3) var(--space-4); border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--navy3); }
 #app #panel-dashboard .dash-room-row { border: 1px solid var(--border-soft); border-radius: var(--radius-sm); background: var(--navy3); }
 #app #panel-dashboard .dash-room-row:hover { transform: none; }
-#app #panel-dashboard .qa-btn { min-height: 48px; border-radius: var(--radius-sm); }
 
 #app .set-tabs { width: 200px; padding: var(--space-1); border-radius: var(--radius-md); }
 #app .set-tab { min-height: 44px; border-radius: var(--radius-sm); }
 
 @media (hover: hover) and (pointer: fine) {
   #app .card-action:hover { background: var(--teal-soft); color: var(--teal); }
-  #app .finance-queue button:hover,
-  #app .qa-btn:hover { border-color: color-mix(in srgb, var(--teal) 42%, var(--border)); }
+  #app .finance-queue button:hover { border-color: color-mix(in srgb, var(--teal) 42%, var(--border)); }
 }
 
 @media (max-width: 900px) {

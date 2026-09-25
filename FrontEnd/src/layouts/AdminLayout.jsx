@@ -9,10 +9,10 @@ import PageTransition from '../components/PageTransition';
 import RiverviewLoader from '../components/RiverviewLoader';
 import AdminTimeWarningDock from '../components/AdminTimeWarningDock';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../hooks/useTheme';
 import { AdminAppNavigation } from '../components/MobileAppNavigation';
 import { buildLoginPath } from '../utils/auth';
 
-const ADMIN_THEME_KEY = 'rv_admin_theme';
 const ADMIN_COMPACT_MEDIA = '(max-width: 900px)';
 
 function AdminLayout() {
@@ -31,20 +31,7 @@ function AdminLayout() {
     menuTriggerRef.current = event?.currentTarget || menuButtonRef.current;
     setMobileMenuOpen(true);
   }, []);
-  const [theme, setTheme] = useState(() => {
-    try {
-      return localStorage.getItem(ADMIN_THEME_KEY) === 'dark' ? 'dark' : 'light';
-    } catch {
-      return 'light';
-    }
-  });
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(ADMIN_THEME_KEY, theme);
-    } catch {
-    }
-  }, [theme]);
+  const [theme, toggleTheme] = useTheme();
 
   useEffect(() => {
     const query = window.matchMedia(ADMIN_COMPACT_MEDIA);
@@ -59,10 +46,6 @@ function AdminLayout() {
   useEffect(() => {
     setMobileMenuOpen(false);
   }, [location.pathname]);
-
-  function toggleTheme() {
-    setTheme((t) => (t === 'dark' ? 'light' : 'dark'));
-  }
 
   useEffect(() => {
     function tick() {

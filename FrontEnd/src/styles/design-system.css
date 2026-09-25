@@ -102,8 +102,42 @@ img { max-width: 100%; }
 }
 
 :where(a, button, input, select, textarea, [tabindex]):focus-visible {
-  outline: 3px solid var(--teal-text);
-  outline-offset: 3px;
+   outline: 3px solid var(--teal-text);
+   outline-offset: 3px;
+}
+
+.page-skeleton {
+   padding: 20px;
+   display: flex;
+   flex-direction: column;
+   gap: 14px;
+}
+
+.page-skeleton-bar {
+   height: 20px;
+   width: 60%;
+   border-radius: 6px;
+   background: linear-gradient(90deg, var(--surface-raised) 25%, var(--border) 50%, var(--surface-raised) 75%);
+   background-size: 200% 100%;
+   animation: skeleton-shimmer 1.5s ease-in-out infinite;
+}
+
+.page-skeleton-bar.short {
+   width: 30%;
+   height: 16px;
+}
+
+.page-skeleton-block {
+   height: 200px;
+   border-radius: 10px;
+   background: linear-gradient(90deg, var(--surface-raised) 25%, var(--border) 50%, var(--surface-raised) 75%);
+   background-size: 200% 100%;
+   animation: skeleton-shimmer 1.5s ease-in-out infinite;
+}
+
+@keyframes skeleton-shimmer {
+   0% { background-position: 200% 0; }
+   100% { background-position: -200% 0; }
 }
 
 .toast {

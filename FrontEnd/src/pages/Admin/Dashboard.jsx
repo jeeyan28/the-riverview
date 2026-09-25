@@ -1,12 +1,10 @@
 import '../../styles/admin/dashboard.css';
-import '../../styles/admin/finance.css';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import DataTable from '../../components/DataTable';
 import { dashboardService } from '../../services/dashboard';
 import { monitorRoomsService, roomSessionsService } from '../../services/monitoring';
 import { bookingsService } from '../../services/bookings';
-import { formatPeso } from '../../utils/currency';
 import { businessDate } from '../../utils/businessDate';
 import { buildRoomView, formatTimeRemaining } from '../../hooks/useRoomMonitorData';
 import { reservationPresentation } from '../../utils/reservationStatus';
@@ -180,7 +178,6 @@ function Dashboard() {
 
   const bookingsDelta = summary?.todayBookings?.deltaVsYesterday ?? 0;
   const overdueCount = summary?.overdueRooms?.count ?? 0;
-  const financial = summary?.financial;
 
   const roomViews = rooms
     .map((r) => ({ room: r, view: buildRoomView(r, sessions) }))
@@ -206,6 +203,13 @@ function Dashboard() {
           )}
         </div>
         <div className="mc">
+          <div className="mc-label"><i className="ti ti-users"></i>Clients today</div>
+          <div className="mc-val">{summaryLoading ? '—' : summaryError ? '—' : summary.todayBookings.clients ?? 0}</div>
+          {!summaryLoading && !summaryError && (
+            <div className="mc-sub">{summary.todayBookings.count} reservation{summary.todayBookings.count === 1 ? '' : 's'} booked</div>
+          )}
+        </div>
+        <div className="mc">
           <div className="mc-label"><i className="ti ti-door-enter"></i>Active Sessions</div>
           <div className="mc-val">{summaryLoading ? '—' : summaryError ? '—' : summary.activeSessions.count}</div>
           {!summaryLoading && !summaryError && (
@@ -218,39 +222,6 @@ function Dashboard() {
           {!summaryLoading && !summaryError && (
             <div className={`mc-sub ${overdueCount > 0 ? 'dn' : 'up'}`}>{overdueCount > 0 ? 'Needs attention' : 'All caught up'}</div>
           )}
-        </div>
-      </div>
-
-      {!summaryLoading && financial && (
-        <>
-          <div className="finance-activity">
-            <span>Collected for today's reservations: <strong>{formatPeso(financial.collected)}</strong></span>
-            <span>Charges: <strong>{formatPeso(financial.charged)}</strong></span>
-            <span>Refunded: <strong>{formatPeso(financial.refunded)}</strong></span>
-            <span>Unpaid sessions: <strong>{summary.unpaidSessions || 0}</strong></span>
-          </div>
-        </>
-      )}
-
-      <div className="card">
-        <div className="card-head"><span className="card-title">Quick Actions</span></div>
-        <div className="qa-row">
-          <button className="qa-btn" onClick={() => navigate('/admin/bookings?openManualBooking=1')}>
-            <span className="qa-ico"><i className="ti ti-plus"></i></span>
-            <span className="qa-label">Add Reservation</span>
-          </button>
-          <button className="qa-btn" onClick={() => navigate('/admin/monitor')}>
-            <span className="qa-ico"><i className="ti ti-device-desktop-analytics"></i></span>
-            <span className="qa-label">Monitor Rooms</span>
-          </button>
-          <button className="qa-btn" onClick={() => navigate('/admin/reports')}>
-            <span className="qa-ico"><i className="ti ti-download"></i></span>
-            <span className="qa-label">Export Report</span>
-          </button>
-          <button className="qa-btn" onClick={() => navigate('/admin/settings?tab=login')}>
-            <span className="qa-ico"><i className="ti ti-lock-access"></i></span>
-            <span className="qa-label">Login History</span>
-          </button>
         </div>
       </div>
 

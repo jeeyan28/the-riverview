@@ -149,7 +149,8 @@
     .public-site .hero-carousel { height: 320px; }
     .public-site .hero-sub { font-size: 1rem; }
     .public-site .rooms-header { align-items: flex-start; }
-    .public-site .rooms-header-right { flex-direction: column; align-items: flex-end; }
+    .public-site .rooms-header-right { flex-direction: column; align-items: flex-start; }
+    .public-site .rooms-header-right p { text-align: left; white-space: pre-line; line-height: 1.6; }
     .public-site .steps-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
     .public-site .about-inner { grid-template-columns: 1fr; gap: 2rem; }
     .public-site .contact-grid { grid-template-columns: 1fr; }
@@ -168,7 +169,7 @@
     .public-site .rooms-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .public-site .rooms-header { flex-direction: column; }
     .public-site .rooms-header-right { align-items: flex-start; }
-    .public-site .rooms-header-right p { text-align: left; }
+    .public-site .rooms-header-right p { text-align: left; white-space: pre-line; line-height: 1.6; word-break: break-word; }
     .public-site .rp-facilities-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .public-site .space-row { gap: 1.5rem; }
     .public-site .about-left { transform: none; }

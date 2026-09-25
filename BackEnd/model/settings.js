@@ -48,6 +48,13 @@ const paymentMethodSchema = new mongoose.Schema({
   isActive: { type: Boolean, default: true },
 }, { timestamps: true });
 
+const emergencyContactSchema = new mongoose.Schema({
+  category: { type: String, enum: ["fire", "police", "hospital", "ambulance", "disaster", "other"], required: true },
+  name: { type: String, required: true, trim: true, maxlength: 80 },
+  phone: { type: String, required: true, trim: true, maxlength: 30 },
+  details: { type: String, default: "", trim: true, maxlength: 180 },
+}, { timestamps: true });
+
 // The whole app only ever needs ONE settings document. We enforce that with
 // a fixed singleton id ("global") rather than a unique-index-on-nothing
 // trick, so `Settings.getSingleton()` can always findOrCreate deterministically.
@@ -57,6 +64,7 @@ const settingsSchema = new mongoose.Schema({
   holidays:       { type: [holidaySchema], default: [] },
   announcements:  { type: [announcementSchema], default: [] },
   paymentMethods: { type: [paymentMethodSchema], default: [] },
+  emergencyContacts: { type: [emergencyContactSchema], default: [] },
   updatedBy:      { type: mongoose.Schema.Types.ObjectId, ref: "User" },
   updatedAt:      { type: Date, default: Date.now },
 });

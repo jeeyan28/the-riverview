@@ -27,6 +27,7 @@
 .login-history-pagination { display: flex; justify-content: flex-end; align-items: center; gap: 10px; margin-top: 14px; }
 .login-history-pagination button { display: inline-flex; align-items: center; gap: 5px; }
 .login-history-pagination > span { color: var(--muted); font-size: .74rem; }
+
 @media (max-width: 720px) {
   .login-history-filters { align-items: stretch; flex-direction: column; }
   .login-history-filters select { width: 100%; }

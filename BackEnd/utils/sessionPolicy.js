@@ -10,6 +10,7 @@ function refreshSessionLifetime(req, user) {
 function setAuthenticatedSession(req, user) {
   req.session.userId = user._id.toString();
   req.session.role = user.role;
+  if (!req.session.startedAt) req.session.startedAt = Date.now();
   refreshSessionLifetime(req, user);
 }
 
