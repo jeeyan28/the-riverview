@@ -1324,6 +1324,7 @@ body.has-guest-banner {
 .bk-payment-choice-check { display: grid; width: 20px; height: 20px; flex: 0 0 20px; place-items: center; border: 1px solid var(--border); border-radius: 50%; color: transparent; }
 .bk-payment-choice-check i { font-size: .62rem; }
 .bk-payment-duration-tile { justify-content: space-between; }
+.bk-payment-duration-grid--single { grid-template-columns: minmax(0, 1fr); }
 .bk-payment-method-tile--selected { background: rgba(0,201,167,.08); border-color: var(--teal-text); color: var(--text-main); }
 .bk-payment-method-tile--selected .bk-payment-choice-icon { color: var(--teal-text); }
 .bk-payment-method-tile--selected .bk-payment-choice-copy small { color: var(--text-main); }

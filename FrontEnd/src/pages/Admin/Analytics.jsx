@@ -1,7 +1,7 @@
 import '../../styles/admin/analytics.css';
 import '../../styles/admin/finance.css';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { Chart } from 'chart.js/auto';
+import { useEffect, useMemo, useState } from 'react';
+import { Area, AreaChart, Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import RevenueFilters from '../../components/RevenueFilters';
 import RevenueSummary from '../../components/RevenueSummary';
 import { useRevenueReport } from '../../hooks/useRevenueReport';
@@ -22,6 +22,10 @@ function trendLabel(period, interval) {
   return displayDate(period.start);
 }
 
+const chartTooltip = { background: '#1b2a3f', border: '1px solid #35445c', borderRadius: 10, color: '#f5f8fc', fontSize: 12 };
+const chartTick = { fill: '#a8b3c4', fontSize: 11 };
+const chartGrid = '#304056';
+
 function Analytics() {
   const [from, setFrom] = useState(() => businessDate());
   const [to, setTo] = useState(() => businessDate());
@@ -32,9 +36,6 @@ function Analytics() {
   const [trendLoading, setTrendLoading] = useState(true);
   const [trendError, setTrendError] = useState('');
   const { data, loading, error, reload } = useRevenueReport(from, to, source);
-  const revenueCanvasRef = useRef(null);
-  const facilityCanvasRef = useRef(null);
-  const trendCanvasRef = useRef(null);
 
   useEffect(() => {
     let current = true;
@@ -48,31 +49,6 @@ function Analytics() {
   }, [trendInterval]);
 
   useEffect(() => {
-    if (trendLoading || !trend?.periods?.length || !trendCanvasRef.current) return undefined;
-    const app = document.querySelector('#app');
-    const styles = app ? getComputedStyle(app) : null;
-    const textColor = styles?.getPropertyValue('--muted').trim() || '#6B7280';
-    const gridColor = styles?.getPropertyValue('--border').trim() || 'rgba(16,24,40,.08)';
-    const chart = new Chart(trendCanvasRef.current, {
-      type: 'bar',
-      data: {
-        labels: trend.periods.map((period) => trendLabel(period, trend.interval)),
-        datasets: [{ label: 'Confirmed bookings', data: trend.periods.map((period) => period.count), backgroundColor: '#00C9A7', borderRadius: 5, maxBarThickness: 46 }],
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: { legend: { display: false }, tooltip: { callbacks: { label: (item) => `${item.raw} confirmed booking${item.raw === 1 ? '' : 's'}` } } },
-        scales: {
-          x: { grid: { display: false }, ticks: { color: textColor, maxTicksLimit: 14 } },
-          y: { beginAtZero: true, grid: { color: gridColor }, ticks: { color: textColor, precision: 0, stepSize: 1 } },
-        },
-      },
-    });
-    return () => chart.destroy();
-  }, [trend, trendLoading]);
-
-  useEffect(() => {
     if (!printRequested) return undefined;
     const frame = requestAnimationFrame(() => {
       window.print();
@@ -81,46 +57,16 @@ function Analytics() {
     return () => cancelAnimationFrame(frame);
   }, [printRequested]);
 
-  useEffect(() => {
-    if (!data || !revenueCanvasRef.current) return undefined;
-    const app = document.querySelector('#app');
-    const styles = app ? getComputedStyle(app) : null;
-    const textColor = styles?.getPropertyValue('--muted').trim() || '#6B7280';
-    const gridColor = styles?.getPropertyValue('--border').trim() || 'rgba(16,24,40,.08)';
-    const labels = (data.daily || []).map((day) => displayDate(day.date));
-    const sourceByDate = new Map((data.daily || []).map((day) => [day.date, { booking: 0, walkin: 0 }]));
-    (data.rows || []).forEach((row) => {
+  const trendChartData = useMemo(() => (trend?.periods || []).map((period) => ({ label: trendLabel(period, trend.interval), bookings: period.count })), [trend]);
+  const revenueChartData = useMemo(() => {
+    const sourceByDate = new Map((data?.daily || []).map((day) => [day.date, { label: displayDate(day.date), reservations: 0, monitoring: 0 }]));
+    (data?.rows || []).forEach((row) => {
       const bucket = sourceByDate.get(row.date);
-      if (bucket) bucket[row.source === 'booking' ? 'booking' : 'walkin'] += Number(row.collected || 0);
+      if (bucket) bucket[row.source === 'booking' ? 'reservations' : 'monitoring'] += Number(row.collected || 0);
     });
-    const revenueChart = new Chart(revenueCanvasRef.current, {
-      type: 'line',
-      data: {
-        labels,
-        datasets: [
-          { label: 'Reservations', data: (data.daily || []).map((day) => sourceByDate.get(day.date)?.booking || 0), borderColor: '#00C9A7', backgroundColor: 'rgba(0,201,167,.12)', fill: true, tension: .3, pointRadius: 2 },
-          { label: 'Room monitoring', data: (data.daily || []).map((day) => sourceByDate.get(day.date)?.walkin || 0), borderColor: '#EF3E6D', backgroundColor: 'transparent', fill: false, tension: .3, pointRadius: 2 },
-        ],
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        interaction: { mode: 'index', intersect: false },
-        plugins: { legend: { labels: { color: textColor, usePointStyle: true } }, tooltip: { callbacks: { label: (item) => `${item.dataset.label}: ${formatPeso(item.raw)}` } } },
-        scales: { x: { grid: { display: false }, ticks: { color: textColor, maxTicksLimit: 8 } }, y: { grid: { color: gridColor }, ticks: { color: textColor, callback: (value) => formatPeso(value) } } },
-      },
-    });
-    const facilities = (data.byFacility || []).slice(0, 6);
-    const facilityChart = facilityCanvasRef.current && facilities.length ? new Chart(facilityCanvasRef.current, {
-      type: 'doughnut',
-      data: { labels: facilities.map((facility) => facility.name), datasets: [{ data: facilities.map((facility) => facility.collected), backgroundColor: ['#00C9A7', '#378ADD', '#EF3E6D', '#EF9F27', '#8B5CF6', '#64748B'], borderWidth: 0 }] },
-      options: { responsive: true, maintainAspectRatio: false, cutout: '66%', plugins: { legend: { position: 'bottom', labels: { color: textColor, usePointStyle: true, padding: 14 } }, tooltip: { callbacks: { label: (item) => `${item.label}: ${formatPeso(item.raw)}` } } } },
-    }) : null;
-    return () => {
-      revenueChart.destroy();
-      facilityChart?.destroy();
-    };
+    return [...sourceByDate.values()];
   }, [data]);
+  const facilityChartData = useMemo(() => (data?.byFacility || []).slice(0, 6).map((facility) => ({ name: facility.name, collected: Number(facility.collected) || 0 })), [data]);
 
   const peakHour = useMemo(() => {
     const hours = data?.hourly || [];
@@ -179,7 +125,7 @@ function Analytics() {
           </div>
         </div>
         {trendError ? <p className="finance-error" role="alert">{trendError}</p> : trendLoading ? <p className="finance-empty" role="status">Loading booking trend…</p> : trend?.periods?.length ? (
-          <div className="finance-chart confirmed-trend-chart"><canvas ref={trendCanvasRef} role="img" aria-label={`Confirmed booking counts by ${trendInterval} period`} /></div>
+          <div className="finance-chart confirmed-trend-chart" role="img" aria-label={`Confirmed booking counts by ${trendInterval} period`}><ResponsiveContainer width="100%" height="100%"><BarChart data={trendChartData} margin={{ top: 10, right: 8, bottom: 2, left: -22 }} accessibilityLayer><CartesianGrid vertical={false} stroke={chartGrid} strokeDasharray="3 4" /><XAxis dataKey="label" tick={chartTick} axisLine={false} tickLine={false} minTickGap={18} /><YAxis allowDecimals={false} tick={chartTick} axisLine={false} tickLine={false} /><Tooltip contentStyle={chartTooltip} formatter={(value) => [`${value} confirmed`, 'Bookings']} cursor={{ fill: 'rgba(0,201,167,.08)' }} /><Bar dataKey="bookings" fill="#00C9A7" radius={[5, 5, 0, 0]} maxBarSize={42} /></BarChart></ResponsiveContainer></div>
         ) : <p className="finance-empty">No booking trend available.</p>}
       </section>
 
@@ -187,11 +133,11 @@ function Analytics() {
         <div className="finance-charts">
           <div className="card">
             <div className="card-head"><span className="card-title">Payments by source</span><span className="finance-meta">{displayDate(from)} – {displayDate(to)}</span></div>
-            <div className="finance-chart"><canvas ref={revenueCanvasRef} aria-label="Payments from reservations and room monitoring by day" /></div>
+            <div className="finance-chart" role="img" aria-label="Payments from reservations and room monitoring by day"><ResponsiveContainer width="100%" height="100%"><AreaChart data={revenueChartData} margin={{ top: 12, right: 14, bottom: 2, left: -12 }} accessibilityLayer><CartesianGrid vertical={false} stroke={chartGrid} strokeDasharray="3 4" /><XAxis dataKey="label" tick={chartTick} axisLine={false} tickLine={false} minTickGap={18} /><YAxis tick={chartTick} axisLine={false} tickLine={false} tickFormatter={(value) => value >= 1000 ? `₱${(value / 1000).toFixed(1)}k` : `₱${value}`} /><Tooltip contentStyle={chartTooltip} formatter={(value) => formatPeso(value)} /><Legend iconType="circle" wrapperStyle={{ color: '#a8b3c4', fontSize: 12 }} /><Area type="monotone" dataKey="reservations" name="Reservations" stroke="#00C9A7" fill="rgba(0,201,167,.14)" strokeWidth={2.5} activeDot={{ r: 5 }} /><Area type="monotone" dataKey="monitoring" name="Room monitoring" stroke="#EF9F27" fill="rgba(239,159,39,.08)" strokeWidth={2.5} activeDot={{ r: 5 }} /></AreaChart></ResponsiveContainer></div>
           </div>
           <div className="card">
             <div className="card-head"><span className="card-title">Collected by facility</span></div>
-            {data.byFacility?.length ? <div className="finance-chart"><canvas ref={facilityCanvasRef} aria-label="Collected payments by facility" /></div> : <div className="finance-empty">No facility sales in this period.</div>}
+            {data.byFacility?.length ? <div className="finance-chart" role="img" aria-label="Collected payments by facility"><ResponsiveContainer width="100%" height="100%"><BarChart data={facilityChartData} layout="vertical" margin={{ top: 10, right: 24, bottom: 0, left: 4 }} accessibilityLayer><CartesianGrid horizontal={false} stroke={chartGrid} strokeDasharray="3 4" /><XAxis type="number" tick={chartTick} axisLine={false} tickLine={false} tickFormatter={(value) => value >= 1000 ? `₱${(value / 1000).toFixed(1)}k` : `₱${value}`} /><YAxis type="category" dataKey="name" width={90} tick={chartTick} axisLine={false} tickLine={false} /><Tooltip contentStyle={chartTooltip} formatter={(value) => formatPeso(value)} cursor={{ fill: 'rgba(0,201,167,.08)' }} /><Bar dataKey="collected" name="Payments received" fill="#378ADD" radius={[0, 5, 5, 0]} maxBarSize={24} /></BarChart></ResponsiveContainer></div> : <div className="finance-empty">No facility sales in this period.</div>}
           </div>
           <div className="card finance-chart-wide">
             <div className="card-head"><span className="card-title">Facility performance</span></div>

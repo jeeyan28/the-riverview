@@ -22,6 +22,7 @@ const createIntentSchema = Joi.object({
   duration: Joi.number().integer().min(1).max(5).required(),
   downPaymentHours: Joi.number().integer().min(1),
   paymentChoice: Joi.string().valid("deposit", "full"),
+  claimDiscount: Joi.boolean().default(false),
   selectedAddOns: Joi.array().items(Joi.string().trim().min(1).max(80)).unique().max(10).default([]),
 });
 

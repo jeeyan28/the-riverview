@@ -169,6 +169,42 @@ button.bk-payment-pill{cursor:pointer;}
 .cancellation-review .mfield{margin:0;}
 .cancellation-review-actions{margin-top:0;padding-top:16px;border-top:1px solid var(--border);}
 
+#app .modal-box.cancellation-review-modal.modal-xl{max-width:720px;}
+#app .cancellation-review-modal .modal-heading{position:sticky;z-index:2;top:0;margin:-24px -24px 18px;padding:22px 24px 16px;border-bottom:1px solid var(--border);background:var(--navy2);}
+#app .cancellation-review-modal .modal-title{margin:0;}
+#app .cancellation-review-modal .cancellation-review{gap:18px;}
+#app .cancellation-review-modal .cancellation-review-context{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+#app .cancellation-review-modal .cancellation-review-summary{grid-template-columns:1fr;gap:12px;padding:16px;}
+#app .cancellation-review-modal .cancellation-review-reason{min-width:0;padding:16px;border:1px solid var(--border);border-radius:12px;background:var(--navy3);}
+#app .cancellation-review-modal .cancellation-review-reason p{max-height:110px;overflow:auto;overflow-wrap:anywhere;}
+#app .cancellation-review-modal .cancellation-decision legend{margin-bottom:10px;}
+#app .cancellation-review-modal .cancellation-decision-options button{display:grid;align-content:center;gap:4px;min-height:76px;padding:12px 14px;text-align:left;}
+#app .cancellation-review-modal .cancellation-decision-options button strong{font-size:.82rem;}
+#app .cancellation-review-modal .cancellation-decision-options button small{color:var(--muted);font-size:.7rem;font-weight:500;line-height:1.35;}
+#app .cancellation-review-modal .cancellation-refund-section{display:grid;grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr);gap:12px;align-items:start;padding:14px;border:1px solid var(--border);border-radius:12px;}
+#app .cancellation-review-modal .cancellation-policy{min-height:100%;}
+#app .cancellation-review-modal .cancellation-refund-input{display:flex;align-items:center;min-height:42px;border:1px solid var(--border);border-radius:8px;background:var(--navy3);}
+#app .cancellation-review-modal .cancellation-refund-input span{padding-left:12px;color:var(--muted);font-weight:700;}
+#app .cancellation-review-modal .cancellation-refund-input input{width:100%;min-height:40px;border:0;background:transparent;}
+#app .cancellation-review-modal .cancellation-exception-option{display:flex;grid-column:1/-1;align-items:flex-start;gap:10px;padding-top:11px;border-top:1px solid var(--border);cursor:pointer;}
+#app .cancellation-review-modal .cancellation-exception-option input{flex:0 0 18px;width:18px;height:18px;margin:2px 0 0;accent-color:var(--teal);}
+#app .cancellation-review-modal .cancellation-exception-option strong,#app .cancellation-review-modal .cancellation-exception-option small{display:block;}
+#app .cancellation-review-modal .cancellation-exception-option strong{font-size:.78rem;}
+#app .cancellation-review-modal .cancellation-exception-option small{margin-top:3px;color:var(--muted);font-size:.7rem;line-height:1.4;}
+#app .cancellation-review-modal .cancellation-review-error{margin:0;padding:10px 12px;border:1px solid var(--red);border-radius:8px;color:var(--red);font-size:.76rem;}
+#app .cancellation-review-modal .cancellation-review-actions{position:sticky;z-index:2;bottom:0;justify-content:flex-end;margin:0 -24px -24px;padding:14px 24px;border-top:1px solid var(--border);background:var(--navy2);}
+@media(max-width:640px){
+  #app .modal-box.cancellation-review-modal.modal-xl{max-width:none;}
+  #app .cancellation-review-modal .modal-heading{margin:-16px -16px 16px;padding:16px;}
+  #app .cancellation-review-modal .cancellation-review-context,#app .cancellation-review-modal .cancellation-refund-section{grid-template-columns:minmax(0,1fr);}
+  #app .cancellation-review-modal .cancellation-review-summary{grid-template-columns:repeat(2,minmax(0,1fr));}
+  #app .cancellation-review-modal .cancellation-decision-options{grid-template-columns:repeat(2,minmax(0,1fr));}
+  #app .cancellation-review-modal .cancellation-review-actions{margin:0 -16px -16px;padding:12px 16px;}
+}
+@media(max-width:420px){
+  #app .cancellation-review-modal .cancellation-decision-options{grid-template-columns:minmax(0,1fr);}
+}
+
 @media (max-width:900px){
   .bk-search-wrap{max-width:none;width:100%;}
   #app .manual-payment-layout{grid-template-columns:repeat(2,minmax(0,1fr));}

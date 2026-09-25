@@ -29,12 +29,12 @@ export function roomRateForHour(variant, hour, guestCount = 1) {
   return roundMoney(scheduledRate + Math.max(0, guests - includedGuests) * extraGuestFee);
 }
 
-export function calculateBookingPrice({ room, variant, startHour = 0, duration = 1, guestCount = 1, hasCorkage = false, paymentChoice = 'deposit', selectedAddOns = [] }) {
+export function calculateBookingPrice({ room, variant, startHour = 0, duration = 1, guestCount = 1, hasCorkage = false, paymentChoice = 'deposit', claimDiscount = false, selectedAddOns = [] }) {
   const hours = Math.max(1, Number(duration) || 1);
   const hourlyRates = Array.from({ length: hours }, (_, index) => roomRateForHour(variant, (Number(startHour) + index) % 24, guestCount));
   const roomCharge = roundMoney(hourlyRates.reduce((sum, rate) => sum + rate, 0));
   const corkageFee = hasCorkage ? CORKAGE_FEE : 0;
-  const discountPercent = effectiveDiscountPercent(room, variant);
+  const discountPercent = claimDiscount ? effectiveDiscountPercent(room, variant) : 0;
   const eligibleDiscount = roundMoney(roomCharge * discountPercent / 100);
   const discountAmount = paymentChoice === 'full' ? eligibleDiscount : 0;
   const addOns = (room?.addOns || []).filter((item) => selectedAddOns.includes(item.name));

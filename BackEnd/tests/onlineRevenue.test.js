@@ -50,13 +50,18 @@ test('room discounts apply only to explicit full payment; services and corkage s
   const { calculateBookingPrice: previewPrice } = await import('../../FrontEnd/src/utils/roomPricing.js');
   const room = { discountPercent: 20, addOns: [{ name: 'Referee', fee: 150 }] };
   const basePrice = calculateBookingPrice({ variant, timeIn: '16:00', duration: 1, hasCorkage: true });
-  const full = quoteOnlineBooking({ room, variant, basePrice, paymentChoice: 'full', selectedAddOns: ['Referee'] });
-  const deposit = quoteOnlineBooking({ room, variant, basePrice, paymentChoice: 'deposit', selectedAddOns: ['Referee'] });
+  const full = quoteOnlineBooking({ room, variant, basePrice, paymentChoice: 'full', claimDiscount: true, selectedAddOns: ['Referee'] });
+  const deposit = quoteOnlineBooking({ room, variant, basePrice, paymentChoice: 'deposit', claimDiscount: true, selectedAddOns: ['Referee'] });
   assert.deepEqual({ amount: full.amount, downPayment: full.downPayment, discountAmount: full.discountAmount }, { amount: 590, downPayment: 590, discountAmount: 60 });
   assert.deepEqual({ amount: deposit.amount, downPayment: deposit.downPayment, eligibleDiscount: deposit.eligibleDiscount }, { amount: 650, downPayment: 300, eligibleDiscount: 60 });
-  const preview = previewPrice({ room, variant, startHour: 16, duration: 1, hasCorkage: true, paymentChoice: 'full', selectedAddOns: ['Referee'] });
+  const preview = previewPrice({ room, variant, startHour: 16, duration: 1, hasCorkage: true, paymentChoice: 'full', claimDiscount: true, selectedAddOns: ['Referee'] });
   assert.equal(preview.amount, full.amount);
   assert.equal(preview.downPayment, full.downPayment);
+  const noDiscount = quoteOnlineBooking({ room, variant, basePrice, paymentChoice: 'full', claimDiscount: false, selectedAddOns: ['Referee'] });
+  assert.equal(noDiscount.discountAmount, 0);
+  assert.equal(noDiscount.amount, 650);
+  assert.equal(quoteOnlineBooking({ room, variant, basePrice, paymentChoice: 'deposit', claimDiscount: false }).eligibleDiscount, 0);
+  assert.equal(previewPrice({ room, variant, startHour: 16, duration: 1, hasCorkage: true, paymentChoice: 'full', claimDiscount: false, selectedAddOns: ['Referee'] }).amount, noDiscount.amount);
   assert.throws(() => quoteOnlineBooking({ room, variant, basePrice, selectedAddOns: ['Unknown'] }), /no longer available/);
   const changedTime = { ...basePrice, roomCharge: 400 };
   assert.deepEqual(

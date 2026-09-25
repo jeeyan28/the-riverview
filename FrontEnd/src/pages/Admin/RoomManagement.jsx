@@ -159,6 +159,7 @@ function RoomManagement() {
   const [featureInput, setFeatureInput] = useState('');
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
+  const [deleteWarningId, setDeleteWarningId] = useState(null);
 
   const fetchRooms = useCallback(async () => {
     setLoading(true);
@@ -379,7 +380,7 @@ function RoomManagement() {
     const clash = rooms.find((r) => r.name.trim().toLowerCase() === normalized && r._id !== editingId);
     if (clash) {
       setFormStep('facility');
-      setFormError(`${clash.name} is already set up. Use “Add room” on its card to expand its inventory.`);
+      setFormError(`${clash.name} is already set up. Open Manage to expand its room inventory.`);
       return;
     }
     const cleanVariantEntries = form.variants.map((v, originalIndex) => ({ v, originalIndex }));
@@ -494,11 +495,10 @@ function RoomManagement() {
     if (!guardPermission('room:manage')) return;
     const facility = rooms.find((room) => room._id === id);
     if (facility?.variants?.length) {
-      openEditModal(facility);
-      setFormStep('rooms');
-      setFormError('Remove every room and save the facility before deleting it.');
+      setDeleteWarningId(id);
       return;
     }
+    setDeleteWarningId(null);
     if (!window.confirm('Remove this facility? This cannot be undone.')) return;
     try {
       await roomsService.remove(id);
@@ -622,42 +622,22 @@ function RoomManagement() {
             return (
               <article className="facility-catalog-row" key={facility._id}>
                 <div className="facility-catalog-media">
-                  {facility.image ? <img src={facilityImage(facility.image, facility.name)} alt={`${facility.name} facility`} /> : <div className="facility-name-placeholder">{facility.name}</div>}
-                  <span className="facility-category-mark"><FacilityIcon name={facility.name} size={18} />{facility.name}</span>
-                  <span className="facility-price-mark">{variants.length ? `From ₱${lowestRoomPrice(variants).toLocaleString()}/hr` : 'Add pricing'}</span>
+                  {facility.image ? <img src={facilityImage(facility.image, facility.name)} alt="" /> : <div className="facility-name-placeholder"><FacilityIcon name={facility.name} size={28} /></div>}
                 </div>
 
                 <div className="facility-catalog-main">
                   <div className="facility-catalog-title">
-                    <div><h3>{facility.name}</h3><span>{variants.length ? 'Visible in the customer booking catalog' : 'No rooms available for booking'}</span></div>
+                    <div><h3>{facility.name}</h3><span>{variants.length ? `From ₱${lowestRoomPrice(variants).toLocaleString()}/hr` : 'No rooms available for booking'}</span></div>
                     <span className={`facility-health ${counts.maintenance || counts.unavailable ? 'facility-health--attention' : ''}`}>
                       {counts.maintenance || counts.unavailable ? `${counts.maintenance + counts.unavailable} need attention` : `${counts.available} ready`}
                     </span>
                   </div>
-                  <p className={facility.description ? '' : 'facility-copy-missing'}>{facility.description || 'Add a short description so guests know what makes this facility useful.'}</p>
-
-                  <div className="facility-card-facts" aria-label={`${facility.name} summary`}>
-                    <span><DoorOpen size={16} /><strong>{variants.length}</strong> room type{variants.length === 1 ? '' : 's'}</span>
-                    <span><CheckCircle2 size={16} /><strong>{counts.available}</strong> ready</span>
-                    <span><Building2 size={16} /><strong>{totalUnits}</strong> total unit{totalUnits === 1 ? '' : 's'}</span>
-                  </div>
-
-                  <div className="facility-room-section-head"><span>Rooms &amp; hourly rates</span><span>{variants.length} type{variants.length === 1 ? '' : 's'}</span></div>
-                  <div className="facility-room-type-list" aria-label={`${facility.name} room types`}>
-                    {variants.length ? variants.map((variant, index) => (
-                      <div className="facility-room-type-row" key={`${variant.label}-${index}`}>
-                        <span className={`facility-room-status-dot facility-room-status-dot--${(variant.status || 'Available').toLowerCase().replace(' ', '-')}`} aria-hidden="true" />
-                        <span className="facility-room-name"><strong>{variant.label || `Room type ${index + 1}`}</strong><small>{roomNumberRangeLabel(variant)}{variant.pax ? ` · ${variant.pax}` : ''}</small></span>
-                        <span className={`facility-room-status ${ROOM_STATUS_PILL_CLASS[variant.status] || 'pill-active'}`}>{variant.status || 'Available'}</span>
-                        <strong className="facility-room-rate">{variantRateLabel(variant)}</strong>
-                      </div>
-                    )) : <div className="facility-room-type-empty">No rooms remain. Add a room or remove this facility.</div>}
-                  </div>
+                  <p className="facility-compact-summary">{variants.length} room type{variants.length === 1 ? '' : 's'} · {totalUnits} table{totalUnits === 1 ? '' : 's'}{variants.length ? ` · ${variants.slice(0, 2).map((variant) => variant.label).join(', ')}${variants.length > 2 ? ` +${variants.length - 2} more` : ''}` : ''}</p>
+                  {deleteWarningId === facility._id && <div className="facility-delete-warning" role="alert"><AlertCircle size={16} aria-hidden="true" /><span>Remove all rooms in Manage before deleting this facility.</span><button type="button" aria-label="Dismiss warning" onClick={() => setDeleteWarningId(null)}><X size={14} /></button></div>}
                 </div>
 
                 <div className="facility-catalog-actions">
                   {canManage ? <>
-                    <button type="button" className="facility-add-room-button" onClick={() => openEditModal(facility, { addRoom: true })}><Plus size={17} aria-hidden="true" />Add room</button>
                     <button type="button" className="facility-edit-button" onClick={() => openEditModal(facility)}><Pencil size={16} aria-hidden="true" />Manage</button>
                     <button type="button" className="facility-remove-button" aria-label={`Remove ${facility.name}`} title={variants.length ? 'Remove its rooms first' : `Remove ${facility.name}`} onClick={() => quickDelete(facility._id)}><Trash2 size={16} aria-hidden="true" /></button>
                   </> : <span>View only</span>}
@@ -771,25 +751,24 @@ function RoomManagement() {
                 </div>
 
                 <div className="fm-section">
-                  <div className="fm-section-title"><Tags size={16} aria-hidden="true" /> Full-payment discount</div>
+                  <div className="fm-section-title"><Tags size={16} aria-hidden="true" /> Room discount</div>
                   <div className="ffield">
                     <label className="flabel" htmlFor="facility-discount">Facility discount (%)</label>
-                    <span className="flabel-hint">Applies to the room charge when guests choose Pay in full. Corkage and optional services are excluded. A room can use its own percentage.</span>
+                    <span className="flabel-hint">Guests choose this in reservation details. Full payment applies it online; a down payment settles it at the facility. Corkage and services are excluded. Rooms can use their own percentage.</span>
                     <input id="facility-discount" type="number" min="0" max="99" step="0.01" value={form.discountPercent} onChange={(event) => setForm((current) => ({ ...current, discountPercent: event.target.value }))} />
                   </div>
                 </div>
 
-                <div className="fm-section">
-                  <div className="fm-section-title"><Plus size={16} aria-hidden="true" /> Optional services</div>
-                  <span className="flabel-hint">Guests can add these once per reservation. For example, a court referee for a flat fee.</span>
+                <div className="fm-section fm-services-section">
+                  <div className="fm-services-head"><div><div className="fm-section-title"><Plus size={16} aria-hidden="true" /> Optional services</div><p>Flat-fee extras guests can choose during booking.</p></div><button type="button" className="btn-cancel fm-add-service" disabled={(form.addOns || []).length >= 10} onClick={() => setForm((current) => ({ ...current, addOns: [...(current.addOns || []), { name: '', fee: '' }] }))}><Plus size={16} aria-hidden="true" /> Add service</button></div>
+                  {(form.addOns || []).length === 0 && <p className="fm-services-empty">No optional services yet. Add one if guests can request extras such as a referee.</p>}
                   {(form.addOns || []).map((addOn, index) => (
                     <div className="frow fm-addon-row" key={index}>
-                      <div className="ffield"><label className="flabel" htmlFor={`facility-addon-name-${index}`}>Service</label><input id={`facility-addon-name-${index}`} type="text" maxLength="80" placeholder="e.g. Referee" value={addOn.name} onChange={(event) => updateAddOn(index, 'name', event.target.value)} /></div>
+                      <div className="ffield"><label className="flabel" htmlFor={`facility-addon-name-${index}`}>Service {index + 1}</label><input id={`facility-addon-name-${index}`} type="text" maxLength="80" placeholder="e.g. Referee" value={addOn.name} onChange={(event) => updateAddOn(index, 'name', event.target.value)} /></div>
                       <div className="ffield"><label className="flabel" htmlFor={`facility-addon-fee-${index}`}>Flat fee (₱)</label><input id={`facility-addon-fee-${index}`} type="number" min="0.01" step="0.01" value={addOn.fee} onChange={(event) => updateAddOn(index, 'fee', event.target.value)} /></div>
                       <button type="button" className="chip-add-btn" aria-label={`Remove service ${addOn.name || index + 1}`} onClick={() => setForm((current) => ({ ...current, addOns: current.addOns.filter((_, i) => i !== index) }))}><Trash2 size={16} aria-hidden="true" /></button>
                     </div>
                   ))}
-                  <button type="button" className="btn-cancel fm-add-service" disabled={(form.addOns || []).length >= 10} onClick={() => setForm((current) => ({ ...current, addOns: [...(current.addOns || []), { name: '', fee: '' }] }))}><Plus size={16} aria-hidden="true" /> Add service</button>
                 </div>
 
                 <div className="fm-section">

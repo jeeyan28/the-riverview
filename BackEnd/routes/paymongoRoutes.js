@@ -63,7 +63,7 @@ router.get("/config", (req, res) => {
 
 router.post("/intent", ensureAuthenticated, paymentIntentLimiter, validate(createIntentSchema), async (req, res) => {
   try {
-    const { guestName, guestContact, guestEmail, guestCount: guestCountRaw, hasCorkage, specialRequests, roomId, variantLabel, date, timeIn, duration, paymentChoice: requestedPaymentChoice, downPaymentHours: legacyPaymentHours, selectedAddOns = [] } = req.body;
+    const { guestName, guestContact, guestEmail, guestCount: guestCountRaw, hasCorkage, specialRequests, roomId, variantLabel, date, timeIn, duration, paymentChoice: requestedPaymentChoice, downPaymentHours: legacyPaymentHours, claimDiscount, selectedAddOns = [] } = req.body;
     const guestCount = guestCountRaw || 1;
     const paymentChoice = requestedPaymentChoice || (duration > 1 && legacyPaymentHours === duration ? "full" : "deposit");
     const downPaymentHours = paymentChoice === "full" ? duration : 1;
@@ -96,7 +96,7 @@ router.post("/intent", ensureAuthenticated, paymentIntentLimiter, validate(creat
     }
     let quote;
     try {
-      quote = quoteOnlineBooking({ room, variant: selectedVariant, basePrice: { roomCharge, corkageFee, hourlyRates }, paymentChoice, selectedAddOns });
+      quote = quoteOnlineBooking({ room, variant: selectedVariant, basePrice: { roomCharge, corkageFee, hourlyRates }, paymentChoice, claimDiscount, selectedAddOns });
     } catch (e) {
       return res.status(e.status || 400).json({ message: e.message });
     }
