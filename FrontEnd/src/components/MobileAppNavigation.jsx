@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { Activity, BarChart3, CalendarDays, DoorOpen, House, LayoutDashboard, Menu, MessageCircle, UserRound } from 'lucide-react';
+import { Activity, BarChart3, CalendarDays, DoorOpen, House, LayoutDashboard, Menu, MessageCircle, Siren, UserRound } from 'lucide-react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { buildLoginPath } from '../utils/auth';
 
@@ -60,6 +60,7 @@ function AdminAppNavigation({ hasPermission, menuOpen = false, onOpenMenu }) {
   const candidates = [
     { to: '/admin/monitor', label: 'Monitor', icon: Activity, permission: 'room:view' },
     { to: '/admin/bookings', label: 'Reservations', icon: CalendarDays, permission: 'booking:view' },
+    { to: '/admin/emergency-contacts', label: 'Emergency', icon: Siren },
     { to: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard, permission: 'reports:view' },
     { to: '/admin/reports', label: 'Reports', icon: BarChart3, permission: 'reports:view' },
     { to: '/admin/room-management', label: 'Spaces', icon: DoorOpen, permission: 'room:manage' },

@@ -48,6 +48,21 @@ const updatePaymentMethodSchema = Joi.object({
   isActive: Joi.boolean(),
 });
 
+const emergencyContactFields = {
+  category: Joi.string().valid("fire", "police", "hospital", "ambulance", "disaster", "other"),
+  name: Joi.string().trim().min(2).max(80),
+  phone: Joi.string().trim().min(3).max(30).pattern(/^\+?[0-9() .-]+$/).custom((value, helpers) =>
+    value.replace(/\D/g, "").length >= 3 ? value : helpers.error("string.pattern.base")),
+  details: Joi.string().trim().allow("").max(180),
+};
+const createEmergencyContactSchema = Joi.object({
+  ...emergencyContactFields,
+  category: emergencyContactFields.category.required(),
+  name: emergencyContactFields.name.required(),
+  phone: emergencyContactFields.phone.required(),
+});
+const updateEmergencyContactSchema = Joi.object(emergencyContactFields).min(1);
+
 module.exports = {
   settingsItemIdParamsSchema,
   emptyBodySchema,
@@ -57,4 +72,6 @@ module.exports = {
   updateAnnouncementSchema,
   createPaymentMethodSchema,
   updatePaymentMethodSchema,
+  createEmergencyContactSchema,
+  updateEmergencyContactSchema,
 };

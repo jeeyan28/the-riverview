@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 const Settings = require("../model/settings");
 const User = require("../model/user");
-const { ensureAuthenticated, requirePermission } = require("../middleware/adminAuth");
+const { ensureAuthenticated, ensureAdmin, requirePermission } = require("../middleware/adminAuth");
 const { PERMISSIONS } = require("../utils/permissions");
 const { paymentMethodQrUpload } = require("../middleware/upload");
 const { logAudit } = require("../utils/auditLog");
@@ -16,6 +16,8 @@ const {
   updateAnnouncementSchema,
   createPaymentMethodSchema,
   updatePaymentMethodSchema,
+  createEmergencyContactSchema,
+  updateEmergencyContactSchema,
 } = require("../validation/settingsSchemas");
 
 router.get("/", async (req, res) => {
@@ -63,6 +65,70 @@ router.post("/announcements/:id/read", ensureAuthenticated, validate(settingsIte
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Server error." });
+  }
+});
+
+router.get("/emergency-contacts", ensureAdmin, async (req, res) => {
+  try {
+    const settings = await Settings.getSingleton();
+    res.json({ contacts: settings.emergencyContacts });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Could not load emergency contacts." });
+  }
+});
+
+router.post("/emergency-contacts", requirePermission(PERMISSIONS.SETTINGS_MANAGE), validate(createEmergencyContactSchema), async (req, res) => {
+  try {
+    const settings = await Settings.getSingleton();
+    if (settings.emergencyContacts.length >= 40) {
+      return res.status(400).json({ message: "The directory is full. Remove an unused contact before adding another." });
+    }
+    settings.emergencyContacts.push(req.body);
+    settings.updatedBy = req.user._id;
+    settings.updatedAt = new Date();
+    await settings.save();
+    const contact = settings.emergencyContacts[settings.emergencyContacts.length - 1];
+    await logAudit({ category: "Settings", action: "created", description: `added emergency contact "${contact.name}"`, user: req.user });
+    res.status(201).json(contact);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Could not add emergency contact." });
+  }
+});
+
+router.put("/emergency-contacts/:id", requirePermission(PERMISSIONS.SETTINGS_MANAGE), validate(settingsItemIdParamsSchema, "params"), validate(updateEmergencyContactSchema), async (req, res) => {
+  try {
+    const settings = await Settings.getSingleton();
+    const contact = settings.emergencyContacts.id(req.params.id);
+    if (!contact) return res.status(404).json({ message: "Emergency contact not found." });
+    for (const [key, value] of Object.entries(req.body)) contact[key] = value;
+    settings.updatedBy = req.user._id;
+    settings.updatedAt = new Date();
+    await settings.save();
+    await logAudit({ category: "Settings", action: "updated", description: `updated emergency contact "${contact.name}"`, user: req.user });
+    res.json(contact);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Could not update emergency contact." });
+  }
+});
+
+router.delete("/emergency-contacts/:id", requirePermission(PERMISSIONS.SETTINGS_MANAGE), validate(settingsItemIdParamsSchema, "params"), validate(emptyBodySchema), async (req, res) => {
+  try {
+    const settings = await Settings.getSingleton();
+    const contact = settings.emergencyContacts.id(req.params.id);
+    if (!contact) return res.status(404).json({ message: "Emergency contact not found." });
+    const name = contact.name;
+    settings.emergencyContacts = settings.emergencyContacts.filter((item) => String(item._id) !== req.params.id);
+    settings.updatedBy = req.user._id;
+    settings.updatedAt = new Date();
+    await settings.save();
+    await logAudit({ category: "Settings", action: "deleted", description: `removed emergency contact "${name}"`, user: req.user });
+    res.json({ message: "Emergency contact removed." });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Could not remove emergency contact." });
   }
 });
 

@@ -23,9 +23,9 @@ const Users = lazy(() => import('./pages/Admin/Users'));
 const Reports = lazy(() => import('./pages/Admin/Reports'));
 const Settings = lazy(() => import('./pages/Admin/Settings'));
 const AuditTrail = lazy(() => import('./pages/Admin/AuditTrail'));
-const ActiveSessions = lazy(() => import('./pages/Admin/ActiveSessions'));
 const RoomManagement = lazy(() => import('./pages/Admin/RoomManagement'));
 const Forecasting = lazy(() => import('./pages/Admin/Forecasting'));
+const EmergencyContacts = lazy(() => import('./pages/Admin/EmergencyContacts'));
 
 
 function RequirePermission({ permission, children }) {
@@ -74,13 +74,13 @@ function App() {
         <Route path="dashboard" element={<RequirePermission permission="reports:view"><Dashboard /></RequirePermission>} />
         <Route path="monitor" element={<RequirePermission permission="room:view"><Monitor /></RequirePermission>} />
         <Route path="bookings" element={<RequirePermission permission="booking:view"><Bookings /></RequirePermission>} />
+        <Route path="emergency-contacts" element={<EmergencyContacts />} />
         <Route path="analytics" element={<RequirePermission permission="reports:view"><Analytics /></RequirePermission>} />
         <Route path="reports" element={<RequirePermission permission="reports:view"><Reports /></RequirePermission>} />
         <Route path="forecasting" element={<RequirePermission permission="forecasting:view"><Forecasting /></RequirePermission>} />
         <Route path="users" element={<RequirePermission permission="admin:manage"><Users /></RequirePermission>} />
         <Route path="logs" element={<RequirePermission permission="admin:manage"><Navigate to="/admin/settings?tab=login" replace /></RequirePermission>} />
         <Route path="audit-trail" element={<RequirePermission permission="settings:view"><AuditTrail /></RequirePermission>} />
-        <Route path="active-sessions" element={<RequirePermission permission="admin:manage"><ActiveSessions /></RequirePermission>} />
         <Route path="room-management" element={<RequirePermission permission="room:manage"><RoomManagement /></RequirePermission>} />
         <Route path="settings" element={<RequirePermission permission="settings:view"><Settings /></RequirePermission>} />
         <Route path="*" element={<AdminLanding />} />

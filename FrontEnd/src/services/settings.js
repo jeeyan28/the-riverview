@@ -6,6 +6,11 @@ const BASE = '/api/settings';
 export const settingsService = {
   getAdmin: () => apiRequest(`${BASE}/admin`, { fallbackMessage: 'Failed to load settings.' }),
 
+  getEmergencyContacts: () => apiRequest(`${BASE}/emergency-contacts`, { fallbackMessage: 'Could not load emergency contacts.' }),
+  addEmergencyContact: (payload) => apiRequest(`${BASE}/emergency-contacts`, { method: 'POST', body: payload, fallbackMessage: 'Could not add emergency contact.' }),
+  updateEmergencyContact: (id, payload) => apiRequest(`${BASE}/emergency-contacts/${id}`, { method: 'PUT', body: payload, fallbackMessage: 'Could not update emergency contact.' }),
+  removeEmergencyContact: (id) => apiRequest(`${BASE}/emergency-contacts/${id}`, { method: 'DELETE', fallbackMessage: 'Could not remove emergency contact.' }),
+
   /** @param {{openTime:string, closeTime:string, openDays:number[]}} payload */
   updateOperatingHours: (payload) =>
     apiRequest(`${BASE}/operating-hours`, { method: 'PUT', body: payload, fallbackMessage: 'Failed to save.' }),
