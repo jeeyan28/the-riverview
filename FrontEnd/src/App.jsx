@@ -6,6 +6,7 @@ import AdminLayout from './layouts/AdminLayout';
 import { useAuth } from './context/AuthContext';
 import Login from './pages/Login';
 import { isAdminReturnPath } from './utils/auth';
+import PageSkeleton from './components/PageSkeleton';
 
 const Home = lazy(() => import('./pages/Home'));
 const Rooms = lazy(() => import('./pages/Rooms'));
@@ -22,6 +23,7 @@ const Users = lazy(() => import('./pages/Admin/Users'));
 const Reports = lazy(() => import('./pages/Admin/Reports'));
 const Settings = lazy(() => import('./pages/Admin/Settings'));
 const AuditTrail = lazy(() => import('./pages/Admin/AuditTrail'));
+const ActiveSessions = lazy(() => import('./pages/Admin/ActiveSessions'));
 const RoomManagement = lazy(() => import('./pages/Admin/RoomManagement'));
 const Forecasting = lazy(() => import('./pages/Admin/Forecasting'));
 
@@ -42,10 +44,6 @@ function AdminLanding() {
   return <Navigate to="/" replace />;
 }
 
-function RouteFallback() {
-  return <div className="route-fallback" role="status">Opening page…</div>;
-}
-
 function LegacyAdminLoginRedirect() {
   const returnTo = new URLSearchParams(window.location.search).get('returnTo') || '';
   return <Navigate to={isAdminReturnPath(returnTo) ? returnTo : '/admin'} replace />;
@@ -53,7 +51,7 @@ function LegacyAdminLoginRedirect() {
 
 function App() {
   return (
-    <Suspense fallback={<RouteFallback />}>
+    <Suspense fallback={<PageSkeleton />}>
       <Routes>
       <Route element={<MainLayout />}>
         <Route path="/" element={<Home />} />
@@ -82,6 +80,7 @@ function App() {
         <Route path="users" element={<RequirePermission permission="admin:manage"><Users /></RequirePermission>} />
         <Route path="logs" element={<RequirePermission permission="admin:manage"><Navigate to="/admin/settings?tab=login" replace /></RequirePermission>} />
         <Route path="audit-trail" element={<RequirePermission permission="settings:view"><AuditTrail /></RequirePermission>} />
+        <Route path="active-sessions" element={<RequirePermission permission="admin:manage"><ActiveSessions /></RequirePermission>} />
         <Route path="room-management" element={<RequirePermission permission="room:manage"><RoomManagement /></RequirePermission>} />
         <Route path="settings" element={<RequirePermission permission="settings:view"><Settings /></RequirePermission>} />
         <Route path="*" element={<AdminLanding />} />

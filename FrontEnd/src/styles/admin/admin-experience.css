@@ -151,40 +151,6 @@
     line-height: 1.25;
   }
 
-  #app #panel-dashboard .finance-activity {
-    gap: 6px 14px;
-    padding: 9px 10px;
-    margin-bottom: 10px;
-    font-size: .68rem;
-  }
-
-  #app #panel-dashboard .qa-row {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 6px;
-  }
-
-  #app #panel-dashboard .qa-btn {
-    min-width: 0;
-    min-height: 42px;
-    padding: 7px;
-    gap: 7px;
-    font-size: .7rem;
-  }
-
-  #app #panel-dashboard .qa-ico {
-    width: 26px;
-    height: 26px;
-    border-radius: 7px;
-    font-size: 13px;
-  }
-
-  #app #panel-dashboard .qa-label {
-    min-width: 0;
-    white-space: normal;
-    text-align: left;
-    line-height: 1.2;
-  }
-
   #app .rm-refresh-error {
     display: flex;
     align-items: center;

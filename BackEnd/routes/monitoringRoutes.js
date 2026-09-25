@@ -30,10 +30,19 @@ function currentBusinessHour(value = new Date()) {
   return Number(new Intl.DateTimeFormat("en-US", { timeZone: TIME_ZONE, hour: "2-digit", hourCycle: "h23" }).format(new Date(value)));
 }
 
+function sessionAuditLabel(session) {
+  const place = [session.facilityName, session.roomName, session.roomNumber ? `Table ${session.roomNumber}` : null].filter(Boolean).join(" · ") || "room session";
+  const guest = session.guestName || "walk-in";
+  const when = session.startTime
+    ? new Intl.DateTimeFormat("en-PH", { timeZone: TIME_ZONE, month: "short", day: "numeric", hour: "numeric", minute: "2-digit", hour12: true }).format(new Date(session.startTime))
+    : "";
+  return `${place} for ${guest}${when ? ` on ${when}` : ""}`;
+}
+
 async function logSessionPayment(session, previousPaid, user) {
   const received = Number(session.paidAmount || 0) - Number(previousPaid || 0);
   if (received <= 0) return;
-  await logAudit({ category: "Booking", action: "updated", description: `recorded payment of ₱${received.toFixed(2)} for session ${session._id} (${session.guestName || "walk-in"})`, user });
+  await logAudit({ category: "Booking", action: "updated", description: `recorded payment of ₱${received.toFixed(2)} for ${sessionAuditLabel(session)}`, user });
 }
 
 async function syncBookingFromSession(session, status) {
@@ -398,7 +407,7 @@ sessionsRouter.post("/", requireAnyPermission(PERMISSIONS.ROOM_OPERATE, PERMISSI
       booking.paymentUpdatedAt = new Date();
       if (paymentMethod) booking.paymentMethod = paymentMethod;
       await booking.save();
-      if (discount > 0) await logAudit({ category: "Booking", action: "updated", description: `applied ₱${discount.toFixed(2)} venue discount to reservation ${booking.reservationCode || booking._id}${cashReturned > 0 ? `, including ₱${cashReturned.toFixed(2)} returned to the guest` : ''}`, user: req.user });
+      if (discount > 0) await logAudit({ category: "Booking", action: "updated", description: `applied ₱${discount.toFixed(2)} venue discount to reservation ${booking.reservationCode || (booking.guestName ? `${booking.guestName}'s reservation` : "reservation")}${cashReturned > 0 ? `, including ₱${cashReturned.toFixed(2)} returned to the guest` : ''}`, user: req.user });
     }
 
     await logSessionPayment(session, previousPaid, req.user);

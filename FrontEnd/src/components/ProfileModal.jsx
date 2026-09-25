@@ -5,7 +5,7 @@ import { bookingsService } from '../services/bookings';
 import { API_BASE_URL } from '../services/api';
 import { openBookingReceipt } from '../utils/receipt';
 import { cancellationAmounts } from '../utils/cancellationPolicy';
-import { reservationPresentation } from '../utils/reservationStatus';
+import { reservationPresentation, reservationWindow } from '../utils/reservationStatus';
 import { formatTime12 } from '../utils/time';
 import { useSiteSettings } from '../hooks/useSiteSettings';
 import PasswordInput from './PasswordInput';
@@ -17,6 +17,16 @@ import ModalPortal from './ModalPortal';
 
 const EMPTY_DETAILS = { firstName: '', lastName: '', phone: '', email: '' };
 const EMPTY_PASSWORD = { currentPassword: '', newPassword: '', confirmPassword: '' };
+const CLOSED_STATUSES = ['Done', 'No Show', 'Cancelled', 'Rejected'];
+
+function isClosedStatus(status) {
+  return CLOSED_STATUSES.includes(status);
+}
+
+function bookingStartMs(booking) {
+  const start = reservationWindow(booking)?.start;
+  return Number.isFinite(start) ? start : NaN;
+}
 
 function historyStatusClass(status) {
   if (status === 'Done') return 'completed';
@@ -53,6 +63,7 @@ function ProfileModal({ open, onClose, reservationIntent }) {
   const [savingPassword, setSavingPassword] = useState(false);
 
   const [bookings, setBookings] = useState([]);
+  const [historyView, setHistoryView] = useState('active');
   const [clockMs, setClockMs] = useState(Date.now);
   const [loadingBookings, setLoadingBookings] = useState(false);
   const [bookingsError, setBookingsError] = useState('');
@@ -240,6 +251,19 @@ function ProfileModal({ open, onClose, reservationIntent }) {
 
   const completedBookings = bookings.filter((b) => reservationPresentation(b, clockMs).status === 'Done');
   const totalSpent = bookings.reduce((sum, booking) => sum + paymentBreakdown(booking, clockMs).paid, 0);
+  const activeBookings = bookings
+    .filter((booking) => !isClosedStatus(reservationPresentation(booking, clockMs).status))
+    .sort((bookingA, bookingB) => {
+      const startA = bookingStartMs(bookingA);
+      const startB = bookingStartMs(bookingB);
+      const distanceA = Number.isFinite(startA) ? Math.abs(startA - clockMs) : Number.POSITIVE_INFINITY;
+      const distanceB = Number.isFinite(startB) ? Math.abs(startB - clockMs) : Number.POSITIVE_INFINITY;
+      return distanceA - distanceB || startA - startB;
+    });
+  const historyBookings = bookings
+    .filter((booking) => isClosedStatus(reservationPresentation(booking, clockMs).status))
+    .sort((bookingA, bookingB) => (bookingStartMs(bookingB) || 0) - (bookingStartMs(bookingA) || 0));
+  const visibleBookings = historyView === 'active' ? activeBookings : historyBookings;
 
   return (
     <ModalPortal>
@@ -451,13 +475,37 @@ function ProfileModal({ open, onClose, reservationIntent }) {
               </div>
             </div>
 
+            <div className="pf-tabs pf-history-filter" role="tablist" aria-label="Reservation list">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={historyView === 'active'}
+                className={`pf-tab${historyView === 'active' ? ' active' : ''}`}
+                onClick={() => setHistoryView('active')}
+              >
+                Active <span className="pf-tab-count">{activeBookings.length}</span>
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={historyView === 'history'}
+                className={`pf-tab${historyView === 'history' ? ' active' : ''}`}
+                onClick={() => setHistoryView('history')}
+              >
+                History <span className="pf-tab-count">{historyBookings.length}</span>
+              </button>
+            </div>
+
             <div className="pf-history">
               {loadingBookings && <p className="pf-history-empty">Loading your reservations…</p>}
               {!loadingBookings && bookingsError && <p className="pf-history-empty">{bookingsError}</p>}
               {!loadingBookings && !bookingsError && bookings.length === 0 && (
                 <p className="pf-history-empty">You haven't made any reservations yet.</p>
               )}
-              {!loadingBookings && !bookingsError && bookings.map((b) => {
+              {!loadingBookings && !bookingsError && bookings.length > 0 && visibleBookings.length === 0 && (
+                <p className="pf-history-empty">{historyView === 'active' ? 'No active reservations right now.' : 'No past reservations yet.'}</p>
+              )}
+              {!loadingBookings && !bookingsError && visibleBookings.map((b) => {
                 const payment = paymentBreakdown(b, clockMs);
                 const presentation = reservationPresentation(b, clockMs);
                 return (

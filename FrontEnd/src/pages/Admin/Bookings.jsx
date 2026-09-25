@@ -35,6 +35,8 @@ const QUICK_VIEWS = [
   ['all', 'All'], ['new', 'New'], ['today', 'Today'], ['upcoming', 'Upcoming'],
   ['ongoing', 'Ongoing'], ['finished', 'Finished'], ['review', 'Needs review'],
 ];
+const CLOSED_STATUSES = ['Done', 'No Show', 'Cancelled', 'Rejected'];
+const OPEN_ONLY_VIEWS = ['all', 'new', 'today', 'upcoming'];
 const PAYMENT_METHODS = ['Cash', 'GCash', 'Maya', 'QR Ph', 'Credit / Debit Card'];
 const SEARCH_DEBOUNCE_MS = 350;
 const BOOKINGS_POLL_MS = 15000;
@@ -60,6 +62,27 @@ function matchesQuickView(booking, view, now, today) {
   if (view === 'finished') return status === 'Done' || status === 'No Show';
   if (view === 'review') return booking.cancellationStatus === 'Requested' || booking.status === 'Pending Payment Verification' || status === 'Overdue';
   return true;
+}
+
+function isClosedStatus(status) {
+  return CLOSED_STATUSES.includes(status);
+}
+
+function bookingStartMs(booking) {
+  const start = reservationWindow(booking)?.start;
+  return Number.isFinite(start) ? start : NaN;
+}
+
+function compareByNearest(bookingA, bookingB, now) {
+  const closedA = isClosedStatus(reservationPresentation(bookingA, now).status);
+  const closedB = isClosedStatus(reservationPresentation(bookingB, now).status);
+  if (closedA !== closedB) return closedA ? 1 : -1;
+  const startA = bookingStartMs(bookingA);
+  const startB = bookingStartMs(bookingB);
+  if (closedA) return (Number.isFinite(startB) ? startB : 0) - (Number.isFinite(startA) ? startA : 0);
+  const distanceA = Number.isFinite(startA) ? Math.abs(startA - now) : Number.POSITIVE_INFINITY;
+  const distanceB = Number.isFinite(startB) ? Math.abs(startB - now) : Number.POSITIVE_INFINITY;
+  return distanceA - distanceB || startA - startB || String(bookingA._id || '').localeCompare(String(bookingB._id || ''));
 }
 
 function shortBookingId(b) {
@@ -240,11 +263,15 @@ function Bookings() {
   }, []);
 
   const today = businessDate();
-  const quickViewCounts = useMemo(() => Object.fromEntries(QUICK_VIEWS.map(([key]) => [key, allBookings.filter((booking) => matchesQuickView(booking, key, clockMs, today)).length])), [allBookings, clockMs, today]);
-  const bookings = useMemo(() => allBookings.filter((booking) =>
-    (!statusFilter || reservationPresentation(booking, clockMs).status === statusFilter) &&
-    matchesQuickView(booking, quickView, clockMs, today)
-  ), [allBookings, statusFilter, quickView, clockMs, today]);
+  const isListed = useCallback((booking, view) => {
+    if (!matchesQuickView(booking, view, clockMs, today)) return false;
+    if (!statusFilter && OPEN_ONLY_VIEWS.includes(view) && isClosedStatus(reservationPresentation(booking, clockMs).status)) return false;
+    return true;
+  }, [clockMs, today, statusFilter]);
+  const quickViewCounts = useMemo(() => Object.fromEntries(QUICK_VIEWS.map(([key]) => [key, allBookings.filter((booking) => isListed(booking, key)).length])), [allBookings, isListed]);
+  const bookings = useMemo(() => allBookings
+    .filter((booking) => (!statusFilter || reservationPresentation(booking, clockMs).status === statusFilter) && isListed(booking, quickView))
+    .sort((bookingA, bookingB) => compareByNearest(bookingA, bookingB, clockMs)), [allBookings, statusFilter, quickView, clockMs, isListed]);
 
   function openEditBooking(id) {
     if (!guardPermission('booking:manage')) return;
@@ -554,7 +581,7 @@ function Bookings() {
           </div>
         </div>
         <div className="bk-results-row">
-          {loading ? 'Loading reservations…' : `${bookings.length.toLocaleString()} reservation${bookings.length === 1 ? '' : 's'} · newest first`}
+          {loading ? 'Loading reservations…' : `${bookings.length.toLocaleString()} reservation${bookings.length === 1 ? '' : 's'} · nearest first`}
         </div>
       </div>
 

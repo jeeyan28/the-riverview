@@ -16,14 +16,21 @@ router.get('/summary', async (req, res) => {
     const todayKey = businessDate();
     const yesterdayKey = addDays(todayKey, -1);
     const sinceKey = addDays(todayKey, -TREND_WINDOW_DAYS);
-    const [todayBookings, yesterdayBookings, activeSessions, sales, pendingReservations, cancellationRequests] = await Promise.all([
-      Booking.countDocuments({ date: todayKey, status: { $nin: ['Rejected', 'Cancelled', 'No Show'] } }),
-      Booking.countDocuments({ date: yesterdayKey, status: { $nin: ['Rejected', 'Cancelled', 'No Show'] } }),
+    const activeFilter = { status: { $nin: ['Rejected', 'Cancelled', 'No Show'] } };
+    const [todayReservations, yesterdayBookings, activeSessions, sales, pendingReservations, cancellationRequests] = await Promise.all([
+      Booking.find({ date: todayKey, ...activeFilter }).select('guestName guestContact guestEmail').lean(),
+      Booking.countDocuments({ date: yesterdayKey, ...activeFilter }),
       RoomSession.find({ status: 'Active' }).select('facilityName startTime scheduledEndTime duration').lean(),
       getSalesReport({ from: sinceKey, to: todayKey }),
       Booking.countDocuments({ status: { $in: ['Pending', 'Pending Payment Verification', 'Awaiting Online Payment'] } }),
       Booking.countDocuments({ cancellationStatus: 'Requested' }),
     ]);
+    const todayBookings = todayReservations.length;
+    const todayClients = new Set(
+      todayReservations
+        .map((booking) => String(booking.guestContact || booking.guestEmail || booking.guestName || booking._id || '').trim().toLowerCase())
+        .filter(Boolean)
+    ).size;
 
     const activeByFacility = new Map();
     let overdueCount = 0;
@@ -39,7 +46,7 @@ router.get('/summary', async (req, res) => {
     const revenuePercentVsAvg = avgPriorCollected ? Math.round(((today.collected - avgPriorCollected) / avgPriorCollected) * 100) : 0;
 
     res.json({
-      todayBookings: { count: todayBookings, deltaVsYesterday: todayBookings - yesterdayBookings },
+      todayBookings: { count: todayBookings, clients: todayClients, deltaVsYesterday: todayBookings - yesterdayBookings },
       activeSessions: { count: activeSessions.length, byFacility: [...activeByFacility.entries()].sort((a, b) => b[1] - a[1]).map(([facilityName, count]) => ({ facilityName, count })) },
       todayRevenue: { amount: today.collected, percentVsAvg: revenuePercentVsAvg, direction: revenuePercentVsAvg > 0 ? 'up' : revenuePercentVsAvg < 0 ? 'down' : 'flat' },
       overdueRooms: { count: overdueCount },

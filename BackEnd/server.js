@@ -117,6 +117,7 @@ app.use("/api/users", require("./routes/userRoutes"));
 app.use("/api/login-history", require("./routes/loginHistoryRoutes"));
 app.use("/api/settings", require("./routes/settingsRoutes"));
 app.use("/api/audit-logs", require("./routes/auditLogRoutes"));
+app.use("/api/active-sessions", require("./routes/activeSessionsRoutes"));
 app.use("/api/forecast", require("./routes/forecastRoutes"));
 app.use("/api/dashboard", require("./routes/dashboardRoutes"));
 app.use("/api/reports", require("./routes/reportRoutes"));

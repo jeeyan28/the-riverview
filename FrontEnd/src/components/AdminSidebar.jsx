@@ -12,6 +12,7 @@ import {
   LogOut,
   PanelLeftClose,
   PanelLeftOpen,
+  Radio,
   Settings,
   TrendingUp,
   Users,
@@ -44,6 +45,7 @@ const NAV_SECTIONS = [
   {
     label: 'Management',
     items: [
+      { to: '/admin/active-sessions', icon: Radio, label: "Who's online", permission: 'admin:manage' },
       { to: '/admin/users', icon: Users, label: 'Team & Users', permission: 'admin:manage' },
       { to: '/admin/audit-trail', icon: History, label: 'Audit Trail', permission: 'settings:view' },
       { to: '/admin/room-management', icon: Building2, label: 'Facilities', permission: 'room:manage' },
@@ -66,6 +68,7 @@ export const PAGE_TITLES = {
   reports: 'Reports',
   forecasting: 'Forecasting',
   users: 'Team & Users',
+  'active-sessions': "Who's online",
   'audit-trail': 'Audit Trail',
   'room-management': 'Facilities',
   settings: 'Settings',
@@ -79,6 +82,7 @@ export const PAGE_CONTEXT = {
   reports: 'Financial records',
   forecasting: 'Revenue planning',
   users: 'Access management',
+  'active-sessions': 'Live system access',
   'audit-trail': 'Administrative activity',
   'room-management': 'Inventory & pricing',
   settings: 'Business configuration',

@@ -214,6 +214,15 @@ function Home() {
   const previousSpace = SPACE_ITEMS[(activeSpaceIndex - 1 + SPACE_ITEMS.length) % SPACE_ITEMS.length];
   const nextSpace = SPACE_ITEMS[(activeSpaceIndex + 1) % SPACE_ITEMS.length];
 
+  if (typeof window !== 'undefined' && window.opener && !window.opener.closed) {
+    const result = searchParams.get('paymongo');
+    const paymentIntentId = searchParams.get('paymentIntentId');
+    if (result && paymentIntentId) {
+      window.opener.focus();
+      window.close();
+    }
+  }
+
   function showSpace(direction) {
     setActiveSpaceIndex((current) => (current + direction + SPACE_ITEMS.length) % SPACE_ITEMS.length);
   }
@@ -263,9 +272,6 @@ function Home() {
     const result = searchParams.get('paymongo');
     const paymentIntentId = searchParams.get('paymentIntentId');
     if (!result || !paymentIntentId) return;
-
-    setPaymongoReturn({ result, paymentIntentId });
-    setSearchParams({}, { replace: true });
     if (window.opener && !window.opener.closed) {
       window.opener.focus();
       window.close();

@@ -157,8 +157,6 @@
   #app .fac-chip{flex:1 1 auto;justify-content:center;}
   #app .view-toggle{width:100%;}
   #app .view-toggle-btn{flex:1;justify-content:center;}
-  #app #panel-dashboard .qa-row{display:grid;grid-template-columns:minmax(0,1fr);gap:8px;}
-  #app #panel-dashboard .qa-btn{width:100%;}
   #app #panel-dashboard .dash-room-row{flex-wrap:wrap;gap:8px;}
   #app .dt-pagination{align-items:stretch;gap:12px;font-size:.78rem;}
   #app .dt-pagination-size{justify-content:space-between;flex-wrap:wrap;}

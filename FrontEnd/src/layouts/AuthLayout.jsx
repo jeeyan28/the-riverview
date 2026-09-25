@@ -1,22 +1,13 @@
-import { useLayoutEffect } from 'react';
 import { Outlet } from 'react-router-dom';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import '../styles/login.css';
+import { useTheme } from '../hooks/useTheme';
 
 function AuthLayout() {
-  useLayoutEffect(() => {
-    const root = document.documentElement;
-    const previousTheme = root.getAttribute('data-theme');
-    root.setAttribute('data-theme', 'dark');
-
-    return () => {
-      if (previousTheme) root.setAttribute('data-theme', previousTheme);
-      else root.removeAttribute('data-theme');
-    };
-  }, []);
+  const [theme] = useTheme();
 
   return (
-    <div className="auth-content" data-auth-theme="dark">
+    <div className="auth-content" data-auth-theme={theme}>
       <Outlet />
     </div>
   );

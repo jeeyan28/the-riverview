@@ -1,22 +1,22 @@
-/* ══════════════════════════════════════════════════════════════
-   ADMIN — DASHBOARD (pages/Admin/Dashboard.jsx)
+﻿/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+   ADMIN â€” DASHBOARD (pages/Admin/Dashboard.jsx)
    Everything here is scoped to #panel-dashboard. Generic pieces the
    dashboard also uses (.card, .mc, .pill, etc.) live in shared.css.
-   ══════════════════════════════════════════════════════════════ */
+   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 
-/* ══════════════════════════════════════════
-   TIER 5 — DASHBOARD VISUAL MODERNIZATION
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+   TIER 5 â€” DASHBOARD VISUAL MODERNIZATION
    Scoped to #panel-dashboard so no other panel's look changes, and purely
-   visual — no selectors here touch anything that drives layout logic
+   visual â€” no selectors here touch anything that drives layout logic
    (panel switching, gating, etc.) from earlier tiers.
-   ══════════════════════════════════════════ */
+   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 #panel-dashboard{gap:18px;}
 #panel-dashboard .dash-reservation-status{display:inline-flex;flex-direction:column;align-items:flex-start;gap:4px;}
 #panel-dashboard .dash-reservation-status small{font-size:.67rem;color:var(--muted);}
 #panel-dashboard .dash-reservation-status .dash-status-warning{color:var(--red);font-weight:600;}
 
-/* Metric cards — icon badges, per-card accent color, soft depth + hover lift */
-#app #panel-dashboard .metric-row{grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;}
+/* Metric cards â€” icon badges, per-card accent color, soft depth + hover lift */
+#app #panel-dashboard .metric-row{grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;}
 #panel-dashboard .mc{
   position:relative;overflow:hidden;border-radius:16px;
   box-shadow:0 1px 2px rgba(0,0,0,.18),0 10px 24px -18px rgba(0,0,0,.6);
@@ -30,7 +30,8 @@
   box-shadow:0 4px 10px rgba(0,0,0,.22),0 16px 32px -18px rgba(0,0,0,.65);
 }
 #panel-dashboard .metric-row .mc:nth-child(2)::before{background:var(--blue);}
-#panel-dashboard .metric-row .mc:nth-child(3)::before{background:var(--red);}
+#panel-dashboard .metric-row .mc:nth-child(3)::before{background:var(--amber);}
+#panel-dashboard .metric-row .mc:nth-child(4)::before{background:var(--red);}
 
 #panel-dashboard .mc-label{gap:8px;margin-bottom:10px;}
 #panel-dashboard .mc-label i{
@@ -39,21 +40,20 @@
   font-size:13px!important;background:var(--teal-soft);color:var(--teal);
 }
 #panel-dashboard .metric-row .mc:nth-child(2) .mc-label i{background:rgba(55,138,221,.14);color:var(--blue);}
-#panel-dashboard .metric-row .mc:nth-child(3) .mc-label i{background:rgba(255,107,107,.14);color:var(--red);}
+#panel-dashboard .metric-row .mc:nth-child(3) .mc-label i{background:rgba(239,159,39,.14);color:var(--amber);}
+#panel-dashboard .metric-row .mc:nth-child(4) .mc-label i{background:rgba(255,107,107,.14);color:var(--red);}
 
 @media (max-width:900px){
   #app #panel-dashboard .metric-row{grid-template-columns:repeat(2,minmax(0,1fr));}
-  #app #panel-dashboard .metric-row .mc:nth-child(3){grid-column:1/-1;}
 }
 @media (max-width:640px){
   #app #panel-dashboard .metric-row{grid-template-columns:minmax(0,1fr);}
-  #app #panel-dashboard .metric-row .mc:nth-child(3){grid-column:auto;}
 }
 #panel-dashboard .mc-val{letter-spacing:-.01em;}
 #panel-dashboard .mc-sub.up{font-weight:500;}
 
 /* Recent Bookings + Room Status row (was an inline-styled div; admin.js
-   swaps its inline style for this class — see enhanceDashboardStaticMarkup) */
+   swaps its inline style for this class â€” see enhanceDashboardStaticMarkup) */
 #panel-dashboard .dash-grid{display:grid;grid-template-columns:1.4fr 1fr;gap:14px;}
 
 /* Cards get a touch more depth on the dashboard specifically */
@@ -67,7 +67,7 @@
   box-shadow:0 2px 6px rgba(0,0,0,.2),0 18px 36px -20px rgba(0,0,0,.65);
 }
 
-/* Recent Bookings table — guest avatar + row hover */
+/* Recent Bookings table â€” guest avatar + row hover */
 #panel-dashboard .dash-guest-cell{display:flex;align-items:center;gap:10px;}
 #panel-dashboard .dash-avatar{
   width:26px;height:26px;border-radius:50%;flex-shrink:0;
@@ -80,7 +80,7 @@
 
 #panel-dashboard .dash-room-status{display:flex;flex-direction:column;gap:7px;}
 
-/* Room Status list — replaces the old plain rows with a dot indicator */
+/* Room Status list â€” replaces the old plain rows with a dot indicator */
 #panel-dashboard .dash-room-row{
   display:flex;align-items:center;gap:10px;
   padding:9px 12px;background:var(--navy3);border-radius:10px;
@@ -103,28 +103,3 @@
 #panel-dashboard .dash-empty-state{
   text-align:center;color:var(--muted);padding:20px 0;font-size:.8rem;
 }
-
-/* Quick Actions — was 4 fully inline-styled buttons; admin.js re-skins them
-   into icon-tile buttons and applies these classes (inline style attribute
-   is removed, so no !important overrides are needed here). */
-#panel-dashboard .qa-row{display:flex;gap:10px;flex-wrap:wrap;}
-#panel-dashboard .qa-btn{
-  display:flex;align-items:center;gap:10px;
-  padding:10px 16px 10px 10px;border-radius:12px;
-  background:var(--navy3);border:1px solid var(--border);
-  color:var(--text);font-size:.82rem;font-weight:500;cursor:pointer;
-  font-family:var(--font-body);
-  transition:transform .15s ease,border-color .15s ease,background-color .15s ease;
-}
-#panel-dashboard .qa-btn:hover{
-  transform:translateY(-1px);border-color:rgba(0,201,167,.35);background:var(--navy4);
-}
-#panel-dashboard .qa-ico{
-  width:30px;height:30px;border-radius:9px;flex-shrink:0;
-  display:flex;align-items:center;justify-content:center;
-  background:var(--teal-soft);color:var(--teal);font-size:15px;
-}
-#panel-dashboard .qa-btn:nth-child(2) .qa-ico{background:rgba(55,138,221,.14);color:var(--blue);}
-#panel-dashboard .qa-btn:nth-child(3) .qa-ico{background:rgba(239,159,39,.14);color:var(--amber);}
-#panel-dashboard .qa-btn:nth-child(4) .qa-ico{background:rgba(212,83,126,.14);color:var(--pink);}
-#panel-dashboard .qa-label{white-space:nowrap;}

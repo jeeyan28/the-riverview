@@ -27,6 +27,25 @@
 .login-history-pagination { display: flex; justify-content: flex-end; align-items: center; gap: 10px; margin-top: 14px; }
 .login-history-pagination button { display: inline-flex; align-items: center; gap: 5px; }
 .login-history-pagination > span { color: var(--muted); font-size: .74rem; }
+
+/* Signed-in accounts page (Admin/ActiveSessions.jsx) */
+.as-user-cell { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.as-avatar {
+  display: inline-grid; place-items: center; flex-shrink: 0;
+  width: 32px; height: 32px; border-radius: 50%;
+  background: var(--teal-soft); color: var(--teal);
+  font-size: .72rem; font-weight: 700;
+}
+.as-user-text { display: grid; gap: 2px; min-width: 0; }
+.as-user-text > span { display: inline-flex; align-items: center; gap: 6px; color: var(--text); font-size: .82rem; font-weight: 600; }
+.as-user-text small { color: var(--muted); font-size: .7rem; overflow: hidden; text-overflow: ellipsis; }
+.as-you-tag {
+  padding: 1px 6px; border-radius: 999px;
+  background: color-mix(in srgb, var(--teal) 16%, transparent);
+  color: var(--teal); font-size: .6rem; font-style: normal; font-weight: 700;
+  letter-spacing: .04em; text-transform: uppercase;
+}
+
 @media (max-width: 720px) {
   .login-history-filters { align-items: stretch; flex-direction: column; }
   .login-history-filters select { width: 100%; }

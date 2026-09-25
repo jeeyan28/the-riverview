@@ -240,6 +240,16 @@
 @media (max-width: 900px) {
   .public-site .amenities-header { align-items: flex-start; flex-direction: column; gap: 10px; }
   .public-site .amenities-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .public-site .rooms-header { flex-direction: column; align-items: flex-start; gap: 1rem; }
+  .public-site .rooms-header-right { width: 100%; flex-direction: column; align-items: flex-start; gap: .5rem; }
+  .public-site .rooms-header-right p {
+    text-align: left;
+    white-space: pre-line;
+    line-height: 1.6;
+    max-width: 100%;
+    font-size: .85rem;
+    word-break: break-word;
+  }
   .public-site .spaces-rows {
     gap: calc(var(--space-10) + var(--space-6));
   }

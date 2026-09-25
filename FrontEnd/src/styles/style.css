@@ -1674,6 +1674,8 @@ body.has-guest-banner {
 .pf-summary-label { font-size: .68rem; color: var(--text-muted-light); margin-top: .2rem; }
 
 .pf-history { max-height: 360px; overflow-y: auto; }
+.pf-history-filter { margin-bottom: .9rem; }
+.pf-history-filter .pf-tab { flex: 1; padding: .45rem 1rem; text-align: center; }
 .pf-history-empty { font-size: .82rem; color: var(--text-muted-light); padding: .4rem 0 .2rem; }
 
 .pf-booking-row {
@@ -1939,6 +1941,10 @@ footer {
     .steps-grid { grid-template-columns: repeat(2, 1fr); }
     .about-inner { grid-template-columns: 1fr; gap: 2rem; }
     .footer-top { grid-template-columns: 1fr 1fr; }
+    #rooms { padding: 4rem 1.5rem; }
+    .rooms-header { flex-direction: column; align-items: flex-start; gap: 1rem; }
+    .rooms-header-right { width: 100%; flex-direction: column; align-items: flex-start; gap: .5rem; }
+    .rooms-header-right p { text-align: left; white-space: pre-line; line-height: 1.6; font-size: .85rem; word-break: break-word; }
 }
 
 @media (max-width: 768px) {
