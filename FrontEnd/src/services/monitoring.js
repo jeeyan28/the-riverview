@@ -36,7 +36,7 @@ export const roomSessionsService = {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = match?.[1] || `Riverview-Live-Monitor_${from}_to_${to}.xlsx`;
+    link.download = match?.[1] || `Riverview_Monitor_Daily_${from}${from === to ? '' : `_to_${to}`}.xlsx`;
     document.body.appendChild(link);
     link.click();
     link.remove();

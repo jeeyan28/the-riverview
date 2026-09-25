@@ -75,7 +75,7 @@ const BOOKING_STEPS = [
   {
     icon: CalendarDays,
     title: 'Choose a facility and time',
-    desc: 'Select a live facility, room type, date, and whole-hour time slot from the booking calendar.',
+    desc: 'Select a live facility, room type, date, and whole-hour time slot from the reservation calendar.',
   },
   {
     icon: Wallet,
@@ -90,7 +90,7 @@ const BOOKING_STEPS = [
 ];
 
 const HELPFUL_INFO_CARDS = [
-  { icon: Wallet, title: 'Online Payment Required', desc: 'Pay the first hour or the full booking total online. A successful payment confirms the slot automatically.' },
+  { icon: Wallet, title: 'Online Payment Required', desc: 'Pay for the first hour or, for a multi-hour reservation, pay in full online. A successful payment confirms the slot automatically.' },
   { icon: Timer, title: '20-Minute Payment Window', desc: 'Complete your online payment within 20 minutes, or the slot is released to other customers.' },
   { icon: Hourglass, title: '1–5 Hour Reservations', desc: 'Online reservations use whole-hour increments, with a one-hour minimum and five-hour maximum.' },
   { icon: DoorOpen, title: 'Arrive On Time', desc: 'A confirmed reservation that passes its scheduled end without completion is recorded as a no-show.' },
@@ -104,7 +104,7 @@ const AMENITY_ITEMS = [
   { icon: Trophy, title: 'Game-ready court', desc: 'Court rentals include the scoreboard, timer, and sound system for official games.' },
   { icon: Music2, title: 'Private KTV time', desc: 'KTV rooms include an updated song library for your group.' },
   { icon: CalendarCheck, title: 'Whole-hour scheduling', desc: 'Reserve one to five whole hours from the live availability calendar.' },
-  { icon: ShieldCheck, title: 'Clear booking totals', desc: 'See the rate, duration, add-ons, and payment total before confirming.' },
+  { icon: ShieldCheck, title: 'Clear reservation totals', desc: 'See the rate, duration, add-ons, and payment total before confirming.' },
   { icon: UsersRound, title: 'Plan with the team', desc: 'Message us when you need help choosing a room or arranging a visit.' },
 ];
 
@@ -399,7 +399,7 @@ function Home() {
       <section className="how-it-works">
         <div className="how-it-works-inner reveal">
           <div className="section-label">3 Easy Steps</div>
-          <h2>A clear path from available slot to confirmed booking.</h2>
+          <h2>A clear path from available slot to confirmed reservation.</h2>
         </div>
         <div className="steps-grid reveal-stagger">
           {BOOKING_STEPS.map((s, i) => (

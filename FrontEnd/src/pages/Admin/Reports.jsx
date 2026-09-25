@@ -28,7 +28,7 @@ function Reports() {
   const [reportView, setReportView] = useState('revenue');
   const [from, setFrom] = useState(() => businessDate());
   const [to, setTo] = useState(() => businessDate());
-  const [source, setSource] = useState('all');
+  const source = 'booking';
   const [search, setSearch] = useState('');
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState('');
@@ -58,11 +58,11 @@ function Reports() {
       <div className="reports-view-tabs" role="tablist" aria-label="Report type">
         <button type="button" role="tab" aria-selected={reportView === 'revenue'} className={reportView === 'revenue' ? 'active' : ''} onClick={() => setReportView('revenue')}>
           <WalletCards size={18} aria-hidden="true" />
-          <span><strong>Revenue &amp; payments</strong><small>Collected, outstanding, and hourly sales</small></span>
+          <span><strong>Reservations</strong><small>Reservation payments and balances</small></span>
         </button>
         <button type="button" role="tab" aria-selected={reportView === 'sessions'} className={reportView === 'sessions' ? 'active' : ''} onClick={() => setReportView('sessions')}>
           <Activity size={18} aria-hidden="true" />
-          <span><strong>Live sessions</strong><small>Played hours, walk-ins, and reservation starts</small></span>
+          <span><strong>Room monitoring</strong><small>Completed room sessions and daily export</small></span>
         </button>
       </div>
 
@@ -72,7 +72,7 @@ function Reports() {
         to={to}
         source={source}
         onRangeChange={(nextFrom, nextTo) => { setFrom(nextFrom); setTo(nextTo); }}
-        onSourceChange={setSource}
+        showSource={false}
         reload={reload}
         loading={loading}
       >
@@ -97,8 +97,7 @@ function Reports() {
       <div className="finance-activity">
         <span><strong>{data?.summary?.transactions ?? '—'}</strong> transactions</span>
         <span><strong>{data?.summary?.reservations ?? '—'}</strong> online reservations</span>
-        <span><strong>{data?.summary?.walkins ?? '—'}</strong> walk-ins / manual bookings</span>
-        <span><strong>{data?.summary?.bookedHours ?? '—'}h</strong> booked hours</span>
+        <span><strong>{data?.summary?.bookedHours ?? '—'}h</strong> reserved hours</span>
       </div>
 
       {data?.byFacility?.length > 0 && (

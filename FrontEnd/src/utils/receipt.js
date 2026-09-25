@@ -38,43 +38,54 @@ export function getBookingReceiptData(booking, overrides = {}) {
   const remaining = closed ? 0 : Math.max(0, amount - payment.retained);
   const refundException = Boolean(booking.cancellationRefundException);
   const showRefundToArrange = Boolean(booking.cancellationSource || booking.cancellationRequestedAt);
+  const venueDiscountReturned = Math.max(0, Number(booking.venueDiscountRefunded) || 0);
+  const cancellationRefunded = Math.max(0, payment.refunded - venueDiscountReturned);
 
   const costRows = [
-    ...(Number(booking.discountAmount) > 0 ? [{ label: 'Pay-in-full discount', value: -Number(booking.discountAmount) }] : []),
+    ...(Number(booking.discountAmount) > 0 ? [{ label: booking.venueDiscountApplied ? 'Room discount at venue' : 'Pay-in-full discount', value: -Number(booking.discountAmount) }] : []),
     ...(booking.addOns || []).map((service) => ({ label: service.name, value: Number(service.fee) || 0 })),
     ...(Number(booking.corkageFee) > 0 ? [{ label: 'Corkage', value: Number(booking.corkageFee) }] : []),
     { label: 'Total amount', value: amount },
     { label: 'Paid online', value: downPayment },
     ...(paidAtVenue > 0 ? [{ label: 'Paid later', value: paidAtVenue }] : []),
+    ...(venueDiscountReturned > 0 ? [{ label: 'Room discount returned at venue', value: -venueDiscountReturned }] : []),
     ...(closed ? [
-      { label: 'Refunded', value: payment.refunded },
-      { label: 'Payment retained', value: payment.retained },
+      ...(cancellationRefunded > 0 ? [{ label: 'Refunded', value: cancellationRefunded }] : []),
+      { label: 'Paid', value: payment.retained },
       ...(status === 'Cancelled' && showRefundToArrange && payment.refundRemaining > 0 ? [{ label: 'Refund to arrange', value: payment.refundRemaining }] : []),
     ] : [{ label: 'Remaining balance', value: remaining }]),
   ];
   const notes = [];
-  if (booking.paymentChoice === 'deposit' && Number(booking.eligibleDiscount) > 0) {
-    notes.push(`Ask staff to apply your ₱${Number(booking.eligibleDiscount).toLocaleString()} room discount at the venue.`);
+  if (booking.venueDiscountApplied && Number(booking.discountAmount) > 0) {
+    notes.push(`The ₱${Number(booking.discountAmount).toLocaleString()} room discount was settled at the facility.`);
+  } else if (booking.paymentChoice === 'deposit' && Number(booking.eligibleDiscount) > 0) {
+    notes.push(duration === 1
+      ? `Room discount ₱${Number(booking.eligibleDiscount).toLocaleString()} is due back at the facility. Show this receipt to staff.`
+      : `Room discount ₱${Number(booking.eligibleDiscount).toLocaleString()} is due against your remaining balance at the facility. Show this receipt to staff.`);
+    notes.push(duration === 1
+      ? `Staff: give the guest ₱${Number(booking.eligibleDiscount).toLocaleString()} back at the facility as the room discount.`
+      : `Staff: deduct ₱${Number(booking.eligibleDiscount).toLocaleString()} from the guest's remaining balance at the facility as the room discount.`);
   }
+  if (status === 'No Show') notes.push('No refund is due for a no-show.');
   if (status === 'Cancelled' && payment.customerCancelled) {
     notes.push(refundException ? 'A refund exception was approved.' : 'The first-hour charge is non-refundable for a customer cancellation.');
     if (payment.refundRemaining > 0) notes.push('Contact admin to arrange the remaining manual refund.');
   } else if (status === 'Cancelled' && showRefundToArrange && payment.refundRemaining > 0) {
     notes.push('Contact admin to arrange the manual refund.');
   }
-  if (booking.guestEmail) notes.push(`A booking confirmation was sent to ${booking.guestEmail}.`);
+  if (booking.guestEmail) notes.push(`A reservation confirmation was sent to ${booking.guestEmail}.`);
 
   return {
     reservationCode: booking.reservationCode || '—',
-    title: closed ? `Reservation ${status}` : 'Booking Confirmed',
+    title: closed ? `Reservation ${status}` : 'Reservation Confirmed',
     subtitle: closed ? 'Payment record for this reservation.' : 'Your reservation has been successfully created.',
     facility,
     info: [
-      [{ label: 'Booked by', value: booking.guestName || '—' }, { label: 'Contact no.', value: guestPhoneDisplay(booking.guestContact) }],
+      [{ label: 'Reserved by', value: booking.guestName || '—' }, { label: 'Contact no.', value: guestPhoneDisplay(booking.guestContact) }],
       [{ label: 'Email', value: booking.guestEmail || '—' }],
       [{ label: 'Room', value: roomName }, { label: 'Guests', value: String(booking.guestCount || 1) }],
-      [{ label: 'Booking date', value: dateLabel }, { label: 'Time', value: timeLabel }],
-      [{ label: 'Booked on', value: bookedOnLabel }],
+      [{ label: 'Reservation date', value: dateLabel }, { label: 'Time', value: timeLabel }],
+      [{ label: 'Reserved on', value: bookedOnLabel }],
     ],
     costRows,
     notes,
@@ -279,7 +290,7 @@ function showReceiptOptions(imageUrl, canvas, filenameBase, browserName) {
   });
   const closeButton = document.createElement('button');
   closeButton.type = 'button';
-  closeButton.textContent = 'Back to booking';
+  closeButton.textContent = 'Back to reservation';
   closeButton.addEventListener('click', close);
   actions.append(saveButton, pdfButton, closeButton);
   panel.append(heading, instruction, image, actions);

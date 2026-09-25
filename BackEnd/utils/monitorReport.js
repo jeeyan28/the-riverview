@@ -1,4 +1,5 @@
 const { MonitorRoom, RoomSession } = require('../model/monitoring');
+const Room = require('../model/room');
 const { businessDate, dateRange } = require('./businessDate');
 const { TIME_ZONE } = require('./constants');
 
@@ -36,6 +37,7 @@ function sessionRow(session) {
 
   return {
     id: String(session._id),
+    roomId: String(session.room?._id || session.room || ''),
     date: businessDate(start),
     timeIn: localTime(start),
     timeOut: localTime(scheduledEnd),
@@ -116,17 +118,26 @@ function buildMonitorReport(sessions, { from, to, maxDays = 366 }) {
   };
 }
 
+function currentMonitorInventory(inventory, catalog) {
+  const activeCatalogUnits = new Set(catalog.flatMap((facility) => (facility.variants || []).flatMap((variant) =>
+    Array.from({ length: Math.max(1, Number(variant.roomCount) || 1) }, (_, index) => `${facility.name}\u0000${variant.label}\u0000${index + 1}`))));
+  return inventory.filter((room) => room.status !== 'Inactive' && !room.isTemporary &&
+    activeCatalogUnits.has(`${room.facilityName}\u0000${room.roomName}\u0000${room.roomNumber}`));
+}
+
 async function getMonitorReport({ from, to, maxDays = 366 }) {
   const { start, end } = dateRange(from, to, maxDays);
-  const [sessions, inventory] = await Promise.all([
+  const [sessions, inventory, catalog] = await Promise.all([
     RoomSession.find({ startTime: { $gte: start, $lt: end } })
       .populate('booking', 'reservationCode source guestName')
       .lean(),
-    MonitorRoom.find({}).select('facilityName roomName roomNumber').sort({ facilityName: 1, roomName: 1, roomNumber: 1 }).lean(),
+    MonitorRoom.find({ status: { $ne: 'Inactive' }, isTemporary: { $ne: true } }).select('facilityName roomName roomNumber status isTemporary').sort({ facilityName: 1, roomName: 1, roomNumber: 1 }).lean(),
+    Room.find({}).select('name variants.label variants.roomCount').lean(),
   ]);
   return {
     ...buildMonitorReport(sessions, { from, to, maxDays }),
-    inventory: inventory.map((room) => ({
+    inventory: currentMonitorInventory(inventory, catalog).map((room) => ({
+      id: String(room._id),
       facilityName: room.facilityName || 'Other',
       roomType: room.roomName || 'Standard',
       unitNumber: room.roomNumber || '',
@@ -134,4 +145,4 @@ async function getMonitorReport({ from, to, maxDays = 366 }) {
   };
 }
 
-module.exports = { buildMonitorReport, getMonitorReport };
+module.exports = { buildMonitorReport, currentMonitorInventory, getMonitorReport };

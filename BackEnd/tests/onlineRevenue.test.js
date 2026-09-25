@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { calculateBookingPrice, calculateSessionExtension, computeDownPayment, quoteOnlineBooking, repriceExistingBooking } = require('../utils/roomPricing');
 const { buildSalesReport } = require('../utils/salesLedger');
-const { extendSessionFields, financialFields } = require('../utils/bookingLifecycle');
+const { extendSessionFields, financialFields, venueDiscountSettlement } = require('../utils/bookingLifecycle');
 
 const variant = { price: 300, eveningPrice: 400, eveningStartTime: '17:00', pricingMode: 'time-based' };
 const price = calculateBookingPrice({ variant, timeIn: '16:00', duration: 3, hasCorkage: true });
@@ -46,17 +46,25 @@ test('online full payment includes corkage and has no venue balance', async () =
   assert.equal(financialFields(price.amount, price.amount).paymentStatus, 'Paid');
 });
 
-test('room discounts apply only to explicit full payment; services and corkage stay undiscounted', async () => {
+test('one-hour discounts settle at the venue; multi-hour full payment discounts online', async () => {
   const { calculateBookingPrice: previewPrice } = await import('../../FrontEnd/src/utils/roomPricing.js');
   const room = { discountPercent: 20, addOns: [{ name: 'Referee', fee: 150 }] };
   const basePrice = calculateBookingPrice({ variant, timeIn: '16:00', duration: 1, hasCorkage: true });
   const full = quoteOnlineBooking({ room, variant, basePrice, paymentChoice: 'full', claimDiscount: true, selectedAddOns: ['Referee'] });
   const deposit = quoteOnlineBooking({ room, variant, basePrice, paymentChoice: 'deposit', claimDiscount: true, selectedAddOns: ['Referee'] });
-  assert.deepEqual({ amount: full.amount, downPayment: full.downPayment, discountAmount: full.discountAmount }, { amount: 590, downPayment: 590, discountAmount: 60 });
+  assert.deepEqual({ amount: full.amount, downPayment: full.downPayment, discountAmount: full.discountAmount, eligibleDiscount: full.eligibleDiscount }, { amount: 650, downPayment: 300, discountAmount: 0, eligibleDiscount: 60 });
   assert.deepEqual({ amount: deposit.amount, downPayment: deposit.downPayment, eligibleDiscount: deposit.eligibleDiscount }, { amount: 650, downPayment: 300, eligibleDiscount: 60 });
   const preview = previewPrice({ room, variant, startHour: 16, duration: 1, hasCorkage: true, paymentChoice: 'full', claimDiscount: true, selectedAddOns: ['Referee'] });
   assert.equal(preview.amount, full.amount);
   assert.equal(preview.downPayment, full.downPayment);
+  assert.equal(preview.discountAmount, 0);
+  const multiHourBase = calculateBookingPrice({ variant, timeIn: '16:00', duration: 3, hasCorkage: true });
+  const multiHourFull = quoteOnlineBooking({ room, variant, basePrice: multiHourBase, paymentChoice: 'full', claimDiscount: true, selectedAddOns: ['Referee'] });
+  const multiHourDeposit = quoteOnlineBooking({ room, variant, basePrice: multiHourBase, paymentChoice: 'deposit', claimDiscount: true, selectedAddOns: ['Referee'] });
+  assert.equal(multiHourFull.discountAmount, 220);
+  assert.equal(multiHourFull.downPayment, multiHourFull.amount);
+  assert.equal(multiHourDeposit.discountAmount, 0);
+  assert.equal(multiHourDeposit.downPayment, 300);
   const noDiscount = quoteOnlineBooking({ room, variant, basePrice, paymentChoice: 'full', claimDiscount: false, selectedAddOns: ['Referee'] });
   assert.equal(noDiscount.discountAmount, 0);
   assert.equal(noDiscount.amount, 650);
@@ -65,9 +73,23 @@ test('room discounts apply only to explicit full payment; services and corkage s
   assert.throws(() => quoteOnlineBooking({ room, variant, basePrice, selectedAddOns: ['Unknown'] }), /no longer available/);
   const changedTime = { ...basePrice, roomCharge: 400 };
   assert.deepEqual(
-    repriceExistingBooking(changedTime, { paymentChoice: 'full', discountPercent: 20, addOns: [{ name: 'Referee', fee: 150 }] }),
-    { eligibleDiscount: 80, discountAmount: 80, addOnFee: 150, amount: 670 }
+    repriceExistingBooking(changedTime, { paymentChoice: 'deposit', discountPercent: 20, addOns: [{ name: 'Referee', fee: 150 }] }),
+    { eligibleDiscount: 80, discountAmount: 0, addOnFee: 150, amount: 750 }
   );
+});
+
+test('venue settlement reduces a deposit balance or records cash returned for one hour', () => {
+  const oneHour = venueDiscountSettlement({ duration: 1, amount: 150, paidAmount: 150, downPayment: 150, refundedAmount: 0, paymentChoice: 'deposit', eligibleDiscount: 30 });
+  assert.deepEqual(oneHour, { discount: 30, amount: 120, cashReturned: 30, refundedAmount: 30 });
+  assert.equal(financialFields(oneHour.amount, 150, oneHour.refundedAmount).paymentStatus, 'Paid');
+
+  const oneHourWithCorkage = venueDiscountSettlement({ duration: 1, amount: 350, paidAmount: 150, downPayment: 150, refundedAmount: 0, paymentChoice: 'deposit', eligibleDiscount: 30 });
+  assert.deepEqual(oneHourWithCorkage, { discount: 30, amount: 320, cashReturned: 30, refundedAmount: 30 });
+  assert.equal(oneHourWithCorkage.amount - (150 - oneHourWithCorkage.refundedAmount), 200);
+  const threeHours = venueDiscountSettlement({ duration: 3, amount: 450, paidAmount: 150, downPayment: 150, refundedAmount: 0, paymentChoice: 'deposit', eligibleDiscount: 90 });
+  assert.deepEqual(threeHours, { discount: 90, amount: 360, cashReturned: 0, refundedAmount: 0 });
+  assert.equal(financialFields(threeHours.amount, 150).paymentStatus, 'Partial');
+  assert.throws(() => venueDiscountSettlement({ amount: 150, paidAmount: 150, paymentChoice: 'full', eligibleDiscount: 30 }), /no venue discount/);
 });
 
 test('a linked session carries the online payment once, then adds venue collection', () => {

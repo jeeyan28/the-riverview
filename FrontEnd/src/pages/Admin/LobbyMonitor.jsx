@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import '../../styles/admin/lobby-monitor.css';
 import { useAuth } from '../../context/AuthContext';
+import { useTheme } from '../../hooks/useTheme';
 import { useCountdownClock } from '../../hooks/useCountdownClock';
 import {
   useRoomMonitorData,
@@ -38,6 +39,7 @@ const STATUS_RANK = { expired: 0, 'ending-soon': 1, occupied: 2, available: 3, o
 
 function LobbyMonitor() {
   const { initializing, isAdmin } = useAuth();
+  const [theme, toggleTheme] = useTheme();
   const now = useCountdownClock(true);
   const clockDateObj = new Date(now);
   const [clockTime, clockAmPm] = clockDateObj.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true }).split(' ');
@@ -49,6 +51,7 @@ function LobbyMonitor() {
   const [roomTypeFilter, setRoomTypeFilter] = useState('All');
   const [sortBy, setSortBy] = useState('default');
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [displaySize, setDisplaySize] = useState({ width: 0, height: 0 });
 
   const scrollRef = useRef(null);
 
@@ -65,34 +68,21 @@ function LobbyMonitor() {
   }
 
   useEffect(() => {
-    if (!isFullscreen) return undefined;
     const el = scrollRef.current;
     if (!el) return undefined;
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return undefined;
-
-    let raf;
-    let direction = 1;
-    let pauseUntil = performance.now() + 2000;
-
-    function step(ts) {
-      const maxScroll = el.scrollHeight - el.clientHeight;
-      if (maxScroll > 40) {
-        if (ts >= pauseUntil) {
-          el.scrollTop += direction * 0.55;
-          if (el.scrollTop >= maxScroll - 1) {
-            direction = -1;
-            pauseUntil = ts + 3500;
-          } else if (el.scrollTop <= 0) {
-            direction = 1;
-            pauseUntil = ts + 3500;
-          }
-        }
-      }
-      raf = requestAnimationFrame(step);
-    }
-    raf = requestAnimationFrame(step);
-    return () => cancelAnimationFrame(raf);
-  }, [isFullscreen, rooms.length, facilityFilter, roomTypeFilter]);
+    const updateSize = () => {
+      const { width, height } = el.getBoundingClientRect();
+      setDisplaySize((current) => current.width === width && current.height === height ? current : { width, height });
+    };
+    updateSize();
+    window.addEventListener('resize', updateSize);
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(updateSize);
+    observer?.observe(el);
+    return () => {
+      window.removeEventListener('resize', updateSize);
+      observer?.disconnect();
+    };
+  }, [initializing, isAdmin]);
 
   const facilities = useMemo(() => [...new Set(rooms.map((r) => r.facilityName))], [rooms]);
   const roomTypes = useMemo(() => [...new Set(rooms.map((r) => r.roomName))], [rooms]);
@@ -152,6 +142,17 @@ function LobbyMonitor() {
     }));
   }, [visibleRooms, sortBy, sessions]);
 
+  const liveColumns = Math.min(
+    Math.max(visibleRooms.length, 1),
+    Math.max(1, Math.ceil(Math.sqrt(visibleRooms.length * (displaySize.width || 1920) / (displaySize.height || 800))))
+  );
+  const liveRows = Math.max(1, Math.ceil(visibleRooms.length / liveColumns));
+  const liveGridHeight = displaySize.height > 0
+    ? Math.min(displaySize.height, liveRows * 150 + (liveRows - 1) * 8)
+    : undefined;
+  const tableFont = Math.max(0.55, Math.min(0.84, (displaySize.height || 700) / Math.max(visibleRooms.length, 1) / 35));
+  const tablePad = Math.max(1, Math.min(8, Math.floor(((displaySize.height || 700) / Math.max(visibleRooms.length, 1) - tableFont * 16 * 1.3) / 2)));
+
   if (initializing) {
     return (
       <div style={{ padding: '3rem', fontFamily: 'sans-serif', color: '#94A3B8' }}>
@@ -163,10 +164,8 @@ function LobbyMonitor() {
     return <Navigate to="/login" replace />;
   }
 
-  const effectiveViewMode = viewMode;
-
   return (
-    <div className={`lobby-display${isFullscreen ? ' lobby-display--live' : ''}`}>
+    <div className={`lobby-display${isFullscreen ? ' lobby-display--live' : ''}`} data-theme={theme}>
       <div className="lobby-topbar">
         <div className="lobby-brand">
           <div className="lobby-brand-mark"><i className="bi bi-building"></i></div>
@@ -174,20 +173,23 @@ function LobbyMonitor() {
           <span className="lobby-live"><span className="dot"></span>{isFullscreen ? 'Live' : 'Preview'}</span>
         </div>
         <div className="lobby-topbar-right">
+          <div className="lobby-view-toggle" role="group" aria-label="Switch view">
+            <button type="button" className={`lobby-view-btn${viewMode === 'grid' ? ' active' : ''}`} onClick={() => changeViewMode('grid')}>
+              <i className="bi bi-grid" aria-hidden="true"></i>Grid
+            </button>
+            <button type="button" className={`lobby-view-btn${viewMode === 'table' ? ' active' : ''}`} onClick={() => changeViewMode('table')}>
+              <i className="bi bi-list-ul" aria-hidden="true"></i>Table
+            </button>
+          </div>
+          <button type="button" className="lobby-theme-btn" onClick={toggleTheme} aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`} title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}>
+            <i className={`bi ${theme === 'dark' ? 'bi-sun' : 'bi-moon-stars'}`} aria-hidden="true"></i>
+          </button>
           <div className="lobby-clock">
             <div className="lobby-clock-time">{clockTime} <span className="lobby-clock-ampm">{clockAmPm}</span></div>
             <div className="lobby-clock-date">{clockDate}</div>
           </div>
           {!isFullscreen && (
             <>
-              <div className="lobby-view-toggle" role="group" aria-label="Switch view">
-                <button type="button" className={`lobby-view-btn${viewMode === 'grid' ? ' active' : ''}`} onClick={() => changeViewMode('grid')}>
-                  <i className="bi bi-grid"></i>Grid
-                </button>
-                <button type="button" className={`lobby-view-btn${viewMode === 'table' ? ' active' : ''}`} onClick={() => changeViewMode('table')}>
-                  <i className="bi bi-list-ul"></i>Table
-                </button>
-              </div>
               <button type="button" className="lobby-golive-btn" onClick={goLive}>
                 <i className="bi bi-tv"></i>Display on TV
               </button>
@@ -200,7 +202,7 @@ function LobbyMonitor() {
         <>
           <p className="lobby-setup-note">
             <i className="bi bi-info-circle"></i>
-            <span>This is a setup preview. Pick what this screen should show below, then select <strong>Display on TV</strong> — filters and sorting hide automatically for guests, and the list will gently auto-scroll if it doesn't fit the screen.</span>
+            <span>This is a setup preview. Pick what this screen should show below, then select <strong>Display on TV</strong>. Grid and Table both fit the visible rooms on one TV screen.</span>
           </p>
           <div className="lobby-filters">
             <div className="lobby-filter-row">
@@ -255,7 +257,27 @@ function LobbyMonitor() {
           <div className="lobby-empty">No rooms configured yet.</div>
         ) : visibleRooms.length === 0 ? (
           <div className="lobby-empty">No rooms match the current filters.</div>
-        ) : effectiveViewMode === 'grid' ? (
+        ) : isFullscreen && viewMode === 'grid' ? (
+          <div className="lobby-live-grid" style={{ '--lobby-columns': liveColumns, '--lobby-rows': liveRows, height: liveGridHeight ?? '100%' }}>
+            {sortRooms(visibleRooms).map((r) => {
+              const { occupancy, remaining, isPastEnd } = buildRoomView(r, sessions);
+              const status = lobbyStatus(r, sessions);
+              const unit = r.facilityName === 'Billiards' ? 'Table' : r.facilityName === 'Court' ? 'Court' : 'Room';
+              return (
+                <div className={`lobby-card lobby-card--${status.key}${status.critical ? ' lobby-card--critical' : ''}`} key={r._id}>
+                  <div className="lobby-card-top">
+                    <span className="lobby-live-card-identity">
+                      <strong>{unit} {r.roomNumber}</strong>
+                      <small>{r.facilityName} · {r.roomName}</small>
+                    </span>
+                    <span className={`lobby-badge lobby-badge--${status.key}${status.critical ? ' lobby-badge--critical' : ''}`}><span className="dot"></span>{status.label}</span>
+                  </div>
+                  <div className="lobby-timer">{occupancy ? formatTimeRemaining(remaining, isPastEnd) : status.key === 'available' ? 'Ready for guests' : status.label}</div>
+                </div>
+              );
+            })}
+          </div>
+        ) : viewMode === 'grid' ? (
           groups.map(({ facilityName, types }) => (
             <div className="lobby-facility" key={facilityName}>
               <div className="lobby-facility-head">
@@ -297,30 +319,35 @@ function LobbyMonitor() {
             </div>
           ))
         ) : (
-          <div className="lobby-table-wrap" tabIndex={0} role="region" aria-label="Room availability table">
-            <table className="lobby-table">
+          <div className="lobby-table-wrap" tabIndex={isFullscreen ? undefined : 0} role="region" aria-label="Room availability table" style={{ '--lobby-table-font': `${tableFont}rem`, '--lobby-table-row-pad': `${tablePad}px` }}>
+            <table className="lobby-table lobby-board-table" data-compact={visibleRooms.length > 16}>
               <thead>
                 <tr>
-                  <th>Room</th>
-                  <th>Facility</th>
-                  <th>Type</th>
-                  <th>Status</th>
-                  <th>Remaining</th>
-                  <th>Price</th>
+                  <th>Rate</th>
+                  <th>Table #</th>
+                  <th>Time-in</th>
+                  <th>Time-out</th>
+                  <th>Status / Guest</th>
+                  <th>Payment</th>
                 </tr>
               </thead>
               <tbody>
                 {sortRooms(visibleRooms).map((r) => {
-                  const { occupancy, remaining, isPastEnd } = buildRoomView(r, sessions);
+                  const { occupancy, remaining, isPastEnd, isCritical, isWarning } = buildRoomView(r, sessions);
                   const status = lobbyStatus(r, sessions);
+                  const end = occupancy ? sessionEnd(occupancy) : null;
+                  const amount = Number(occupancy?.amount) || 0;
+                  const paid = Math.max(Number(occupancy?.paidAmount) || 0, occupancy?.paymentStatus === 'Paid' ? amount : 0);
+                  const balance = Math.max(0, amount - paid + (Number(occupancy?.refundedAmount) || 0));
+                  const unit = r.facilityName === 'Billiards' ? 'Table' : r.facilityName === 'Court' ? 'Court' : 'Room';
                   return (
                     <tr key={r._id} data-status={status.key} data-critical={status.critical || undefined}>
-                      <td>{r.roomNumber}</td>
-                      <td>{r.facilityName}</td>
-                      <td>{r.roomName}</td>
-                      <td><span className={`lobby-badge lobby-badge--${status.key}${status.critical ? ' lobby-badge--critical' : ''}`}><span className="dot"></span>{status.label}</span></td>
-                      <td>{occupancy ? formatTimeRemaining(remaining, isPastEnd) : '—'}</td>
-                      <td>₱{r.price}/hr</td>
+                      <td><strong>₱{Number(occupancy?.rate || r.price || 0).toLocaleString()}</strong><small>per hour</small></td>
+                      <td><strong>{unit} {r.roomNumber}</strong><small>{r.facilityName} · {r.roomName}</small></td>
+                      <td>{occupancy ? new Date(occupancy.startTime).toLocaleTimeString('en-US', { timeZone: 'Asia/Manila', hour: 'numeric', minute: '2-digit' }) : '—'}</td>
+                      <td>{end ? <><strong>{end.toLocaleTimeString('en-US', { timeZone: 'Asia/Manila', hour: 'numeric', minute: '2-digit' })}</strong><small className={isPastEnd || isCritical ? 'is-urgent' : isWarning ? 'is-warning' : ''}>{isPastEnd ? 'Overdue' : `${formatTimeRemaining(remaining, false)} left`}</small></> : '—'}</td>
+                      <td><span className={`lobby-badge lobby-badge--${status.key}${status.critical ? ' lobby-badge--critical' : ''}`}><span className="dot"></span>{status.label}</span>{occupancy && <small>{occupancy.guestName || 'Walk-in guest'}</small>}</td>
+                      <td>{occupancy ? <><strong className={balance > 0 ? 'is-warning' : 'is-paid'}>{balance > 0 ? `₱${balance.toLocaleString()} due` : 'Paid in full'}</strong><small>{balance > 0 ? `₱${Math.max(0, paid - (Number(occupancy.refundedAmount) || 0)).toLocaleString()} paid` : `₱${paid.toLocaleString()} collected`}</small></> : '—'}</td>
                     </tr>
                   );
                 })}

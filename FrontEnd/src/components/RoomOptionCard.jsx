@@ -22,7 +22,7 @@ function RoomOptionCard({ option, room, selected = false, disabled = false, onSe
   const hasDetails = !!description || showAvailability;
   const discountPercent = effectiveDiscountPercent(room, option);
   const canToggleDetails = interactive && !preview;
-  const expanded = (canToggleDetails ? detailsOpen : true) && (hasDetails || !canToggleDetails);
+  const expanded = !preview && (canToggleDetails ? detailsOpen : true) && (hasDetails || !canToggleDetails);
 
   function handleKeyDown(e) {
     if (!interactive || disabled) return;
@@ -84,7 +84,7 @@ function RoomOptionCard({ option, room, selected = false, disabled = false, onSe
           )}
           <div className="bk-room-option-bottom-row">
             <span className="bk-room-option-price">{variantRateLabel(option)}</span>
-            {discountPercent > 0 && <span className="bk-room-option-discount">{discountPercent}% off with full payment</span>}
+            {discountPercent > 0 && <span className="bk-room-option-discount">{discountPercent}% room discount available</span>}
             {canToggleDetails && hasDetails && (
               <button
                 type="button"

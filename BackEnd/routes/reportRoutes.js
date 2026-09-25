@@ -17,7 +17,7 @@ router.get('/confirmed-booking-trend', async (req, res) => {
     res.json(await getConfirmedBookingTrend(req.query.interval || 'daily'));
   } catch (err) {
     console.error(err);
-    res.status(err.status || 500).json({ message: err.status === 400 ? err.message : 'Could not load confirmed booking trend.' });
+    res.status(err.status || 500).json({ message: err.status === 400 ? err.message : 'Could not load confirmed reservation trend.' });
   }
 });
 
@@ -39,7 +39,7 @@ router.get('/export', async (req, res) => {
       range: report.range,
       metrics: [
         { label: 'Transactions', value: report.summary.transactions },
-        { label: 'Played / booked hours', value: report.summary.bookedHours, format: 'hours' },
+        { label: 'Played / reserved hours', value: report.summary.bookedHours, format: 'hours' },
         { label: 'Charges', value: report.summary.charged, format: 'money' },
         { label: 'Collected, net of refunds', value: report.summary.collected, format: 'money' },
         { label: 'Outstanding balance', value: report.summary.outstanding, format: 'money' },

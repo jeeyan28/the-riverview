@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import '../styles/style.css';
 import '../styles/enhancements.css';
@@ -16,9 +17,16 @@ import { useAuth } from '../context/AuthContext';
 import { useSiteSettings } from '../hooks/useSiteSettings';
 import { useAnnouncements } from '../hooks/useAnnouncements';
 import { CustomerAppNavigation } from '../components/MobileAppNavigation';
+import { buildLoginPath } from '../utils/auth';
 
 function MainLayout() {
+  const location = useLocation();
+  const navigate = useNavigate();
   const { initializing, user } = useAuth();
+  const reservationParams = new URLSearchParams(location.search);
+  const reservationIntent = reservationParams.get('reservation')
+    ? { code: reservationParams.get('reservation'), action: reservationParams.get('action') }
+    : null;
   const { settings } = useSiteSettings();
   const announcements = useAnnouncements(settings.announcements, initializing ? null : user?._id);
   const [theme, toggleTheme] = useTheme();
@@ -28,6 +36,25 @@ function MainLayout() {
   const [claimAccountOpen, setClaimAccountOpen] = useState(false);
   const siteRef = useRef(null);
   const closeMobileNav = useCallback(() => setMobileNavOpen(false), []);
+
+  useEffect(() => {
+    if (!reservationIntent || initializing) return;
+    if (!user) {
+      navigate(buildLoginPath(`${location.pathname}${location.search}`), { replace: true });
+      return;
+    }
+    setProfileOpen(true);
+  }, [initializing, user, location.pathname, location.search]);
+
+  function closeProfile() {
+    setProfileOpen(false);
+    if (reservationIntent) {
+      const params = new URLSearchParams(location.search);
+      params.delete('reservation');
+      params.delete('action');
+      navigate(`${location.pathname}${params.size ? `?${params}` : ''}`, { replace: true });
+    }
+  }
 
   useEffect(() => {
     let frame = 0;
@@ -106,7 +133,7 @@ function MainLayout() {
         onOpenProfile={() => setProfileOpen(true)}
       />
 
-      <ProfileModal open={profileOpen} onClose={() => setProfileOpen(false)} />
+      <ProfileModal open={profileOpen} onClose={closeProfile} reservationIntent={reservationIntent} />
 
       <ClaimAccountModal open={claimAccountOpen} onClose={() => setClaimAccountOpen(false)} />
 

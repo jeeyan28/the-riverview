@@ -41,7 +41,7 @@ function paymentSummary(record, isBooking = false) {
   const refunded = Math.max(0, Number(record?.refundedAmount) || 0);
   const collected = Math.max(0, paid - refunded);
   const balance = Math.max(0, Math.round((total - collected) * 100) / 100);
-  return { total, collected, balance };
+  return { total, paid, refunded, collected, balance };
 }
 
 const money = (value) => `₱${Number(value || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -56,17 +56,6 @@ function SessionPayment({ session }) {
       <span className="rm-payment-label">{hasBalance ? 'Balance remaining' : 'Paid in full'}</span>
       <strong className="rm-payment-amount">{money(hasBalance ? payment.balance : payment.collected)}</strong>
       {hasBalance && <span className="rm-payment-detail">{payment.collected > 0 ? `${money(payment.collected)} paid` : 'No payment recorded'}</span>}
-    </div>
-  );
-}
-
-function SessionBalance({ session }) {
-  const payment = paymentSummary(session);
-  const due = payment.balance > 0;
-  return (
-    <div className={`rm-card-balance${due ? ' is-due' : ' is-paid'}`}>
-      <span>{due ? 'Balance remaining' : 'Paid in full'}</span>
-      <strong>{money(due ? payment.balance : payment.total)}</strong>
     </div>
   );
 }
@@ -200,10 +189,11 @@ function Monitor() {
       initialDurationHours: booking.duration,
       downPaymentInfo: paymentSummary(booking, true),
       venueDiscount: booking.paymentChoice === 'deposit' ? Number(booking.eligibleDiscount || 0) : 0,
+      paymentChoice: booking.paymentChoice,
     });
   }
 
-  async function handleModalSubmit({ mode, roomId, roomTarget, sessionId, totalHours, paymentMethod, paymentTiming, paidAmount, guestName, guestCount, hasCorkage, bookingId }) {
+  async function handleModalSubmit({ mode, roomId, roomTarget, sessionId, totalHours, paymentMethod, paymentTiming, paidAmount, guestName, guestCount, hasCorkage, bookingId, applyVenueDiscount }) {
     if (refreshError) throw new Error('Wait for the table status to refresh before changing this session.');
     if (mode !== 'extend' && bookingId) {
       if (!canStartFromBooking) return;
@@ -214,7 +204,7 @@ function Monitor() {
     if (mode === 'extend') {
       await roomSessionsService.extend(sessionId, { addedHours: totalHours });
     } else {
-      await roomSessionsService.create({ roomId, roomTarget: roomTarget || undefined, duration: totalHours, paymentMethod, paymentTiming, paidAmount, guestName, guestCount, hasCorkage, bookingId });
+      await roomSessionsService.create({ roomId, roomTarget: roomTarget || undefined, duration: totalHours, paymentMethod, paymentTiming, paidAmount, guestName, guestCount, hasCorkage, bookingId, applyVenueDiscount });
     }
 
     setModal(null);
@@ -406,7 +396,7 @@ function Monitor() {
         </div>
         <div className="rm-toolbar-actions">
           {canStartFromBooking && (
-            <button type="button" className="btn-teal rm-reservations-button" aria-haspopup="dialog" onClick={() => { setSchedulePeriod(todayBookings.length ? 'today' : 'earlier'); setScheduleOpen(true); }}>
+            <button type="button" className="rm-reservations-button" aria-haspopup="dialog" onClick={() => { setSchedulePeriod(todayBookings.length ? 'today' : 'earlier'); setScheduleOpen(true); }}>
               <i className="bi bi-calendar-check" aria-hidden="true"></i>View reservations ({scheduledBookings.length})
             </button>
           )}
@@ -535,7 +525,8 @@ function Monitor() {
                             {payment.balance === 0 ? 'Fully paid' : `${money(payment.balance)} balance due`}
                           </span>
                           {payment.balance > 0 && payment.collected > 0 && <small className="rm-schedule-collected">{money(payment.collected)} collected</small>}
-                          {b.paymentChoice === 'deposit' && Number(b.eligibleDiscount) > 0 && <small className="rm-schedule-collected">{money(b.eligibleDiscount)} discount to arrange at venue</small>}
+                          {b.paymentChoice === 'deposit' && Number(b.eligibleDiscount) > 0 && <small className="rm-schedule-discount">{Number(b.discountPercent) > 0 ? `${b.discountPercent}% room discount` : 'Room discount'} · {money(b.eligibleDiscount)} to settle at the facility</small>}
+                          {b.paymentChoice === 'full' && Number(b.discountAmount) > 0 && <small className="rm-schedule-discount">{Number(b.discountPercent) > 0 ? `${b.discountPercent}% room discount` : 'Room discount'} · {money(b.discountAmount)} applied online</small>}
                           {hasConflict && <small className="rm-schedule-warning">{unitLabel} occupied — end that session first</small>}
                         </div>
                         <div className="rm-schedule-action">
@@ -651,6 +642,7 @@ function Monitor() {
                 {facilityRooms.map((r) => {
             const v = buildRoomView(r, sessions);
             const { occupancy, remaining, isPastEnd, isCritical, isWarning, stateClass, statusLabel, blinkClass } = v;
+            const isPaid = occupancy ? paymentSummary(occupancy).balance <= 0 : false;
 
             return (
               <div
@@ -690,12 +682,10 @@ function Monitor() {
                         </div>
                         <div className="rm-timer-caption">Time left</div>
                       </div>
+                      <span className={`pay-pill ${isPaid ? 'pay-paid' : 'pay-unpaid'}`}>
+                        {isPaid ? 'Paid' : 'Unpaid'}
+                      </span>
                     </div>
-                    <div className="rm-session-meta">
-                      <span><i className="bi bi-person" aria-hidden="true"></i>{occupancy.guestName || 'Walk-in guest'}</span>
-                      <span>{money(Number(occupancy.rate) || r.price)}/hr</span>
-                    </div>
-                    <SessionBalance session={occupancy} />
                     <button type="button" className="rm-card-details" onClick={(event) => { event.stopPropagation(); setDetailRoomId(r._id); }}>View details <i className="bi bi-arrow-right" aria-hidden="true"></i></button>
                     {canOperate && !refreshError && (
                       <div className={`rm-quick-actions${canExtendSession(occupancy) ? '' : ' rm-quick-actions--no-extend'}`}>
@@ -1158,6 +1148,7 @@ function SessionModal({ modal, onClose, onSubmit }) {
   const [guestName, setGuestName] = useState('');
   const [guestCount, setGuestCount] = useState('1');
   const [hasCorkage, setHasCorkage] = useState(false);
+  const [applyVenueDiscount, setApplyVenueDiscount] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
 
@@ -1178,6 +1169,7 @@ function SessionModal({ modal, onClose, onSubmit }) {
       setGuestName(modal.initialGuestName || '');
       setGuestCount('1');
       setHasCorkage(false);
+      setApplyVenueDiscount(false);
     } else {
       setHours(1);
       setPaymentMethod('Cash');
@@ -1185,6 +1177,7 @@ function SessionModal({ modal, onClose, onSubmit }) {
       setGuestName('');
       setGuestCount('1');
       setHasCorkage(false);
+      setApplyVenueDiscount(false);
     }
     setFormError('');
   }, [modal]);
@@ -1195,20 +1188,26 @@ function SessionModal({ modal, onClose, onSubmit }) {
   const walkInPricing = !isExtend && !fromBooking && modal?.fixedRoom
     ? calculateBookingPrice({ variant: modal.fixedRoom, startHour: manilaHour(), duration, guestCount: Number(guestCount) || 1, hasCorkage })
     : null;
-  const totalCharge = fromBooking ? Number(modal?.downPaymentInfo?.total) || 0 : Number(walkInPricing?.amount) || 0;
-  const alreadyCollected = fromBooking ? Number(modal?.downPaymentInfo?.collected) || 0 : 0;
-  const outstanding = Math.max(0, totalCharge - alreadyCollected);
+  const originalCharge = fromBooking ? Number(modal?.downPaymentInfo?.total) || 0 : Number(walkInPricing?.amount) || 0;
+  const previouslyCollected = fromBooking ? Number(modal?.downPaymentInfo?.collected) || 0 : 0;
   const venueDiscount = fromBooking ? Number(modal?.venueDiscount || 0) : 0;
+  const appliedDiscount = applyVenueDiscount ? venueDiscount : 0;
+  const originalBalance = Math.max(0, originalCharge - previouslyCollected);
+  const cashToReturn = duration === 1 ? appliedDiscount : Math.max(0, appliedDiscount - originalBalance);
+  const totalCharge = Math.max(0, Math.round((originalCharge - appliedDiscount) * 100) / 100);
+  const alreadyCollected = Math.max(0, previouslyCollected - cashToReturn);
+  const outstanding = Math.max(0, Math.round((totalCharge - alreadyCollected) * 100) / 100);
+  const recordedRefund = Number(modal?.downPaymentInfo?.refunded || 0) + cashToReturn;
   const reservationPaidInFull = fromBooking && totalCharge > 0 && outstanding === 0;
   const paidAmount = fromBooking
-    ? collectionMode === 'full' ? totalCharge : alreadyCollected
+    ? collectionMode === 'full' ? totalCharge + recordedRefund : Number(modal?.downPaymentInfo?.paid || 0)
     : collectionMode === 'full' ? totalCharge : 0;
 
   async function handleSubmit() {
     const totalHours = duration;
     setFormError('');
     if (fromBooking && (Date.now() < Number(modal?.scheduledStartMs) || Date.now() >= Number(modal?.scheduledEndMs))) {
-      setFormError('This reservation can only start during its booked time. Refresh the schedule if its slot has ended.');
+      setFormError('This reservation can only start during its reserved time. Refresh the schedule if its slot has ended.');
       return;
     }
     if (!isExtend && !fromBooking && !(Number(modal?.fixedRoom?.price) > 0)) {
@@ -1223,7 +1222,11 @@ function SessionModal({ modal, onClose, onSubmit }) {
       setFormError(`Choose no more than ${maxHours} whole hour${maxHours === 1 ? '' : 's'}.`);
       return;
     }
-    if (!isExtend && paidAmount > totalCharge) {
+    if (fromBooking && venueDiscount > 0 && !applyVenueDiscount) {
+      setFormError('Settle the room discount with the guest before starting this reservation.');
+      return;
+    }
+    if (!isExtend && paidAmount - recordedRefund > totalCharge) {
       setFormError('The amount collected cannot be higher than the session charge.');
       return;
     }
@@ -1237,12 +1240,13 @@ function SessionModal({ modal, onClose, onSubmit }) {
         sessionId: modal.session?._id,
         totalHours,
         paymentMethod: reservationPaidInFull || collectionMode === 'later' ? undefined : paymentMethod,
-        paymentTiming: paidAmount >= totalCharge && totalCharge > 0 ? 'Before' : 'After',
+        paymentTiming: paidAmount - recordedRefund >= totalCharge && totalCharge > 0 ? 'Before' : 'After',
         paidAmount,
         guestName,
         guestCount: Number(guestCount) || 1,
         hasCorkage,
         bookingId: modal.bookingId,
+        applyVenueDiscount: fromBooking && applyVenueDiscount,
       });
     } catch (err) {
       console.error(err);
@@ -1286,7 +1290,7 @@ function SessionModal({ modal, onClose, onSubmit }) {
               </div>
             )}
             {fromBooking && <p className="session-reservation-deadline">{bookingNotStarted ? 'Starts at' : 'Ends at'} {boardClock(new Date(bookingNotStarted ? modal.scheduledStartMs : modal.scheduledEndMs))}{!bookingNotStarted && !bookingEnded ? ` · ${Math.ceil((modal.scheduledEndMs - Date.now()) / 60000)} min left` : ''}</p>}
-            {bookedLengthExceedsLimit && <p className="session-form-error" role="alert">This reservation exceeds the five-hour session limit. Update its booked length before starting the session.</p>}
+            {bookedLengthExceedsLimit && <p className="session-form-error" role="alert">This reservation exceeds the five-hour session limit. Update its reserved length before starting the session.</p>}
             {isExtend && <p className="mfield-note">Up to {MAX_SESSION_HOURS} hours total. The original charge stays fixed; added hours use their current rates.</p>}
           </div>
 
@@ -1314,16 +1318,23 @@ function SessionModal({ modal, onClose, onSubmit }) {
 
           {fromBooking && !isExtend && (
             <>
+              {venueDiscount > 0 && (
+                <label className="booking-addon-check">
+                  <input type="checkbox" checked={applyVenueDiscount} onChange={(event) => setApplyVenueDiscount(event.target.checked)} />
+                  <span><strong>Apply {money(venueDiscount)} room discount at the venue</strong><small>{duration === 1 ? `Return ${money(venueDiscount)} to the guest. Corkage and extras stay due separately.` : originalBalance >= venueDiscount ? `Reduce the balance to ${money(originalBalance - venueDiscount)}.` : `Return ${money(venueDiscount - originalBalance)} to the guest before confirming.`}</small></span>
+                </label>
+              )}
               <div className="session-payment-ledger">
-                <div><span>Total charge</span><strong>{money(totalCharge)}</strong></div>
+                <div><span>Reservation charge</span><strong>{money(originalCharge)}</strong></div>
+                {appliedDiscount > 0 && <div><span>Room discount</span><strong>−{money(appliedDiscount)}</strong></div>}
                 <div><span>Payment received</span><strong>{money(alreadyCollected)}</strong></div>
                 <div className={outstanding > 0 ? 'balance-due' : 'balance-paid'}><span>Balance remaining</span><strong>{money(outstanding)}</strong></div>
               </div>
-              {venueDiscount > 0 && <p className="mfield-note" role="status">This guest chose a down payment. Arrange the {money(venueDiscount)} room discount at the venue. After discount, {outstanding >= venueDiscount ? `${money(outstanding - venueDiscount)} remains to collect` : `${money(venueDiscount - outstanding)} should be returned to the guest`}.</p>}
+              {venueDiscount > 0 && !applyVenueDiscount && <p className="mfield-note" role="status">The room discount is still due at the venue. Select the checkbox when settling it with the guest.</p>}
               {reservationPaidInFull && (
                 <div className="session-payment-complete" role="status">
                   <i className="bi bi-check-circle-fill" aria-hidden="true"></i>
-                  <span><strong>Reservation fully paid</strong><small>No balance or payment method is needed to start this session.</small></span>
+                  <span><strong>{modal?.paymentChoice === 'deposit' && duration === 1 ? 'One-hour payment complete' : 'Reservation fully paid'}</strong><small>No balance or payment method is needed to start this session.</small></span>
                 </div>
               )}
             </>

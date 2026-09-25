@@ -5,13 +5,13 @@ export const REVENUE_BASIS = 'Recorded payments less manual refunds, grouped by 
 export default function RevenueSummary({ summary, loading, analytics = false }) {
   const metrics = analytics ? [
     ['Payments received', 'collected', 'Money received, after refunds'],
-    ['Balance to collect', 'outstanding', 'Unpaid amount on open bookings'],
-    ['Booking value', 'charged', 'Charges for reservations and room sessions'],
+    ['Balance to collect', 'outstanding', 'Unpaid amount on open reservations'],
+    ['Total charges', 'charged', 'Reservations and room sessions'],
   ] : [
-    ['Collected', 'collected', 'Payments less refunds'],
-    ['Outstanding', 'outstanding', 'Balance still to collect'],
-    ['Charges', 'charged', 'Total service charges'],
-    ['Refunded', 'refunded', 'Refunds recorded manually'],
+    ['Payments received', 'collected', 'Payments after recorded refunds'],
+    ['Balance to collect', 'outstanding', 'Unpaid balance on open reservations'],
+    ['Reservation total', 'charged', 'Total charges before payments'],
+    ['Refunds and rebates', 'refunded', 'Returns recorded by staff'],
   ];
   return (
     <div className="metric-row finance-metrics" aria-busy={loading}>

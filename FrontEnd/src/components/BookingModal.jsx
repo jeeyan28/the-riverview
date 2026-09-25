@@ -289,7 +289,7 @@ function BookingSummaryContents({
                       <span>₱{subtotal.toLocaleString()}</span>
                     </div>
                     <div className="bk-summary-panel-cost-row bk-summary-panel-cost-row--accent">
-                      <span>{paymentChoice === 'deposit' ? '1-hour down payment due now' : 'Full payment due now'}</span>
+                      <span>{selectedDuration === 1 ? '1-hour reservation payment due now' : paymentChoice === 'deposit' ? '1-hour down payment due now' : 'Full payment due now'}</span>
                       <span>₱{downPayment.toLocaleString()}</span>
                     </div>
                     <div className="bk-summary-panel-cost-row bk-summary-panel-cost-row--total">
@@ -301,8 +301,8 @@ function BookingSummaryContents({
               </div>
               {timeLabel ? (
                 <p className="bk-summary-panel-note">{paymentChoice === 'deposit'
-                  ? `Your down payment confirms the booking. ${priceBreakdown.eligibleDiscount > 0 ? `Ask staff for your ₱${priceBreakdown.eligibleDiscount.toLocaleString()} room discount at the venue. ` : ''}Pay the remaining balance when you arrive.`
-                  : 'Your full payment confirms the booking. No balance remains at the venue.'}</p>
+                  ? `${selectedDuration === 1 ? 'Your one-hour payment' : 'Your down payment'} confirms the reservation. ${priceBreakdown.eligibleDiscount > 0 ? `Ask staff for your ₱${priceBreakdown.eligibleDiscount.toLocaleString()} room discount at the venue. ` : ''}${remainingBalance > 0 ? 'Pay the remaining balance when you arrive.' : 'No additional room balance is due.'}`
+                  : 'Your full payment confirms the reservation. No balance remains at the venue.'}</p>
               ) : (
                 <p className="bk-summary-panel-note">Choose a start time to see the total and payment breakdown.</p>
               )}
@@ -352,7 +352,7 @@ function BookingSuccess({ booking, room, selectedVariant, onDone }) {
       <div className="bk-success-intro">
         <div className="bk-confirm-icon"><i className="fa-solid fa-check"></i></div>
         <h3>Reservation confirmed</h3>
-        <p>Your payment is complete. Your booking details and receipt are saved in Profile → Reservations.</p>
+        <p>Your payment is complete. Your reservation details and receipt are saved in Profile → Reservations.</p>
       </div>
 
       <div className="bk-success-card">
@@ -389,6 +389,11 @@ function BookingSuccess({ booking, room, selectedVariant, onDone }) {
             <span className="bk-success-balance">₱{remaining.toLocaleString()}</span>
           </div>
         </div>
+        {booking.paymentChoice === 'deposit' && Number(booking.eligibleDiscount) > 0 && (
+          <p className="bk-success-discount-note" role="status">
+            ₱{Number(booking.eligibleDiscount).toLocaleString()} room discount to settle at the facility. {Number(booking.duration) === 1 ? 'Show your receipt to receive it back.' : 'Staff will deduct it from your remaining balance.'}
+          </p>
+        )}
       </div>
 
       <div className="bk-success-actions-row">
@@ -463,7 +468,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
 
   useEffect(() => {
     if (step === 'paymongoReturn' && pmReturn.phase === 'confirmed') {
-      showToast('Booking successful! Download your receipt or view it in Profile → Reservations.');
+      showToast('Reservation successful! Download your receipt or view it in Profile → Reservations.');
     }
   }, [step, pmReturn.phase, showToast]);
 
@@ -731,7 +736,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
             date: dateStr,
             timeIn: timeStr,
             duration: selectedDuration,
-            paymentChoice,
+            paymentChoice: selectedDuration === 1 ? 'deposit' : paymentChoice,
             claimDiscount,
             selectedAddOns,
           }),
@@ -827,6 +832,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
     releaseCurrentLock();
     setLockError('');
     setSelectedDuration(dur);
+    if (dur === 1) setPaymentChoice('deposit');
     setSelectedHour(null);
   }
 
@@ -885,7 +891,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
       if (requestVersion !== lockRequestVersionRef.current) return;
       if (err.status === 409) {
         setSelectedHour(null);
-        setLockError('That start time was just booked. Choose another time.');
+        setLockError(err.message || 'That start time is no longer available. Choose another time.');
       } else {
         setLockError(err.message || 'We could not verify that time. Please try again.');
       }
@@ -1323,7 +1329,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
         duration: selectedDuration,
         guestCount,
         hasCorkage,
-        paymentChoice,
+        paymentChoice: selectedDuration === 1 ? 'deposit' : paymentChoice,
         claimDiscount,
         selectedAddOns,
       })
@@ -1337,10 +1343,10 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
       : `₱${remainingBalanceAmount.toLocaleString()} remains to pay at the facility. `
     : '';
   const downPaymentOptions = [
-    { choice: 'deposit', label: '1-hour down payment', amount: Math.min(priceBreakdown.roomCharge + priceBreakdown.corkageFee + priceBreakdown.addOnFee, priceBreakdown.hourlyRates[0] || 0) },
+    { choice: 'deposit', label: selectedDuration === 1 ? '1-hour reservation payment' : '1-hour down payment', amount: Math.min(priceBreakdown.roomCharge + priceBreakdown.corkageFee + priceBreakdown.addOnFee, priceBreakdown.hourlyRates[0] || 0) },
     { choice: 'full', label: 'Pay in full', amount: Math.max(0, priceBreakdown.roomCharge - priceBreakdown.eligibleDiscount + priceBreakdown.corkageFee + priceBreakdown.addOnFee) },
   ];
-  const visiblePaymentOptions = downPaymentOptions.filter((option) => option.choice === 'deposit' || option.amount !== downPaymentOptions[0].amount || paymentChoice === 'full');
+  const visiblePaymentOptions = selectedDuration === 1 ? downPaymentOptions.slice(0, 1) : downPaymentOptions;
   const availableDiscountPercent = selectedVariant ? effectiveDiscountPercent(room, selectedVariant) : 0;
   const availableDiscountAmount = Math.round(priceBreakdown.roomCharge * availableDiscountPercent) / 100;
   const visiblePaymentMethods = allowedPaymentMethodKeys
@@ -1729,7 +1735,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
                       <p className="bk-field-error"><i className="fa-solid fa-circle-exclamation"></i> {contactError}</p>
                     )}
                     {authUser?.isGuest && !contactError && !guestContact.trim() && (
-                      <p className="bk-field-warning"><i className="fa-solid fa-triangle-exclamation"></i> Without an email, you won't receive a booking receipt.</p>
+                      <p className="bk-field-warning"><i className="fa-solid fa-triangle-exclamation"></i> Without an email, you won't receive a reservation receipt.</p>
                     )}
                   </div>
                   <div className="bk-field">
@@ -1790,7 +1796,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
                       <span className="bk-addon-option-icon"><i className="fa-solid fa-tag" aria-hidden="true"></i></span>
                       <span>
                         <strong>Use {availableDiscountPercent}% room discount</strong>
-                        <small>Save ₱{availableDiscountAmount.toLocaleString()} on the room. Applied online with full payment; arranged at the facility with a 1-hour down payment.</small>
+                        <small>Save ₱{availableDiscountAmount.toLocaleString()} on the room. For multi-hour full payment, we deduct it online. Otherwise, staff settle it at the facility.</small>
                       </span>
                     </label>
                   )}
@@ -1808,7 +1814,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
                               : current.filter((name) => name !== service.name))}
                           />
                           <span className="bk-addon-option-icon"><i className="fa-solid fa-circle-plus" aria-hidden="true"></i></span>
-                          <span><strong>{service.name}</strong><small>+₱{Number(service.fee).toLocaleString()} per booking</small></span>
+                          <span><strong>{service.name}</strong><small>+₱{Number(service.fee).toLocaleString()} per reservation</small></span>
                         </label>
                       ))}
                     </div>
@@ -1830,15 +1836,15 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
                 </div>
 
                 <div className="bk-downpayment-card">
-                  <p className="bk-summary-label">{paymentChoice === 'deposit' ? '1-hour down payment' : 'Full payment'}</p>
+                  <p className="bk-summary-label">{selectedDuration === 1 ? '1-hour reservation payment' : paymentChoice === 'deposit' ? '1-hour down payment' : 'Full payment'}</p>
                   <p className="bk-downpayment-amount">
                     ₱{downPaymentAmount.toLocaleString()}
                   </p>
                   <p className="bk-downpayment-duration">{paymentChoice === 'deposit'
-                    ? `Confirms your booking. ${priceBreakdown.eligibleDiscount > 0 ? `Your ₱${priceBreakdown.eligibleDiscount.toLocaleString()} room discount is settled at the facility. ` : ''}${depositBalanceCopy}First hour is non-refundable if you cancel.`
+                    ? `Confirms your reservation. ${priceBreakdown.eligibleDiscount > 0 ? selectedDuration === 1 ? `Receive your ₱${priceBreakdown.eligibleDiscount.toLocaleString()} room discount at the facility. ` : `Staff will deduct your ₱${priceBreakdown.eligibleDiscount.toLocaleString()} room discount from the remaining balance at the facility. ` : ''}${depositBalanceCopy}First hour is non-refundable if you cancel.`
                     : downPaymentAmount > (priceBreakdown.hourlyRates[0] || 0)
-                      ? 'Confirms your booking. If you cancel, contact admin for a refund minus the first hour.'
-                      : 'Confirms your booking. Non-refundable if you cancel.'}</p>
+                      ? 'Confirms your reservation. If you cancel, contact admin for a refund minus the first hour.'
+                      : 'Confirms your reservation. Non-refundable if you cancel.'}</p>
                 </div>
 
                 <div className="bk-payment-methods">
@@ -1860,7 +1866,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
                         <span className="bk-payment-choice-copy">
                           <strong>{label}</strong>
                           <small>₱{amount.toLocaleString()}</small>
-                          {claimDiscount && priceBreakdown.eligibleDiscount > 0 && <small>{choice === 'full' ? `Includes ₱${priceBreakdown.eligibleDiscount.toLocaleString()} discount` : 'Discount settled at the facility'}</small>}
+                          {claimDiscount && priceBreakdown.eligibleDiscount > 0 && <small>{choice === 'full' ? `Includes ₱${priceBreakdown.eligibleDiscount.toLocaleString()} discount` : selectedDuration === 1 ? 'Receive room discount at the facility' : 'Room discount deducted from venue balance'}</small>}
                         </span>
                         <span className="bk-payment-choice-check" aria-hidden="true">
                           <i className="fa-solid fa-check"></i>

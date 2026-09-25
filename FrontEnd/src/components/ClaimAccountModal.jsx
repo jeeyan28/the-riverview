@@ -220,13 +220,13 @@ function ClaimAccountModal({ open, onClose }) {
             <div className="claim-account-heading">
               <span className="claim-account-mark"><ShieldCheck size={20} aria-hidden="true" /></span>
               <div className="login-card-header">
-                <span className="claim-account-kicker">KEEP YOUR BOOKINGS</span>
+                <span className="claim-account-kicker">KEEP YOUR RESERVATIONS</span>
                 <h2 id="claim-modal-title">Save your guest account</h2>
                 <p>Add a sign-in method before you log out.</p>
               </div>
             </div>
 
-            <p className="claim-account-note">Your current reservations and booking history will stay connected to this account.</p>
+            <p className="claim-account-note">Your current reservations and reservation history will stay connected to this account.</p>
 
             <div className="profile-tabs">
               <button

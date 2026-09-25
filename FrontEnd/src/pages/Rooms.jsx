@@ -95,7 +95,7 @@ function Rooms() {
         <div className="rp-filter-bar">
           <div>
             <div className="section-label">Available Services</div>
-            <h2 id="facility-list-title" className="visually-hidden">Bookable facilities</h2>
+            <h2 id="facility-list-title" className="visually-hidden">Reservable facilities</h2>
             <div className="rp-filter-list" role="group" aria-label="Filter facilities by service">
               {services.map((service) => (
                 <button

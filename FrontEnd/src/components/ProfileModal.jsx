@@ -29,13 +29,15 @@ function paymentBreakdown(booking, now) {
   const total = Math.max(0, Number(booking?.amount) || 0);
   const received = Math.max(0, Number(booking?.paidAmount) || 0, Number(booking?.downPayment) || 0);
   const refunded = Math.min(received, Math.max(0, Number(booking?.refundedAmount) || 0));
+  const cancellationRefunded = Math.max(0, refunded - Math.max(0, Number(booking?.venueDiscountRefunded) || 0));
   const paid = Math.max(0, received - refunded);
   const balance = closed ? 0 : Math.max(0, total - paid);
-  const status = closed ? refunded > 0 ? 'Refund recorded' : paid > 0 ? 'Payment retained' : 'No payment' : total > 0 && balance <= 0 ? 'Paid' : paid > 0 ? 'Downpayment paid' : 'Unpaid';
-  return { total, paid, refunded, balance, closed, status };
+  const oneHourPayment = Number(booking?.duration) === 1 && booking?.paymentChoice === 'deposit';
+  const status = closed ? cancellationRefunded > 0 ? 'Refund recorded' : paid > 0 ? 'Paid' : 'No payment' : total > 0 && balance <= 0 ? oneHourPayment ? '1-hour payment complete' : 'Paid' : paid > 0 ? 'Downpayment paid' : 'Unpaid';
+  return { total, paid, refunded, cancellationRefunded, balance, closed, status };
 }
 
-function ProfileModal({ open, onClose }) {
+function ProfileModal({ open, onClose, reservationIntent }) {
   const navigate = useNavigate();
   const { user: authUser, revalidate, updateUser, logout } = useAuth();
   const { settings } = useSiteSettings();
@@ -96,11 +98,31 @@ function ProfileModal({ open, onClose }) {
       setPasswordError('');
       setBookingsError('');
       setViewingBooking(null);
+      setReschedulingBooking(null);
       setCancellingBooking(null);
       setLoadingBookings(true);
       try {
         const data = await bookingsService.mine();
-        if (!cancelled) setBookings(Array.isArray(data) ? data : []);
+        if (!cancelled) {
+          const reservations = Array.isArray(data) ? data : [];
+          setBookings(reservations);
+          if (reservationIntent?.code) {
+            setActiveTab('history');
+            const match = reservations.find((item) => item.reservationCode === reservationIntent.code || item._id === reservationIntent.code);
+            if (match) {
+              setViewingBooking(match);
+              if (reservationIntent.action === 'reschedule') {
+                if (canRescheduleBooking(match)) setReschedulingBooking(match);
+                else pfShowToast('This reservation can no longer be rescheduled online. Contact support for help.', 'error');
+              } else if (reservationIntent.action === 'cancel') {
+                if (match.status === 'Confirmed' && match.cancellationStatus !== 'Requested' && match.cancellationStatus !== 'Approved') setCancellingBooking(match);
+                else pfShowToast('This reservation cannot accept a cancellation request online.', 'error');
+              }
+            } else {
+              pfShowToast('This reservation was not found in your account.', 'error');
+            }
+          }
+        }
       } catch (err) {
         if (!cancelled) setBookingsError(err.message || 'Could not load your reservations.');
       } finally {
@@ -111,7 +133,7 @@ function ProfileModal({ open, onClose }) {
     return () => {
       cancelled = true;
     };
-  }, [open]);
+  }, [open, reservationIntent?.code, reservationIntent?.action]);
 
   useEffect(() => {
     if (!open) return;
@@ -453,7 +475,7 @@ function ProfileModal({ open, onClose }) {
                     <div className="pf-booking-price">₱{Number(b.amount || 0).toLocaleString()}</div>
                     <span className={`pf-chip pf-chip--${historyStatusClass(presentation.status)}`}>{presentation.status}</span>
                     {presentation.warning === 'Overdue' && <small className="pf-reservation-warning">Overdue</small>}
-                    <span className={`pf-payment-state pf-payment-state--${payment.status === 'Paid' ? 'paid' : payment.paid > 0 ? 'partial' : 'unpaid'}`}>{payment.status}{payment.balance > 0 ? ` · ₱${payment.balance.toLocaleString()} remaining` : ''}</span>
+                    {presentation.status !== 'No Show' && <span className={`pf-payment-state pf-payment-state--${payment.balance === 0 && payment.paid > 0 ? 'paid' : payment.paid > 0 ? 'partial' : 'unpaid'}`}>{payment.status}{payment.balance > 0 ? ` · ₱${payment.balance.toLocaleString()} remaining` : ''}</span>}
                   </div>
                   <button
                     type="button"
@@ -496,8 +518,10 @@ function ProfileModal({ open, onClose }) {
               return (
                 <section className="pf-payment-breakdown" aria-label="Payment summary">
                   <div><span>Total charge</span><strong>₱{payment.total.toLocaleString()}</strong></div>
-                  <div><span>{payment.closed ? 'Retained payment' : 'Paid so far'}</span><strong>₱{payment.paid.toLocaleString()}</strong></div>
-                  <div className={payment.balance > 0 ? 'has-balance' : 'is-settled'}><span>{payment.closed ? 'Refunded' : payment.balance > 0 ? 'Pay at venue' : 'Balance'}</span><strong>₱{(payment.closed ? payment.refunded : payment.balance).toLocaleString()}</strong></div>
+                  {Number(viewingBooking.discountAmount) > 0 && <div><span>{viewingBooking.venueDiscountApplied ? 'Room discount settled at venue' : 'Room discount applied online'}</span><strong>₱{Number(viewingBooking.discountAmount).toLocaleString()}</strong></div>}
+                  {viewingBooking.paymentChoice === 'deposit' && !viewingBooking.venueDiscountApplied && Number(viewingBooking.eligibleDiscount) > 0 && <div><span>{Number(viewingBooking.duration) === 1 ? 'Room discount to return at venue' : 'Room discount to deduct at venue'}</span><strong>₱{Number(viewingBooking.eligibleDiscount).toLocaleString()}</strong></div>}
+                  <div><span>Paid</span><strong>₱{payment.paid.toLocaleString()}</strong></div>
+                  <div className={payment.balance > 0 ? 'has-balance' : 'is-settled'}><span>{['Cancelled', 'Rejected'].includes(viewingBooking.status) ? 'Cancellation refund' : viewingBooking.status === 'No Show' ? 'Balance' : payment.balance > 0 ? 'Pay at venue' : 'Balance'}</span><strong>₱{(['Cancelled', 'Rejected'].includes(viewingBooking.status) ? payment.cancellationRefunded : payment.balance).toLocaleString()}</strong></div>
                   <p>{viewingBooking.status === 'Cancelled' && cancellation.customerCancelled
                     ? viewingBooking.cancellationRefundException
                       ? cancellation.refundRemaining > 0
@@ -508,11 +532,15 @@ function ProfileModal({ open, onClose }) {
                         : payment.refunded > 0
                           ? `₱${payment.refunded.toLocaleString()} was refunded manually. The first-hour charge was retained.`
                           : 'The first-hour charge is non-refundable. Contact admin if you need help with a payment issue.'
+                    : viewingBooking.status === 'No Show'
+                      ? 'This reservation was marked No Show. No refund is due.'
                     : payment.closed
                       ? 'No balance remains at the venue for this closed reservation.'
                       : payment.balance > 0
                         ? 'Your online downpayment secured the slot. Please settle the remaining balance at the venue.'
-                        : 'This reservation is fully paid.'} {viewingBooking.status === 'Cancelled' && cancellation.customerCancelled && cancellation.refundRemaining > 0 && settings?.contact?.messengerUrl && <a href={settings.contact.messengerUrl} target="_blank" rel="noreferrer">Message admin</a>}</p>
+                        : Number(viewingBooking.duration) === 1 && viewingBooking.paymentChoice === 'deposit'
+                          ? 'Your required one-hour reservation payment is complete.'
+                          : 'This reservation is fully paid.'} {viewingBooking.status === 'Cancelled' && cancellation.customerCancelled && cancellation.refundRemaining > 0 && settings?.contact?.messengerUrl && <a href={settings.contact.messengerUrl} target="_blank" rel="noreferrer">Message admin</a>}</p>
                 </section>
               );
             })()}
@@ -582,7 +610,7 @@ function ProfileModal({ open, onClose }) {
               </div>
               <div className="pf-detail-row">
                 <span className="pf-detail-label">Payment status</span>
-                <span className="pf-detail-value">{viewingBooking.paymentStatus || '—'}</span>
+                <span className="pf-detail-value">{paymentBreakdown(viewingBooking, clockMs).status}</span>
               </div>
               <div className="pf-detail-row">
                 <span className="pf-detail-label">Status</span>
@@ -691,7 +719,7 @@ function CancellationRequestModal({ booking, contactUrl, onClose, onSubmitted, o
         <p className="pf-cancel-reference">Reservation <strong>{booking.reservationCode || '—'}</strong></p>
         <div className="pf-cancel-policy">
           <strong>What happens next</strong>
-          <p>Our team will review your request. The first-hour charge is non-refundable. {cancellation.refundRemaining > 0 ? `If approved, arrange the remaining ₱${cancellation.refundRemaining.toLocaleString()} refund with admin.` : 'This booking has no refundable balance.'} {contactUrl && <a href={contactUrl} target="_blank" rel="noreferrer">Contact admin</a>}</p>
+          <p>Our team will review your request. The first-hour charge is non-refundable. {cancellation.refundRemaining > 0 ? `If approved, arrange the remaining ₱${cancellation.refundRemaining.toLocaleString()} refund with admin.` : 'This reservation has no refundable balance.'} {contactUrl && <a href={contactUrl} target="_blank" rel="noreferrer">Contact admin</a>}</p>
         </div>
         <form onSubmit={submit}>
           <div className="pf-field"><label htmlFor="cancel-reason">Reason for cancellation</label><textarea id="cancel-reason" rows="4" maxLength="500" required value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Tell us why you need to cancel" /></div>

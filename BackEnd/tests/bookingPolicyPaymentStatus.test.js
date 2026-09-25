@@ -1,12 +1,12 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { isBeforeReservationDay } = require('../utils/businessDate');
+const { bookingStartMs } = require('../utils/bookingLifecycle');
 
-test('rescheduling closes at midnight in Manila on the reservation date', () => {
-  const reservationDate = '2026-10-02';
-  assert.equal(isBeforeReservationDay(reservationDate, new Date('2026-10-01T15:59:59Z')), true);
-  assert.equal(isBeforeReservationDay(reservationDate, new Date('2026-10-01T16:00:00Z')), false);
-  assert.equal(isBeforeReservationDay(reservationDate, new Date('2026-10-02T16:00:00Z')), false);
+test('reschedule cutoff is 24 hours before the Manila start time', () => {
+  const start = bookingStartMs('2026-10-02', '10:00');
+  const day = 24 * 60 * 60 * 1000;
+  assert.equal(start - Date.parse('2026-10-01T10:00:00+08:00') >= day, true);
+  assert.equal(start - Date.parse('2026-10-01T10:01:00+08:00') >= day, false);
 });
 
 test('declined payment stops waiting once the attempted intent returns to awaiting a method', async () => {

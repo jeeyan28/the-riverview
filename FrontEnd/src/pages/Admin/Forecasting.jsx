@@ -154,7 +154,7 @@ function Forecasting() {
           <div className="mc-val" id="fc-projected-bookings">
             {data ? projBookings : '—'}
           </div>
-          <div className="mc-sub">Estimate based on recent bookings</div>
+          <div className="mc-sub">Estimate based on recent reservations</div>
         </div>
       </div>
 

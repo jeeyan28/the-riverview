@@ -15,6 +15,27 @@ function bookingCollected(booking) {
   return 0;
 }
 
+function venueDiscountSettlement(booking) {
+  if (!booking || booking.paymentChoice !== 'deposit' || booking.venueDiscountApplied || !(Number(booking.eligibleDiscount) > 0)) {
+    throw new AppError(409, 'This reservation has no venue discount to apply.');
+  }
+  const discount = money(booking.eligibleDiscount);
+  const originalAmount = money(booking.amount);
+  if (discount > originalAmount) throw new AppError(409, 'The room discount exceeds this reservation charge.');
+  const previousPaid = bookingCollected(booking);
+  const previousRefund = money(booking.refundedAmount || 0);
+  const previousBalance = money(Math.max(0, originalAmount - (previousPaid - previousRefund)));
+  // A one-hour reservation has already paid its room charge online. Return its
+  // room discount at the venue even when corkage or other extras are still due.
+  const cashReturned = money(Number(booking.duration) === 1 ? discount : Math.max(0, discount - previousBalance));
+  return {
+    discount,
+    amount: money(originalAmount - discount),
+    cashReturned,
+    refundedAmount: money(previousRefund + cashReturned),
+  };
+}
+
 function financialFields(amount, paidAmount, refundedAmount = 0) {
   amount = money(amount);
   paidAmount = money(paidAmount);
@@ -134,4 +155,4 @@ function reviewCancellationFields(booking, { decision, refundedAmount = booking.
   };
 }
 
-module.exports = { money, bookingCollected, financialFields, fullOrDeferredPaymentFields, bookingStartMs, bookingSessionEnd, completeReservationFields, extendSessionFields, endSessionFields, firstHourCharge, cancellationRefundLimit, reviewCancellationFields };
+module.exports = { money, bookingCollected, venueDiscountSettlement, financialFields, fullOrDeferredPaymentFields, bookingStartMs, bookingSessionEnd, completeReservationFields, extendSessionFields, endSessionFields, firstHourCharge, cancellationRefundLimit, reviewCancellationFields };

@@ -2,6 +2,7 @@ import '../../styles/admin/settings.css';
 import { useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import Modal from '../../components/Modal';
+import ConfirmDialog from '../../components/ConfirmDialog';
 import PasswordInput from '../../components/PasswordInput';
 import PasswordRequirementsList from '../../components/PasswordRequirementsList';
 import LoginHistory from './LoginHistory';
@@ -9,6 +10,7 @@ import { useAuth } from '../../context/AuthContext';
 import { settingsService } from '../../services/settings';
 import { usersService } from '../../services/users';
 import { useSiteSettings } from '../../hooks/useSiteSettings';
+import { useConfirm } from '../../hooks/useConfirm';
 import { PASSWORD_REQUIREMENTS } from '../../utils/password';
 import { BellRing, History, Settings2, UserRound } from 'lucide-react';
 
@@ -116,6 +118,7 @@ function formatHolidayDate(dateStr) {
 function OperatingScheduleAndHolidays() {
   const { guardPermission } = useAuth();
   const { refetch: refreshSiteSettings } = useSiteSettings();
+  const { confirm, confirmProps } = useConfirm();
 
   const [loading, setLoading] = useState(true);
   const [openTime, setOpenTime] = useState(DEFAULT_OPEN_TIME);
@@ -130,6 +133,8 @@ function OperatingScheduleAndHolidays() {
   const [holidayModalOpen, setHolidayModalOpen] = useState(false);
   const [holidayDraft, setHolidayDraft] = useState({ name: '', date: '' });
   const [holidayError, setHolidayError] = useState('');
+  const [deletingHolidayId, setDeletingHolidayId] = useState(null);
+  const [holidayListError, setHolidayListError] = useState('');
 
   const fetchSettings = useCallback(async () => {
     try {
@@ -191,6 +196,7 @@ function OperatingScheduleAndHolidays() {
     try {
       await settingsService.addHoliday({ name, date, fullDay: true });
       await fetchSettings();
+      try { await refreshSiteSettings(); } catch {}
       setHolidayModalOpen(false);
     } catch (err) {
       setHolidayError(err.message || 'Could not add this closure date.');
@@ -201,12 +207,27 @@ function OperatingScheduleAndHolidays() {
 
   async function handleDeleteHoliday(id) {
     if (!guardPermission(SETTINGS_MANAGE_PERMISSION, "You don't have permission to remove holidays.")) return;
-    if (!window.confirm('Remove this holiday/closure date?')) return;
+    const target = holidays.find((h) => h._id === id);
+    const approved = await confirm(`Remove "${target?.name || 'this closure date'}"? Customers will be able to reserve this date again.`, {
+      title: 'Remove closure date',
+      danger: true,
+      confirmText: 'Remove',
+    });
+    if (!approved) return;
+
+    const previous = holidays;
+    setHolidays((list) => list.filter((h) => h._id !== id));
+    setDeletingHolidayId(id);
+    setHolidayListError('');
     try {
       await settingsService.removeHoliday(id);
       await fetchSettings();
+      try { await refreshSiteSettings(); } catch {}
     } catch (err) {
-      alert(err.message);
+      setHolidays(previous);
+      setHolidayListError(err.message || 'Could not remove this closure date.');
+    } finally {
+      setDeletingHolidayId(null);
     }
   }
 
@@ -248,7 +269,7 @@ function OperatingScheduleAndHolidays() {
           </div>
         </div>
         <p className={`sched-save-status${scheduleError ? ' is-error' : scheduleDirty ? ' is-dirty' : ''}`} role="status">
-          {scheduleError || (scheduleDirty ? 'Unsaved changes — save to update customer booking times.' : saveState === 'saved' ? 'Schedule saved.' : 'Customer booking times use the saved schedule.')}
+          {scheduleError || (scheduleDirty ? 'Unsaved changes — save to update customer reservation times.' : saveState === 'saved' ? 'Schedule saved.' : 'Customer reservation times use the saved schedule.')}
         </p>
         <button
           id="op-save-btn"
@@ -276,6 +297,7 @@ function OperatingScheduleAndHolidays() {
           Customers cannot reserve on these dates. The reservation calendar will automatically block them, and each
           upcoming date also appears in the announcement banner at the top of the homepage.
         </div>
+        {holidayListError && <p className="settings-form-error" role="alert">{holidayListError}</p>}
         <div className="holiday-list" style={{ marginTop: 10 }}>
           {loading ? (
             <div style={{ textAlign: 'center', color: 'var(--muted)', padding: '12px 0' }}>Loading…</div>
@@ -293,7 +315,14 @@ function OperatingScheduleAndHolidays() {
                     {formatHolidayDate(h.date)} — {h.fullDay ? 'Full Day Closure' : 'Partial'}
                   </div>
                 </div>
-                <button className="holiday-del" type="button" onClick={() => handleDeleteHoliday(h._id)}>
+                <button
+                  className="holiday-del"
+                  type="button"
+                  title="Remove closure date"
+                  aria-label={`Remove ${h.name}`}
+                  disabled={deletingHolidayId === h._id}
+                  onClick={() => handleDeleteHoliday(h._id)}
+                >
                   <i className="ti ti-trash"></i>
                 </button>
               </div>
@@ -311,6 +340,8 @@ function OperatingScheduleAndHolidays() {
           <div className="modal-actions"><button type="button" className="btn-cancel" onClick={() => setHolidayModalOpen(false)} disabled={addingHoliday}>Cancel</button><button type="submit" className="btn-confirm" disabled={addingHoliday}>{addingHoliday ? 'Adding…' : 'Add closure'}</button></div>
         </form>
       </Modal>
+
+      <ConfirmDialog {...confirmProps} />
     </>
   );
 }
@@ -318,6 +349,8 @@ function OperatingScheduleAndHolidays() {
 
 function AnnouncementsTab() {
   const { guardPermission } = useAuth();
+  const { refetch: refreshSiteSettings } = useSiteSettings();
+  const { confirm, confirmProps } = useConfirm();
 
   const [loading, setLoading] = useState(true);
   const [announcements, setAnnouncements] = useState([]);
@@ -327,6 +360,8 @@ function AnnouncementsTab() {
   const [formTitle, setFormTitle] = useState('');
   const [formMessage, setFormMessage] = useState('');
   const [formEmoji, setFormEmoji] = useState('');
+  const [listError, setListError] = useState('');
+  const [formError, setFormError] = useState('');
 
   const fetchAnnouncements = useCallback(async () => {
     try {
@@ -348,6 +383,7 @@ function AnnouncementsTab() {
     setFormTitle('');
     setFormMessage('');
     setFormEmoji('');
+    setFormError('');
     setShowAddModal(true);
   }
 
@@ -360,6 +396,7 @@ function AnnouncementsTab() {
     e.preventDefault();
     if (!formTitle.trim() || !formMessage.trim()) return;
     setPosting(true);
+    setFormError('');
     try {
       await settingsService.addAnnouncement({
         title: formTitle.trim(),
@@ -368,8 +405,9 @@ function AnnouncementsTab() {
       });
       setShowAddModal(false);
       await fetchAnnouncements();
+      try { await refreshSiteSettings(); } catch {}
     } catch (err) {
-      alert(err.message);
+      setFormError(err.message || 'Could not post this announcement.');
     } finally {
       setPosting(false);
     }
@@ -378,11 +416,13 @@ function AnnouncementsTab() {
   async function handleToggle(id, nextIsActive) {
     if (!guardPermission(SETTINGS_MANAGE_PERMISSION, "You don't have permission to change announcements.")) return;
     setBusyId(id);
+    setListError('');
     try {
       await settingsService.updateAnnouncement(id, { isActive: nextIsActive });
       await fetchAnnouncements();
+      try { await refreshSiteSettings(); } catch {}
     } catch (err) {
-      alert(err.message);
+      setListError(err.message || 'Could not update this announcement.');
     } finally {
       setBusyId(null);
     }
@@ -390,13 +430,25 @@ function AnnouncementsTab() {
 
   async function handleDelete(id) {
     if (!guardPermission(SETTINGS_MANAGE_PERMISSION, "You don't have permission to delete announcements.")) return;
-    if (!window.confirm('Delete this announcement?')) return;
+    const target = announcements.find((a) => a._id === id);
+    const approved = await confirm(`Delete "${target?.title || 'this announcement'}"? It will be removed from the homepage banner.`, {
+      title: 'Delete announcement',
+      danger: true,
+      confirmText: 'Delete',
+    });
+    if (!approved) return;
+
+    const previous = announcements;
+    setAnnouncements((list) => list.filter((a) => a._id !== id));
     setBusyId(id);
+    setListError('');
     try {
       await settingsService.removeAnnouncement(id);
       await fetchAnnouncements();
+      try { await refreshSiteSettings(); } catch {}
     } catch (err) {
-      alert(err.message);
+      setAnnouncements(previous);
+      setListError(err.message || 'Could not delete this announcement.');
     } finally {
       setBusyId(null);
     }
@@ -417,6 +469,7 @@ function AnnouncementsTab() {
         Active announcements appear as the dismissible banner at the top of the public homepage. Inactive or expired
         ones stay here but won't show to guests.
       </p>
+      {listError && <p className="settings-form-error" role="alert">{listError}</p>}
       <Modal
         open={showAddModal}
         onClose={closeAddModal}
@@ -467,6 +520,7 @@ function AnnouncementsTab() {
               maxLength={2}
             />
           </div>
+          {formError && <p className="settings-form-error" role="alert">{formError}</p>}
         </form>
       </Modal>
       <div className="announcement-list">
@@ -497,6 +551,8 @@ function AnnouncementsTab() {
                 <button
                   type="button"
                   className="announcement-btn danger"
+                  title="Delete announcement"
+                  aria-label={`Delete ${a.title}`}
                   disabled={busyId === a._id}
                   onClick={() => handleDelete(a._id)}
                 >
@@ -507,6 +563,8 @@ function AnnouncementsTab() {
           ))
         )}
       </div>
+
+      <ConfirmDialog {...confirmProps} />
     </>
   );
 }

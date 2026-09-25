@@ -31,7 +31,8 @@ export function canRescheduleBooking(booking) {
   if (!booking || booking.status !== 'Confirmed') return false;
   if (booking.cancellationStatus === 'Requested') return false;
   if ((booking.rescheduleCount || 0) >= RESCHEDULE_MAX_USES) return false;
-  return booking.date > businessDate();
+  const start = Date.parse(`${booking.date}T${booking.timeIn}:00+08:00`);
+  return Number.isFinite(start) && start - Date.now() >= 24 * 60 * 60 * 1000;
 }
 
 function formatDateLabel(dStr) {
@@ -273,7 +274,7 @@ function RescheduleModal({ booking, onClose, onRescheduled }) {
         {step !== 'success' && (
           <div className="bk-lock-banner">
             <i className="fa-solid fa-circle-info"></i>
-            Reschedule before your reservation day. Your room, option, and {duration}-hour duration stay the same — only the date and time change. You have {usesLeft} reschedule{usesLeft === 1 ? '' : 's'} left for this booking.
+            Reschedule at least 24 hours before your reservation starts. Your room, option, and {duration}-hour duration stay the same — only the date and time change. You have {usesLeft} reschedule{usesLeft === 1 ? '' : 's'} left for this reservation.
           </div>
         )}
 
@@ -283,7 +284,7 @@ function RescheduleModal({ booking, onClose, onRescheduled }) {
               <div className="bk-step" id="rsStepDate">
                 <p className="bk-choose-label bk-choose-label--heading bk-choose-label--tight">Pick a new date</p>
                 <p className="bk-choose-label bk-choose-label--sub">
-                  Currently booked for {formatDateLabel(booking.date)} · {currentTimeLabel}
+                  Currently reserved for {formatDateLabel(booking.date)} · {currentTimeLabel}
                 </p>
 
                 <div className="bk-calendar-block">

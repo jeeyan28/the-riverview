@@ -42,6 +42,8 @@ const bookingSchema = new mongoose.Schema({
   discountPercent: { type: Number, default: 0, min: 0, max: 99 },
   discountAmount: { type: Number, default: 0, min: 0 },
   eligibleDiscount: { type: Number, default: 0, min: 0 },
+  venueDiscountApplied: { type: Boolean, default: false },
+  venueDiscountRefunded: { type: Number, default: 0, min: 0 },
   addOns: [{ name: { type: String, required: true }, fee: { type: Number, required: true, min: 0 } }],
   addOnFee: { type: Number, default: 0, min: 0 },
   paymentChoice: { type: String, enum: ["deposit", "full"], default: "deposit" },

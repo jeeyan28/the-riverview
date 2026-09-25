@@ -77,7 +77,7 @@ const bookingActionLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: userOrIpKey,
-  message: { message: "Too many booking requests. Please slow down and try again later." },
+  message: { message: "Too many reservation requests. Please slow down and try again later." },
 });
 
 const paymentIntentLimiter = rateLimit({

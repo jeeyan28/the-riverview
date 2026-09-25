@@ -74,7 +74,7 @@ export const PAGE_TITLES = {
 export const PAGE_CONTEXT = {
   dashboard: 'Business overview',
   monitor: 'Live operations',
-  bookings: 'Booking operations',
+  bookings: 'Reservation operations',
   analytics: 'Performance insights',
   reports: 'Financial records',
   forecasting: 'Revenue planning',
