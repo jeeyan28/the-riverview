@@ -79,10 +79,10 @@ function computeDownPayment(hourlyRatesOrPrice, hours = 1) {
   return roundMoney(Math.max(0, Number(hourlyRatesOrPrice) || 0) * requestedHours);
 }
 
-function quoteOnlineBooking({ room, variant, basePrice, paymentChoice = "deposit", selectedAddOns = [] }) {
+function quoteOnlineBooking({ room, variant, basePrice, paymentChoice = "deposit", claimDiscount = false, selectedAddOns = [] }) {
   const roomCharge = Number(basePrice.roomCharge) || 0;
   const ownDiscount = variant?.discountPercent;
-  const discountPercent = Math.max(0, Math.min(99, Number(ownDiscount === null || ownDiscount === undefined || ownDiscount === "" ? room.discountPercent : ownDiscount) || 0));
+  const discountPercent = claimDiscount ? Math.max(0, Math.min(99, Number(ownDiscount === null || ownDiscount === undefined || ownDiscount === "" ? room.discountPercent : ownDiscount) || 0)) : 0;
   const eligibleDiscount = roundMoney(roomCharge * discountPercent / 100);
   const discountAmount = paymentChoice === "full" ? eligibleDiscount : 0;
   const names = selectedAddOns || [];

@@ -1,7 +1,7 @@
 import '../../styles/admin/forecasting.css';
 import '../../styles/skeleton.css';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { Chart } from 'chart.js/auto';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Area, CartesianGrid, ComposedChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { formatPeso } from '../../utils/currency';
 import { API_BASE_URL } from '../../services/api';
 
@@ -21,6 +21,40 @@ const INSIGHT_ICON = {
   door: 'ti-door',
 };
 
+function ForecastLineChart({ data, kind }) {
+  const isRevenue = kind === 'revenue';
+  const chartData = useMemo(() => {
+    const actualKey = isRevenue ? 'revenue' : 'bookingCount';
+    const averageKey = isRevenue ? 'smaRevenue' : 'smaBookings';
+    const projectedKey = isRevenue ? 'projectedRevenue' : 'projectedBookings';
+    const history = data.history.map((item) => ({ label: item.date.slice(5), actual: item[actualKey], average: item[averageKey], projected: null, band: null }));
+    if (history.length) history[history.length - 1].projected = history[history.length - 1].actual;
+    return history.concat(data.projection.map((item) => ({
+      label: item.date.slice(5), actual: null, average: null,
+      projected: item[projectedKey],
+      band: [item[`${projectedKey}Low`], item[`${projectedKey}High`]],
+    })));
+  }, [data, isRevenue]);
+  const actualColor = isRevenue ? '#EF3E6D' : '#378ADD';
+  const projectedColor = isRevenue ? '#EF9F27' : '#D4537E';
+  const valueLabel = (value) => isRevenue ? formatPeso(value) : Number(value).toLocaleString();
+  return <>
+    <div className="fc-chart-legend" aria-hidden="true"><span><i style={{ background: actualColor }} />Actual</span><span><i className="fc-legend-average" />Moving average</span><span><i className="fc-legend-projected" style={{ background: projectedColor }} />Projected</span><span><i className="fc-legend-band" />80% range</span></div>
+    <div className="chart-wrap" role="img" aria-label={`${isRevenue ? 'Revenue' : 'Reservation'} history, moving average, projection and 80 percent forecast range`}>
+      <ResponsiveContainer width="100%" height="100%"><ComposedChart data={chartData} margin={{ top: 10, right: 16, bottom: 2, left: isRevenue ? 0 : -20 }} accessibilityLayer>
+        <CartesianGrid vertical={false} stroke="#304056" strokeDasharray="3 4" />
+        <XAxis dataKey="label" tick={{ fill: '#a8b3c4', fontSize: 11 }} axisLine={false} tickLine={false} minTickGap={20} />
+        <YAxis tick={{ fill: '#a8b3c4', fontSize: 11 }} axisLine={false} tickLine={false} allowDecimals={isRevenue} tickFormatter={(value) => isRevenue && value >= 1000 ? `₱${(value / 1000).toFixed(1)}k` : isRevenue ? `₱${value}` : value} />
+        <Tooltip contentStyle={{ background: '#1b2a3f', border: '1px solid #35445c', borderRadius: 10, color: '#f5f8fc', fontSize: 12 }} formatter={(value, name) => name === '80% range' ? `${valueLabel(value[0])} – ${valueLabel(value[1])}` : valueLabel(value)} />
+        <Area type="monotone" dataKey="band" name="80% range" fill="rgba(239,159,39,.15)" stroke="none" connectNulls={false} />
+        <Line type="monotone" dataKey="actual" name="Actual" stroke={actualColor} strokeWidth={2.5} dot={false} activeDot={{ r: 4 }} connectNulls={false} />
+        <Line type="monotone" dataKey="average" name="Moving average" stroke="#94A3B8" strokeWidth={1.5} strokeDasharray="3 4" dot={false} activeDot={false} connectNulls={false} />
+        <Line type="monotone" dataKey="projected" name="Projected" stroke={projectedColor} strokeWidth={2.5} strokeDasharray="6 4" dot={false} activeDot={{ r: 4 }} connectNulls={false} />
+      </ComposedChart></ResponsiveContainer>
+    </div>
+  </>;
+}
+
 function Forecasting() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -31,8 +65,6 @@ function Forecasting() {
   const [rangeOptions, setRangeOptions] = useState(DEFAULT_RANGES);
   const [retryKey, setRetryKey] = useState(0);
 
-  const revenueCanvasRef = useRef(null);
-  const bookingsCanvasRef = useRef(null);
 
   const loadForecast = useCallback(async (window, range, cancelledRef) => {
     setLoading(true);
@@ -62,201 +94,6 @@ function Forecasting() {
       cancelledRef.current = true;
     };
   }, [smaWindow, forecastRange, retryKey, loadForecast]);
-
-  useEffect(() => {
-    if (!data) return;
-
-    const historyLabels = data.history.map((h) => h.date.slice(5));
-    const projLabels = data.projection.map((p) => p.date.slice(5));
-    const allLabels = [...historyLabels, ...projLabels];
-    const bridgeGap = new Array(historyLabels.length - 1).fill(null);
-
-    // ---- Revenue chart: actual, rolling SMA, trend-adjusted projection + confidence band ----
-    const revenueHistory = data.history.map((h) => h.revenue);
-    const revenueSmaLine = data.history.map((h) => h.smaRevenue).concat(new Array(projLabels.length).fill(null));
-    const revenueProjection = bridgeGap
-      .concat([revenueHistory[revenueHistory.length - 1]])
-      .concat(data.projection.map((p) => p.projectedRevenue));
-    const revenueProjHigh = bridgeGap
-      .concat([revenueHistory[revenueHistory.length - 1]])
-      .concat(data.projection.map((p) => p.projectedRevenueHigh));
-    const revenueProjLow = bridgeGap
-      .concat([revenueHistory[revenueHistory.length - 1]])
-      .concat(data.projection.map((p) => p.projectedRevenueLow));
-
-    const revenueChart = new Chart(revenueCanvasRef.current, {
-      type: 'line',
-      data: {
-        labels: allLabels,
-        datasets: [
-          {
-            label: 'Actual',
-            data: [...revenueHistory, ...new Array(projLabels.length).fill(null)],
-            borderColor: '#EF3E6D',
-            backgroundColor: 'rgba(239,62,109,.1)',
-            fill: true,
-            tension: 0.3,
-            pointRadius: 0,
-            order: 3,
-          },
-          {
-            label: `SMA (${data.window}d)`,
-            data: revenueSmaLine,
-            borderColor: '#8B8FA3',
-            borderWidth: 1.5,
-            borderDash: [2, 3],
-            fill: false,
-            tension: 0.3,
-            pointRadius: 0,
-            order: 2,
-          },
-          {
-            label: 'Confidence High',
-            data: revenueProjHigh,
-            borderColor: 'transparent',
-            backgroundColor: 'rgba(239,159,39,.12)',
-            fill: false,
-            tension: 0.3,
-            pointRadius: 0,
-            order: 1,
-          },
-          {
-            label: 'Confidence Low',
-            data: revenueProjLow,
-            borderColor: 'transparent',
-            backgroundColor: 'rgba(239,159,39,.12)',
-            fill: '-1',
-            tension: 0.3,
-            pointRadius: 0,
-            order: 1,
-          },
-          {
-            label: 'Projected',
-            data: revenueProjection,
-            borderColor: '#EF9F27',
-            borderDash: [5, 4],
-            fill: false,
-            tension: 0.3,
-            pointRadius: 0,
-            order: 0,
-          },
-        ],
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: {
-            labels: {
-              color: '#1A1D29',
-              filter: (item) => item.text !== 'Confidence High' && item.text !== 'Confidence Low',
-            },
-          },
-        },
-        scales: {
-          x: { grid: { display: false }, ticks: { color: '#6B7280', font: { size: 10 }, maxTicksLimit: 10 } },
-          y: {
-            grid: { color: 'rgba(16,24,40,.06)' },
-            ticks: { color: '#6B7280', font: { size: 11 }, callback: (v) => formatPeso(v) },
-          },
-        },
-      },
-    });
-
-    // ---- Reservations chart: same treatment ----
-    const bookingHistory = data.history.map((h) => h.bookingCount);
-    const bookingSmaLine = data.history.map((h) => h.smaBookings).concat(new Array(projLabels.length).fill(null));
-    const bookingProjection = bridgeGap
-      .concat([bookingHistory[bookingHistory.length - 1]])
-      .concat(data.projection.map((p) => p.projectedBookings));
-    const bookingProjHigh = bridgeGap
-      .concat([bookingHistory[bookingHistory.length - 1]])
-      .concat(data.projection.map((p) => p.projectedBookingsHigh));
-    const bookingProjLow = bridgeGap
-      .concat([bookingHistory[bookingHistory.length - 1]])
-      .concat(data.projection.map((p) => p.projectedBookingsLow));
-
-    const bookingsChart = new Chart(bookingsCanvasRef.current, {
-      type: 'line',
-      data: {
-        labels: allLabels,
-        datasets: [
-          {
-            label: 'Actual',
-            data: [...bookingHistory, ...new Array(projLabels.length).fill(null)],
-            borderColor: '#378ADD',
-            backgroundColor: 'rgba(55,138,221,.1)',
-            fill: true,
-            tension: 0.3,
-            pointRadius: 0,
-            order: 3,
-          },
-          {
-            label: `SMA (${data.window}d)`,
-            data: bookingSmaLine,
-            borderColor: '#8B8FA3',
-            borderWidth: 1.5,
-            borderDash: [2, 3],
-            fill: false,
-            tension: 0.3,
-            pointRadius: 0,
-            order: 2,
-          },
-          {
-            label: 'Confidence High',
-            data: bookingProjHigh,
-            borderColor: 'transparent',
-            backgroundColor: 'rgba(212,83,126,.12)',
-            fill: false,
-            tension: 0.3,
-            pointRadius: 0,
-            order: 1,
-          },
-          {
-            label: 'Confidence Low',
-            data: bookingProjLow,
-            borderColor: 'transparent',
-            backgroundColor: 'rgba(212,83,126,.12)',
-            fill: '-1',
-            tension: 0.3,
-            pointRadius: 0,
-            order: 1,
-          },
-          {
-            label: 'Projected',
-            data: bookingProjection,
-            borderColor: '#D4537E',
-            borderDash: [5, 4],
-            fill: false,
-            tension: 0.3,
-            pointRadius: 0,
-            order: 0,
-          },
-        ],
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: {
-            labels: {
-              color: '#1A1D29',
-              filter: (item) => item.text !== 'Confidence High' && item.text !== 'Confidence Low',
-            },
-          },
-        },
-        scales: {
-          x: { grid: { display: false }, ticks: { color: '#6B7280', font: { size: 10 }, maxTicksLimit: 10 } },
-          y: { grid: { color: 'rgba(16,24,40,.06)' }, ticks: { color: '#6B7280', font: { size: 11 } } },
-        },
-      },
-    });
-
-    return () => {
-      revenueChart.destroy();
-      bookingsChart.destroy();
-    };
-  }, [data]);
 
   const projRevenue = data ? data.projection.reduce((s, p) => s + p.projectedRevenue, 0) : 0;
   const projBookings = data ? data.projection.reduce((s, p) => s + p.projectedBookings, 0) : 0;
@@ -357,9 +194,7 @@ function Forecasting() {
               <span className="card-title">Revenue: last {historyDays} days + {forecastLabel} projection</span>
               <p className="card-subtitle">Solid line is actual revenue, dashed grey is the {data.window}-day SMA, dashed orange is the trend-adjusted forecast with an 80% confidence band.</p>
             </div>
-            <div className="chart-wrap">
-              <canvas ref={revenueCanvasRef} id="c-forecast-revenue" aria-label="Revenue history, moving average, and forecast chart" />
-            </div>
+            <ForecastLineChart data={data} kind="revenue" />
           </div>
 
           <div className="two-col">
@@ -367,13 +202,7 @@ function Forecasting() {
               <div className="card-head">
                 <span className="card-title">Reservations: last {historyDays} days + {forecastLabel} projection</span>
               </div>
-              <div className="chart-wrap">
-                <canvas
-                  ref={bookingsCanvasRef}
-                  id="c-forecast-bookings"
-                  aria-label="Reservation count history, moving average, and forecast chart"
-                />
-              </div>
+              <ForecastLineChart data={data} kind="bookings" />
             </div>
             <div className="card">
               <div className="card-head">

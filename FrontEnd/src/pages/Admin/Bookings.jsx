@@ -322,7 +322,7 @@ function Bookings() {
   }
 
   async function reviewCancellation(id, payload) {
-    if (!guardPermission('booking:manage')) return;
+    if (!guardPermission('booking:manage')) throw new Error('You do not have permission to review cancellations.');
     try {
       await bookingsService.reviewCancellation(id, payload);
       setCancellationReviewId(null);
@@ -330,7 +330,7 @@ function Bookings() {
       await fetchBookings();
     } catch (err) {
       console.error(err);
-      alert(err.message || 'Could not review this cancellation.');
+      throw err;
     }
   }
 
@@ -925,6 +925,7 @@ function CancellationReviewModal({ booking, onClose, onSubmit }) {
   const [refundException, setRefundException] = useState(false);
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
+  const [reviewError, setReviewError] = useState('');
   const amounts = cancellationAmounts(booking);
   const alreadyApproved = booking?.cancellationStatus === 'Approved';
   const maxRefund = refundException ? amounts.paid : amounts.refundLimit;
@@ -936,55 +937,62 @@ function CancellationReviewModal({ booking, onClose, onSubmit }) {
     setRefundedAmount(String(booking.refundedAmount ?? 0));
     setRefundException(Boolean(booking.cancellationRefundException));
     setNote('');
+    setReviewError('');
   }, [booking]);
 
   async function submit() {
     const refund = Number(refundedAmount);
     if (!Number.isFinite(refund) || refund < 0) {
-      alert('Refund must be a valid non-negative amount.');
+      setReviewError('Enter a valid refund amount of zero or more.');
       return;
     }
     if (refund < amounts.refunded) {
-      alert('Previously recorded refunds cannot be removed.');
+      setReviewError('The refund total cannot be less than the amount already recorded.');
       return;
     }
     if (decision === 'approve' && refund > maxRefund) {
-      alert(amounts.customerCancelled && !refundException
+      setReviewError(amounts.customerCancelled && !refundException
         ? 'For customer cancellations, retain the first-hour charge. An explained venue or payment issue can be marked as an exception.'
         : 'Refund cannot exceed the recorded payment.');
       return;
     }
     if (refundException && !booking.cancellationRefundException && amounts.customerCancelled && !note.trim()) {
-      alert('Explain the venue or payment issue for this refund exception.');
+      setReviewError('Add a note explaining the venue or payment issue.');
       return;
     }
+    setReviewError('');
     setSaving(true);
     try {
       await onSubmit(booking._id, { decision, refundedAmount: refund, refundException, note });
+    } catch (err) {
+      setReviewError(err.message || 'Could not save the cancellation review. Please try again.');
     } finally {
       setSaving(false);
     }
   }
 
   return (
-    <Modal open={!!booking} onClose={onClose} title={alreadyApproved ? 'Record manual refund' : 'Review cancellation request'}>
+    <Modal open={!!booking} onClose={onClose} title={alreadyApproved ? 'Record manual refund' : 'Review cancellation request'} size="xl" className="cancellation-review-modal">
       {booking && (
         <div className="cancellation-review">
-          <div className="cancellation-review-summary">
-            <div><span>Guest</span><strong>{booking.guestName}</strong><small>{booking.reservationCode || shortBookingId(booking)}</small></div>
-            <div><span>Recorded payment</span><strong>{formatPeso(recordedPayment(booking))}</strong></div>
+          <div className="cancellation-review-context">
+            <div className="cancellation-review-summary">
+              <div><span>Guest</span><strong>{booking.guestName}</strong><small>{booking.reservationCode || shortBookingId(booking)}</small></div>
+              <div><span>Paid so far</span><strong>{formatPeso(recordedPayment(booking))}</strong></div>
+            </div>
+            <div className="cancellation-review-reason"><span>Guest's reason</span><p>{booking.cancellationReason?.trim() || 'No reason provided.'}</p></div>
           </div>
-          <div className="cancellation-review-reason"><span>Guest's reason</span><p>{booking.cancellationReason?.trim() || 'No reason provided.'}</p></div>
-          {!alreadyApproved && <fieldset className="cancellation-decision"><legend>Decision</legend><div className="cancellation-decision-options">
-            <button type="button" aria-pressed={decision === 'approve'} className={decision === 'approve' ? 'is-selected' : ''} onClick={() => setDecision('approve')}>Approve cancellation</button>
-            <button type="button" aria-pressed={decision === 'reject'} className={decision === 'reject' ? 'is-selected' : ''} onClick={() => { setDecision('reject'); setRefundException(false); setRefundedAmount(String(booking.refundedAmount ?? 0)); }}>Keep reservation</button>
+          {!alreadyApproved && <fieldset className="cancellation-decision"><legend>Choose a decision</legend><div className="cancellation-decision-options">
+            <button type="button" aria-pressed={decision === 'approve'} className={decision === 'approve' ? 'is-selected' : ''} onClick={() => setDecision('approve')}><strong>Approve cancellation</strong><small>Cancel the booking and record any refund.</small></button>
+            <button type="button" aria-pressed={decision === 'reject'} className={decision === 'reject' ? 'is-selected' : ''} onClick={() => { setDecision('reject'); setRefundException(false); setRefundedAmount(String(booking.refundedAmount ?? 0)); }}><strong>Keep reservation</strong><small>Decline the request; the booking stays active.</small></button>
           </div></fieldset>}
-          {amounts.customerCancelled && decision === 'approve' && <div className="cancellation-policy"><span>Refund guidance</span><strong>Up to {formatPeso(refundException ? amounts.paid : amounts.refundLimit)}</strong><small>{booking.cancellationRefundException ? 'Refund exception approved.' : `First-hour charge retained: ${amounts.firstHour === null ? 'needs review' : formatPeso(Math.min(amounts.paid, amounts.firstHour))}.`}</small></div>}
-          {amounts.customerCancelled && decision === 'approve' && (
-            <div className="mfield"><label className="cancellation-exception-label" htmlFor="cancellation-refund-exception"><input id="cancellation-refund-exception" className="cancellation-exception-checkbox" type="checkbox" checked={refundException} onChange={(event) => setRefundException(event.target.checked)} disabled={Boolean(booking.cancellationRefundException)} /> Venue or payment issue exception</label><p className="mfield-note">Use for a venue cancellation, duplicate charge, or verified payment error. Explain it in the note.</p></div>
-          )}
-          {decision === 'approve' && <div className="mfield"><label htmlFor="cancellation-refund">Total manually refunded (₱)</label><input id="cancellation-refund" type="number" min={amounts.refunded} max={maxRefund} step="0.01" value={refundedAmount} onChange={(event) => setRefundedAmount(event.target.value)} /><p className="mfield-note">Enter the cumulative amount already sent to the guest. This records a manual refund; it does not transfer money.</p></div>}
-          <div className="mfield"><label htmlFor="cancellation-note">Review note</label><textarea id="cancellation-note" rows="3" value={note} onChange={(event) => setNote(event.target.value)} placeholder="Optional note for the audit trail" /></div>
+          {decision === 'approve' && <div className="cancellation-refund-section">
+            {amounts.customerCancelled && <div className="cancellation-policy"><span>Refund limit</span><strong>Up to {formatPeso(maxRefund)}</strong><small>{booking.cancellationRefundException ? 'Refund exception approved.' : `First-hour charge kept: ${amounts.firstHour === null ? 'needs review' : formatPeso(Math.min(amounts.paid, amounts.firstHour))}`}</small></div>}
+            <div className="mfield"><label htmlFor="cancellation-refund">Total refunded manually</label><div className="cancellation-refund-input"><span>₱</span><input id="cancellation-refund" type="number" min={amounts.refunded} max={maxRefund} step="0.01" value={refundedAmount} onChange={(event) => { setRefundedAmount(event.target.value); setReviewError(''); }} /></div><p className="mfield-note">Enter the total already sent. Saving this amount does not send a payment.</p></div>
+            {amounts.customerCancelled && <label className="cancellation-exception-option" htmlFor="cancellation-refund-exception"><input id="cancellation-refund-exception" type="checkbox" checked={refundException} onChange={(event) => setRefundException(event.target.checked)} disabled={Boolean(booking.cancellationRefundException)} /><span><strong>Venue or payment issue</strong><small>Allows a larger refund for a venue cancellation, duplicate charge, or verified payment error. Explain it in the note.</small></span></label>}
+          </div>}
+          <div className="mfield"><label htmlFor="cancellation-note">Review note {refundException && !booking.cancellationRefundException ? '(required)' : '(optional)'}</label><textarea id="cancellation-note" rows="2" value={note} onChange={(event) => { setNote(event.target.value); setReviewError(''); }} placeholder="Add context for the audit trail" /></div>
+          {reviewError && <p className="cancellation-review-error" role="alert">{reviewError}</p>}
           <div className="modal-actions cancellation-review-actions"><button type="button" className="btn-cancel" onClick={onClose}>Close</button><button type="button" className="btn-confirm" disabled={saving || noRefundChange} onClick={submit}>{saving ? 'Saving…' : alreadyApproved ? 'Record refund' : decision === 'approve' ? 'Approve request' : 'Keep reservation'}</button></div>
         </div>
       )}

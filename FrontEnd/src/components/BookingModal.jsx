@@ -25,7 +25,7 @@ import {
   getDayAvailability,
   getTimePeriod,
 } from '../utils/rooms';
-import { CORKAGE_FEE, calculateBookingPrice, variantRateLabel } from '../utils/roomPricing';
+import { CORKAGE_FEE, calculateBookingPrice, effectiveDiscountPercent, variantRateLabel } from '../utils/roomPricing';
 import { API_BASE_URL } from '../services/api';
 import { terminalPaymentFailure } from '../utils/paymongoStatus';
 import { ArrowLeft, X } from 'lucide-react';
@@ -433,6 +433,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
     ? Number(settings.operatingHours.maxOnlineDurationHours) : 5;
   const [selectedDuration, setSelectedDuration] = useState(minDuration);
   const [paymentChoice, setPaymentChoice] = useState('deposit');
+  const [claimDiscount, setClaimDiscount] = useState(false);
   const [selectedAddOns, setSelectedAddOns] = useState([]);
 
   const [guestName, setGuestName] = useState('');
@@ -515,6 +516,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
     setSelectedDuration(minDuration);
     setGuestNote('');
     setHasCorkage(false);
+    setClaimDiscount(false);
     setSelectedAddOns([]);
     setPaymentChoice('deposit');
     setGuestCount(1);
@@ -730,6 +732,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
             timeIn: timeStr,
             duration: selectedDuration,
             paymentChoice,
+            claimDiscount,
             selectedAddOns,
           }),
         });
@@ -767,7 +770,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
     return () => {
       cancelled = true;
     };
-  }, [step, room, selectedVariant, selectedDate, selectedHour, selectedDuration, paymentChoice, selectedAddOns, hasCorkage, paymentInitVersion]);
+  }, [step, room, selectedVariant, selectedDate, selectedHour, selectedDuration, paymentChoice, claimDiscount, selectedAddOns, hasCorkage, paymentInitVersion]);
 
   function handleClose() {
     stopPolling();
@@ -778,6 +781,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
   function handleChooseOption(opt) {
     setSelectedVariant(opt);
     setSelectedAddOns([]);
+    setClaimDiscount(false);
     setViewDate(new Date(`${businessDate()}T12:00:00`));
     setStep('schedule');
   }
@@ -1320,16 +1324,25 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
         guestCount,
         hasCorkage,
         paymentChoice,
+        claimDiscount,
         selectedAddOns,
       })
     : { amount: 0, roomCharge: 0, corkageFee: 0, downPayment: 0, discountAmount: 0, eligibleDiscount: 0, addOns: [], addOnFee: 0, hourlyRates: [] };
   const subtotalAmount = priceBreakdown.amount;
   const downPaymentAmount = priceBreakdown.downPayment;
   const remainingBalanceAmount = Math.max(0, subtotalAmount - downPaymentAmount);
+  const depositBalanceCopy = remainingBalanceAmount > 0
+    ? priceBreakdown.eligibleDiscount > 0
+      ? `₱${remainingBalanceAmount.toLocaleString()} remains before that discount. `
+      : `₱${remainingBalanceAmount.toLocaleString()} remains to pay at the facility. `
+    : '';
   const downPaymentOptions = [
     { choice: 'deposit', label: '1-hour down payment', amount: Math.min(priceBreakdown.roomCharge + priceBreakdown.corkageFee + priceBreakdown.addOnFee, priceBreakdown.hourlyRates[0] || 0) },
     { choice: 'full', label: 'Pay in full', amount: Math.max(0, priceBreakdown.roomCharge - priceBreakdown.eligibleDiscount + priceBreakdown.corkageFee + priceBreakdown.addOnFee) },
   ];
+  const visiblePaymentOptions = downPaymentOptions.filter((option) => option.choice === 'deposit' || option.amount !== downPaymentOptions[0].amount || paymentChoice === 'full');
+  const availableDiscountPercent = selectedVariant ? effectiveDiscountPercent(room, selectedVariant) : 0;
+  const availableDiscountAmount = Math.round(priceBreakdown.roomCharge * availableDiscountPercent) / 100;
   const visiblePaymentMethods = allowedPaymentMethodKeys
     ? PAYMENT_METHODS.filter((m) => allowedPaymentMethodKeys.includes(m.key))
     : PAYMENT_METHODS;
@@ -1771,6 +1784,16 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
                       <small>Includes the required ₱{CORKAGE_FEE.toLocaleString()} corkage fee.</small>
                     </span>
                   </label>
+                  {availableDiscountPercent > 0 && (
+                    <label className={`bk-addon-option bk-discount-option${claimDiscount ? ' bk-addon-option--selected' : ''}`}>
+                      <input type="checkbox" checked={claimDiscount} onChange={(event) => setClaimDiscount(event.target.checked)} />
+                      <span className="bk-addon-option-icon"><i className="fa-solid fa-tag" aria-hidden="true"></i></span>
+                      <span>
+                        <strong>Use {availableDiscountPercent}% room discount</strong>
+                        <small>Save ₱{availableDiscountAmount.toLocaleString()} on the room. Applied online with full payment; arranged at the facility with a 1-hour down payment.</small>
+                      </span>
+                    </label>
+                  )}
                   {(room.addOns || []).length > 0 && (
                     <div className="bk-optional-services">
                       <strong>Optional services</strong>
@@ -1812,7 +1835,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
                     ₱{downPaymentAmount.toLocaleString()}
                   </p>
                   <p className="bk-downpayment-duration">{paymentChoice === 'deposit'
-                    ? `Confirms your booking. ₱${remainingBalanceAmount.toLocaleString()} remains before any venue discount. First hour is non-refundable if you cancel.`
+                    ? `Confirms your booking. ${priceBreakdown.eligibleDiscount > 0 ? `Your ₱${priceBreakdown.eligibleDiscount.toLocaleString()} room discount is settled at the facility. ` : ''}${depositBalanceCopy}First hour is non-refundable if you cancel.`
                     : downPaymentAmount > (priceBreakdown.hourlyRates[0] || 0)
                       ? 'Confirms your booking. If you cancel, contact admin for a refund minus the first hour.'
                       : 'Confirms your booking. Non-refundable if you cancel.'}</p>
@@ -1820,9 +1843,8 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
 
                 <div className="bk-payment-methods">
                   <span className="bk-payment-methods-label" id="bk-payment-hours-label">Pay now</span>
-                  <p className="bk-payment-methods-help">Pay in full to apply the room discount now. A 1-hour down payment keeps the discount for settlement at the venue.</p>
-                  <div className="bk-payment-methods-grid bk-payment-duration-grid" role="group" aria-labelledby="bk-payment-hours-label">
-                    {downPaymentOptions.map(({ choice, label, amount }) => (
+                  <div className={`bk-payment-methods-grid bk-payment-duration-grid${visiblePaymentOptions.length === 1 ? ' bk-payment-duration-grid--single' : ''}`} role="group" aria-labelledby="bk-payment-hours-label">
+                    {visiblePaymentOptions.map(({ choice, label, amount }) => (
                       <button
                         key={choice}
                         type="button"
@@ -1838,6 +1860,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
                         <span className="bk-payment-choice-copy">
                           <strong>{label}</strong>
                           <small>₱{amount.toLocaleString()}</small>
+                          {claimDiscount && priceBreakdown.eligibleDiscount > 0 && <small>{choice === 'full' ? `Includes ₱${priceBreakdown.eligibleDiscount.toLocaleString()} discount` : 'Discount settled at the facility'}</small>}
                         </span>
                         <span className="bk-payment-choice-check" aria-hidden="true">
                           <i className="fa-solid fa-check"></i>

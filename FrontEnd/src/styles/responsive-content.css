@@ -263,6 +263,7 @@
   .public-site .bk-review-cost { padding: 10px 11px; }
   .public-site .bk-review-section-title { margin-bottom: 4px; }
   .public-site .bk-payment-duration-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .public-site .bk-payment-duration-grid--single { grid-template-columns: minmax(0, 1fr); }
   .public-site .bk-payment-method-grid { grid-template-columns: 1fr; }
   .public-site .bk-detail-actions { flex-direction: row; }
   .public-site .bk-detail-actions .bk-back-btn { width: auto; flex: 0 0 84px; }

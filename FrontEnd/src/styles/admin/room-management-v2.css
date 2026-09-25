@@ -1627,3 +1627,39 @@
 .fm-addon-row > button{flex:none;min-width:42px;min-height:42px;}
 .fm-add-service{display:inline-flex;align-items:center;gap:8px;margin-top:12px;}
 .fm-preview-col .room-card-discount,.fm-preview-col .bk-room-option-discount{display:block;}
+
+/* Keep the catalog scannable; detailed inventory stays in Manage. */
+#app #panel-room-management .facility-catalog-list{grid-template-columns:minmax(0,1fr);gap:10px;}
+#app #panel-room-management .facility-catalog-row{display:grid;grid-template-columns:148px minmax(0,1fr) auto;align-items:stretch;min-height:116px;border-radius:14px;}
+#app #panel-room-management .facility-catalog-media{height:100%;min-height:116px;aspect-ratio:auto;}
+#app #panel-room-management .facility-catalog-media::after{display:none;}
+#app #panel-room-management .facility-catalog-media > .facility-name-placeholder{min-height:116px;padding:10px;}
+#app #panel-room-management .facility-catalog-main{justify-content:center;padding:14px 18px;}
+#app #panel-room-management .facility-catalog-title h3{font-size:1rem;}
+#app #panel-room-management .facility-catalog-title > div > span{font-size:.75rem;color:var(--teal);}
+#app #panel-room-management .facility-catalog-main > p.facility-compact-summary{min-height:0;margin:7px 0 0;color:var(--muted);font-size:.76rem;line-height:1.4;}
+#app #panel-room-management .facility-catalog-actions{align-self:center;flex-direction:row;padding:12px 16px;border:0;background:none;}
+#app #panel-room-management .facility-edit-button{min-width:102px;}
+#app #panel-room-management .facility-delete-warning{display:flex;align-items:center;gap:8px;width:fit-content;max-width:100%;margin-top:9px;padding:8px 10px;border:1px solid color-mix(in srgb,var(--amber) 38%,var(--border));border-radius:8px;background:color-mix(in srgb,var(--amber) 10%,var(--navy2));color:var(--amber);font-size:.73rem;line-height:1.35;}
+#app #panel-room-management .facility-delete-warning button{display:grid;flex:0 0 22px;place-items:center;width:22px;height:22px;margin-left:4px;border:0;background:none;color:inherit;cursor:pointer;}
+#app .fm-editor-modal .fm-services-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;}
+#app .fm-editor-modal .fm-services-head p{margin:5px 0 0;color:var(--muted);font-size:.76rem;line-height:1.4;}
+#app .fm-editor-modal .fm-services-head .fm-add-service{flex:0 0 auto;margin:0;}
+#app .fm-editor-modal .fm-services-empty{margin:16px 0 0;padding:15px;border:1px dashed var(--border);border-radius:10px;color:var(--muted);font-size:.76rem;line-height:1.45;}
+#app .fm-editor-modal .fm-addon-row{gap:10px;padding:12px;border:1px solid var(--border);border-radius:10px;background:var(--navy3);}
+#app .fm-editor-modal .fm-addon-row > button{margin-bottom:1px;}
+@media (max-width:760px){
+  #app #panel-room-management .facility-catalog-row{grid-template-columns:104px minmax(0,1fr);}
+  #app #panel-room-management .facility-catalog-media,#app #panel-room-management .facility-catalog-media > .facility-name-placeholder{min-height:104px;}
+  #app #panel-room-management .facility-catalog-main{padding:11px 13px;}
+  #app #panel-room-management .facility-catalog-actions{grid-column:1/-1;justify-content:flex-end;width:100%;padding:8px 12px;border-top:1px solid var(--border-soft);}
+  #app #panel-room-management .facility-health{display:none;}
+}
+@media (max-width:480px){
+  #app #panel-room-management .facility-catalog-row{grid-template-columns:80px minmax(0,1fr);}
+  #app #panel-room-management .facility-catalog-media,#app #panel-room-management .facility-catalog-media > .facility-name-placeholder{min-height:100px;}
+  #app #panel-room-management .facility-catalog-main > p.facility-compact-summary{display:-webkit-box;overflow:hidden;-webkit-box-orient:vertical;-webkit-line-clamp:2;}
+  #app .fm-editor-modal .fm-services-head{align-items:stretch;flex-direction:column;}
+  #app .fm-editor-modal .fm-services-head .fm-add-service{align-self:flex-start;}
+  #app .fm-editor-modal .fm-addon-row{flex-wrap:wrap;}
+}

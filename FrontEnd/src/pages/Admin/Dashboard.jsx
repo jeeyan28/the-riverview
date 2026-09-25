@@ -104,7 +104,17 @@ function Dashboard() {
       const today = businessDate();
       const data = await bookingsService.list({ date: today });
       if (unmountedRef.current) return;
-      setRecentBookings(Array.isArray(data) ? data : []);
+      const now = Date.now();
+      const todayBookings = (Array.isArray(data) ? data : [])
+        .filter((booking) => booking.date === today)
+        .sort((a, b) => {
+          const startA = Date.parse(`${a.date}T${a.timeIn}:00+08:00`);
+          const startB = Date.parse(`${b.date}T${b.timeIn}:00+08:00`);
+          const distanceA = Number.isFinite(startA) ? Math.abs(startA - now) : Infinity;
+          const distanceB = Number.isFinite(startB) ? Math.abs(startB - now) : Infinity;
+          return distanceA - distanceB || startA - startB;
+        });
+      setRecentBookings(todayBookings);
     } catch (err) {
       console.error(err);
       if (!unmountedRef.current && !silent) setBookingsError(true);
@@ -247,7 +257,7 @@ function Dashboard() {
       <div className="dash-grid">
         <div className="card">
           <div className="card-head">
-            <span className="card-title">Recent Reservations</span>
+            <span className="card-title">Reservations today</span>
             <button className="card-action" onClick={() => navigate('/admin/bookings')}>
               View all →
             </button>
@@ -256,7 +266,7 @@ function Dashboard() {
             columns={recentColumns}
             rows={recentBookings}
             loading={bookingsLoading}
-            emptyMessage={bookingsError ? 'Could not load reservations.' : 'No reservations yet.'}
+            emptyMessage={bookingsError ? 'Could not load today’s reservations.' : 'No reservations for today.'}
             getRowKey={(b) => b._id}
             paginate={false}
           />
@@ -275,7 +285,7 @@ function Dashboard() {
               roomViews.map(({ room: r, view }) => (
                 <div className="dash-room-row" key={r._id}>
                   <span className={`dash-room-dot ${ROOM_STATUS_DOT_CLASS[r.status] || 'dash-dot-vacant'}`}></span>
-                  <span className="dash-room-num">Table {r.roomNumber} </span>
+                  <span className="dash-room-identity"><strong>{r.roomName || 'Room'} · Table No. {r.roomNumber}</strong><small>{r.facilityName}</small></span>
                   {view.occupancy && (
                     <span className={`dash-room-time${view.isCritical || view.isPastEnd ? ' critical' : view.isWarning ? ' warning' : ''}`}>
                       {formatTimeRemaining(view.remaining, view.isPastEnd)}

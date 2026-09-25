@@ -1,5 +1,10 @@
 .fc-sma-select{width:100%;margin-top:2px;}
 .fc-chart-skeleton{width:100%;height:100%;border-radius:12px;}
+.fc-chart-legend{display:flex;flex-wrap:wrap;gap:8px 16px;margin:2px 0 12px;color:var(--muted);font-size:.72rem;}
+.fc-chart-legend span{display:inline-flex;align-items:center;gap:6px;}
+.fc-chart-legend i{display:inline-block;width:12px;height:3px;border-radius:3px;}
+.fc-chart-legend .fc-legend-average{background:#94a3b8;}
+.fc-chart-legend .fc-legend-band{height:9px;background:rgba(239,159,39,.3);}
 .fc-table-skeleton{display:flex;flex-direction:column;gap:10px;}
 .fc-skeleton-row{height:32px;border-radius:8px;}
 
