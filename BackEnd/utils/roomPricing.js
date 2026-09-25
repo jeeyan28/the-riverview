@@ -115,16 +115,29 @@ function repriceExistingBooking(basePrice, booking) {
 
 function calculateSessionExtension({ session, room, addedHours, startHour }) {
   const existingRates = Array.isArray(session.hourlyRates) ? session.hourlyRates.map(Number) : [];
-  if (!existingRates.length && Number.isInteger(Number(session.duration))) {
-    existingRates.push(...Array(Number(session.duration)).fill(Number(session.rate) || 0));
+  if (!existingRates.length) {
+    existingRates.push(...Array(Math.ceil(Number(session.duration) || 0)).fill(Number(session.rate) || 0));
   }
   const fallbackRate = existingRates.at(-1) || Number(session.rate) || 0;
   const variant = room && !room.isTemporary && Number(room.price) > 0 ? room : { price: fallbackRate };
-  const addedRates = Array.from({ length: addedHours }, (_, index) =>
-    rateForHour(variant, (startHour + Number(session.duration) + index) % 24, session.guestCount)
-  );
+  const addedRates = [];
+  let remainingMinutes = Math.round(Number(addedHours) * 60);
+  let elapsedMinutes = 0;
+  let addedCharge = 0;
+  const extensionStartMinute = Math.round((Number(startHour) + Number(session.duration)) * 60);
+  while (remainingMinutes > 0) {
+    const clockMinute = ((extensionStartMinute + elapsedMinutes) % 1440 + 1440) % 1440;
+    const segmentMinutes = Math.min(remainingMinutes, 60 - clockMinute % 60);
+    const rate = rateForHour(variant, clockMinute / 60, session.guestCount);
+    addedRates.push(rate);
+    addedCharge += rate * segmentMinutes / 60;
+    remainingMinutes -= segmentMinutes;
+    elapsedMinutes += segmentMinutes;
+  }
+  addedCharge = roundMoney(addedCharge);
   return {
-    amount: roundMoney(Number(session.amount) + addedRates.reduce((sum, rate) => sum + rate, 0)),
+    addedCharge,
+    amount: roundMoney(Number(session.amount) + addedCharge),
     hourlyRates: [...existingRates, ...addedRates],
   };
 }

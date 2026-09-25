@@ -463,6 +463,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
   const [cardExpiry, setCardExpiry] = useState('');
   const [cardCvc, setCardCvc] = useState('');
   const pollRef = useRef(null);
+  const externalCheckoutRef = useRef(false);
 
   const [pmReturn, setPmReturn] = useState({ phase: 'loading', booking: null });
 
@@ -499,7 +500,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
 
   useEffect(() => {
     return () => {
-      if (lockRef.current) bookingsService.releaseLock(lockRef.current.id).catch((err) => console.error(err));
+      if (lockRef.current && !externalCheckoutRef.current) bookingsService.releaseLock(lockRef.current.id).catch((err) => console.error(err));
     };
   }, []);
 
@@ -529,6 +530,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
     setNameError('');
     setContactError('');
     setPmIntent(null);
+    externalCheckoutRef.current = false;
     setSelectedMethod(null);
     setCardNumber('');
     setCardExpiry('');
@@ -566,7 +568,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
     setPmReturn({ phase: 'loading', booking: null });
 
     async function resolve() {
-      if (returnInfo.result === 'cancel') {
+      if (returnInfo.provider !== 'xendit' && returnInfo.result === 'cancel') {
         if (!cancelled) setPmReturn({ phase: 'cancelled', booking: null });
         return;
       }
@@ -584,7 +586,9 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
         if (cancelled) return;
         try {
           const res = await fetch(
-            `${API_BASE_URL}/api/payments/paymongo/status/${encodeURIComponent(returnInfo.paymentIntentId)}`,
+            returnInfo.provider === 'xendit'
+              ? `${API_BASE_URL}/api/payments/xendit/status/${encodeURIComponent(returnInfo.referenceId)}`
+              : `${API_BASE_URL}/api/payments/paymongo/status/${encodeURIComponent(returnInfo.paymentIntentId)}`,
             { credentials: 'include' }
           );
           const data = await res.json().catch(() => ({}));
@@ -759,6 +763,12 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
           clearMonthAvailability(room._id, bookingYear, bookingMonth);
         }
 
+        if (!cancelled && data.gateway === 'xendit') {
+          externalCheckoutRef.current = true;
+          setPmIntent({ gateway: 'xendit', amount: data.amount });
+          window.location.assign(data.redirectUrl);
+          return;
+        }
         if (!cancelled) setPmIntent({ paymentIntentId: data.paymentIntentId, clientKey: data.clientKey, amount: data.amount });
       } catch (err) {
         console.error(err);
@@ -1834,6 +1844,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
                 <div className="bk-slots-head">
                   <h3>Payment</h3>
                 </div>
+                <p className="bk-payment-methods-help">Secure online checkout via PayMongo (GCash, Maya, QR Ph, Card). If PayMongo is down, GCash/Maya checkout opens automatically via Xendit backup.</p>
 
                 <div className="bk-downpayment-card">
                   <p className="bk-summary-label">{selectedDuration === 1 ? '1-hour reservation payment' : paymentChoice === 'deposit' ? '1-hour down payment' : 'Full payment'}</p>

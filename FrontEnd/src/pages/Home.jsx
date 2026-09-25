@@ -80,7 +80,7 @@ const BOOKING_STEPS = [
   {
     icon: Wallet,
     title: 'Complete the down payment',
-    desc: 'Secure the reservation through the available PayMongo checkout options before the temporary hold expires.',
+    desc: 'Secure the reservation through online checkout before the temporary hold expires.',
   },
   {
     icon: CheckCircle2,
@@ -269,14 +269,16 @@ function Home() {
   }, []);
 
   useEffect(() => {
-    const result = searchParams.get('paymongo');
+    const xenditResult = searchParams.get('xendit');
+    const referenceId = searchParams.get('referenceId');
+    const paymongoResult = searchParams.get('paymongo');
     const paymentIntentId = searchParams.get('paymentIntentId');
-    if (!result || !paymentIntentId) return;
-    if (window.opener && !window.opener.closed) {
-      window.opener.focus();
-      window.close();
+    if (xenditResult && referenceId) {
+      setPaymongoReturn({ provider: 'xendit', result: xenditResult, referenceId });
+    } else if (paymongoResult && paymentIntentId && !(window.opener && !window.opener.closed)) {
+      setPaymongoReturn({ provider: 'paymongo', result: paymongoResult, paymentIntentId });
     }
-  }, []);
+  }, [searchParams]);
 
   useEffect(() => {
     let cancelled = false;
@@ -378,6 +380,13 @@ function Home() {
   function handleCloseBooking() {
     setBookingRoom(null);
     setPaymongoReturn(null);
+    if (searchParams.has('xendit') || searchParams.has('paymongo')) {
+      setSearchParams((current) => {
+        const next = new URLSearchParams(current);
+        ['xendit', 'referenceId', 'paymongo', 'paymentIntentId'].forEach((key) => next.delete(key));
+        return next;
+      }, { replace: true });
+    }
   }
 
   return (

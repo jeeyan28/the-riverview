@@ -26,6 +26,22 @@ const FACILITY_ICONS = { Billiards: 'bi-disc', KTV: 'bi-mic', Court: 'bi-trophy'
 const FACILITY_ICON_DEFAULT = 'bi-building';
 const DUE_BOOKINGS_POLL_MS = 20 * 1000;
 const MAX_SESSION_HOURS = 5;
+const EXTENSION_OPTIONS = [
+  { hours: 0.5, label: '30 min' },
+  { hours: 1, label: '1 hr' },
+  { hours: 1.5, label: '1 hr 30 min' },
+  { hours: 2, label: '2 hrs' },
+];
+
+function canExtendSession(session) {
+  return MAX_SESSION_HOURS - Number(session?.duration || 0) >= 0.5;
+}
+
+function sessionLengthLabel(hours) {
+  const wholeHours = Math.floor(Number(hours) || 0);
+  const minutes = Math.round(((Number(hours) || 0) - wholeHours) * 60);
+  return [wholeHours ? `${wholeHours} hr${wholeHours === 1 ? '' : 's'}` : '', minutes ? `${minutes} min` : ''].filter(Boolean).join(' ');
+}
 
 function paymentSummary(record, isBooking = false) {
   const total = Math.max(0, Number(record?.amount) || 0);
@@ -106,6 +122,7 @@ function Monitor() {
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [schedulePeriod, setSchedulePeriod] = useState('today');
   const [finishingSession, setFinishingSession] = useState(null);
+  const [extendingSession, setExtendingSession] = useState(null);
   const [showAddRoom, setShowAddRoom] = useState(false);
   const [editRoomId, setEditRoomId] = useState(null);
   const [facilityFilter, setFacilityFilter] = useState('All');
@@ -147,6 +164,15 @@ function Monitor() {
     setFinishingSession(null);
     await fetchMonitorSessions();
     await fetchDueBookings();
+  }
+
+  async function extendSession({ addedHours, collectNow, expectedCharge, paymentMethod }) {
+    if (refreshError) throw new Error('Wait for the table status to refresh before extending this session.');
+    if (!guardPermission('room:operate')) throw new Error('You do not have permission to extend this session.');
+    await roomSessionsService.extend(extendingSession._id, { addedHours, collectNow, expectedCharge, ...(collectNow ? { paymentMethod } : {}) });
+    setExtendingSession(null);
+    await fetchMonitorSessions();
+    if (extendingSession.booking) await fetchDueBookings();
   }
 
   async function cancelSession(sessionId) {
@@ -351,6 +377,7 @@ function Monitor() {
             {occupancy ? (
               canOperate && !refreshError ? (
                 <>
+                  {canExtendSession(occupancy) && <button className="rm-btn" onClick={() => setExtendingSession(occupancy)}><i className="bi bi-clock-history"></i>Extend</button>}
                   <button className="rm-btn rm-btn--success" onClick={() => endSession(occupancy)}><i className="bi bi-check2-circle"></i>Finish</button>
                   <button className="rm-btn danger" onClick={() => cancelSession(occupancy._id, r._id)}><i className="bi bi-x-circle"></i>Cancel</button>
                 </>
@@ -673,7 +700,14 @@ function Monitor() {
                     </div>
                     <button type="button" className="rm-card-details" onClick={(event) => { event.stopPropagation(); setDetailRoomId(r._id); }}>View details <i className="bi bi-arrow-right" aria-hidden="true"></i></button>
                     {canOperate && !refreshError && (
-                      <div className="rm-quick-actions">
+                      <div className={`rm-quick-actions${canExtendSession(occupancy) ? '' : ' rm-quick-actions--no-extend'}`}>
+                        {canExtendSession(occupancy) && <button
+                          type="button"
+                          className="rm-btn"
+                          onClick={(e) => { e.stopPropagation(); setExtendingSession(occupancy); }}
+                        >
+                          <i className="bi bi-clock-history"></i>Extend
+                        </button>}
                         <button
                           type="button"
                           className="rm-btn rm-btn--success"
@@ -739,6 +773,7 @@ function Monitor() {
       )}
 
       <SessionModal modal={modal} onClose={() => setModal(null)} onSubmit={handleModalSubmit} />
+      <ExtendSessionModal session={extendingSession ? sessions.find((session) => session._id === extendingSession._id) || extendingSession : null} onClose={() => setExtendingSession(null)} onSubmit={extendSession} />
       <FinishSessionModal session={finishingSession ? sessions.find((session) => session._id === finishingSession._id) || finishingSession : null} disabled={!!refreshError} onClose={() => setFinishingSession(null)} onSubmit={finishSession} />
       <RoomDetailModal
         room={detailRoom}
@@ -746,6 +781,10 @@ function Monitor() {
         onClose={() => setDetailRoomId(null)}
         canManage={canManage}
         canOperate={canOperate && !refreshError}
+        onExtend={() => {
+          setDetailRoomId(null);
+          setExtendingSession(detailView.occupancy);
+        }}
         onEndSessionPaid={() => {
           setDetailRoomId(null);
           endSession(detailView.occupancy);
@@ -773,6 +812,109 @@ function guestInitials(name) {
   if (!name) return '?';
   const parts = name.trim().split(/\s+/).filter(Boolean);
   return parts.slice(0, 2).map((p) => p[0].toUpperCase()).join('') || '?';
+}
+
+function ExtendSessionModal({ session, onClose, onSubmit }) {
+  const [addedHours, setAddedHours] = useState(0.5);
+  const [collectNow, setCollectNow] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState('Cash');
+  const [quote, setQuote] = useState(null);
+  const [quoteError, setQuoteError] = useState('');
+  const [quoteAttempt, setQuoteAttempt] = useState(0);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
+
+  useEffect(() => {
+    if (!session) return;
+    setAddedHours(0.5);
+    setCollectNow(false);
+    setPaymentMethod('Cash');
+    setSaveError('');
+  }, [session?._id]);
+
+  useEffect(() => {
+    setQuote(null);
+    if (!session) return;
+    if (!canExtendSession(session) || Number(session.duration) + addedHours > MAX_SESSION_HOURS) {
+      setQuoteError(`Choose an extension that keeps the session within ${MAX_SESSION_HOURS} hours.`);
+      return;
+    }
+    let current = true;
+    setQuoteError('');
+    roomSessionsService.quoteExtension(session._id, addedHours)
+      .then((result) => { if (current) setQuote(result); })
+      .catch((error) => { if (current) setQuoteError(error.message || 'Could not calculate the extension charge.'); });
+    return () => { current = false; };
+  }, [session?._id, session?.duration, session?.amount, session?.paidAmount, session?.refundedAmount, session?.scheduledEndTime, addedHours, quoteAttempt]);
+
+  if (!session) return null;
+
+  const availableOptions = EXTENSION_OPTIONS.filter((option) => Number(session.duration) + option.hours <= MAX_SESSION_HOURS);
+  const balanceAfter = quote ? Math.max(0, Math.round((Number(quote.newBalance) - (collectNow ? Number(quote.addedCharge) : 0)) * 100) / 100) : 0;
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    if (!quote || Number(quote.addedHours) !== addedHours || saving) return;
+    setSaving(true);
+    setSaveError('');
+    try {
+      await onSubmit({ addedHours, collectNow, expectedCharge: quote.addedCharge, paymentMethod });
+    } catch (error) {
+      setSaveError(error.message || 'Could not extend this session.');
+      if (error.status === 409) setQuoteAttempt((value) => value + 1);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Modal open onClose={saving ? undefined : onClose} size="lg" className="extend-session-modal" title={`Extend session · ${session.roomName || session.facilityName} · Table ${session.roomNumber}`}>
+      <form className="session-extension" onSubmit={handleSubmit}>
+        <p className="mfield-note">{session.guestName || 'Walk-in guest'} · Current end {boardClock(sessionEnd(session))} · {sessionLengthLabel(session.duration)} of {MAX_SESSION_HOURS} hours used</p>
+        <div className="mfield-section-label">Add time</div>
+        <div className="session-extension-options" role="group" aria-label="Extension length">
+          {availableOptions.map((option) => (
+            <button key={option.hours} type="button" className={`session-extension-option${addedHours === option.hours ? ' active' : ''}`} aria-pressed={addedHours === option.hours} disabled={saving} onClick={() => { if (option.hours !== addedHours) { setQuote(null); setAddedHours(option.hours); } setSaveError(''); }}>{option.label}</button>
+          ))}
+        </div>
+        <div className="session-extension-quote-slot" aria-live="polite">
+          {quoteError && <div className="session-extension-retry"><p className="session-form-error" role="alert">{quoteError}</p>{availableOptions.length > 0 && <button type="button" className="rm-btn" onClick={() => setQuoteAttempt((value) => value + 1)}>Try again</button>}</div>}
+          {!quote && !quoteError && <p className="mfield-note" role="status">Calculating the extension charge…</p>}
+          {quote && (
+            <>
+              <div className="session-payment-ledger session-extension-summary" aria-label="Extension payment summary">
+                <div><span>Current balance</span><strong>{money(quote.currentBalance)}</strong></div>
+                <div><span>Added time</span><strong>{money(quote.addedCharge)}</strong></div>
+                <div><span>New end time</span><strong>{boardClock(new Date(quote.scheduledEndTime))}</strong></div>
+                <div className={balanceAfter > 0 ? 'balance-due' : 'balance-paid'}><span>Balance after extension</span><strong>{money(balanceAfter)}</strong></div>
+              </div>
+              <div className="mfield-section-label">When will the guest pay for the added time?</div>
+              <div className="session-collection-options" role="group" aria-label="Extension payment timing">
+                <button type="button" className={collectNow ? 'active' : ''} aria-pressed={collectNow} disabled={saving} onClick={() => setCollectNow(true)}><strong>Pay before play</strong><small>Collect {money(quote.addedCharge)} now</small></button>
+                <button type="button" className={!collectNow ? 'active' : ''} aria-pressed={!collectNow} disabled={saving} onClick={() => setCollectNow(false)}><strong>Pay after play</strong><small>Add {money(quote.addedCharge)} to the balance</small></button>
+              </div>
+              {collectNow && Number(quote.currentBalance) > 0 && <p className="mfield-note">The earlier {money(quote.currentBalance)} balance will still be due when this session finishes.</p>}
+              {collectNow && (
+                <div className="mfield session-extension-method">
+                  <label htmlFor="extension-payment-method">Payment method</label>
+                  <select id="extension-payment-method" value={paymentMethod} disabled={saving} onChange={(event) => setPaymentMethod(event.target.value)}>
+                    <option value="Cash">Cash</option>
+                    <option value="GCash">GCash</option>
+                    <option value="Maya">Maya</option>
+                  </select>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+        {saveError && <p className="session-form-error" role="alert">{saveError}</p>}
+        <div className="modal-actions">
+          <button type="button" className="btn-cancel" disabled={saving} onClick={onClose}>Cancel</button>
+          <button type="submit" className="btn-confirm" disabled={!quote || Number(quote.addedHours) !== addedHours || saving}>{saving ? 'Saving…' : 'Confirm extension'}</button>
+        </div>
+      </form>
+    </Modal>
+  );
 }
 
 function FinishSessionModal({ session, disabled, onClose, onSubmit }) {
@@ -820,7 +962,7 @@ function FinishSessionModal({ session, disabled, onClose, onSubmit }) {
   );
 }
 
-function RoomDetailModal({ room, view, onClose, canManage, canOperate, onEndSessionPaid, onCancelSession, onEdit, onDelete }) {
+function RoomDetailModal({ room, view, onClose, canManage, canOperate, onExtend, onEndSessionPaid, onCancelSession, onEdit, onDelete }) {
   const title = room ? `Table ${room.roomNumber} — ${room.facilityName}` : 'Table details';
 
   return (
@@ -876,6 +1018,7 @@ function RoomDetailModal({ room, view, onClose, canManage, canOperate, onEndSess
                 <>
                   <button className="rm-btn rm-btn--success rm-btn--block" onClick={onEndSessionPaid}><i className="bi bi-check2-circle"></i>Finish Session</button>
                   <div className="rmd-actions-row">
+                    {canExtendSession(view.occupancy) && <button className="rm-btn" onClick={onExtend}><i className="bi bi-clock-history"></i>Extend</button>}
                     <button className="rm-btn danger" onClick={onCancelSession}><i className="bi bi-x-circle"></i>Cancel Session</button>
                   </div>
                 </>

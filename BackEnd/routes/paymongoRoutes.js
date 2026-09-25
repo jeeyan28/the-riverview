@@ -1,7 +1,9 @@
 const express = require("express");
+const { randomUUID } = require("node:crypto");
 const router = express.Router();
 const Booking = require("../model/booking");
 const BookingLock = require("../model/bookingLock");
+const XenditPaymentAttempt = require("../model/xenditPaymentAttempt");
 const { ensureAuthenticated } = require("../middleware/adminAuth");
 const { validateAndPriceBooking, finalizeBookingFromPayment } = require("../utils/bookingHelper");
 const { quoteOnlineBooking } = require("../utils/roomPricing");
@@ -22,6 +24,7 @@ const { GUEST_EMAIL_DOMAIN, EMAIL_RE } = require("../utils/constants");
 const { validate } = require("../middleware/validate");
 const { paymentIntentIdParamsSchema, createIntentSchema, attachIntentSchema } = require("../validation/paymentSchemas");
 const { paymentIntentLimiter, paymentAttachLimiter } = require("../middleware/rateLimiter");
+const { createSession: createXenditSession, isConfigured: isXenditConfigured, isPaymongoUnavailable } = require("../utils/xendit");
 
 function getReturnBaseUrl() {
   return (
@@ -102,45 +105,70 @@ router.post("/intent", ensureAuthenticated, paymentIntentLimiter, validate(creat
     }
     const { amount, downPayment, discountPercent, discountAmount, eligibleDiscount, addOns, addOnFee } = quote;
 
+    const metadata = toBookingMetadata({
+      guestName: guestName.trim(),
+      guestContact: (guestContact || "").trim(),
+      guestEmail: resolveGuestEmail({ guestEmail, guestContact, accountEmail: req.user.email, isGuest: req.user.isGuest }),
+      guestCount,
+      hasCorkage,
+      specialRequests: (specialRequests || "").trim(),
+      roomId: room._id,
+      variantLabel: variantLabel || "",
+      date,
+      timeIn,
+      duration,
+      amount,
+      roomCharge,
+      corkageFee,
+      discountPercent,
+      discountAmount,
+      eligibleDiscount,
+      addOns: JSON.stringify(addOns),
+      addOnFee,
+      paymentChoice,
+      hourlyRates: JSON.stringify(hourlyRates),
+      downPayment,
+      downPaymentHours,
+      bookedBy: req.session.userId,
+    });
+    const description = `${paymentChoice === "full" ? "Full payment" : "One-hour down payment"} — ${room.name} (${date} ${new Date(`${date}T${timeIn}:00+08:00`).toLocaleTimeString('en-US', { timeZone: 'Asia/Manila', hour: 'numeric', minute: '2-digit', hour12: true })})`;
     let intent;
     try {
       intent = await createPaymentIntent({
         amountPesos: downPayment,
-        description: `${paymentChoice === "full" ? "Full payment" : "One-hour down payment"} — ${room.name} (${date} ${new Date(`${date}T${timeIn}:00+08:00`).toLocaleTimeString('en-US', { timeZone: 'Asia/Manila', hour: 'numeric', minute: '2-digit', hour12: true })})`,
+        description,
         statementDescriptor: room.name,
-        metadata: toBookingMetadata({
-          guestName: guestName.trim(),
-          guestContact: (guestContact || "").trim(),
-          guestEmail: resolveGuestEmail({ guestEmail, guestContact, accountEmail: req.user.email, isGuest: req.user.isGuest }),
-          guestCount,
-          hasCorkage,
-          specialRequests: (specialRequests || "").trim(),
-          roomId: room._id,
-          variantLabel: variantLabel || "",
-          date,
-          timeIn,
-          duration,
-          amount,
-          roomCharge,
-          corkageFee,
-          discountPercent,
-          discountAmount,
-          eligibleDiscount,
-          addOns: JSON.stringify(addOns),
-          addOnFee,
-          paymentChoice,
-          hourlyRates: JSON.stringify(hourlyRates),
-          downPayment,
-          downPaymentHours,
-          bookedBy: req.session.userId,
-        }),
+        metadata,
       });
     } catch (paymongoErr) {
       console.error("PayMongo payment intent creation failed:", paymongoErr);
+      if (isPaymongoUnavailable(paymongoErr) && isXenditConfigured()) {
+        try {
+          const referenceId = `rv-${randomUUID()}`;
+          const session = await createXenditSession({
+            referenceId,
+            amount: downPayment,
+            expiresAt: activeLock.expiresAt,
+            description,
+          });
+          await XenditPaymentAttempt.create({
+            referenceId,
+            sessionId: session.sessionId,
+            bookedBy: req.user._id,
+            amount: downPayment,
+            metadata,
+          });
+          return res.status(201).json({ gateway: "xendit", referenceId, redirectUrl: session.redirectUrl, amount: downPayment });
+        } catch (backupError) {
+          console.error("Xendit backup checkout failed:", backupError);
+          return res.status(502).json({ message: "Both online payment gateways are unavailable. Please try again shortly." });
+        }
+      }
       return res.status(502).json({ message: paymongoErr.message || "Could not start online payment. Please try again." });
     }
 
     res.status(201).json({
+      gateway: "paymongo",
       paymentIntentId: intent.data.id,
       clientKey: intent.data.attributes.client_key,
       amount: downPayment,
