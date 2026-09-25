@@ -27,10 +27,6 @@ const FACILITY_ICON_DEFAULT = 'bi-building';
 const DUE_BOOKINGS_POLL_MS = 20 * 1000;
 const MAX_SESSION_HOURS = 5;
 
-function canExtendSession(session) {
-  return MAX_SESSION_HOURS - Number(session?.duration) >= 1;
-}
-
 function paymentSummary(record, isBooking = false) {
   const total = Math.max(0, Number(record?.amount) || 0);
   const paid = Math.max(
@@ -168,20 +164,14 @@ function Monitor() {
 
   function openStartSessionModal(room) {
     if (refreshError || !guardPermission('room:operate')) return;
-    setModal({ mode: 'start', fixedRoom: room, session: null });
-  }
-  function openExtendModal(session, room) {
-    if (refreshError || !guardPermission('room:operate')) return;
-    setModal({ mode: 'extend', fixedRoom: room, session });
+    setModal({ fixedRoom: room });
   }
   function openStartFromBooking(booking, matchedRoom, roomTarget, previewNumber) {
     if (refreshError || !canStartFromBooking) return;
     setModal({
-      mode: 'start',
       fixedRoom: matchedRoom,
       roomTarget: matchedRoom ? null : roomTarget,
       previewNumber: matchedRoom ? null : previewNumber,
-      session: null,
       bookingId: booking._id,
       scheduledStartMs: reservationWindow(booking)?.start,
       scheduledEndMs: reservationWindow(booking)?.end,
@@ -193,19 +183,15 @@ function Monitor() {
     });
   }
 
-  async function handleModalSubmit({ mode, roomId, roomTarget, sessionId, totalHours, paymentMethod, paymentTiming, paidAmount, guestName, guestCount, hasCorkage, bookingId, applyVenueDiscount }) {
+  async function handleModalSubmit({ roomId, roomTarget, totalHours, paymentMethod, paymentTiming, paidAmount, guestName, guestCount, hasCorkage, bookingId, applyVenueDiscount }) {
     if (refreshError) throw new Error('Wait for the table status to refresh before changing this session.');
-    if (mode !== 'extend' && bookingId) {
+    if (bookingId) {
       if (!canStartFromBooking) return;
     } else if (!guardPermission('room:operate')) {
       return;
     }
 
-    if (mode === 'extend') {
-      await roomSessionsService.extend(sessionId, { addedHours: totalHours });
-    } else {
-      await roomSessionsService.create({ roomId, roomTarget: roomTarget || undefined, duration: totalHours, paymentMethod, paymentTiming, paidAmount, guestName, guestCount, hasCorkage, bookingId, applyVenueDiscount });
-    }
+    await roomSessionsService.create({ roomId, roomTarget: roomTarget || undefined, duration: totalHours, paymentMethod, paymentTiming, paidAmount, guestName, guestCount, hasCorkage, bookingId, applyVenueDiscount });
 
     setModal(null);
     await fetchMonitorSessions();
@@ -365,7 +351,6 @@ function Monitor() {
             {occupancy ? (
               canOperate && !refreshError ? (
                 <>
-                  {canExtendSession(occupancy) && <button className="rm-btn" onClick={() => openExtendModal(occupancy, r)}><i className="bi bi-clock-history"></i>Extend</button>}
                   <button className="rm-btn rm-btn--success" onClick={() => endSession(occupancy)}><i className="bi bi-check2-circle"></i>Finish</button>
                   <button className="rm-btn danger" onClick={() => cancelSession(occupancy._id, r._id)}><i className="bi bi-x-circle"></i>Cancel</button>
                 </>
@@ -688,14 +673,7 @@ function Monitor() {
                     </div>
                     <button type="button" className="rm-card-details" onClick={(event) => { event.stopPropagation(); setDetailRoomId(r._id); }}>View details <i className="bi bi-arrow-right" aria-hidden="true"></i></button>
                     {canOperate && !refreshError && (
-                      <div className={`rm-quick-actions${canExtendSession(occupancy) ? '' : ' rm-quick-actions--no-extend'}`}>
-                        {canExtendSession(occupancy) && <button
-                          type="button"
-                          className="rm-btn"
-                          onClick={(e) => { e.stopPropagation(); openExtendModal(occupancy, r); }}
-                        >
-                          <i className="bi bi-clock-history"></i>Extend
-                        </button>}
+                      <div className="rm-quick-actions">
                         <button
                           type="button"
                           className="rm-btn rm-btn--success"
@@ -768,10 +746,6 @@ function Monitor() {
         onClose={() => setDetailRoomId(null)}
         canManage={canManage}
         canOperate={canOperate && !refreshError}
-        onExtend={() => {
-          setDetailRoomId(null);
-          openExtendModal(detailView.occupancy, detailRoom);
-        }}
         onEndSessionPaid={() => {
           setDetailRoomId(null);
           endSession(detailView.occupancy);
@@ -846,7 +820,7 @@ function FinishSessionModal({ session, disabled, onClose, onSubmit }) {
   );
 }
 
-function RoomDetailModal({ room, view, onClose, canManage, canOperate, onExtend, onEndSessionPaid, onCancelSession, onEdit, onDelete }) {
+function RoomDetailModal({ room, view, onClose, canManage, canOperate, onEndSessionPaid, onCancelSession, onEdit, onDelete }) {
   const title = room ? `Table ${room.roomNumber} — ${room.facilityName}` : 'Table details';
 
   return (
@@ -902,7 +876,6 @@ function RoomDetailModal({ room, view, onClose, canManage, canOperate, onExtend,
                 <>
                   <button className="rm-btn rm-btn--success rm-btn--block" onClick={onEndSessionPaid}><i className="bi bi-check2-circle"></i>Finish Session</button>
                   <div className="rmd-actions-row">
-                    {canExtendSession(view.occupancy) && <button className="rm-btn" onClick={onExtend}><i className="bi bi-clock-history"></i>Extend</button>}
                     <button className="rm-btn danger" onClick={onCancelSession}><i className="bi bi-x-circle"></i>Cancel Session</button>
                   </div>
                 </>
@@ -1152,17 +1125,14 @@ function SessionModal({ modal, onClose, onSubmit }) {
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
 
-  const isExtend = modal?.mode === 'extend';
-  const fromBooking = !isExtend && !!modal?.bookingId;
+  const fromBooking = !!modal?.bookingId;
   const bookingNotStarted = fromBooking && Date.now() < Number(modal?.scheduledStartMs);
   const bookingEnded = fromBooking && Date.now() >= Number(modal?.scheduledEndMs);
 
   useEffect(() => {
     if (!modal) return;
 
-    if (modal.mode === 'extend' && modal.session) {
-      setHours(1);
-    } else if (fromBooking) {
+    if (fromBooking) {
       setHours(Math.max(1, Math.round(Number(modal.initialDurationHours) || 1)));
       setPaymentMethod('Cash');
       setCollectionMode((modal.downPaymentInfo?.balance || 0) > 0 ? 'later' : 'full');
@@ -1183,9 +1153,9 @@ function SessionModal({ modal, onClose, onSubmit }) {
   }, [modal]);
 
   const duration = Math.max(1, Math.round(Number(hours) || 1));
-  const maxHours = isExtend ? Math.max(0, Math.floor(MAX_SESSION_HOURS - Number(modal?.session?.duration || 0))) : MAX_SESSION_HOURS;
+  const maxHours = MAX_SESSION_HOURS;
   const bookedLengthExceedsLimit = fromBooking && duration > maxHours;
-  const walkInPricing = !isExtend && !fromBooking && modal?.fixedRoom
+  const walkInPricing = !fromBooking && modal?.fixedRoom
     ? calculateBookingPrice({ variant: modal.fixedRoom, startHour: manilaHour(), duration, guestCount: Number(guestCount) || 1, hasCorkage })
     : null;
   const originalCharge = fromBooking ? Number(modal?.downPaymentInfo?.total) || 0 : Number(walkInPricing?.amount) || 0;
@@ -1210,12 +1180,12 @@ function SessionModal({ modal, onClose, onSubmit }) {
       setFormError('This reservation can only start during its reserved time. Refresh the schedule if its slot has ended.');
       return;
     }
-    if (!isExtend && !fromBooking && !(Number(modal?.fixedRoom?.price) > 0)) {
+    if (!fromBooking && !(Number(modal?.fixedRoom?.price) > 0)) {
       setFormError('Set this table’s hourly rate before starting a session.');
       return;
     }
     if (!Number.isInteger(totalHours) || totalHours < 1) {
-      setFormError(isExtend ? 'Choose at least one whole hour to add.' : 'Choose a duration of at least one whole hour.');
+      setFormError('Choose a duration of at least one whole hour.');
       return;
     }
     if (totalHours > maxHours) {
@@ -1226,7 +1196,7 @@ function SessionModal({ modal, onClose, onSubmit }) {
       setFormError('Settle the room discount with the guest before starting this reservation.');
       return;
     }
-    if (!isExtend && paidAmount - recordedRefund > totalCharge) {
+    if (paidAmount - recordedRefund > totalCharge) {
       setFormError('The amount collected cannot be higher than the session charge.');
       return;
     }
@@ -1234,10 +1204,8 @@ function SessionModal({ modal, onClose, onSubmit }) {
     setSubmitting(true);
     try {
       await onSubmit({
-        mode: modal.mode,
         roomId: modal.fixedRoom?._id,
         roomTarget: modal.roomTarget,
-        sessionId: modal.session?._id,
         totalHours,
         paymentMethod: reservationPaidInFull || collectionMode === 'later' ? undefined : paymentMethod,
         paymentTiming: paidAmount - recordedRefund >= totalCharge && totalCharge > 0 ? 'Before' : 'After',
@@ -1264,26 +1232,24 @@ function SessionModal({ modal, onClose, onSubmit }) {
   const fixedRoomRate = modal?.fixedRoom
     ? Number(modal.fixedRoom.price) > 0 ? variantRateLabel(modal.fixedRoom) : 'Rate not set'
     : modal?.roomTarget ? 'From reservation' : '';
-  const title = isExtend ? `Extend Session — ${modal?.fixedRoom?.roomName || ''}` : fromBooking ? 'Start Session from Reservation' : 'Start Session';
+  const title = fromBooking ? 'Start Session from Reservation' : 'Start Session';
 
   return (
     <Modal open={!!modal} onClose={onClose} title={title} size="lg">
       {modal && (
         <>
-          {!isExtend && (
-            <div className="rmd-stat-box">
-              <div className="val">{fixedRoomLabel}</div>
-              <div className="lbl lbl--sub">Rate: {fixedRoomRate}</div>
-            </div>
-          )}
+          <div className="rmd-stat-box">
+            <div className="val">{fixedRoomLabel}</div>
+            <div className="lbl lbl--sub">Rate: {fixedRoomRate}</div>
+          </div>
 
           <div className="mfield-section-label">Session details</div>
           <div className="mfield">
-            <label>{isExtend ? 'Whole hours to add' : 'Session length'}</label>
+            <label>Session length</label>
             {fromBooking ? (
               <div className="session-fixed-length"><strong>{duration} hour{duration === 1 ? '' : 's'}</strong><small>Fixed by the confirmed reservation</small></div>
             ) : (
-              <div className="session-hour-picker" role="group" aria-label={isExtend ? 'Hours to add' : 'Session length'}>
+              <div className="session-hour-picker" role="group" aria-label="Session length">
                 {HOUR_PRESETS.filter((value) => value <= maxHours).map((value) => (
                   <button key={value} type="button" className={`session-hour-option${duration === value ? ' active' : ''}`} aria-pressed={duration === value} onClick={() => setHours(value)}>{value}<small>hr</small></button>
                 ))}
@@ -1291,17 +1257,14 @@ function SessionModal({ modal, onClose, onSubmit }) {
             )}
             {fromBooking && <p className="session-reservation-deadline">{bookingNotStarted ? 'Starts at' : 'Ends at'} {boardClock(new Date(bookingNotStarted ? modal.scheduledStartMs : modal.scheduledEndMs))}{!bookingNotStarted && !bookingEnded ? ` · ${Math.ceil((modal.scheduledEndMs - Date.now()) / 60000)} min left` : ''}</p>}
             {bookedLengthExceedsLimit && <p className="session-form-error" role="alert">This reservation exceeds the five-hour session limit. Update its reserved length before starting the session.</p>}
-            {isExtend && <p className="mfield-note">Up to {MAX_SESSION_HOURS} hours total. The original charge stays fixed; added hours use their current rates.</p>}
           </div>
 
-          {!isExtend && (
-            <div className="mfield">
-              <label>Guest Name{fromBooking ? '' : ' (optional)'}</label>
-              <input type="text" value={guestName} onChange={(e) => setGuestName(e.target.value)} placeholder="e.g. Juan Dela Cruz" readOnly={fromBooking} />
-            </div>
-          )}
+          <div className="mfield">
+            <label>Guest Name{fromBooking ? '' : ' (optional)'}</label>
+            <input type="text" value={guestName} onChange={(e) => setGuestName(e.target.value)} placeholder="e.g. Juan Dela Cruz" readOnly={fromBooking} />
+          </div>
 
-          {!isExtend && !fromBooking && (
+          {!fromBooking && (
             <>
               <div className="mfield">
                 <label>Number of Guests</label>
@@ -1314,9 +1277,9 @@ function SessionModal({ modal, onClose, onSubmit }) {
             </>
           )}
 
-          {!isExtend && <div className="mfield-section-label">Payment</div>}
+          <div className="mfield-section-label">Payment</div>
 
-          {fromBooking && !isExtend && (
+          {fromBooking && (
             <>
               {venueDiscount > 0 && (
                 <label className="booking-addon-check">
@@ -1340,14 +1303,14 @@ function SessionModal({ modal, onClose, onSubmit }) {
             </>
           )}
 
-          {!isExtend && !reservationPaidInFull && (
+          {!reservationPaidInFull && (
             <div className="session-collection-options" role="group" aria-label="Payment collection">
               <button type="button" className={collectionMode === 'later' ? 'active' : ''} aria-pressed={collectionMode === 'later'} onClick={() => setCollectionMode('later')}><strong>Pay after play</strong><small>{fromBooking ? `${money(outstanding)} remains to collect` : `Collect ${money(totalCharge)} when the session ends`}</small></button>
               <button type="button" className={collectionMode === 'full' ? 'active' : ''} aria-pressed={collectionMode === 'full'} onClick={() => setCollectionMode('full')}><strong>Pay before play</strong><small>{fromBooking ? `Collect the full ${money(outstanding)} balance now` : `Collect ${money(totalCharge)} now`}</small></button>
             </div>
           )}
 
-          {!isExtend && !reservationPaidInFull && collectionMode !== 'later' && (
+          {!reservationPaidInFull && collectionMode !== 'later' && (
             <div className="mfield">
               <label>Payment Method</label>
               <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)}>
@@ -1363,7 +1326,7 @@ function SessionModal({ modal, onClose, onSubmit }) {
           <div className="modal-actions">
             <button type="button" className="btn-cancel" onClick={onClose}>Cancel</button>
             <button type="button" className="btn-confirm" disabled={submitting || maxHours < 1 || bookedLengthExceedsLimit || bookingNotStarted || bookingEnded} onClick={handleSubmit}>
-              {submitting ? (isExtend ? 'Extending…' : 'Starting…') : (isExtend ? `Add ${duration} hour${duration === 1 ? '' : 's'}` : 'Start session')}
+              {submitting ? 'Starting…' : 'Start session'}
             </button>
           </div>
         </>
