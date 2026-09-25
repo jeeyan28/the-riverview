@@ -12,6 +12,7 @@ import { bookingsService } from '../../services/bookings';
 import { businessDate } from '../../utils/businessDate';
 import { reservationWindow, showOnRoomMonitor } from '../../utils/reservationStatus';
 import { CORKAGE_FEE, calculateBookingPrice, variantRateLabel } from '../../utils/roomPricing';
+import { getBookingRoomTarget } from '../../utils/monitorInventory';
 import {
   useRoomMonitorData,
   sessionEnd,
@@ -70,21 +71,6 @@ function SessionBalance({ session }) {
   );
 }
 
-function getBookingRoomTarget(booking) {
-  const facilityName = booking.room?.name;
-  if (!facilityName) return null;
-  const variants = Array.isArray(booking.room?.variants) ? booking.room.variants : [];
-  const variant = booking.variantLabel ? variants.find((v) => v.label === booking.variantLabel) : null;
-  const roomName = variant?.label || booking.variantLabel || booking.roomLabel;
-  if (!roomName) return null;
-  return {
-    facilityName,
-    roomName,
-    startingRoomNumber: 1,
-    roomCount: variant?.roomCount != null ? Number(variant.roomCount) : null,
-  };
-}
-
 function matchRoomForTarget(rooms, roomTarget) {
   if (!roomTarget) return { matchedRoom: null, previewNumber: null };
   const { facilityName, roomName, startingRoomNumber, roomCount } = roomTarget;
@@ -108,6 +94,7 @@ function matchRoomForTarget(rooms, roomTarget) {
   let nextInRange = startingRoomNumber;
   while (nextInRange <= rangeEnd && usedInRange.has(nextInRange)) nextInRange++;
   if (nextInRange <= rangeEnd) return { matchedRoom: null, previewNumber: nextInRange };
+  if (inRange.length) return { matchedRoom: inRange[0].room, previewNumber: null };
 
   const usedAll = new Set(facilityRooms.map((r) => Number(r.roomNumber)).filter((n) => Number.isFinite(n) && n > 0));
   let overflow = rangeEnd + 1;
@@ -131,12 +118,13 @@ function Monitor() {
   } = useRoomMonitorData('admin');
 
   const [modal, setModal] = useState(null);
+  const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [schedulePeriod, setSchedulePeriod] = useState('today');
   const [finishingSession, setFinishingSession] = useState(null);
   const [showAddRoom, setShowAddRoom] = useState(false);
   const [editRoomId, setEditRoomId] = useState(null);
   const [facilityFilter, setFacilityFilter] = useState('All');
   const [roomNameFilter, setRoomNameFilter] = useState('All');
-  const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('default');
   const [detailRoomId, setDetailRoomId] = useState(null);
   const [dueBookings, setDueBookings] = useState([]);
@@ -206,9 +194,12 @@ function Monitor() {
       previewNumber: matchedRoom ? null : previewNumber,
       session: null,
       bookingId: booking._id,
+      scheduledStartMs: reservationWindow(booking)?.start,
+      scheduledEndMs: reservationWindow(booking)?.end,
       initialGuestName: booking.guestName,
       initialDurationHours: booking.duration,
       downPaymentInfo: paymentSummary(booking, true),
+      venueDiscount: booking.paymentChoice === 'deposit' ? Number(booking.eligibleDiscount || 0) : 0,
     });
   }
 
@@ -263,14 +254,8 @@ function Monitor() {
   const filteredRooms = facilityFilter === 'All' ? rooms : rooms.filter((r) => r.facilityName === facilityFilter);
   const roomNameOptions = facilityFilter === 'All' ? [] : [...new Set(filteredRooms.map((r) => r.roomName))];
   const visibleRooms = (() => {
-    let list = roomNameFilter === 'All' ? filteredRooms : filteredRooms.filter((r) => r.roomName === roomNameFilter);
-    const q = searchQuery.trim().toLowerCase();
-    if (q) {
-      list = list.filter((r) => {
-        const occ = findRoomOccupancy(r._id, sessions);
-        return String(r.roomNumber).toLowerCase().includes(q) || (occ?.guestName || '').toLowerCase().includes(q);
-      });
-    }
+    const list = roomNameFilter === 'All' ? filteredRooms : filteredRooms.filter((r) => r.roomName === roomNameFilter);
+    const compareRoomNumber = (a, b) => String(a.roomNumber).localeCompare(String(b.roomNumber), undefined, { numeric: true, sensitivity: 'base' });
     if (sortBy === 'timeLeft') {
       return [...list].sort((a, b) => {
         const occA = findRoomOccupancy(a._id, sessions);
@@ -284,19 +269,13 @@ function Monitor() {
       });
     }
     if (sortBy === 'roomNumber') {
-      return [...list].sort((a, b) => String(a.roomNumber).localeCompare(String(b.roomNumber), undefined, { numeric: true, sensitivity: 'base' }));
+      return [...list].sort(compareRoomNumber);
     }
     return list;
   })();
-  const facilityGroups = [];
-  const groupIndex = new Map();
-  visibleRooms.forEach((r) => {
-    if (!groupIndex.has(r.facilityName)) {
-      groupIndex.set(r.facilityName, []);
-      facilityGroups.push([r.facilityName, groupIndex.get(r.facilityName)]);
-    }
-    groupIndex.get(r.facilityName).push(r);
-  });
+  const facilityGroups = facilities
+    .map((name) => [name, visibleRooms.filter((room) => room.facilityName === name)])
+    .filter(([, facilityRooms]) => facilityRooms.length > 0);
 
   const stats = rooms.reduce((acc, r) => {
     const v = buildRoomView(r, sessions);
@@ -318,6 +297,9 @@ function Monitor() {
   const scheduledBookings = dueBookings
     .filter((booking) => showOnRoomMonitor(booking))
     .sort((a, b) => b.date.localeCompare(a.date) || String(a.timeIn || '').localeCompare(String(b.timeIn || '')));
+  const todayBookings = scheduledBookings.filter((booking) => booking.date === scheduleToday);
+  const earlierBookings = scheduledBookings.filter((booking) => booking.date < scheduleToday);
+  const displayedBookings = schedulePeriod === 'today' ? todayBookings : earlierBookings;
 
   const roomTableColumns = [
     {
@@ -423,30 +405,39 @@ function Monitor() {
           <span className="rm-page-sub">Real-time table status and session monitoring</span>
         </div>
         <div className="rm-toolbar-actions">
-          <div className="view-toggle" role="group" aria-label="Switch view">
+          {canStartFromBooking && (
+            <button type="button" className="btn-teal rm-reservations-button" aria-haspopup="dialog" onClick={() => { setSchedulePeriod(todayBookings.length ? 'today' : 'earlier'); setScheduleOpen(true); }}>
+              <i className="bi bi-calendar-check" aria-hidden="true"></i>View reservations ({scheduledBookings.length})
+            </button>
+          )}
+          <div className="view-toggle" role="group" aria-label="Room display">
             <button
               type="button"
               className={`view-toggle-btn${viewMode === 'grid' ? ' active' : ''}`}
+              aria-pressed={viewMode === 'grid'}
               onClick={() => changeViewMode('grid')}
             >
-              <i className="bi bi-grid"></i>Grid View
+              <i className="bi bi-grid" aria-hidden="true"></i>Grid
             </button>
             <button
               type="button"
               className={`view-toggle-btn${viewMode === 'table' ? ' active' : ''}`}
+              aria-pressed={viewMode === 'table'}
               onClick={() => changeViewMode('table')}
             >
-              <i className="bi bi-list-ul"></i>Table View
+              <i className="bi bi-list-ul" aria-hidden="true"></i>Table
             </button>
           </div>
-          <a className="rm-btn" href="/lobby-monitor" target="_blank" rel="noreferrer">
-            <i className="bi bi-tv"></i>View Lobby Display
-          </a>
-          {canManage && (
-            <Link className="btn-teal" to="/admin/room-management">
-              <i className="bi bi-building-gear"></i>Manage Inventory
-            </Link>
-          )}
+          <div className="rm-toolbar-links">
+            <a className="rm-toolbar-link" href="/lobby-monitor" target="_blank" rel="noreferrer" aria-label="Open lobby display in a new tab">
+              <i className="bi bi-tv" aria-hidden="true"></i>Lobby display
+            </a>
+            {canManage && (
+              <Link className="rm-toolbar-link" to="/admin/room-management">
+                <i className="bi bi-building-gear" aria-hidden="true"></i>Manage inventory
+              </Link>
+            )}
+          </div>
         </div>
       </div>
 
@@ -484,84 +475,95 @@ function Monitor() {
         </div>
       )}
 
-      {canStartFromBooking && scheduledBookings.length > 0 && (
-        <div className="card card-flush rm-table-wrap rm-due-wrap">
-          <div className="rm-due-head">
-            <div className="rm-schedule-heading"><span className="card-title"><i className="bi bi-calendar-check"></i>Reservation schedule</span><span className="rm-schedule-today">Today · {scheduleDate(scheduleToday)}</span></div>
-            <span className="rm-group-count">{scheduledBookings.length}</span>
-          </div>
-          <table className="rm-table">
-            <thead>
-              <tr>
-                <th>Guest</th>
-                <th>Facility / Table</th>
-                <th>Time</th>
-                <th>Payment collected</th>
-                <th>Status</th>
-                <th>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {scheduledBookings.map((b, index) => {
-                  const roomTarget = getBookingRoomTarget(b);
+      {canStartFromBooking && (
+        <Modal
+          open={scheduleOpen}
+          onClose={() => setScheduleOpen(false)}
+          ariaLabel="Reservation schedule"
+          className="rm-schedule-drawer"
+          backdropClassName="rm-schedule-backdrop"
+        >
+          <div className="rm-due-wrap">
+            <div className="rm-schedule-top">
+              <div className="rm-due-head">
+                <div className="rm-schedule-heading">
+                  <span className="card-title">Reservation schedule</span>
+                  <span className="rm-schedule-today">Confirmed reservations waiting to start · {scheduleDate(scheduleToday)}</span>
+                </div>
+                <button type="button" className="rm-btn rm-schedule-close" onClick={() => setScheduleOpen(false)} aria-label="Close reservation schedule">Close</button>
+              </div>
+              <div className="rm-schedule-tabs" aria-label="Reservation dates">
+                <button type="button" className={schedulePeriod === 'today' ? 'active' : ''} aria-pressed={schedulePeriod === 'today'} onClick={() => setSchedulePeriod('today')}>Today <span>{todayBookings.length}</span></button>
+                <button type="button" className={schedulePeriod === 'earlier' ? 'active' : ''} aria-pressed={schedulePeriod === 'earlier'} onClick={() => setSchedulePeriod('earlier')}>Earlier <span>{earlierBookings.length}</span></button>
+              </div>
+            </div>
+            {displayedBookings.length > 0 ? (
+              <div className="rm-schedule-list">
+                {displayedBookings.map((b, index) => {
+                  const roomTarget = getBookingRoomTarget(b, rooms);
                   const { matchedRoom, previewNumber } = matchRoomForTarget(rooms, roomTarget);
                   const scheduledStart = new Date(`${b.date}T${String(b.timeIn).padStart(5, '0')}:00+08:00`);
                   const isDue = scheduledStart.getTime() <= Date.now();
                   const scheduledEnd = new Date(reservationWindow(b).end);
                   const occupancy = matchedRoom ? findRoomOccupancy(matchedRoom._id, sessions) : null;
-                  const hasConflict = matchedRoom && occupancy;
+                  const hasConflict = matchedRoom && (matchedRoom.status !== 'Available' || occupancy);
                   const payment = paymentSummary(b, true);
+                  const facilityLabel = roomTarget?.facilityName || b.room?.name || b.roomLabel || 'Facility unavailable';
+                  const variantLabel = b.variantLabel || (roomTarget?.roomName !== facilityLabel ? roomTarget?.roomName : '');
+                  const unitLabel = facilityLabel === 'Billiards' ? 'Table' : facilityLabel === 'Court' ? 'Court' : 'Room';
+                  const assignmentLabel = matchedRoom
+                    ? `${unitLabel} ${matchedRoom.roomNumber}`
+                    : roomTarget
+                      ? previewNumber ? `${unitLabel} ${previewNumber} · assigned on start` : 'Assigned on start'
+                      : 'No matching active room';
                   return (
                     <Fragment key={b._id}>
-                    {b.date !== scheduleToday && (index === 0 || scheduledBookings[index - 1].date !== b.date) && <tr className="rm-schedule-date-row"><td colSpan={6}>{scheduleDate(b.date)}</td></tr>}
-                    <tr className={`rm-schedule-row--${isDue ? 'due' : 'upcoming'}`}>
-                      <td><span className="rm-guest-name">{b.guestName}</span></td>
-                      <td>
-                        <div className="rm-name">{b.roomLabel}</div>
-                        <div className="rm-type">
-                          {matchedRoom
-                            ? `Table No.${matchedRoom.roomNumber}`
-                            : roomTarget
-                              ? previewNumber
-                                ? `Table No.${previewNumber} (will be created)`
-                                : 'Table No. will be auto-assigned'
-                              : 'No matching Table Monitor table'}
+                      {schedulePeriod === 'earlier' && (index === 0 || displayedBookings[index - 1].date !== b.date) && (
+                        <h3 className="rm-schedule-date">{scheduleDate(b.date)}</h3>
+                      )}
+                      <div className={`rm-schedule-item rm-schedule-item--${isDue ? 'due' : 'upcoming'}`}>
+                        <div className="rm-schedule-slot">
+                          <strong>{boardClock(scheduledStart)}</strong>
+                          <small>to {boardClock(scheduledEnd)}</small>
                         </div>
-                      </td>
-                      <td className="rm-schedule-time">{boardClock(scheduledStart)}-{boardClock(scheduledEnd)}</td>
-                      <td>
-                        <div className="rm-amount">{money(payment.collected)}</div>
-                        <div className={`rm-amount-sub${payment.balance === 0 ? ' paid' : ''}`}>
-                          {payment.balance === 0 ? 'Fully paid' : `${money(payment.balance)} balance`}
+                        <div className="rm-schedule-reservation">
+                          <strong className="rm-guest-name">{b.guestName}</strong>
+                          <span className={`rm-schedule-location${!roomTarget ? ' needs-review' : ''}`}>
+                            {facilityLabel}{variantLabel ? ` · ${variantLabel}` : ''} · {assignmentLabel}
+                          </span>
+                          <span className={`rm-schedule-payment${payment.balance === 0 ? ' paid' : ' due'}`}>
+                            {payment.balance === 0 ? 'Fully paid' : `${money(payment.balance)} balance due`}
+                          </span>
+                          {payment.balance > 0 && payment.collected > 0 && <small className="rm-schedule-collected">{money(payment.collected)} collected</small>}
+                          {b.paymentChoice === 'deposit' && Number(b.eligibleDiscount) > 0 && <small className="rm-schedule-collected">{money(b.eligibleDiscount)} discount to arrange at venue</small>}
+                          {hasConflict && <small className="rm-schedule-warning">{unitLabel} occupied — end that session first</small>}
                         </div>
-                      </td>
-                      <td>
-                        <span className={`rm-status-pill ${isDue ? 'status-warning' : 'status-occupied'}`}>
-                          <span className="dot"></span>{isDue ? 'Due now' : 'Upcoming'}
-                        </span>
-                        {hasConflict && (
-                          <div className="rm-conflict-note">
-                            <i className="bi bi-exclamation-triangle"></i>Table occupied — end that session first
-                          </div>
-                        )}
-                      </td>
-                      <td>
-                        <button
-                          className="rm-btn primary"
-                          disabled={!!refreshError || !roomTarget || hasConflict}
-                          title={!roomTarget ? 'Could not determine this reservation\'s room.' : hasConflict ? 'End the current session on this room first.' : ''}
-                          onClick={() => openStartFromBooking(b, matchedRoom, roomTarget, previewNumber)}
-                        >
-                          <i className="bi bi-play-circle"></i>Start Now
-                        </button>
-                      </td>
-                    </tr>
+                        <div className="rm-schedule-action">
+                          <span className={`rm-schedule-state${isDue ? ' is-due' : ''}`}>{isDue ? 'Due now' : 'Upcoming'}</span>
+                          <button
+                            type="button"
+                            className="rm-btn primary"
+                            disabled={!!refreshError || !isDue || !roomTarget || hasConflict}
+                            title={!isDue ? 'This reservation has not started yet.' : !roomTarget ? 'No matching active room was found for this reservation.' : hasConflict ? 'End the current session on this room first.' : ''}
+                            aria-label={`Start reservation for ${b.guestName}`}
+                            onClick={() => {
+                              setScheduleOpen(false);
+                              openStartFromBooking(b, matchedRoom, roomTarget, previewNumber);
+                            }}
+                          >
+                            <i className="bi bi-play-circle" aria-hidden="true"></i>Start Now
+                          </button>
+                        </div>
+                      </div>
                     </Fragment>
                   );
                 })}
-            </tbody>
-          </table>
-        </div>
+              </div>
+            ) : (
+              <p className="rm-schedule-empty">{schedulePeriod === 'today' ? 'No reservations waiting to start today.' : 'No earlier reservations waiting to start.'}</p>
+            )}
+          </div>
+        </Modal>
       )}
 
       {loading ? (
@@ -576,21 +578,6 @@ function Monitor() {
         </div>
       ) : (
         <>
-          <div className="rm-search-row">
-            <i className="bi bi-search rm-search-ico"></i>
-            <input
-              type="text"
-              className="rm-search-input"
-              placeholder="Search by table number or guest name"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-            {searchQuery && (
-              <button type="button" className="rm-search-clear" onClick={() => setSearchQuery('')} aria-label="Clear search">
-                <i className="bi bi-x-lg"></i>
-              </button>
-            )}
-          </div>
           <div className="fac-toolbar">
             <div className="fac-chips" role="group" aria-label="Filter by facility">
               <button
@@ -632,29 +619,14 @@ function Monitor() {
                 ))}
               </div>
             )}
-            <div className="fac-chips" role="group" aria-label="Sort rooms">
-              <button
-                type="button"
-                className={`fac-chip${sortBy === 'default' ? ' active' : ''}`}
-                onClick={() => setSortBy('default')}
-              >
-                Sort: Default
-              </button>
-              <button
-                type="button"
-                className={`fac-chip${sortBy === 'timeLeft' ? ' active' : ''}`}
-                onClick={() => setSortBy('timeLeft')}
-              >
-                Sort: Time Left
-              </button>
-              <button
-                type="button"
-                className={`fac-chip${sortBy === 'roomNumber' ? ' active' : ''}`}
-                onClick={() => setSortBy('roomNumber')}
-              >
-                Sort: Table No.
-              </button>
-            </div>
+            <label className="rm-sort-control">
+              <span>Sort rooms</span>
+              <select className="rm-sort-select" value={sortBy} onChange={(event) => setSortBy(event.target.value)}>
+                <option value="default">Default order</option>
+                <option value="timeLeft">Time left</option>
+                <option value="roomNumber">Table number</option>
+              </select>
+            </label>
             <div className="legend">
               <button
                 type="button"
@@ -1191,6 +1163,8 @@ function SessionModal({ modal, onClose, onSubmit }) {
 
   const isExtend = modal?.mode === 'extend';
   const fromBooking = !isExtend && !!modal?.bookingId;
+  const bookingNotStarted = fromBooking && Date.now() < Number(modal?.scheduledStartMs);
+  const bookingEnded = fromBooking && Date.now() >= Number(modal?.scheduledEndMs);
 
   useEffect(() => {
     if (!modal) return;
@@ -1224,6 +1198,7 @@ function SessionModal({ modal, onClose, onSubmit }) {
   const totalCharge = fromBooking ? Number(modal?.downPaymentInfo?.total) || 0 : Number(walkInPricing?.amount) || 0;
   const alreadyCollected = fromBooking ? Number(modal?.downPaymentInfo?.collected) || 0 : 0;
   const outstanding = Math.max(0, totalCharge - alreadyCollected);
+  const venueDiscount = fromBooking ? Number(modal?.venueDiscount || 0) : 0;
   const reservationPaidInFull = fromBooking && totalCharge > 0 && outstanding === 0;
   const paidAmount = fromBooking
     ? collectionMode === 'full' ? totalCharge : alreadyCollected
@@ -1232,6 +1207,10 @@ function SessionModal({ modal, onClose, onSubmit }) {
   async function handleSubmit() {
     const totalHours = duration;
     setFormError('');
+    if (fromBooking && (Date.now() < Number(modal?.scheduledStartMs) || Date.now() >= Number(modal?.scheduledEndMs))) {
+      setFormError('This reservation can only start during its booked time. Refresh the schedule if its slot has ended.');
+      return;
+    }
     if (!isExtend && !fromBooking && !(Number(modal?.fixedRoom?.price) > 0)) {
       setFormError('Set this table’s hourly rate before starting a session.');
       return;
@@ -1306,6 +1285,7 @@ function SessionModal({ modal, onClose, onSubmit }) {
                 ))}
               </div>
             )}
+            {fromBooking && <p className="session-reservation-deadline">{bookingNotStarted ? 'Starts at' : 'Ends at'} {boardClock(new Date(bookingNotStarted ? modal.scheduledStartMs : modal.scheduledEndMs))}{!bookingNotStarted && !bookingEnded ? ` · ${Math.ceil((modal.scheduledEndMs - Date.now()) / 60000)} min left` : ''}</p>}
             {bookedLengthExceedsLimit && <p className="session-form-error" role="alert">This reservation exceeds the five-hour session limit. Update its booked length before starting the session.</p>}
             {isExtend && <p className="mfield-note">Up to {MAX_SESSION_HOURS} hours total. The original charge stays fixed; added hours use their current rates.</p>}
           </div>
@@ -1339,6 +1319,7 @@ function SessionModal({ modal, onClose, onSubmit }) {
                 <div><span>Payment received</span><strong>{money(alreadyCollected)}</strong></div>
                 <div className={outstanding > 0 ? 'balance-due' : 'balance-paid'}><span>Balance remaining</span><strong>{money(outstanding)}</strong></div>
               </div>
+              {venueDiscount > 0 && <p className="mfield-note" role="status">This guest chose a down payment. Arrange the {money(venueDiscount)} room discount at the venue. After discount, {outstanding >= venueDiscount ? `${money(outstanding - venueDiscount)} remains to collect` : `${money(venueDiscount - outstanding)} should be returned to the guest`}.</p>}
               {reservationPaidInFull && (
                 <div className="session-payment-complete" role="status">
                   <i className="bi bi-check-circle-fill" aria-hidden="true"></i>
@@ -1370,7 +1351,7 @@ function SessionModal({ modal, onClose, onSubmit }) {
 
           <div className="modal-actions">
             <button type="button" className="btn-cancel" onClick={onClose}>Cancel</button>
-            <button type="button" className="btn-confirm" disabled={submitting || maxHours < 1 || bookedLengthExceedsLimit} onClick={handleSubmit}>
+            <button type="button" className="btn-confirm" disabled={submitting || maxHours < 1 || bookedLengthExceedsLimit || bookingNotStarted || bookingEnded} onClick={handleSubmit}>
               {submitting ? (isExtend ? 'Extending…' : 'Starting…') : (isExtend ? `Add ${duration} hour${duration === 1 ? '' : 's'}` : 'Start session')}
             </button>
           </div>

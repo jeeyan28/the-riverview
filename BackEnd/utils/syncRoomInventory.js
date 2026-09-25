@@ -6,15 +6,25 @@ function monitorStatus(variantStatus) {
   return "Available";
 }
 
-function releasedMonitorStatus(monitorRoom, catalogRoom) {
-  if (!monitorRoom || monitorRoom.isTemporary) return "Available";
+function currentCatalogVariant(monitorRoom, catalogRoom) {
+  if (!monitorRoom || monitorRoom.isTemporary) return null;
   const variant = catalogRoom?.variants?.find((entry) => entry.label === monitorRoom.roomName);
   const number = Number(monitorRoom.roomNumber);
   const count = Math.max(1, Number(variant?.roomCount) || 1);
   if (!variant || !Number.isInteger(number) || number < 1 || number > count) {
-    return "Inactive";
+    return null;
   }
-  return monitorStatus(variant.status);
+  return variant;
+}
+
+function releasedMonitorStatus(monitorRoom, catalogRoom) {
+  if (!monitorRoom || monitorRoom.isTemporary) return "Available";
+  const variant = currentCatalogVariant(monitorRoom, catalogRoom);
+  return variant ? monitorStatus(variant.status) : "Inactive";
+}
+
+function visibleMonitorRoom(monitorRoom, catalogRoom) {
+  return monitorRoom.status !== "Inactive" || !!currentCatalogVariant(monitorRoom, catalogRoom);
 }
 
 function inventoryKey(facilityName, roomName, roomNumber) {
@@ -114,4 +124,4 @@ async function deactivateRoomInventory(facilityName) {
   );
 }
 
-module.exports = { syncRoomInventory, deactivateRoomInventory, releasedMonitorStatus };
+module.exports = { syncRoomInventory, deactivateRoomInventory, releasedMonitorStatus, visibleMonitorRoom };

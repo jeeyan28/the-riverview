@@ -4,10 +4,10 @@ const Room = require("../model/room");
 const Booking = require("../model/booking");
 const { ensureAdmin, requirePermission, requireAnyPermission } = require("../middleware/adminAuth");
 const { PERMISSIONS, hasPermission } = require("../utils/permissions");
-const { bookingCollected, financialFields, fullOrDeferredPaymentFields, extendSessionFields, endSessionFields } = require("../utils/bookingLifecycle");
+const { bookingCollected, bookingSessionEnd, financialFields, fullOrDeferredPaymentFields, extendSessionFields, endSessionFields } = require("../utils/bookingLifecycle");
 const { calculateBookingPrice, calculateSessionExtension, parsePaxCapacity } = require("../utils/roomPricing");
 const { pricedMonitorRoom } = require("../utils/monitorRoomRate");
-const { releasedMonitorStatus } = require("../utils/syncRoomInventory");
+const { releasedMonitorStatus, visibleMonitorRoom } = require("../utils/syncRoomInventory");
 const { logAudit } = require("../utils/auditLog");
 const { TIME_ZONE, MAX_MONITOR_SESSION_HOURS } = require("../utils/constants");
 const { getMonitorReport } = require("../utils/monitorReport");
@@ -71,12 +71,14 @@ roomsRouter.get("/", ensureAdmin, async (req, res) => {
     const filter = {};
     if (req.query.status) filter.status = String(req.query.status);
     const rooms = await MonitorRoom.find(filter).sort({ facilityName: 1, roomNumber: 1 });
-    const missingPriceNames = [...new Set(rooms.filter((room) => !(Number(room.price) > 0)).map((room) => room.facilityName))];
-    const catalog = missingPriceNames.length
-      ? await Room.find({ name: { $in: missingPriceNames } }).select("name variants").lean()
+    const catalogNames = [...new Set(rooms.filter((room) => room.status === "Inactive" || !(Number(room.price) > 0)).map((room) => room.facilityName))];
+    const catalog = catalogNames.length
+      ? await Room.find({ name: { $in: catalogNames } }).select("name variants").lean()
       : [];
     const catalogByName = new Map(catalog.map((room) => [room.name.toLowerCase(), room]));
-    res.json(rooms.map((room) => pricedMonitorRoom(room, catalogByName.get(room.facilityName.toLowerCase()))));
+    res.json(rooms
+      .filter((room) => visibleMonitorRoom(room, catalogByName.get(room.facilityName.toLowerCase())))
+      .map((room) => pricedMonitorRoom(room, catalogByName.get(room.facilityName.toLowerCase()))));
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Server error." });
@@ -228,12 +230,14 @@ sessionsRouter.post("/", requireAnyPermission(PERMISSIONS.ROOM_OPERATE, PERMISSI
     }
 
     let booking = null;
+    let scheduledEndTime = null;
     if (bookingId) {
       booking = await Booking.findById(bookingId);
       if (!booking) return res.status(404).json({ message: "Booking not found." });
       if (booking.status !== Booking.BOOKING_STATUS.CONFIRMED) {
         return res.status(400).json({ message: "This booking cannot be started (already started or not confirmed)." });
       }
+      scheduledEndTime = bookingSessionEnd(booking);
     }
 
     const sessionDuration = booking ? Number(booking.duration) : duration;
@@ -361,6 +365,7 @@ sessionsRouter.post("/", requireAnyPermission(PERMISSIONS.ROOM_OPERATE, PERMISSI
       guestName: booking ? booking.guestName : (guestName ? String(guestName).trim() : ""),
       guestCount,
       duration: sessionDuration,
+      scheduledEndTime,
       rate,
       amount,
       corkageFee: booking ? Number(booking.corkageFee) || 0 : directPricing.corkageFee,
@@ -430,9 +435,13 @@ sessionsRouter.put("/:id/extend", requirePermission(PERMISSIONS.ROOM_OPERATE), v
     }
 
     const room = await MonitorRoom.findById(session.room);
-    const pricing = calculateSessionExtension({ session, room, addedHours, startHour: currentBusinessHour(session.startTime) });
+    const pricingStart = session.scheduledEndTime
+      ? new Date(session.scheduledEndTime).getTime() - Number(session.duration) * 3600000
+      : session.startTime;
+    const pricing = calculateSessionExtension({ session, room, addedHours, startHour: currentBusinessHour(pricingStart) });
     const fields = extendSessionFields(session, addedHours, pricing.amount);
     session.duration = fields.duration;
+    if (session.scheduledEndTime) session.scheduledEndTime = new Date(new Date(session.scheduledEndTime).getTime() + Number(addedHours) * 3600000);
     session.amount = fields.amount;
     session.hourlyRates = pricing.hourlyRates;
     session.paidAmount = fields.paidAmount;

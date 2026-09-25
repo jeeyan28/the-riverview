@@ -12,7 +12,10 @@
 .fc-weekday-row{display:grid;grid-template-columns:88px 1fr auto;align-items:center;gap:10px;}
 .fc-weekday-name{font-size:.78rem;color:var(--muted);}
 .fc-weekday-bar-track{height:8px;border-radius:6px;background:var(--navy4);overflow:hidden;}
-.fc-weekday-bar-fill{height:100%;border-radius:6px;background:var(--teal);}
+.fc-weekday-bar-fill{display:block;height:100%;border-radius:6px;background:var(--teal);}
+.fc-filter-bar{display:flex;flex-wrap:wrap;gap:12px;align-items:end;margin:0 0 18px;}
+.fc-filter-bar label{display:flex;flex-direction:column;gap:6px;min-width:180px;color:var(--muted);font-size:.8rem;font-weight:600;}
+.fc-filter-bar select{width:100%;}
 .fc-weekday-bar-fill.best{background:var(--teal);}
 .fc-weekday-bar-fill.worst{background:var(--red);}
 .fc-weekday-val{font-size:.78rem;color:var(--text);font-weight:600;min-width:40px;text-align:right;}
@@ -30,4 +33,3 @@
 .fc-ai-badge{display:inline-flex;align-items:center;gap:5px;font-size:.68rem;font-weight:700;letter-spacing:.03em;text-transform:uppercase;color:var(--teal);background:var(--teal-soft);border-radius:999px;padding:3px 9px;margin-left:8px;vertical-align:middle;}
 
 .fc-chart-note{font-size:.72rem;color:var(--muted);margin-top:6px;display:flex;align-items:center;gap:6px;}
-

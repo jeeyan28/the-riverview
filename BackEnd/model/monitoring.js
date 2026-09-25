@@ -27,6 +27,7 @@ const roomSessionSchema = new mongoose.Schema({
   guestName: { type: String, trim: true, default: "" },
   guestCount: { type: Number, min: 1, default: 1 },
   startTime: { type: Date, required: true, default: Date.now },
+  scheduledEndTime: { type: Date, default: null },
   duration: { type: Number, required: true, min: 1 / 3600, max: 24 },
   rate: { type: Number, default: 0, min: 0 },
   amount: { type: Number, default: 0, min: 0 },

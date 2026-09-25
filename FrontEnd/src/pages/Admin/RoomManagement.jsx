@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   AlertCircle,
   ArrowLeft,
-  ArrowRight,
   Building2,
   CheckCircle2,
   ChevronDown,
@@ -32,6 +31,7 @@ import ImageUploadPreview from '../../components/ImageUploadPreview';
 import FacilityBookingCard from '../../components/FacilityBookingCard';
 import RoomOptionCard from '../../components/RoomOptionCard';
 import { resolveImageUrl } from '../../utils/resolveImageUrl';
+import { facilityImage } from '../../utils/facilityImage';
 import { useAuth } from '../../context/AuthContext';
 import { roomsService } from '../../services/rooms';
 import { variantRateLabel } from '../../utils/roomPricing';
@@ -86,6 +86,7 @@ function emptyVariant() {
     label: '', price: '', pax: '', startingRoomNumber: 1, roomCount: 1,
     status: 'Available', image: '', features: [], pricingMode: 'flat',
     eveningPrice: '', eveningStartTime: '17:00', includedGuests: 0, extraGuestFee: 0,
+    discountPercent: '',
   };
 }
 
@@ -95,6 +96,8 @@ function emptyFacilityForm(name = '') {
   return {
     name,
     description: preset?.description || '',
+    discountPercent: 0,
+    addOns: [],
     variants: variants.map((variant) => ({
       ...emptyVariant(),
       ...variant,
@@ -237,6 +240,7 @@ function RoomManagement() {
       eveningStartTime: v.eveningStartTime || '17:00',
       includedGuests: v.includedGuests ?? 0,
       extraGuestFee: v.extraGuestFee ?? 0,
+      discountPercent: v.discountPercent ?? '',
       features: Array.isArray(v.features) ? v.features : [],
     }));
     if (addRoom) variants.push(emptyVariant());
@@ -247,6 +251,8 @@ function RoomManagement() {
     setForm({
       name: room.name || '',
       description: room.description || '',
+      discountPercent: room.discountPercent ?? 0,
+      addOns: (room.addOns || []).map((addOn) => ({ name: addOn.name || '', fee: addOn.fee ?? '' })),
       variants,
     });
     setExistingImageUrl(room.image ? resolveImageUrl(room.image) : '');
@@ -281,6 +287,10 @@ function RoomManagement() {
       ...f,
       variants: f.variants.map((v, idx) => (idx === i ? { ...v, [field]: value } : v)),
     }));
+  }
+
+  function updateAddOn(index, field, value) {
+    setForm((current) => ({ ...current, addOns: current.addOns.map((addOn, i) => i === index ? { ...addOn, [field]: value } : addOn) }));
   }
 
   function reindexAfterRemove(map, removedIndex) {
@@ -322,7 +332,7 @@ function RoomManagement() {
   function variantThumbSrc(i, v) {
     if (variantImagePreviews[i]) return variantImagePreviews[i];
     if (v.image) return resolveImageUrl(v.image);
-    return null;
+    return '';
   }
 
   function addVariantFeature(i) {
@@ -373,11 +383,24 @@ function RoomManagement() {
       return;
     }
     const cleanVariantEntries = form.variants.map((v, originalIndex) => ({ v, originalIndex }));
+    const facilityDiscount = Number(form.discountPercent);
+    if (!Number.isFinite(facilityDiscount) || facilityDiscount < 0 || facilityDiscount > 99) {
+      setFormStep('facility');
+      setFormError('Enter a facility discount from 0% to 99%.');
+      return;
+    }
+    const addOns = (form.addOns || []).map((addOn) => ({ name: addOn.name.trim(), fee: Number(addOn.fee) }));
+    if (addOns.some((addOn) => !addOn.name || !Number.isFinite(addOn.fee) || addOn.fee <= 0) || new Set(addOns.map((addOn) => addOn.name.toLowerCase())).size !== addOns.length) {
+      setFormStep('facility');
+      setFormError('Give each optional service a unique name and a fee greater than ₱0.');
+      return;
+    }
     const invalidVariant = cleanVariantEntries.find(({ v }) => {
       const price = Number(v.price);
       const eveningPrice = Number(v.eveningPrice);
       return !v.label.trim() || v.price === '' || !Number.isFinite(price) || price < 0 ||
-        (v.pricingMode === 'time-based' && (v.eveningPrice === '' || !Number.isFinite(eveningPrice) || eveningPrice < 0));
+        (v.pricingMode === 'time-based' && (v.eveningPrice === '' || !Number.isFinite(eveningPrice) || eveningPrice < 0)) ||
+        (v.discountPercent !== '' && v.discountPercent !== null && (!Number.isFinite(Number(v.discountPercent)) || Number(v.discountPercent) < 0 || Number(v.discountPercent) > 99));
     });
     if (invalidVariant) {
       setFormStep('rooms');
@@ -399,8 +422,9 @@ function RoomManagement() {
       eveningStartTime: v.eveningStartTime || '17:00',
       includedGuests: Math.max(0, Number(v.includedGuests) || 0),
       extraGuestFee: Math.max(0, Number(v.extraGuestFee) || 0),
+      discountPercent: v.discountPercent === '' || v.discountPercent === null ? null : Number(v.discountPercent),
     }));
-    if (cleanVariants.length === 0) {
+    if (cleanVariants.length === 0 && !editingId) {
       setFormStep('rooms');
       setActiveRoomIndex(null);
       setFormError('Add at least one reservable room before saving the facility.');
@@ -412,6 +436,8 @@ function RoomManagement() {
       const formData = new FormData();
       formData.append('name', form.name.trim());
       formData.append('description', form.description.trim());
+      formData.append('discountPercent', facilityDiscount);
+      formData.append('addOns', JSON.stringify(addOns));
       formData.append('price', lowestRoomPrice(cleanVariants));
       formData.append('variants', JSON.stringify(cleanVariants));
       if (selectedImageFile) formData.append('image', selectedImageFile);
@@ -446,6 +472,13 @@ function RoomManagement() {
   async function handleRemove() {
     if (!guardPermission('room:manage')) return;
     if (!editingId) return closeModal();
+    const savedFacility = rooms.find((room) => room._id === editingId);
+    if (savedFacility?.variants?.length) {
+      setFormStep('rooms');
+      setActiveRoomIndex(null);
+      setFormError('Remove every room and save the facility before deleting it.');
+      return;
+    }
     if (!window.confirm('Remove this facility? This cannot be undone.')) return;
     try {
       await roomsService.remove(editingId);
@@ -453,19 +486,26 @@ function RoomManagement() {
       await fetchRooms();
     } catch (err) {
       console.error(err);
-      alert('Could not delete this facility.');
+      alert(err.message || 'Could not delete this facility.');
     }
   }
 
   async function quickDelete(id) {
     if (!guardPermission('room:manage')) return;
+    const facility = rooms.find((room) => room._id === id);
+    if (facility?.variants?.length) {
+      openEditModal(facility);
+      setFormStep('rooms');
+      setFormError('Remove every room and save the facility before deleting it.');
+      return;
+    }
     if (!window.confirm('Remove this facility? This cannot be undone.')) return;
     try {
       await roomsService.remove(id);
       await fetchRooms();
     } catch (err) {
       console.error(err);
-      alert('Could not delete this facility.');
+      alert(err.message || 'Could not delete this facility.');
     }
   }
 
@@ -582,14 +622,14 @@ function RoomManagement() {
             return (
               <article className="facility-catalog-row" key={facility._id}>
                 <div className="facility-catalog-media">
-                  {facility.image ? <img src={resolveImageUrl(facility.image)} alt={`${facility.name} facility`} /> : <div className="facility-media-placeholder"><FacilityIcon name={facility.name} size={38} /><span>Add a cover photo</span></div>}
+                  {facility.image ? <img src={facilityImage(facility.image, facility.name)} alt={`${facility.name} facility`} /> : <div className="facility-name-placeholder">{facility.name}</div>}
                   <span className="facility-category-mark"><FacilityIcon name={facility.name} size={18} />{facility.name}</span>
                   <span className="facility-price-mark">{variants.length ? `From ₱${lowestRoomPrice(variants).toLocaleString()}/hr` : 'Add pricing'}</span>
                 </div>
 
                 <div className="facility-catalog-main">
                   <div className="facility-catalog-title">
-                    <div><h3>{facility.name}</h3><span>Visible in the customer booking catalog</span></div>
+                    <div><h3>{facility.name}</h3><span>{variants.length ? 'Visible in the customer booking catalog' : 'No rooms available for booking'}</span></div>
                     <span className={`facility-health ${counts.maintenance || counts.unavailable ? 'facility-health--attention' : ''}`}>
                       {counts.maintenance || counts.unavailable ? `${counts.maintenance + counts.unavailable} need attention` : `${counts.available} ready`}
                     </span>
@@ -611,7 +651,7 @@ function RoomManagement() {
                         <span className={`facility-room-status ${ROOM_STATUS_PILL_CLASS[variant.status] || 'pill-active'}`}>{variant.status || 'Available'}</span>
                         <strong className="facility-room-rate">{variantRateLabel(variant)}</strong>
                       </div>
-                    )) : <div className="facility-room-type-empty">Add at least one room type and hourly price.</div>}
+                    )) : <div className="facility-room-type-empty">No rooms remain. Add a room or remove this facility.</div>}
                   </div>
                 </div>
 
@@ -619,7 +659,7 @@ function RoomManagement() {
                   {canManage ? <>
                     <button type="button" className="facility-add-room-button" onClick={() => openEditModal(facility, { addRoom: true })}><Plus size={17} aria-hidden="true" />Add room</button>
                     <button type="button" className="facility-edit-button" onClick={() => openEditModal(facility)}><Pencil size={16} aria-hidden="true" />Manage</button>
-                    <button type="button" className="facility-remove-button" aria-label={`Remove ${facility.name}`} title={`Remove ${facility.name}`} onClick={() => quickDelete(facility._id)}><Trash2 size={16} aria-hidden="true" /></button>
+                    <button type="button" className="facility-remove-button" aria-label={`Remove ${facility.name}`} title={variants.length ? 'Remove its rooms first' : `Remove ${facility.name}`} onClick={() => quickDelete(facility._id)}><Trash2 size={16} aria-hidden="true" /></button>
                   </> : <span>View only</span>}
                 </div>
               </article>
@@ -731,12 +771,34 @@ function RoomManagement() {
                 </div>
 
                 <div className="fm-section">
+                  <div className="fm-section-title"><Tags size={16} aria-hidden="true" /> Full-payment discount</div>
+                  <div className="ffield">
+                    <label className="flabel" htmlFor="facility-discount">Facility discount (%)</label>
+                    <span className="flabel-hint">Applies to the room charge when guests choose Pay in full. Corkage and optional services are excluded. A room can use its own percentage.</span>
+                    <input id="facility-discount" type="number" min="0" max="99" step="0.01" value={form.discountPercent} onChange={(event) => setForm((current) => ({ ...current, discountPercent: event.target.value }))} />
+                  </div>
+                </div>
+
+                <div className="fm-section">
+                  <div className="fm-section-title"><Plus size={16} aria-hidden="true" /> Optional services</div>
+                  <span className="flabel-hint">Guests can add these once per reservation. For example, a court referee for a flat fee.</span>
+                  {(form.addOns || []).map((addOn, index) => (
+                    <div className="frow fm-addon-row" key={index}>
+                      <div className="ffield"><label className="flabel" htmlFor={`facility-addon-name-${index}`}>Service</label><input id={`facility-addon-name-${index}`} type="text" maxLength="80" placeholder="e.g. Referee" value={addOn.name} onChange={(event) => updateAddOn(index, 'name', event.target.value)} /></div>
+                      <div className="ffield"><label className="flabel" htmlFor={`facility-addon-fee-${index}`}>Flat fee (₱)</label><input id={`facility-addon-fee-${index}`} type="number" min="0.01" step="0.01" value={addOn.fee} onChange={(event) => updateAddOn(index, 'fee', event.target.value)} /></div>
+                      <button type="button" className="chip-add-btn" aria-label={`Remove service ${addOn.name || index + 1}`} onClick={() => setForm((current) => ({ ...current, addOns: current.addOns.filter((_, i) => i !== index) }))}><Trash2 size={16} aria-hidden="true" /></button>
+                    </div>
+                  ))}
+                  <button type="button" className="btn-cancel fm-add-service" disabled={(form.addOns || []).length >= 10} onClick={() => setForm((current) => ({ ...current, addOns: [...(current.addOns || []), { name: '', fee: '' }] }))}><Plus size={16} aria-hidden="true" /> Add service</button>
+                </div>
+
+                <div className="fm-section">
                 <div className="ffield">
                   <label className="flabel"><ImageIcon size={15} aria-hidden="true" /> Cover photo</label>
-                  <span className="flabel-hint">Use a bright landscape photo that helps guests recognize the space.</span>
+                  <span className="flabel-hint">Choose or drag a landscape photo here. If blank, the facility name appears instead.</span>
                   <div className="fm-upload-zone">
                   <ImageUploadPreview
-                    title={existingImageUrl || selectedImageFile ? 'Click to change image' : 'Click to upload facility image'}
+                    title={existingImageUrl || selectedImageFile ? 'Click or drop to change image' : 'Click or drop a facility image'}
                     subtitle="PNG, JPG up to 10MB"
                     accept="image/png,image/jpeg"
                     maxSizeMB={10}
@@ -758,7 +820,7 @@ function RoomManagement() {
                 </div>
 
                 {form.variants.length === 0 ? (
-                  <div className="variant-empty">No rooms yet — add one to get started.</div>
+                  <div className="variant-empty">{editingId ? 'No rooms left. Save changes, then you can delete this facility.' : 'No rooms yet — add one to get started.'}</div>
                 ) : null}
 
                 <div className="fm-room-grid">
@@ -768,7 +830,7 @@ function RoomManagement() {
                       onClick={() => { setFeatureInput(''); setActiveRoomIndex(i); }}
                     >
                       <div className="fm-room-card-media">
-                        {variantThumbSrc(i, v) ? <img src={variantThumbSrc(i, v)} alt="" /> : <ImageIcon size={22} aria-hidden="true" />}
+                        {variantThumbSrc(i, v) ? <img src={variantThumbSrc(i, v)} alt="" /> : <span className="facility-name-placeholder">{v.label || 'Untitled Room'}</span>}
                         <span className={`pill ${ROOM_STATUS_PILL_CLASS[v.status] || 'pill-done'}`}>{v.status || 'Available'}</span>
                       </div>
                       <div className="fm-room-card-body">
@@ -842,6 +904,12 @@ function RoomManagement() {
                       <option value="flat">Same rate all day</option>
                       <option value="time-based">Daytime and evening rates</option>
                     </select>
+                  </div>
+
+                  <div className="ffield">
+                    <label className="flabel" htmlFor={`room-discount-${activeRoomIndex}`}>Room discount (%)</label>
+                    <span className="flabel-hint">Leave blank to use the facility discount. Enter 0 to turn it off for this room.</span>
+                    <input id={`room-discount-${activeRoomIndex}`} type="number" min="0" max="99" step="0.01" placeholder="Use facility discount" value={activeRoom.discountPercent ?? ''} onChange={(event) => updateVariant(activeRoomIndex, 'discountPercent', event.target.value)} />
                   </div>
 
                   {activeRoom.pricingMode === 'time-based' && (
@@ -925,12 +993,13 @@ function RoomManagement() {
                   <div className="ffield">
                     <div className="fm-upload-zone">
                     <ImageUploadPreview
-                      title={variantThumbSrc(activeRoomIndex, activeRoom) ? 'Click to change image' : 'Click to upload image'}
+                      key={activeRoomIndex}
+                      title={activeRoom.image || variantImageFiles[activeRoomIndex] ? 'Click or drop to change image' : 'Click or drop a room image'}
                       subtitle="PNG, JPG up to 10MB"
                       accept="image/png,image/jpeg"
                       maxSizeMB={10}
                       maxHeight={130}
-                      value={variantThumbSrc(activeRoomIndex, activeRoom) || ''}
+                      value={variantImagePreviews[activeRoomIndex] || (activeRoom.image ? resolveImageUrl(activeRoom.image) : '')}
                       onFileSelect={(file) => handleVariantImageSelect(activeRoomIndex, file)}
                     />
                     </div>
@@ -980,24 +1049,6 @@ function RoomManagement() {
               </div>
             )}
 
-            <div className="fm-step-nav">
-              <button
-                type="button"
-                className="btn-cancel"
-                disabled={stepIndex === 0}
-                onClick={() => setFormStep(FORM_STEPS[stepIndex - 1].key)}
-              >
-                <ArrowLeft size={16} aria-hidden="true" /> Back
-              </button>
-              <button
-                type="button"
-                className="btn-cancel"
-                disabled={stepIndex === FORM_STEPS.length - 1}
-                onClick={() => setFormStep(FORM_STEPS[stepIndex + 1].key)}
-              >
-                Next <ArrowRight size={16} aria-hidden="true" />
-              </button>
-            </div>
           </div>
 
           <details className="fm-preview-col" open>

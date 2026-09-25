@@ -79,6 +79,39 @@ function computeDownPayment(hourlyRatesOrPrice, hours = 1) {
   return roundMoney(Math.max(0, Number(hourlyRatesOrPrice) || 0) * requestedHours);
 }
 
+function quoteOnlineBooking({ room, variant, basePrice, paymentChoice = "deposit", selectedAddOns = [] }) {
+  const roomCharge = Number(basePrice.roomCharge) || 0;
+  const ownDiscount = variant?.discountPercent;
+  const discountPercent = Math.max(0, Math.min(99, Number(ownDiscount === null || ownDiscount === undefined || ownDiscount === "" ? room.discountPercent : ownDiscount) || 0));
+  const eligibleDiscount = roundMoney(roomCharge * discountPercent / 100);
+  const discountAmount = paymentChoice === "full" ? eligibleDiscount : 0;
+  const names = selectedAddOns || [];
+  if (new Set(names).size !== names.length) throw new AppError(400, "Choose each optional service only once.");
+  const addOns = names.map((name) => {
+    const item = (room.addOns || []).find((service) => service.name === name);
+    if (!item) throw new AppError(400, "An optional service is no longer available. Please review your booking.");
+    return { name: item.name, fee: Number(item.fee) };
+  });
+  const addOnFee = roundMoney(addOns.reduce((sum, item) => sum + item.fee, 0));
+  const amount = roundMoney(roomCharge - discountAmount + addOnFee + Number(basePrice.corkageFee || 0));
+  const downPayment = paymentChoice === "full" ? amount : Math.min(amount, computeDownPayment(basePrice.hourlyRates, 1));
+  return { discountPercent, eligibleDiscount, discountAmount, addOns, addOnFee, amount, downPayment };
+}
+
+function repriceExistingBooking(basePrice, booking) {
+  const roomCharge = Number(basePrice.roomCharge) || 0;
+  const discountPercent = Math.max(0, Math.min(99, Number(booking.discountPercent) || 0));
+  const eligibleDiscount = roundMoney(roomCharge * discountPercent / 100);
+  const discountAmount = booking.paymentChoice === "full" ? eligibleDiscount : 0;
+  const addOnFee = roundMoney((booking.addOns || []).reduce((sum, item) => sum + Number(item.fee || 0), 0));
+  return {
+    eligibleDiscount,
+    discountAmount,
+    addOnFee,
+    amount: roundMoney(roomCharge - discountAmount + addOnFee + Number(basePrice.corkageFee || 0)),
+  };
+}
+
 function calculateSessionExtension({ session, room, addedHours, startHour }) {
   const existingRates = Array.isArray(session.hourlyRates) ? session.hourlyRates.map(Number) : [];
   if (!existingRates.length && Number.isInteger(Number(session.duration))) {
@@ -99,6 +132,8 @@ module.exports = {
   CORKAGE_FEE,
   calculateBookingPrice,
   computeDownPayment,
+  quoteOnlineBooking,
+  repriceExistingBooking,
   calculateSessionExtension,
   parsePaxCapacity,
   rateForHour,

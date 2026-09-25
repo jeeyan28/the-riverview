@@ -1,12 +1,13 @@
 const express = require("express");
 const router = express.Router();
 const Room = require("../model/room");
+const { MonitorRoom } = require("../model/monitoring");
 const upload = require("../middleware/upload");
 const { requirePermission } = require("../middleware/adminAuth");
 const { validate } = require("../middleware/validate");
 const { PERMISSIONS } = require("../utils/permissions");
 const { canonicalServiceName, escapeRegExp } = require("../utils/roomCatalog");
-const { roomIdParamsSchema, emptyBodySchema, roomWriteSchema } = require("../validation/roomSchemas");
+const { roomIdParamsSchema, emptyBodySchema, roomWriteSchema, roomUpdateSchema } = require("../validation/roomSchemas");
 const { logAudit } = require("../utils/auditLog");
 const { syncRoomInventory, deactivateRoomInventory } = require("../utils/syncRoomInventory");
 const AppError = require("../utils/appError");
@@ -36,6 +37,7 @@ function parseRoomBody(req, res, next) {
       name: canonicalName || req.body.name,
       features: parseJsonField(req.body.features, [], "features"),
       variants: parseJsonField(req.body.variants, [], "variants"),
+      addOns: parseJsonField(req.body.addOns, [], "addOns"),
       variantImageIndexes: parseJsonField(req.body.variantImageIndexes, [], "variantImageIndexes"),
     };
     next();
@@ -65,6 +67,8 @@ function attachUploadedImages(req) {
     price: req.body.price,
     capacity: req.body.capacity,
     features: req.body.features,
+    discountPercent: req.body.discountPercent,
+    addOns: req.body.addOns,
     variants,
     ...(req.files?.image?.[0] ? { image: req.files.image[0].path } : {}),
   };
@@ -79,7 +83,7 @@ async function findDuplicateService(name, excludingId) {
 
 router.get("/", async (req, res) => {
   try {
-    const rooms = await Room.find().sort({ name: 1 });
+    const rooms = await Room.find({ "variants.0": { $exists: true } }).sort({ name: 1 });
     res.json(rooms);
   } catch (err) {
     console.error(err);
@@ -124,7 +128,7 @@ router.post("/", requirePermission(PERMISSIONS.ROOM_MANAGE), roomUploads, parseR
   }
 });
 
-router.put("/:id", requirePermission(PERMISSIONS.ROOM_MANAGE), roomUploads, parseRoomBody, validate(roomIdParamsSchema, "params"), validate(roomWriteSchema), async (req, res) => {
+router.put("/:id", requirePermission(PERMISSIONS.ROOM_MANAGE), roomUploads, parseRoomBody, validate(roomIdParamsSchema, "params"), validate(roomUpdateSchema), async (req, res) => {
   try {
     const duplicate = await findDuplicateService(req.body.name, req.params.id);
     if (duplicate) return res.status(409).json({ message: `${duplicate.name} already exists. Edit that facility instead.` });
@@ -146,8 +150,20 @@ router.put("/:id", requirePermission(PERMISSIONS.ROOM_MANAGE), roomUploads, pars
 
 router.delete("/:id", requirePermission(PERMISSIONS.ROOM_MANAGE), validate(roomIdParamsSchema, "params"), validate(emptyBodySchema), async (req, res) => {
   try {
-    const room = await Room.findByIdAndDelete(req.params.id);
+    const room = await Room.findById(req.params.id);
     if (!room) return res.status(404).json({ message: "Facility not found." });
+    const unitCount = (room.variants || []).reduce((count, variant) => count + Math.max(1, Number(variant.roomCount) || 1), 0);
+    if (unitCount > 0) {
+      return res.status(409).json({ message: `Remove all ${unitCount} room${unitCount === 1 ? "" : "s"} from this facility and save it before deleting.` });
+    }
+    const remainingMonitorRoom = await MonitorRoom.exists({
+      facilityName: new RegExp(`^${escapeRegExp(room.name)}$`, "i"),
+      status: { $ne: "Inactive" },
+    });
+    if (remainingMonitorRoom) {
+      return res.status(409).json({ message: "Remove or finish the remaining Monitor rooms before deleting this facility." });
+    }
+    await Room.deleteOne({ _id: room._id });
     await deactivateRoomInventory(room.name);
     await logAudit({ category: "Room Management", action: "deleted", description: `deleted facility "${room.name}"`, user: req.user });
     res.json({ message: "Facility deleted." });

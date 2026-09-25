@@ -8,6 +8,7 @@ import LoginHistory from './LoginHistory';
 import { useAuth } from '../../context/AuthContext';
 import { settingsService } from '../../services/settings';
 import { usersService } from '../../services/users';
+import { useSiteSettings } from '../../hooks/useSiteSettings';
 import { PASSWORD_REQUIREMENTS } from '../../utils/password';
 import { BellRing, History, Settings2, UserRound } from 'lucide-react';
 
@@ -22,6 +23,16 @@ const SETTINGS_MANAGE_PERMISSION = 'settings:manage';
 const DEFAULT_OPEN_TIME = '07:00';
 const DEFAULT_CLOSE_TIME = '00:00';
 const DEFAULT_ANNOUNCEMENT_EMOJI = '📣';
+const SCHEDULE_HOURS = Array.from({ length: 24 }, (_, hour) => ({
+  value: `${String(hour).padStart(2, '0')}:00`,
+  label: `${hour % 12 || 12}:00 ${hour < 12 ? 'AM' : 'PM'}`,
+}));
+
+function scheduleTimeLabel(value) {
+  const hour = Number.parseInt(String(value).split(':')[0], 10);
+  const minute = String(value).split(':')[1] || '00';
+  return `${hour % 12 || 12}:${minute} ${hour < 12 ? 'AM' : 'PM'}`;
+}
 
 function Settings() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -83,36 +94,13 @@ const DAY_PILLS = [
 
 const DEFAULT_OPEN_DAYS_BEFORE_LOAD = [0, 1, 2, 3, 4, 5, 6];
 function ScheduleTimeField({ id, label, value, onChange }) {
-  const hour24 = Number(value.slice(0, 2));
-  const hour12 = hour24 % 12 || 12;
-  const minutes = value.slice(3, 5) || '00';
-  const period = hour24 < 12 ? 'AM' : 'PM';
-  const [draftHour, setDraftHour] = useState(String(hour12));
-
-  useEffect(() => { setDraftHour(String(hour12)); }, [value]);
-
-  function applyTime(hourText, nextPeriod = period) {
-    const hour = Number(hourText);
-    if (!Number.isInteger(hour) || hour < 1 || hour > 12) {
-      setDraftHour(String(hour12));
-      return;
-    }
-    setDraftHour(String(hour));
-    const nextHour = hour % 12 + (nextPeriod === 'PM' ? 12 : 0);
-    onChange(`${String(nextHour).padStart(2, '0')}:${minutes}`);
-  }
-
   return (
     <div className="sched-field">
       <label htmlFor={id}>{label}</label>
-      <div className="sched-time-control">
-        <i className="ti ti-clock" aria-hidden="true"></i>
-        <input id={id} type="text" inputMode="numeric" maxLength={2} value={draftHour} aria-label={`${label} hour, 1 to 12`} onFocus={(event) => event.target.select()} onChange={(event) => { if (/^\d{0,2}$/.test(event.target.value)) setDraftHour(event.target.value); }} onBlur={() => applyTime(draftHour)} onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur(); }} />
-        <span className="sched-time-minutes">:{minutes}</span>
-        <div className="sched-period" role="group" aria-label={`${label} period`}>
-          {['AM', 'PM'].map((choice) => <button key={choice} type="button" aria-pressed={period === choice} className={period === choice ? 'active' : ''} onClick={() => applyTime(draftHour, choice)}>{choice}</button>)}
-        </div>
-      </div>
+      <select id={id} className="sched-time-select" value={value} onChange={(event) => onChange(event.target.value)}>
+        {!SCHEDULE_HOURS.some((option) => option.value === value) && <option value={value}>{scheduleTimeLabel(value)}</option>}
+        {SCHEDULE_HOURS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+      </select>
     </div>
   );
 }
@@ -127,14 +115,17 @@ function formatHolidayDate(dateStr) {
 
 function OperatingScheduleAndHolidays() {
   const { guardPermission } = useAuth();
+  const { refetch: refreshSiteSettings } = useSiteSettings();
 
   const [loading, setLoading] = useState(true);
   const [openTime, setOpenTime] = useState(DEFAULT_OPEN_TIME);
   const [closeTime, setCloseTime] = useState(DEFAULT_CLOSE_TIME);
   const [openDays, setOpenDays] = useState(DEFAULT_OPEN_DAYS_BEFORE_LOAD);
+  const [savedSchedule, setSavedSchedule] = useState(null);
   const [holidays, setHolidays] = useState([]);
 
   const [saveState, setSaveState] = useState('idle');
+  const [scheduleError, setScheduleError] = useState('');
   const [addingHoliday, setAddingHoliday] = useState(false);
   const [holidayModalOpen, setHolidayModalOpen] = useState(false);
   const [holidayDraft, setHolidayDraft] = useState({ name: '', date: '' });
@@ -147,6 +138,7 @@ function OperatingScheduleAndHolidays() {
       setOpenTime(oh.openTime || DEFAULT_OPEN_TIME);
       setCloseTime(oh.closeTime || DEFAULT_CLOSE_TIME);
       setOpenDays(Array.isArray(oh.openDays) ? oh.openDays : [0, 1, 2, 3, 4, 5, 6]);
+      setSavedSchedule({ openTime: oh.openTime || DEFAULT_OPEN_TIME, closeTime: oh.closeTime || DEFAULT_CLOSE_TIME, openDays: Array.isArray(oh.openDays) ? oh.openDays : [0, 1, 2, 3, 4, 5, 6] });
       setHolidays(settings.holidays || []);
     } catch (err) {
       console.error(err);
@@ -165,13 +157,16 @@ function OperatingScheduleAndHolidays() {
 
   async function handleSaveSchedule() {
     if (!guardPermission(SETTINGS_MANAGE_PERMISSION, "You don't have permission to change operating hours.")) return;
+    setScheduleError('');
     setSaveState('saving');
     try {
-      await settingsService.updateOperatingHours({ openTime, closeTime, openDays });
+      const saved = await settingsService.updateOperatingHours({ openTime, closeTime, openDays });
+      setSavedSchedule({ openTime: saved.openTime, closeTime: saved.closeTime, openDays: saved.openDays });
+      await refreshSiteSettings();
       setSaveState('saved');
       setTimeout(() => setSaveState('idle'), 1500);
     } catch (err) {
-      alert(err.message);
+      setScheduleError(err.message || 'Could not save the operating schedule.');
       setSaveState('idle');
     }
   }
@@ -216,23 +211,25 @@ function OperatingScheduleAndHolidays() {
   }
 
   const sortedHolidays = [...holidays].sort((a, b) => a.date.localeCompare(b.date));
-  const closesNextDay = Number(closeTime.replace(':', '')) <= Number(openTime.replace(':', ''));
+  const closesNextDay = closeTime <= openTime;
+  const scheduleDirty = savedSchedule && (
+    savedSchedule.openTime !== openTime || savedSchedule.closeTime !== closeTime ||
+    [...savedSchedule.openDays].sort().join(',') !== [...openDays].sort().join(',')
+  );
 
   return (
     <>
       <div className="card">
         <div className="card-head">
-          <span className="card-title">
-            <i className="ti ti-clock" style={{ color: 'var(--teal)', marginRight: 6 }}></i>Operating Schedule
-          </span>
+          <span className="card-title"><i className="ti ti-clock" style={{ color: 'var(--teal)', marginRight: 6 }}></i>Operating hours</span>
         </div>
         <div className="sched-2col">
-          <ScheduleTimeField id="schedule-open-time" label="Opens at" value={openTime} onChange={setOpenTime} />
-          <ScheduleTimeField id="schedule-close-time" label="Closes at" value={closeTime} onChange={setCloseTime} />
+          <ScheduleTimeField id="schedule-open-time" label="Opens" value={openTime} onChange={setOpenTime} />
+          <ScheduleTimeField id="schedule-close-time" label="Closes" value={closeTime} onChange={setCloseTime} />
         </div>
-        <p className="sched-summary">Type an hour and choose AM or PM · Manila time{closesNextDay ? ' · Closes the next day' : ''}</p>
+        <p className="sched-summary">{scheduleTimeLabel(openTime)} to {scheduleTimeLabel(closeTime)}{closesNextDay ? ' next day' : ''} · Manila time</p>
         <div className="sched-field" style={{ marginTop: 4 }}>
-          <div className="sched-days-head"><label>Open days</label><div className="sched-day-presets"><button type="button" onClick={() => setOpenDays([0, 1, 2, 3, 4, 5, 6])}>Every day</button><button type="button" onClick={() => setOpenDays([1, 2, 3, 4, 5])}>Weekdays</button></div></div>
+          <div className="sched-days-head"><label>Open days</label><button type="button" className="sched-all-days" onClick={() => setOpenDays([0, 1, 2, 3, 4, 5, 6])}>Every day</button></div>
           <div className="day-row" id="op-day-row">
             {DAY_PILLS.map((d) => (
               <button
@@ -250,15 +247,18 @@ function OperatingScheduleAndHolidays() {
             ))}
           </div>
         </div>
+        <p className={`sched-save-status${scheduleError ? ' is-error' : scheduleDirty ? ' is-dirty' : ''}`} role="status">
+          {scheduleError || (scheduleDirty ? 'Unsaved changes — save to update customer booking times.' : saveState === 'saved' ? 'Schedule saved.' : 'Customer booking times use the saved schedule.')}
+        </p>
         <button
           id="op-save-btn"
           className="save-btn"
           style={{ marginTop: 10 }}
           type="button"
-          disabled={loading || saveState === 'saving'}
+          disabled={loading || saveState === 'saving' || !scheduleDirty}
           onClick={handleSaveSchedule}
         >
-          {saveState === 'saving' ? 'Saving…' : saveState === 'saved' ? 'Saved ✓' : 'Save operating schedule'}
+          {saveState === 'saving' ? 'Saving…' : saveState === 'saved' ? 'Saved ✓' : 'Save schedule'}
         </button>
       </div>
 

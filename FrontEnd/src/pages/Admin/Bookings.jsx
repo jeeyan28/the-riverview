@@ -28,9 +28,13 @@ const STATUS_PILL_CLASS = {
   'No Show': 'pill-overdue',
   Confirmed: 'pill-active',
   Overdue: 'pill-overdue',
-  Ongoing: 'pill-active',
+  Ongoing: 'pill-pending',
   Rejected: 'pill-overdue',
 };
+const QUICK_VIEWS = [
+  ['all', 'All'], ['new', 'New'], ['today', 'Today'], ['upcoming', 'Upcoming'],
+  ['ongoing', 'Ongoing'], ['finished', 'Finished'], ['review', 'Needs review'],
+];
 const PAYMENT_METHODS = ['Cash', 'GCash', 'Maya', 'QR Ph', 'Credit / Debit Card'];
 const SEARCH_DEBOUNCE_MS = 350;
 const BOOKINGS_POLL_MS = 15000;
@@ -40,10 +44,22 @@ function ReservationStatus({ booking, now }) {
   const { status, warning } = reservationPresentation(booking, now);
   return (
     <span className="bk-status-cell">
-      <span className={`pill ${STATUS_PILL_CLASS[status] || 'pill-pending'}`}>{status}</span>
-      {warning && <span className={`bk-status-note${warning === 'Overdue' ? ' bk-status-note--overdue' : ''}`}>{warning}</span>}
+      <span className={`pill ${warning === 'Cancellation requested' ? 'pill-pending' : STATUS_PILL_CLASS[status] || 'pill-pending'}`}>{status}</span>
+      {warning && <span className={`bk-status-note${warning === 'Cancellation requested' ? ' bk-status-note--warning' : ''}`}>{warning}</span>}
     </span>
   );
+}
+
+function matchesQuickView(booking, view, now, today) {
+  const status = reservationPresentation(booking, now).status;
+  const start = reservationWindow(booking)?.start;
+  if (view === 'new') return Number.isFinite(Date.parse(booking.createdAt)) && Date.parse(booking.createdAt) >= now - 24 * 60 * 60 * 1000;
+  if (view === 'today') return booking.date === today;
+  if (view === 'upcoming') return status === 'Confirmed' && booking.cancellationStatus !== 'Requested' && start > now;
+  if (view === 'ongoing') return status === 'Ongoing';
+  if (view === 'finished') return status === 'Done' || status === 'No Show';
+  if (view === 'review') return booking.cancellationStatus === 'Requested' || booking.status === 'Pending Payment Verification' || status === 'Overdue';
+  return true;
 }
 
 function shortBookingId(b) {
@@ -65,13 +81,12 @@ function netCollected(b) {
 }
 
 function outstandingBalance(b) {
-  if (['Cancelled', 'Rejected', 'No Show'].includes(reservationPresentation(b).status)) return 0;
+  if (['Cancelled', 'Rejected'].includes(reservationPresentation(b).status)) return 0;
   return Math.max(0, Number(b?.amount || 0) - netCollected(b));
 }
 
 function isFullPayment(b) {
-  return !['Cancelled', 'Rejected', 'No Show'].includes(reservationPresentation(b).status)
-    && Number(b?.amount || 0) > 0 && netCollected(b) >= Number(b.amount);
+  return Number(b?.amount || 0) > 0 && netCollected(b) >= Number(b.amount);
 }
 
 function paymentPlanLabel(b) {
@@ -80,10 +95,11 @@ function paymentPlanLabel(b) {
   const refunded = Number(b?.refundedAmount) || 0;
   const cancellation = cancellationAmounts(b);
   if (b?.status === 'Cancelled' && b?.cancellationStatus === 'Approved' && cancellation.customerCancelled && cancellation.refundRemaining > 0) {
-    return `${formatPeso(paid)} retained · ${formatPeso(cancellation.refundRemaining)} refund to arrange`;
+    return `${isFullPayment(b) ? 'Paid ' : ''}${formatPeso(paid)} retained · ${formatPeso(cancellation.refundRemaining)} refund to arrange`;
   }
-  if (refunded > 0) return `${formatPeso(refunded)} refunded · ${formatPeso(paid)} retained`;
-  if (['Cancelled', 'Rejected', 'No Show'].includes(reservationPresentation(b).status)) return paid > 0 ? `${formatPeso(paid)} retained` : 'No payment retained';
+  if (refunded > 0) return `${formatPeso(refunded)} refunded · ${isFullPayment(b) ? 'Paid ' : ''}${formatPeso(paid)} retained`;
+  if (reservationPresentation(b).status === 'No Show') return `${formatPeso(paid)} paid · ${formatPeso(balance)} remaining`;
+  if (['Cancelled', 'Rejected'].includes(reservationPresentation(b).status)) return paid > 0 ? `${isFullPayment(b) ? 'Paid ' : ''}${formatPeso(paid)} retained` : 'No payment retained';
   if (isFullPayment(b)) return `Paid ${formatPeso(paid)}`;
   if (paid > 0) return `${formatPeso(paid)} paid · ${formatPeso(balance)} remaining`;
   return `${formatPeso(balance)} remaining`;
@@ -127,6 +143,7 @@ function Bookings() {
   const { minDuration, maxDuration } = useSiteSettings();
 
   const [search, setSearch] = useState('');
+  const [quickView, setQuickView] = useState('all');
   const [statusFilter, setStatusFilter] = useState(() => {
     const requested = new URLSearchParams(window.location.search).get('status');
     return RESERVATION_STATUS_FILTERS.includes(requested) ? requested : '';
@@ -220,9 +237,12 @@ function Bookings() {
     };
   }, []);
 
-  const bookings = useMemo(() => statusFilter
-    ? allBookings.filter((booking) => reservationPresentation(booking, clockMs).status === statusFilter)
-    : allBookings, [allBookings, statusFilter, clockMs]);
+  const today = businessDate();
+  const quickViewCounts = useMemo(() => Object.fromEntries(QUICK_VIEWS.map(([key]) => [key, allBookings.filter((booking) => matchesQuickView(booking, key, clockMs, today)).length])), [allBookings, clockMs, today]);
+  const bookings = useMemo(() => allBookings.filter((booking) =>
+    (!statusFilter || reservationPresentation(booking, clockMs).status === statusFilter) &&
+    matchesQuickView(booking, quickView, clockMs, today)
+  ), [allBookings, statusFilter, quickView, clockMs, today]);
 
   function openEditBooking(id) {
     if (!guardPermission('booking:manage')) return;
@@ -231,6 +251,7 @@ function Bookings() {
 
   function clearFilters() {
     setSearch('');
+    setQuickView('all');
     setStatusFilter('');
     setCancellationFilter('');
     setRoomFilter('');
@@ -313,16 +334,6 @@ function Bookings() {
     }
   }
 
-  const stats = useMemo(
-    () => ({
-      total: bookings.length,
-      pendingPayments: bookings.filter((b) => ['Pending', 'Pending Payment Verification', 'Awaiting Online Payment'].includes(b.status)).length,
-      activeGuests: bookings.filter((b) => b.status === 'Ongoing').length,
-      cancelled: bookings.filter((b) => b.status === 'Cancelled').length,
-    }),
-    [bookings]
-  );
-
   const detailBooking = useMemo(() => allBookings.find((b) => b._id === detailId) || null, [allBookings, detailId]);
   const editBooking = useMemo(() => allBookings.find((b) => b._id === editId) || null, [allBookings, editId]);
   const proofBooking = useMemo(() => allBookings.find((b) => b._id === proofId) || null, [allBookings, proofId]);
@@ -366,7 +377,7 @@ function Bookings() {
       label: 'Reservation',
       sortable: true,
       sortValue: (b) => b.reservationCode || shortBookingId(b),
-      render: (b) => <span className="bk-code">{b.reservationCode || shortBookingId(b)}</span>,
+      render: (b) => <span className="bk-code-wrap"><span className="bk-code">{b.reservationCode || shortBookingId(b)}</span>{matchesQuickView(b, 'new', clockMs, today) && <span className="bk-new-badge">New</span>}</span>,
     },
     {
       key: 'guestName',
@@ -453,11 +464,6 @@ function Bookings() {
                     </button>
                   </>
                 )}
-                {reservationPresentation(b, clockMs).status === 'No Show' && (
-                  <button className="tbl-action-btn" style={{ color: 'var(--teal)' }} onClick={() => markBookingDone(b)}>
-                    Done
-                  </button>
-                )}
               </>
             )}
           </div>
@@ -468,23 +474,18 @@ function Bookings() {
 
   return (
     <div className="panel active" id="panel-bookings">
-      <div className="metric-row">
-        <div className="mc">
-          <div className="mc-label"><i className="ti ti-calendar-stats"></i> Total Reservations</div>
-          <div className="mc-val">{stats.total.toLocaleString()}</div>
-        </div>
-        <div className="mc">
-          <div className="mc-label"><i className="ti ti-credit-card"></i> Pending Payments</div>
-          <div className="mc-val">{stats.pendingPayments.toLocaleString()}</div>
-        </div>
-        <div className="mc">
-          <div className="mc-label"><i className="ti ti-users"></i> Active Guests</div>
-          <div className="mc-val">{stats.activeGuests.toLocaleString()}</div>
-        </div>
-        <div className="mc">
-          <div className="mc-label"><i className="ti ti-circle-x"></i> Cancelled</div>
-          <div className="mc-val">{stats.cancelled.toLocaleString()}</div>
-        </div>
+      <div className="bk-quick-views" role="group" aria-label="Reservation views">
+        {QUICK_VIEWS.map(([key, label]) => (
+          <button type="button" key={key} className={`bk-quick-view${quickView === key ? ' is-active' : ''}`} aria-pressed={quickView === key} onClick={() => {
+            setQuickView(key);
+            setStatusFilter('');
+            setCancellationFilter('');
+            setDateFrom('');
+            setDateTo('');
+          }}>
+            <span>{label}</span><strong>{quickViewCounts[key] || 0}</strong>
+          </button>
+        ))}
       </div>
 
       <div className="card bk-toolbar-card">
@@ -542,7 +543,7 @@ function Bookings() {
                 onChange={(event) => setDateTo(event.target.value)}
               />
             </div>
-            {(search || statusFilter || cancellationFilter || roomFilter || dateFrom || dateTo) && (
+            {(search || quickView !== 'all' || statusFilter || cancellationFilter || roomFilter || dateFrom || dateTo) && (
               <button type="button" className="bk-clear-btn" onClick={clearFilters}>
                 <i className="ti ti-x"></i> Clear
               </button>
@@ -551,7 +552,7 @@ function Bookings() {
           </div>
         </div>
         <div className="bk-results-row">
-          {loading ? 'Loading reservations…' : `${bookings.length.toLocaleString()} reservation${bookings.length === 1 ? '' : 's'} found`}
+          {loading ? 'Loading reservations…' : `${bookings.length.toLocaleString()} reservation${bookings.length === 1 ? '' : 's'} · newest first`}
         </div>
       </div>
 
@@ -631,14 +632,18 @@ function Bookings() {
                       <p>{guestPhoneDisplay(detailBooking.guestContact)}</p>
                     </div>
                     <div className="bd-field"><label>Number of Guests</label><p>{detailBooking.guestCount ? String(detailBooking.guestCount) : '—'}</p></div>
-                    <div className="bd-field"><label>Corkage</label><p>{Number(detailBooking.corkageFee) > 0 ? formatPeso(detailBooking.corkageFee) : 'None'}</p></div>
                   </div>
                 </div>
 
                 <div className="bd-card">
                   <div className="bd-section-title"><i className="ti ti-credit-card"></i> Payment Breakdown</div>
                   <div className="bd-grid bd-financial-grid">
-                    <div className="bd-field"><label>Total charge</label><p>{formatPeso(detailBooking.amount)}</p></div>
+                    <div className="bd-field"><label>Room charge</label><p>{formatPeso(Math.max(0, Number(detailBooking.roomCharge ?? (Number(detailBooking.amount || 0) - Number(detailBooking.corkageFee || 0)))))}</p></div>
+                    {Number(detailBooking.discountAmount) > 0 && <div className="bd-field"><label>Pay-in-full discount ({detailBooking.discountPercent}%)</label><p>−{formatPeso(detailBooking.discountAmount)}</p></div>}
+                    {(detailBooking.addOns || []).map((service) => <div className="bd-field" key={service.name}><label>{service.name}</label><p>{formatPeso(service.fee)}</p></div>)}
+                    <div className="bd-field"><label>Corkage</label><p>{formatPeso(detailBooking.corkageFee || 0)}</p></div>
+                    {detailBooking.paymentChoice === 'deposit' && Number(detailBooking.eligibleDiscount) > 0 && <div className="bd-field"><label>Discount to arrange at venue</label><p>{formatPeso(detailBooking.eligibleDiscount)}</p></div>}
+                    <div className="bd-field bd-field--total"><label>Total charge</label><p>{formatPeso(detailBooking.amount)}</p></div>
                     <div className="bd-field"><label>Payment received</label><p>{formatPeso(netCollected(detailBooking))}</p></div>
                     <div className="bd-field"><label>Balance remaining</label><p>{formatPeso(outstandingBalance(detailBooking))}</p></div>
                   </div>
@@ -727,7 +732,7 @@ function Bookings() {
                     style={{ color: 'var(--teal)', borderColor: 'rgba(45,212,191,.35)' }}
                     onClick={() => markBookingDone(detailBooking)}
                   >
-                    Mark Done
+                    {reservationPresentation(detailBooking, clockMs).status === 'No Show' ? 'Correct to Done' : 'Mark Done'}
                   </button>
                 )}
                 {canManage && ['Pending', 'Confirmed'].includes(detailBooking.status) && reservationPresentation(detailBooking, clockMs).status !== 'No Show' && (

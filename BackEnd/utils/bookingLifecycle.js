@@ -40,6 +40,16 @@ function bookingStartMs(date, time) {
   return result;
 }
 
+function bookingSessionEnd(booking, now = Date.now()) {
+  const start = bookingStartMs(booking?.date, booking?.timeIn);
+  const duration = Number(booking?.duration);
+  if (!Number.isFinite(start) || !Number.isInteger(duration) || duration <= 0) throw new AppError(409, "This reservation has an invalid schedule.");
+  const end = start + duration * 3600000;
+  if (now < start) throw new AppError(409, "This reservation has not started yet.");
+  if (now >= end) throw new AppError(409, "This reservation's scheduled time has ended.");
+  return new Date(end);
+}
+
 function completeReservationFields(booking, { now = Date.now(), hasMonitorSession = false } = {}) {
   if (hasMonitorSession) throw new AppError(409, "Finish the linked session in Room Monitoring instead.");
   if (booking.status === "No Show") return { status: "Done", noShowAt: null };
@@ -124,4 +134,4 @@ function reviewCancellationFields(booking, { decision, refundedAmount = booking.
   };
 }
 
-module.exports = { money, bookingCollected, financialFields, fullOrDeferredPaymentFields, bookingStartMs, completeReservationFields, extendSessionFields, endSessionFields, firstHourCharge, cancellationRefundLimit, reviewCancellationFields };
+module.exports = { money, bookingCollected, financialFields, fullOrDeferredPaymentFields, bookingStartMs, bookingSessionEnd, completeReservationFields, extendSessionFields, endSessionFields, firstHourCharge, cancellationRefundLimit, reviewCancellationFields };

@@ -2,6 +2,7 @@ const express = require('express');
 const { requirePermission } = require('../middleware/adminAuth');
 const { PERMISSIONS } = require('../utils/permissions');
 const { getSalesReport } = require('../utils/salesReport');
+const { getConfirmedBookingTrend } = require('../utils/confirmedBookingTrend');
 const { createWorkbook, addSummarySheet, addActivitySheet, addRoomTypeSheet, styleHeading } = require('../utils/reportWorkbook');
 
 const router = express.Router();
@@ -10,6 +11,15 @@ router.use(requirePermission(PERMISSIONS.REPORTS_VIEW));
 function queryRange(req) {
   return { from: req.query.from, to: req.query.to, source: req.query.source || 'all' };
 }
+
+router.get('/confirmed-booking-trend', async (req, res) => {
+  try {
+    res.json(await getConfirmedBookingTrend(req.query.interval || 'daily'));
+  } catch (err) {
+    console.error(err);
+    res.status(err.status || 500).json({ message: err.status === 400 ? err.message : 'Could not load confirmed booking trend.' });
+  }
+});
 
 router.get('/', async (req, res) => {
   try {

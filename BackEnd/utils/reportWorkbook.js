@@ -146,7 +146,7 @@ function addMonitoringGridSheets(workbook, rows = [], inventory = [], range = {}
       unit.rows.sort((a, b) => new Date(a.startTime) - new Date(b.startTime)).forEach((row, rowIndex) => {
         const outputRow = 5 + rowIndex;
         const startSerial = excelManilaSerial(row.startTime);
-        const endSerial = excelManilaSerial(new Date(new Date(row.startTime).getTime() + (Number(row.duration) || 0) * 60 * 60 * 1000));
+        const endSerial = excelManilaSerial(row.scheduledEndTime || new Date(new Date(row.startTime).getTime() + (Number(row.duration) || 0) * 60 * 60 * 1000));
         const timeFormat = singleDay ? 'h:mm AM/PM' : 'm/d/yyyy h:mm AM/PM';
         const startCell = sheet.getCell(outputRow, startColumn);
         const endCell = sheet.getCell(outputRow, startColumn + 1);

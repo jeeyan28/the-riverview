@@ -15,12 +15,13 @@ export function operatingHoursSummary(settings, { includeDays = true } = {}) {
   const hours = settings?.operatingHours;
   const open = formatClock(hours?.openTime, '7AM');
   const close = formatClock(hours?.closeTime, '12AM');
+  const closeLabel = hours?.closeTime && hours?.openTime && hours.closeTime <= hours.openTime ? `${close} next day` : close;
   const openDays = Array.isArray(hours?.openDays) ? [...new Set(hours.openDays)] : [0, 1, 2, 3, 4, 5, 6];
 
-  if (!includeDays) return `${open}–${close}`;
-  if (openDays.length === 7) return `Open daily ${open}–${close}`;
+  if (!includeDays) return `${open}–${closeLabel}`;
+  if (openDays.length === 7) return `Open daily ${open}–${closeLabel}`;
   if (openDays.length === 0) return 'Temporarily closed';
 
   const labels = DAY_NAMES.filter((_, index) => openDays.includes(index));
-  return `${labels.join(', ')} · ${open}–${close}`;
+  return `${labels.join(', ')} · ${open}–${closeLabel}`;
 }

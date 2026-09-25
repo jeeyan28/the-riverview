@@ -8,6 +8,7 @@ import { useRevenueReport } from '../../hooks/useRevenueReport';
 import { businessDate } from '../../utils/businessDate';
 import { formatPeso } from '../../utils/currency';
 import { formatTime12 } from '../../utils/time';
+import { reportsService } from '../../services/reports';
 
 function displayDate(value) {
   if (!value) return '—';
@@ -15,14 +16,61 @@ function displayDate(value) {
   return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
+function trendLabel(period, interval) {
+  if (interval === 'monthly') return new Date(`${period.start}T12:00:00+08:00`).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+  if (interval === 'weekly') return `${displayDate(period.start)}–${displayDate(period.end)}`;
+  return displayDate(period.start);
+}
+
 function Analytics() {
   const [from, setFrom] = useState(() => businessDate());
   const [to, setTo] = useState(() => businessDate());
   const [source, setSource] = useState('all');
   const [printRequested, setPrintRequested] = useState(false);
+  const [trendInterval, setTrendInterval] = useState('daily');
+  const [trend, setTrend] = useState(null);
+  const [trendLoading, setTrendLoading] = useState(true);
+  const [trendError, setTrendError] = useState('');
   const { data, loading, error, reload } = useRevenueReport(from, to, source);
   const revenueCanvasRef = useRef(null);
   const facilityCanvasRef = useRef(null);
+  const trendCanvasRef = useRef(null);
+
+  useEffect(() => {
+    let current = true;
+    setTrendLoading(true);
+    setTrendError('');
+    reportsService.getConfirmedBookingTrend(trendInterval)
+      .then((result) => { if (current) setTrend(result); })
+      .catch((err) => { if (current) { setTrend(null); setTrendError(err.message || 'Could not load confirmed bookings.'); } })
+      .finally(() => { if (current) setTrendLoading(false); });
+    return () => { current = false; };
+  }, [trendInterval]);
+
+  useEffect(() => {
+    if (trendLoading || !trend?.periods?.length || !trendCanvasRef.current) return undefined;
+    const app = document.querySelector('#app');
+    const styles = app ? getComputedStyle(app) : null;
+    const textColor = styles?.getPropertyValue('--muted').trim() || '#6B7280';
+    const gridColor = styles?.getPropertyValue('--border').trim() || 'rgba(16,24,40,.08)';
+    const chart = new Chart(trendCanvasRef.current, {
+      type: 'bar',
+      data: {
+        labels: trend.periods.map((period) => trendLabel(period, trend.interval)),
+        datasets: [{ label: 'Confirmed bookings', data: trend.periods.map((period) => period.count), backgroundColor: '#00C9A7', borderRadius: 5, maxBarThickness: 46 }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: (item) => `${item.raw} confirmed booking${item.raw === 1 ? '' : 's'}` } } },
+        scales: {
+          x: { grid: { display: false }, ticks: { color: textColor, maxTicksLimit: 14 } },
+          y: { beginAtZero: true, grid: { color: gridColor }, ticks: { color: textColor, precision: 0, stepSize: 1 } },
+        },
+      },
+    });
+    return () => chart.destroy();
+  }, [trend, trendLoading]);
 
   useEffect(() => {
     if (!printRequested) return undefined;
@@ -40,13 +88,18 @@ function Analytics() {
     const textColor = styles?.getPropertyValue('--muted').trim() || '#6B7280';
     const gridColor = styles?.getPropertyValue('--border').trim() || 'rgba(16,24,40,.08)';
     const labels = (data.daily || []).map((day) => displayDate(day.date));
+    const sourceByDate = new Map((data.daily || []).map((day) => [day.date, { booking: 0, walkin: 0 }]));
+    (data.rows || []).forEach((row) => {
+      const bucket = sourceByDate.get(row.date);
+      if (bucket) bucket[row.source === 'booking' ? 'booking' : 'walkin'] += Number(row.collected || 0);
+    });
     const revenueChart = new Chart(revenueCanvasRef.current, {
       type: 'line',
       data: {
         labels,
         datasets: [
-          { label: 'Collected', data: (data.daily || []).map((day) => day.collected), borderColor: '#00C9A7', backgroundColor: 'rgba(0,201,167,.12)', fill: true, tension: .3, pointRadius: 2 },
-          { label: 'Charges', data: (data.daily || []).map((day) => day.charged), borderColor: '#EF3E6D', backgroundColor: 'transparent', fill: false, tension: .3, pointRadius: 2 },
+          { label: 'Reservations', data: (data.daily || []).map((day) => sourceByDate.get(day.date)?.booking || 0), borderColor: '#00C9A7', backgroundColor: 'rgba(0,201,167,.12)', fill: true, tension: .3, pointRadius: 2 },
+          { label: 'Room monitoring', data: (data.daily || []).map((day) => sourceByDate.get(day.date)?.walkin || 0), borderColor: '#EF3E6D', backgroundColor: 'transparent', fill: false, tension: .3, pointRadius: 2 },
         ],
       },
       options: {
@@ -93,8 +146,8 @@ function Analytics() {
         </button>
       </RevenueFilters>
 
-      <p className="finance-basis">Collected amounts are recorded payments less manual refunds. Linked reservations and room sessions are counted once, using service dates in Asia/Manila.</p>
-      <RevenueSummary summary={summary} loading={loading} />
+      <p className="finance-basis">Payments received excludes refunds. The chart separates reservation payments from room monitoring payments. A reservation linked to a room session is counted once, on its service date.</p>
+      <RevenueSummary summary={summary} loading={loading} analytics />
 
       {error && <div className="finance-error" role="alert">{error}</div>}
       {data?.warnings?.length > 0 && (
@@ -113,11 +166,28 @@ function Analytics() {
         <span>Peak hour: <strong>{peakHour ? `${String(peakHour.hour).padStart(2, '0')}:00` : '—'}</strong></span>
       </div>
 
+      <section className="card confirmed-trend" aria-labelledby="confirmed-trend-title">
+        <div className="confirmed-trend-head">
+          <div>
+            <h2 id="confirmed-trend-title" className="card-title">Confirmed Booking Trend</h2>
+            <p className="finance-meta">Reservations by booked date · {trendInterval === 'daily' ? 'Last 14 days' : trendInterval === 'weekly' ? 'Last 12 weeks' : 'Last 12 months'}</p>
+          </div>
+          <div className="confirmed-trend-toggle" role="group" aria-label="Booking trend period">
+            {['daily', 'weekly', 'monthly'].map((interval) => (
+              <button key={interval} type="button" className={trendInterval === interval ? 'active' : ''} aria-pressed={trendInterval === interval} onClick={() => setTrendInterval(interval)}>{interval[0].toUpperCase() + interval.slice(1)}</button>
+            ))}
+          </div>
+        </div>
+        {trendError ? <p className="finance-error" role="alert">{trendError}</p> : trendLoading ? <p className="finance-empty" role="status">Loading booking trend…</p> : trend?.periods?.length ? (
+          <div className="finance-chart confirmed-trend-chart"><canvas ref={trendCanvasRef} role="img" aria-label={`Confirmed booking counts by ${trendInterval} period`} /></div>
+        ) : <p className="finance-empty">No booking trend available.</p>}
+      </section>
+
       {loading && !data ? <div className="card finance-empty">Loading sales data…</div> : data && (
         <div className="finance-charts">
           <div className="card">
-            <div className="card-head"><span className="card-title">Collected vs charges</span><span className="finance-meta">{displayDate(from)} – {displayDate(to)}</span></div>
-            <div className="finance-chart"><canvas ref={revenueCanvasRef} aria-label="Collected payments and charges by day" /></div>
+            <div className="card-head"><span className="card-title">Payments by source</span><span className="finance-meta">{displayDate(from)} – {displayDate(to)}</span></div>
+            <div className="finance-chart"><canvas ref={revenueCanvasRef} aria-label="Payments from reservations and room monitoring by day" /></div>
           </div>
           <div className="card">
             <div className="card-head"><span className="card-title">Collected by facility</span></div>
@@ -127,7 +197,7 @@ function Analytics() {
             <div className="card-head"><span className="card-title">Facility performance</span></div>
             <div className="admin-table-scroll" tabIndex={0} role="region" aria-label="Facility performance table">
               <table className="tbl">
-                <thead><tr><th>Facility</th><th>Transactions</th><th>Booked hours</th><th>Charges</th><th>Collected</th></tr></thead>
+                <thead><tr><th>Facility</th><th>Transactions</th><th>Booked hours</th><th>Booking value</th><th>Payments received</th></tr></thead>
                 <tbody>
                   {data.byFacility?.length ? data.byFacility.map((facility) => (
                     <tr key={facility.name}><td>{facility.name}</td><td>{facility.transactions}</td><td>{facility.bookedHours}</td><td>{formatPeso(facility.charged)}</td><td>{formatPeso(facility.collected)}</td></tr>
@@ -136,23 +206,13 @@ function Analytics() {
               </table>
             </div>
           </div>
-          <div className="card finance-chart-wide">
-            <details className="finance-chart-data">
-              <summary>Daily detail</summary>
-              <div className="admin-table-scroll" tabIndex={0} role="region" aria-label="Daily sales table">
-                <table className="tbl"><thead><tr><th>Date</th><th>Transactions</th><th>Charges</th><th>Collected</th><th>Outstanding</th></tr></thead><tbody>
-                  {(data.daily || []).map((day) => <tr key={day.date}><td>{displayDate(day.date)}</td><td>{day.transactions}</td><td>{formatPeso(day.charged)}</td><td>{formatPeso(day.collected)}</td><td>{formatPeso(day.outstanding)}</td></tr>)}
-                </tbody></table>
-              </div>
-            </details>
-          </div>
         </div>
       )}
 
       <div className="card">
         <div className="card-head"><span className="card-title">Recent transactions</span><span className="finance-meta">{rows.length} in selected range</span></div>
         <div className="admin-table-scroll" tabIndex={0} role="region" aria-label="Recent sales table">
-          <table className="tbl"><thead><tr><th>Date</th><th>Reference</th><th>Guest</th><th>Facility</th><th>Status</th><th>Collected</th><th>Balance</th></tr></thead><tbody>
+          <table className="tbl"><thead><tr><th>Date</th><th>Reference</th><th>Guest</th><th>Facility</th><th>Status</th><th>Received</th><th>Due</th></tr></thead><tbody>
             {rows.length ? rows.slice(0, 20).map((row) => <tr key={row.id}><td>{displayDate(row.date)}<div className="finance-meta">{formatTime12(row.timeIn)}</div></td><td>{row.reference}</td><td>{row.guestName}</td><td>{row.facilityName}</td><td><span className={`pill ${row.status === 'Done' || row.status === 'Finished' ? 'pill-done' : row.status === 'Cancelled' || row.status === 'No Show' ? 'pill-overdue' : 'pill-active'}`}>{row.status}</span></td><td>{formatPeso(row.collected)}</td><td>{formatPeso(row.balance)}</td></tr>) : <tr><td colSpan="7" className="finance-empty">No transactions in this period.</td></tr>}
           </tbody></table>
         </div>

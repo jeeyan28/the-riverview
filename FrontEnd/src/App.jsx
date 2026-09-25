@@ -4,7 +4,6 @@ import MainLayout from './layouts/MainLayout';
 import AuthLayout from './layouts/AuthLayout';
 import AdminLayout from './layouts/AdminLayout';
 import { useAuth } from './context/AuthContext';
-import RiverviewLoader from './components/RiverviewLoader';
 import Login from './pages/Login';
 import { isAdminReturnPath } from './utils/auth';
 
@@ -44,7 +43,7 @@ function AdminLanding() {
 }
 
 function RouteFallback() {
-  return <RiverviewLoader message="Loading your next view…" />;
+  return <div className="route-fallback" role="status">Opening page…</div>;
 }
 
 function LegacyAdminLoginRedirect() {

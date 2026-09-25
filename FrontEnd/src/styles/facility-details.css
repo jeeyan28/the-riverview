@@ -89,6 +89,9 @@
   pointer-events: none;
 }
 
+.public-site .fd-hero-media > .facility-name-placeholder,
+.public-site .fd-room-media > .facility-name-placeholder { display: flex; }
+
 .public-site .fd-hero-media img,
 .public-site .fd-room-media img {
   width: 100%;

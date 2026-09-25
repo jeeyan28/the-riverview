@@ -25,6 +25,12 @@ const roomVariantSchema = Joi.object({
   eveningStartTime: hourlyTime.default("17:00"),
   includedGuests: Joi.number().integer().min(0).max(100).default(0),
   extraGuestFee: Joi.number().min(0).precision(2).default(0),
+  discountPercent: Joi.number().min(0).max(99).precision(2).allow(null).default(null),
+});
+
+const addOnSchema = Joi.object({
+  name: Joi.string().trim().min(1).max(80).required(),
+  fee: Joi.number().min(0.01).precision(2).required(),
 });
 
 const roomWriteSchema = Joi.object({
@@ -34,8 +40,12 @@ const roomWriteSchema = Joi.object({
   capacity: Joi.number().integer().min(0).max(100).default(0),
   image: Joi.string().trim().allow("").max(1000),
   features: Joi.array().items(Joi.string().trim().min(1).max(120)).max(30).default([]),
+  discountPercent: Joi.number().min(0).max(99).precision(2).default(0),
+  addOns: Joi.array().items(addOnSchema).max(10).unique('name').default([]),
   variants: Joi.array().items(roomVariantSchema).min(1).max(30).required(),
   variantImageIndexes: Joi.array().items(Joi.number().integer().min(0)).max(20).default([]),
 });
 
-module.exports = { roomIdParamsSchema, emptyBodySchema, roomWriteSchema };
+const roomUpdateSchema = roomWriteSchema.fork(["variants"], (schema) => schema.min(0));
+
+module.exports = { roomIdParamsSchema, emptyBodySchema, roomWriteSchema, roomUpdateSchema };

@@ -3,7 +3,8 @@ const router = express.Router();
 const Booking = require("../model/booking");
 const BookingLock = require("../model/bookingLock");
 const { ensureAuthenticated } = require("../middleware/adminAuth");
-const { validateAndPriceBooking, computeDownPayment, finalizeBookingFromPayment } = require("../utils/bookingHelper");
+const { validateAndPriceBooking, finalizeBookingFromPayment } = require("../utils/bookingHelper");
+const { quoteOnlineBooking } = require("../utils/roomPricing");
 const {
   getPublicKey,
   PAYMONGO_ALLOWED_METHODS,
@@ -62,13 +63,10 @@ router.get("/config", (req, res) => {
 
 router.post("/intent", ensureAuthenticated, paymentIntentLimiter, validate(createIntentSchema), async (req, res) => {
   try {
-    const { guestName, guestContact, guestEmail, guestCount: guestCountRaw, hasCorkage, specialRequests, roomId, variantLabel, date, timeIn, duration, downPaymentHours: downPaymentHoursRaw } = req.body;
+    const { guestName, guestContact, guestEmail, guestCount: guestCountRaw, hasCorkage, specialRequests, roomId, variantLabel, date, timeIn, duration, paymentChoice: requestedPaymentChoice, downPaymentHours: legacyPaymentHours, selectedAddOns = [] } = req.body;
     const guestCount = guestCountRaw || 1;
-
-    const downPaymentHours = downPaymentHoursRaw !== undefined ? downPaymentHoursRaw : 1;
-    if (downPaymentHours !== 1 && downPaymentHours !== duration) {
-      return res.status(400).json({ message: "Choose a 1-hour down payment or pay the full booking total." });
-    }
+    const paymentChoice = requestedPaymentChoice || (duration > 1 && legacyPaymentHours === duration ? "full" : "deposit");
+    const downPaymentHours = paymentChoice === "full" ? duration : 1;
 
     if (req.user.isGuest) {
       const candidateEmail = (guestEmail || guestContact || "").trim().toLowerCase();
@@ -90,20 +88,25 @@ router.post("/intent", ensureAuthenticated, paymentIntentLimiter, validate(creat
       return res.status(409).json({ message: "Your hold on this time slot has expired. Please select a time again." });
     }
 
-    let room, amount, roomCharge, corkageFee, hourlyRates;
+    let room, selectedVariant, roomCharge, corkageFee, hourlyRates;
     try {
-      ({ room, amount, roomCharge, corkageFee, hourlyRates } = await validateAndPriceBooking({ roomId, variantLabel, date, timeIn, duration, isAdminBooking: false, guestCount, hasCorkage, excludeLockUserId: req.user._id }));
+      ({ room, selectedVariant, roomCharge, corkageFee, hourlyRates } = await validateAndPriceBooking({ roomId, variantLabel, date, timeIn, duration, isAdminBooking: false, guestCount, hasCorkage, excludeLockUserId: req.user._id }));
     } catch (e) {
       return res.status(e.status || 500).json({ message: e.message || "Server error." });
     }
-
-    const downPayment = downPaymentHours === duration ? amount : computeDownPayment(hourlyRates, 1);
+    let quote;
+    try {
+      quote = quoteOnlineBooking({ room, variant: selectedVariant, basePrice: { roomCharge, corkageFee, hourlyRates }, paymentChoice, selectedAddOns });
+    } catch (e) {
+      return res.status(e.status || 400).json({ message: e.message });
+    }
+    const { amount, downPayment, discountPercent, discountAmount, eligibleDiscount, addOns, addOnFee } = quote;
 
     let intent;
     try {
       intent = await createPaymentIntent({
         amountPesos: downPayment,
-        description: `${downPaymentHours === duration ? "Full payment" : "One-hour down payment"} — ${room.name} (${date} ${new Date(`${date}T${timeIn}:00+08:00`).toLocaleTimeString('en-US', { timeZone: 'Asia/Manila', hour: 'numeric', minute: '2-digit', hour12: true })})`,
+        description: `${paymentChoice === "full" ? "Full payment" : "One-hour down payment"} — ${room.name} (${date} ${new Date(`${date}T${timeIn}:00+08:00`).toLocaleTimeString('en-US', { timeZone: 'Asia/Manila', hour: 'numeric', minute: '2-digit', hour12: true })})`,
         statementDescriptor: room.name,
         metadata: toBookingMetadata({
           guestName: guestName.trim(),
@@ -120,6 +123,12 @@ router.post("/intent", ensureAuthenticated, paymentIntentLimiter, validate(creat
           amount,
           roomCharge,
           corkageFee,
+          discountPercent,
+          discountAmount,
+          eligibleDiscount,
+          addOns: JSON.stringify(addOns),
+          addOnFee,
+          paymentChoice,
           hourlyRates: JSON.stringify(hourlyRates),
           downPayment,
           downPaymentHours,

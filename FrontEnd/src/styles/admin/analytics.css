@@ -19,7 +19,18 @@
   background:linear-gradient(90deg, rgba(239,62,109,.08), rgba(239,62,109,.9));
 }
 
+#app .confirmed-trend { margin-bottom: 20px; }
+#app .confirmed-trend-head { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; }
+#app .confirmed-trend-head h2 { margin: 0; }
+#app .confirmed-trend-toggle { display: inline-flex; flex-wrap: wrap; gap: 3px; padding: 3px; border: 1px solid var(--border); border-radius: 10px; background: var(--navy3); }
+#app .confirmed-trend-toggle button { min-height: 38px; padding: 8px 13px; border: 0; border-radius: 7px; background: transparent; color: var(--muted); font: inherit; font-size: .8rem; font-weight: 650; cursor: pointer; }
+#app .confirmed-trend-toggle button.active { background: var(--teal-soft); color: var(--teal); }
+#app .confirmed-trend-toggle button:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+#app .confirmed-trend-chart { height: 300px; }
+
 @media (max-width:900px){
   .donut-center-val{font-size:1.15rem;}
   .hm-labels{font-size:.6rem;}
 }
+#app #panel-analytics .finance-metrics{grid-template-columns:repeat(3,minmax(0,1fr));}
+@media(max-width:760px){#app #panel-analytics .finance-metrics{grid-template-columns:1fr;}}

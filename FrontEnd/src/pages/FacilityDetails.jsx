@@ -12,13 +12,11 @@ import {
   UsersRound,
 } from 'lucide-react';
 import BookingModal from '../components/BookingModal';
-import RiverviewLoader from '../components/RiverviewLoader';
 import { useSiteSettings } from '../hooks/useSiteSettings';
 import { roomsService } from '../services/rooms';
 import { getPaxCapacity, priceOptionsFor } from '../utils/rooms';
 import { variantRateLabel } from '../utils/roomPricing';
-import { resolveImageUrl } from '../utils/resolveImageUrl';
-import fallbackRoomImg from '../assets/pictures/Billiard.jpg';
+import { facilityImage } from '../utils/facilityImage';
 import '../styles/facility-details.css';
 import { useAuth } from '../context/AuthContext';
 import { buildLoginPath, buildRoomReservationPath } from '../utils/auth';
@@ -139,7 +137,7 @@ function FacilityDetails() {
   if (loading) {
     return (
       <div className="fd-page fd-page--state">
-        <RiverviewLoader fullscreen={false} title="Loading facility" message="Getting room types, rates, and amenities…" />
+        <div className="fd-state-card" role="status">Loading facility details…</div>
       </div>
     );
   }
@@ -156,7 +154,7 @@ function FacilityDetails() {
     );
   }
 
-  const heroImage = room.image ? resolveImageUrl(room.image) : fallbackRoomImg;
+  const heroImage = facilityImage(room.image, room.name);
 
   return (
     <div className="fd-page">
@@ -165,7 +163,7 @@ function FacilityDetails() {
           <Link to="/rooms" className="fd-back"><ArrowLeft size={17} aria-hidden="true" /> All facilities</Link>
           <div className="fd-hero-grid">
             <div className="fd-hero-media">
-              <img src={heroImage} alt={`${room.name} at The Riverview`} />
+              {heroImage ? <img src={heroImage} alt={`${room.name} at The Riverview`} /> : <strong className="facility-name-placeholder">{room.name}</strong>}
               <span>Availability is checked by date and time</span>
             </div>
             <div className="fd-hero-copy">
@@ -215,12 +213,12 @@ function FacilityDetails() {
           <div className="fd-room-list">
             {variants.map((variant, index) => {
               const features = variant.features?.length ? variant.features : room.features || [];
-              const image = variant.image ? resolveImageUrl(variant.image) : heroImage;
+              const image = facilityImage(variant.image, room.name, variant.label, room.image);
               const roomCount = Number(variant.roomCount) || 1;
               const status = variant.status || 'Available';
               return (
                 <article className="fd-room" id={sectionId(variant.label, index)} key={variant.label || index}>
-                  <div className="fd-room-media"><img src={image} alt={`${variant.label || room.name} room`} loading="lazy" /></div>
+                  <div className="fd-room-media">{image ? <img src={image} alt={`${variant.label || room.name} room`} loading="lazy" /> : <span className="facility-name-placeholder">{variant.label || room.name}</span>}</div>
                   <div className="fd-room-body">
                     <div className="fd-room-title-row">
                       <div>

@@ -354,14 +354,24 @@
   margin-left: auto;
 }
 
+.public-site .bk-header--success { grid-template-columns: minmax(0, 1fr) 44px; }
+
 .public-site .bk-modal.bk-modal--payment-return {
   width: min(760px, 100%);
   height: min(620px, calc(100dvh - 48px));
+}
+.public-site .bk-modal.bk-modal--payment-confirmed {
+  height: auto;
+  max-height: calc(100dvh - 48px);
 }
 .public-site .bk-content--payment-return .bk-body {
   display: grid;
   place-items: center;
   padding: 28px;
+}
+.public-site .bk-content--payment-confirmed .bk-body {
+  display: block;
+  padding: 0 24px 24px;
 }
 .public-site .bk-payment-return {
   display: flex;
@@ -373,6 +383,32 @@
   margin: 0 auto;
   padding: 28px 20px;
   text-align: center;
+}
+.public-site .bk-payment-return--confirmed {
+  width: min(100%, 560px);
+  min-height: 0;
+  align-items: stretch;
+  justify-content: flex-start;
+  padding: 24px 0 0;
+  text-align: left;
+}
+.public-site .bk-success-intro { text-align: center; }
+.public-site .bk-success-intro .bk-confirm-icon { margin-bottom: 12px; }
+#bkStepPaymongoReturn .bk-success-intro h3 { font-family: var(--font-body); font-size: 1.25rem; font-weight: 750; }
+.public-site .bk-success-intro p { margin: 8px 0 0; color: var(--text-muted-light); font-size: .82rem; line-height: 1.5; }
+.public-site .bk-success-card { margin: 20px 0 16px; padding: 16px 20px; }
+.public-site .bk-success-reference { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding-bottom: 16px; border-bottom: 1px solid var(--border); }
+.public-site .bk-success-reference .bk-success-code { overflow-wrap: anywhere; }
+.public-site .bk-success-grid { gap: 16px 20px; padding: 16px 0; }
+.public-site .bk-success-grid .bk-summary-value { line-height: 1.4; overflow-wrap: anywhere; }
+.public-site .bk-success-cost { gap: 16px 20px; padding-top: 16px; }
+.public-site .bk-payment-return--confirmed .bk-success-actions-row { width: 100%; margin-top: 0; }
+.public-site .bk-payment-return--confirmed .bk-success-note { margin-top: 16px !important; line-height: 1.45; }
+
+.public-site .bk-modal.bk-modal--reschedule {
+  width: min(720px, calc(100vw - 48px));
+  max-width: 720px;
+  height: min(720px, calc(100dvh - 48px));
 }
 .public-site .bk-payment-return--cancelled .bk-confirm-icon,
 .public-site .bk-payment-return--expired .bk-confirm-icon,
@@ -508,6 +544,12 @@
 }
 
 @media (max-width: 599px) {
+  .public-site .bk-modal.bk-modal--reschedule { width: 100%; max-width: none; height: calc(100dvh - 16px); }
+  .public-site .bk-modal.bk-modal--payment-confirmed { max-height: calc(100dvh - 16px); }
+  .public-site .bk-content--payment-confirmed .bk-body { padding: 0 16px 16px; }
+  .public-site .bk-payment-return--confirmed { padding-top: 16px; }
+  .public-site .bk-success-card { padding: 16px; }
+  .public-site .bk-success-reference { flex-wrap: wrap; }
   .public-site .bk-modal.bk-modal--payment-return {
     height: calc(100dvh - 16px);
     max-height: calc(100dvh - 16px);

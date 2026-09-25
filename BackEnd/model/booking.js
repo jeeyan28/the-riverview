@@ -39,6 +39,12 @@ const bookingSchema = new mongoose.Schema({
   duration:      { type: Number, required: true, min: MIN_DURATION_HOURS, max: MAX_DURATION_HOURS },
   amount:        { type: Number, required: true, min: 0 },
   roomCharge:    { type: Number, min: 0 },
+  discountPercent: { type: Number, default: 0, min: 0, max: 99 },
+  discountAmount: { type: Number, default: 0, min: 0 },
+  eligibleDiscount: { type: Number, default: 0, min: 0 },
+  addOns: [{ name: { type: String, required: true }, fee: { type: Number, required: true, min: 0 } }],
+  addOnFee: { type: Number, default: 0, min: 0 },
+  paymentChoice: { type: String, enum: ["deposit", "full"], default: "deposit" },
   hourlyRates:   [{ type: Number, min: 0 }],
   corkageFee:    { type: Number, default: 0, min: 0 },
   status:        {

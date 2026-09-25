@@ -19,7 +19,7 @@ router.get('/summary', async (req, res) => {
     const [todayBookings, yesterdayBookings, activeSessions, sales, pendingReservations, cancellationRequests] = await Promise.all([
       Booking.countDocuments({ date: todayKey, status: { $nin: ['Rejected', 'Cancelled', 'No Show'] } }),
       Booking.countDocuments({ date: yesterdayKey, status: { $nin: ['Rejected', 'Cancelled', 'No Show'] } }),
-      RoomSession.find({ status: 'Active' }).select('facilityName startTime duration').lean(),
+      RoomSession.find({ status: 'Active' }).select('facilityName startTime scheduledEndTime duration').lean(),
       getSalesReport({ from: sinceKey, to: todayKey }),
       Booking.countDocuments({ status: { $in: ['Pending', 'Pending Payment Verification', 'Awaiting Online Payment'] } }),
       Booking.countDocuments({ cancellationStatus: 'Requested' }),
@@ -31,7 +31,7 @@ router.get('/summary', async (req, res) => {
     for (const session of activeSessions) {
       const label = session.facilityName || 'Other';
       activeByFacility.set(label, (activeByFacility.get(label) || 0) + 1);
-      if (new Date(session.startTime).getTime() + Number(session.duration || 0) * 3600000 <= now) overdueCount += 1;
+      if ((session.scheduledEndTime ? new Date(session.scheduledEndTime).getTime() : new Date(session.startTime).getTime() + Number(session.duration || 0) * 3600000) <= now) overdueCount += 1;
     }
     const today = sales.daily.find((day) => day.date === todayKey) || { charged: 0, collected: 0, outstanding: 0 };
     const priorDays = sales.daily.filter((day) => day.date !== todayKey);

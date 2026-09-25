@@ -1,9 +1,9 @@
-import { resolveImageUrl } from '../utils/resolveImageUrl';
-import fallbackRoomImg from '../assets/pictures/Billiard.jpg';
+import { facilityImage } from '../utils/facilityImage';
 import { CalendarCheck, Info, Layers3 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { buildLoginPath, buildRoomReservationPath } from '../utils/auth';
+import { effectiveDiscountPercent } from '../utils/roomPricing';
 
 function getFeatureIcon(feature = '') {
   const f = feature.toLowerCase();
@@ -18,7 +18,7 @@ function getFeatureIcon(feature = '') {
 
 function FacilityBookingCard({ room, liveStatus, onSelect }) {
   const { user } = useAuth();
-  const cardImage = room.image ? resolveImageUrl(room.image) : fallbackRoomImg;
+  const cardImage = facilityImage(room.image, room.name);
   const hasVariants = room.variants && room.variants.length > 0;
   const startingPrice = hasVariants
     ? Math.min(...room.variants.flatMap((v) => [
@@ -27,6 +27,7 @@ function FacilityBookingCard({ room, liveStatus, onSelect }) {
       ]))
     : Number(room.price) || 0;
   const roomTypeCount = hasVariants ? room.variants.length : 0;
+  const bestDiscount = hasVariants ? Math.max(...room.variants.map((variant) => effectiveDiscountPercent(room, variant))) : effectiveDiscountPercent(room);
   const visibleFeatures = Array.isArray(room.features) ? room.features.slice(0, 2) : [];
   const remainingFeatureCount = Math.max(0, (room.features?.length || 0) - visibleFeatures.length);
 
@@ -43,11 +44,12 @@ function FacilityBookingCard({ room, liveStatus, onSelect }) {
     <div className="room-card" data-room-id={room._id}>
       <div className="room-card-img">
         {showStatus && <span className={`room-card-status ${statusClass}`}>{statusLabel}</span>}
-        <img src={cardImage} alt={room.name} />
+        {cardImage ? <img src={cardImage} alt={room.name} /> : <span className="facility-name-placeholder">{room.name || 'Untitled Facility'}</span>}
       </div>
       <div className="room-card-body">
         <h3>{room.name || 'Untitled Facility'}</h3>
         <span className="price-amt">From ₱{startingPrice.toLocaleString()}/hr</span>
+        {bestDiscount > 0 && <span className="room-card-discount">Up to {bestDiscount}% off room charge when paid in full</span>}
 
         {(roomTypeCount > 0 || (room.features && room.features.length > 0)) && (
           <div className="room-card-tags">
