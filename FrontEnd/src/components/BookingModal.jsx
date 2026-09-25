@@ -1844,7 +1844,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
                 <div className="bk-slots-head">
                   <h3>Payment</h3>
                 </div>
-                <p className="bk-payment-methods-help">Secure online checkout via PayMongo (GCash, Maya, QR Ph, Card). If PayMongo is down, GCash/Maya checkout opens automatically via Xendit backup.</p>
+                <p className="bk-payment-methods-help">Secure online payment — GCash, Maya, QR Ph, and cards accepted.</p>
 
                 <div className="bk-downpayment-card">
                   <p className="bk-summary-label">{selectedDuration === 1 ? '1-hour reservation payment' : paymentChoice === 'deposit' ? '1-hour down payment' : 'Full payment'}</p>
