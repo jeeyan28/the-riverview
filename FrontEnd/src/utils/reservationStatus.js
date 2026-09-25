@@ -27,6 +27,7 @@ export function reservationPresentation(booking, now = Date.now()) {
     if (window && now >= window.start + MINUTE_MS && now < window.end) return { status: 'Overdue', warning: '' };
   }
   if (rawStatus === 'Ongoing') return { status: 'Ongoing', warning: '' };
+  if (rawStatus === 'Confirmed' && booking?.cancellationStatus === 'Requested') return { status: 'Confirmed', warning: 'Cancellation requested' };
   if (rawStatus === 'Pending Payment Verification') return { status: 'Pending', warning: 'Verify payment' };
   if (rawStatus === 'Awaiting Online Payment') return { status: 'Pending', warning: 'Awaiting payment' };
   // Old records may contain this persisted status. It is no longer produced.

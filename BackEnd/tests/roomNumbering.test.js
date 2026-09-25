@@ -1,9 +1,9 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { roomWriteSchema } = require('../validation/roomSchemas');
+const { roomWriteSchema, roomUpdateSchema } = require('../validation/roomSchemas');
 const { sessionCreateSchema } = require('../validation/monitoringSchemas');
 const { MonitorRoom } = require('../model/monitoring');
-const { syncRoomInventory, releasedMonitorStatus } = require('../utils/syncRoomInventory');
+const { syncRoomInventory, releasedMonitorStatus, visibleMonitorRoom } = require('../utils/syncRoomInventory');
 
 test('facility writes only allow room numbering from 1', () => {
   const base = { name: 'Court', variants: [{ label: 'Standard', price: 350, roomCount: 3 }] };
@@ -17,6 +17,11 @@ test('facility writes only allow room numbering from 1', () => {
     bookingId: '507f1f77bcf86cd799439011', duration: 1,
     roomTarget: { facilityName: 'Court', roomName: 'Standard', roomCount: 3, startingRoomNumber: 101 },
   }).error);
+});
+
+test('a facility can clear its rooms only when editing', () => {
+  assert.ok(roomWriteSchema.validate({ name: 'Billiards', variants: [] }).error);
+  assert.equal(roomUpdateSchema.validate({ name: 'Billiards', variants: [] }).error, undefined);
 });
 
 test('inventory starts at 1 and reuses an idle legacy room when renumbered', async () => {
@@ -81,4 +86,14 @@ test('an occupied legacy room is retired when its session ends', () => {
   const room = { roomName: 'Official Games', roomNumber: '2', isTemporary: false };
   assert.equal(releasedMonitorStatus(room, catalog), 'Inactive');
   assert.equal(releasedMonitorStatus({ ...room, roomNumber: '1' }, catalog), 'Available');
+});
+
+test('the live monitor hides retired inactive units but keeps current and occupied units', () => {
+  const catalog = { variants: [{ label: 'Shared Room', roomCount: 1, status: 'Available' }] };
+  const oldRoom = { roomName: 'Big Rooms', roomNumber: '1', status: 'Inactive', isTemporary: false };
+  assert.equal(visibleMonitorRoom(oldRoom, catalog), false);
+  assert.equal(visibleMonitorRoom({ ...oldRoom, status: 'Occupied' }, catalog), true);
+  assert.equal(visibleMonitorRoom({ ...oldRoom, roomName: 'Shared Room' }, catalog), true);
+  assert.equal(visibleMonitorRoom({ ...oldRoom, isTemporary: true }, catalog), false);
+  assert.equal(visibleMonitorRoom({ ...oldRoom, roomName: 'Shared Room', roomNumber: '2' }, catalog), false);
 });

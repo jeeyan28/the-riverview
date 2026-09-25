@@ -2,7 +2,7 @@ import { useEffect, useId, useRef } from 'react';
 import { X } from 'lucide-react';
 import ModalPortal from './ModalPortal';
 
-function Modal({ open, onClose, title, ariaLabel = 'Dialog', size, className = '', children, actions }) {
+function Modal({ open, onClose, title, ariaLabel = 'Dialog', size, className = '', backdropClassName = '', children, actions }) {
   const dialogRef = useRef(null);
   const onCloseRef = useRef(onClose);
   const titleId = useId();
@@ -41,7 +41,7 @@ function Modal({ open, onClose, title, ariaLabel = 'Dialog', size, className = '
 
   return (
     <ModalPortal>
-      <div className={`modal-bg${open ? ' open' : ''}`} onMouseDown={(event) => { if (event.target === event.currentTarget) onClose?.(); }}>
+      <div className={`modal-bg${open ? ' open' : ''}${backdropClassName ? ` ${backdropClassName}` : ''}`} onMouseDown={(event) => { if (event.target === event.currentTarget) onClose?.(); }}>
         <div className={`modal-box${sizeClass}${className ? ` ${className}` : ''}`} role="dialog" aria-modal="true" aria-labelledby={title ? titleId : undefined} aria-label={title ? undefined : ariaLabel} ref={dialogRef} tabIndex={-1}>
           {title ? (
             <div className="modal-heading">

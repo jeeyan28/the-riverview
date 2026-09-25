@@ -10,7 +10,9 @@ const { requirePermission, ensureAuthenticated } = require("../middleware/adminA
 const { paymentProofUpload } = require("../middleware/upload");
 const { PERMISSIONS, isAdminRole } = require("../utils/permissions");
 const { validateAndPriceBooking, computeDownPayment, saveWithReservationCode, runInTransaction } = require("../utils/bookingHelper");
+const { repriceExistingBooking } = require("../utils/roomPricing");
 const { isBeforeReservationDay } = require("../utils/businessDate");
+const { shiftDate, nearbyDates, availabilityRows } = require("../utils/bookingSchedule");
 const { validate } = require("../middleware/validate");
 const {
   bookingIdParamsSchema,
@@ -70,24 +72,25 @@ router.get("/", requirePermission(PERMISSIONS.BOOKING_VIEW), async (req, res) =>
 router.get("/availability", async (req, res) => {
   try {
     const { roomId, date, variantLabel } = req.query;
-    if (!roomId || !date) {
+    if (!roomId || !DATE_KEY_PATTERN.test(String(date))) {
       return res.status(400).json({ message: "roomId and date are required." });
     }
 
     const filter = {
       room: roomId,
-      date,
+      date: { $in: nearbyDates(date) },
       status: { $nin: [Booking.BOOKING_STATUS.CANCELLED, Booking.BOOKING_STATUS.REJECTED, Booking.BOOKING_STATUS.NO_SHOW] },
     };
     if (variantLabel) filter.variantLabel = variantLabel;
 
-    const bookings = await Booking.find(filter).select("timeIn duration");
+    const bookings = await Booking.find(filter).select("date timeIn duration");
 
-    const lockFilter = { room: roomId, date, expiresAt: { $gt: new Date() } };
+    const lockFilter = { room: roomId, date: { $in: nearbyDates(date) }, expiresAt: { $gt: new Date() } };
     if (variantLabel) lockFilter.variantLabel = variantLabel;
-    const locks = await BookingLock.find(lockFilter).select("timeIn duration");
+    if (req.session?.userId) lockFilter.lockedBy = { $ne: req.session.userId };
+    const locks = await BookingLock.find(lockFilter).select("date timeIn duration");
 
-    res.json([...bookings, ...locks].map(b => ({ timeIn: b.timeIn, duration: b.duration })));
+    res.json(availabilityRows([...bookings, ...locks], date));
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Server error." });
@@ -114,7 +117,7 @@ router.get("/availability-month", async (req, res) => {
 
     const filter = {
       room: roomId,
-      date: { $gte: startStr, $lte: endStr },
+      date: { $gte: shiftDate(startStr, -1), $lte: shiftDate(endStr, 1) },
       status: { $nin: [Booking.BOOKING_STATUS.CANCELLED, Booking.BOOKING_STATUS.REJECTED, Booking.BOOKING_STATUS.NO_SHOW] },
     };
 
@@ -124,7 +127,7 @@ router.get("/availability-month", async (req, res) => {
 
     const lockFilter = {
       room: roomId,
-      date: { $gte: startStr, $lte: endStr },
+      date: { $gte: shiftDate(startStr, -1), $lte: shiftDate(endStr, 1) },
       expiresAt: { $gt: new Date() },
     };
     if (variantLabel) lockFilter.variantLabel = variantLabel;
@@ -133,8 +136,12 @@ router.get("/availability-month", async (req, res) => {
 
     const byDate = {};
     [...bookings, ...locks].forEach((b) => {
-      if (!byDate[b.date]) byDate[b.date] = [];
-      byDate[b.date].push({ timeIn: b.timeIn, duration: b.duration });
+      for (const offset of [-1, 0, 1]) {
+        const serviceDate = shiftDate(b.date, offset);
+        if (serviceDate < startStr || serviceDate > endStr) continue;
+        if (!byDate[serviceDate]) byDate[serviceDate] = [];
+        byDate[serviceDate].push(...availabilityRows([b], serviceDate));
+      }
     });
 
     res.json(byDate);
@@ -313,7 +320,8 @@ router.put("/:id/reschedule", ensureAuthenticated, bookingActionLimiter, validat
           session,
         });
 
-        const financial = financialFields(pricing.amount, bookingCollected(existing), existing.refundedAmount || 0);
+        const repriced = repriceExistingBooking(pricing, existing);
+        const financial = financialFields(repriced.amount, bookingCollected(existing), existing.refundedAmount || 0);
         if (financial.paidAmount - financial.refundedAmount > financial.amount) {
           throw new AppError(409, "The new slot costs less than the amount already collected. Choose an equal or higher-priced slot, or contact the venue.");
         }
@@ -323,8 +331,11 @@ router.put("/:id/reschedule", ensureAuthenticated, bookingActionLimiter, validat
             $set: {
               date,
               timeIn,
-              amount: pricing.amount,
+              amount: repriced.amount,
               roomCharge: pricing.roomCharge,
+              discountAmount: repriced.discountAmount,
+              eligibleDiscount: repriced.eligibleDiscount,
+              addOnFee: repriced.addOnFee,
               hourlyRates: pricing.hourlyRates,
               corkageFee: pricing.corkageFee,
               ...financial,
@@ -539,8 +550,12 @@ router.put("/:id", requirePermission(PERMISSIONS.BOOKING_MANAGE), validate(booki
           update.date = effectiveDate;
           update.timeIn = effectiveTimeIn;
           update.duration = effectiveDuration;
-          update.amount = pricing.amount;
+          const repriced = repriceExistingBooking(pricing, existing);
+          update.amount = repriced.amount;
           update.roomCharge = pricing.roomCharge;
+          update.discountAmount = repriced.discountAmount;
+          update.eligibleDiscount = repriced.eligibleDiscount;
+          update.addOnFee = repriced.addOnFee;
           update.hourlyRates = pricing.hourlyRates;
           update.corkageFee = pricing.corkageFee;
         }

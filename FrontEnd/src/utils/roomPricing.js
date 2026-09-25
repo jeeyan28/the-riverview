@@ -1,5 +1,10 @@
 export const CORKAGE_FEE = 200;
 
+export function effectiveDiscountPercent(room, variant) {
+  const own = variant?.discountPercent;
+  return Math.max(0, Math.min(99, Number(own === '' || own === null || own === undefined ? room?.discountPercent : own) || 0));
+}
+
 function roundMoney(value) {
   return Math.round((Number(value) + Number.EPSILON) * 100) / 100;
 }
@@ -24,14 +29,19 @@ export function roomRateForHour(variant, hour, guestCount = 1) {
   return roundMoney(scheduledRate + Math.max(0, guests - includedGuests) * extraGuestFee);
 }
 
-export function calculateBookingPrice({ variant, startHour = 0, duration = 1, guestCount = 1, hasCorkage = false, downPaymentHours = 1 }) {
+export function calculateBookingPrice({ room, variant, startHour = 0, duration = 1, guestCount = 1, hasCorkage = false, paymentChoice = 'deposit', selectedAddOns = [] }) {
   const hours = Math.max(1, Number(duration) || 1);
   const hourlyRates = Array.from({ length: hours }, (_, index) => roomRateForHour(variant, (Number(startHour) + index) % 24, guestCount));
   const roomCharge = roundMoney(hourlyRates.reduce((sum, rate) => sum + rate, 0));
   const corkageFee = hasCorkage ? CORKAGE_FEE : 0;
-  const amount = roundMoney(roomCharge + corkageFee);
-  const downPayment = Number(downPaymentHours) === hours ? amount : hourlyRates[0];
-  return { hourlyRates, roomCharge, corkageFee, amount, downPayment };
+  const discountPercent = effectiveDiscountPercent(room, variant);
+  const eligibleDiscount = roundMoney(roomCharge * discountPercent / 100);
+  const discountAmount = paymentChoice === 'full' ? eligibleDiscount : 0;
+  const addOns = (room?.addOns || []).filter((item) => selectedAddOns.includes(item.name));
+  const addOnFee = roundMoney(addOns.reduce((sum, item) => sum + Number(item.fee || 0), 0));
+  const amount = roundMoney(roomCharge - discountAmount + addOnFee + corkageFee);
+  const downPayment = paymentChoice === 'full' ? amount : Math.min(amount, hourlyRates[0]);
+  return { hourlyRates, roomCharge, corkageFee, discountPercent, discountAmount, eligibleDiscount, addOns, addOnFee, amount, downPayment };
 }
 
 function formatTime(value) {

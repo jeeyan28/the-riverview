@@ -1,13 +1,6 @@
 import { useState } from 'react';
-import { resolveImageUrl } from '../utils/resolveImageUrl';
-import fallbackRoomImg from '../assets/pictures/Billiard.jpg';
-import { variantRateLabel } from '../utils/roomPricing';
-
-function toDisplaySrc(image) {
-  if (!image) return fallbackRoomImg;
-  if (image.startsWith('blob:') || image.startsWith('data:')) return image;
-  return resolveImageUrl(image);
-}
+import { facilityImage } from '../utils/facilityImage';
+import { effectiveDiscountPercent, variantRateLabel } from '../utils/roomPricing';
 
 function featureIcon(feature) {
   const f = String(feature || '').toLowerCase();
@@ -19,7 +12,7 @@ function featureIcon(feature) {
 
 function RoomOptionCard({ option, room, selected = false, disabled = false, onSelect, availableCount, showSelectionIndicator = true, preview = false }) {
   const [detailsOpen, setDetailsOpen] = useState(false);
-  const cardImage = toDisplaySrc(option.image);
+  const cardImage = facilityImage(option.image, room?.name, option.label, room?.image);
   const description = option.description || room?.description;
   const features = option.features && option.features.length ? option.features : room?.features;
   const interactive = typeof onSelect === 'function';
@@ -27,7 +20,8 @@ function RoomOptionCard({ option, room, selected = false, disabled = false, onSe
   const totalRooms = Number(option.roomCount) || 1;
   const showAvailability = interactive && Number.isFinite(availableCount) && !disabled;
   const hasDetails = !!description || showAvailability;
-  const canToggleDetails = interactive || preview;
+  const discountPercent = effectiveDiscountPercent(room, option);
+  const canToggleDetails = interactive && !preview;
   const expanded = (canToggleDetails ? detailsOpen : true) && (hasDetails || !canToggleDetails);
 
   function handleKeyDown(e) {
@@ -62,7 +56,7 @@ function RoomOptionCard({ option, room, selected = false, disabled = false, onSe
     >
       <div className="bk-room-option-collapsed">
         <div className="bk-room-option-img">
-          <img src={cardImage} alt={option.label || 'Room'} />
+          {cardImage ? <img src={cardImage} alt={option.label || 'Room'} /> : <span className="facility-name-placeholder">{option.label || 'Untitled Room'}</span>}
         </div>
         <div className="bk-room-option-body">
           <div className="bk-room-option-top">
@@ -90,6 +84,7 @@ function RoomOptionCard({ option, room, selected = false, disabled = false, onSe
           )}
           <div className="bk-room-option-bottom-row">
             <span className="bk-room-option-price">{variantRateLabel(option)}</span>
+            {discountPercent > 0 && <span className="bk-room-option-discount">{discountPercent}% off with full payment</span>}
             {canToggleDetails && hasDetails && (
               <button
                 type="button"

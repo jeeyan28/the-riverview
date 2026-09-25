@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
+import { ArrowLeft, X } from 'lucide-react';
 import { useSiteSettings } from '../hooks/useSiteSettings';
 import { bookingsService } from '../services/bookings';
 import { roomsService } from '../services/rooms';
 import { formatHour } from '../utils/receipt';
 import { businessDate } from '../utils/businessDate';
+import { relativeBookingHour, slotBookingFields, slotStartMs } from '../utils/bookingHours';
 import ModalPortal from './ModalPortal';
 import {
   dateKey,
@@ -37,10 +39,11 @@ function formatDateLabel(dStr) {
   return `${MONTHS[m - 1]} ${d}, ${y}`;
 }
 
-function excludeOwnSlotFromDayList(dayBookings, booking) {
+function excludeOwnSlotFromDayList(dayBookings, booking, serviceDate) {
   if (!dayBookings || !dayBookings.length) return dayBookings;
+  const ownHour = relativeBookingHour(serviceDate, booking.date, booking.timeIn);
   const idx = dayBookings.findIndex(
-    (b) => b.timeIn === booking.timeIn && Number(b.duration) === Number(booking.duration)
+    (b) => Number.parseInt(b.timeIn, 10) === ownHour && Number(b.duration) === Number(booking.duration)
   );
   if (idx === -1) return dayBookings;
   const copy = dayBookings.slice();
@@ -49,8 +52,7 @@ function excludeOwnSlotFromDayList(dayBookings, booking) {
 }
 
 function excludeOwnSlotFromHourCounts(reservedCounts, booking, dateStr) {
-  if (dateStr !== booking.date) return reservedCounts;
-  const startHour = parseInt(String(booking.timeIn).split(':')[0], 10);
+  const startHour = relativeBookingHour(dateStr, booking.date, booking.timeIn);
   const duration = Number(booking.duration) || 1;
   const adjusted = { ...reservedCounts };
   for (let h = startHour; h < startHour + duration; h++) {
@@ -145,11 +147,11 @@ function RescheduleModal({ booking, onClose, onRescheduled }) {
     const d = i + 1;
     const dStr = dateKey(viewYear, viewMonth, d);
     const dateObj = new Date(viewYear, viewMonth, d);
-    const isPast = dStr < todayKey;
+    const isPast = slotStartMs(dStr, closeHour) <= Date.now();
     const isToday = dStr === todayKey;
     const holiday = isHolidayDate(dStr, settings.holidays);
     const closedDay = !isOperatingDay(dateObj, settings.operatingHours);
-    const dayList = excludeOwnSlotFromDayList(monthBookings[dStr], booking);
+    const dayList = excludeOwnSlotFromDayList(monthBookings[dStr], booking, dStr);
     const { availableStarts, nearlyFull } = getDayAvailability(dayList, openHour, closeHour, totalRooms, duration, dStr);
     const fullyBooked = availableStarts === 0;
     const unavailable = holiday || closedDay;
@@ -197,9 +199,9 @@ function RescheduleModal({ booking, onClose, onRescheduled }) {
 
   const slotGroups = useMemo(() => {
     if (!selectedDateKey) return {};
-    const groups = { Morning: [], Afternoon: [], Evening: [] };
-    for (let h = openHour; h < Math.min(closeHour, 24); h++) {
-      if (Date.parse(`${selectedDateKey}T${String(h).padStart(2, '0')}:00:00+08:00`) <= Date.now()) continue;
+    const groups = { Morning: [], Afternoon: [], Evening: [], 'After midnight · next day': [] };
+    for (let h = openHour; h < closeHour; h++) {
+      if (slotStartMs(selectedDateKey, h) <= Date.now()) continue;
       const state = getSlotState(h, duration, closeHour, reserved, totalRooms);
       groups[getTimePeriod(h)].push({ hour: h, state });
     }
@@ -219,8 +221,8 @@ function RescheduleModal({ booking, onClose, onRescheduled }) {
     setSubmitting(true);
     setError('');
     try {
-      const timeIn = `${String(selectedHour).padStart(2, '0')}:00`;
-      const updated = await bookingsService.reschedule(booking._id, { date: selectedDateKey, timeIn });
+      const { date, timeIn } = slotBookingFields(selectedDateKey, selectedHour);
+      const updated = await bookingsService.reschedule(booking._id, { date, timeIn });
       setResult(updated);
       setStep('success');
     } catch (err) {
@@ -235,26 +237,37 @@ function RescheduleModal({ booking, onClose, onRescheduled }) {
     onRescheduled?.(result);
   }
 
+  function handleHeaderBack() {
+    if (step === 'confirm') setStep('time');
+    else if (step === 'time') setStep('date');
+    else if (step === 'success') handleDone();
+    else onClose();
+  }
+
   const newTimeLabel = selectedHour !== null
-    ? `${formatHour(selectedHour)} – ${formatHour(selectedHour + duration)}`
+    ? `${formatHour(selectedHour)} – ${formatHour(selectedHour + duration)}${selectedHour + duration >= 24 && selectedHour < 24 ? ' next day' : ''}`
     : null;
+  const newBookingDate = selectedDateKey && selectedHour !== null ? slotBookingFields(selectedDateKey, selectedHour).date : selectedDateKey;
   const currentStartHour = parseInt(String(booking.timeIn).split(':')[0], 10) || 0;
   const currentTimeLabel = `${formatHour(currentStartHour)} – ${formatHour(currentStartHour + duration)}`;
 
   return (
     <ModalPortal>
       <div className="bk-overlay open" id="reschedule-modal" role="dialog" aria-modal="true" aria-labelledby="reschedule-modal-title">
-        <div className="bk-modal bk-modal--compact">
-        <button className="bk-close" aria-label="Close" onClick={onClose}>✕</button>
-
+        <div className="bk-modal bk-modal--compact bk-modal--reschedule">
         <div className="bk-header">
-          <div className="bk-room-icon">
-            <i className="fa-solid fa-calendar-clock"></i>
+          <button type="button" className="bk-modal-back" onClick={handleHeaderBack} aria-label={step === 'date' || step === 'success' ? 'Back to reservation' : step === 'time' ? 'Back to date' : 'Back to time'}>
+            <ArrowLeft size={18} aria-hidden="true" /><span>Back</span>
+          </button>
+          <div className="bk-header-identity">
+            <div>
+              <p className="bk-eyebrow">{booking.reservationCode || 'Reservation'}</p>
+              <h2 id="reschedule-modal-title">Reschedule your reservation</h2>
+            </div>
           </div>
-          <div>
-            <p className="bk-eyebrow">{booking.reservationCode || 'Reservation'}</p>
-            <h2 id="reschedule-modal-title">Reschedule your reservation</h2>
-          </div>
+          <button type="button" className="bk-close" aria-label="Close reschedule" onClick={step === 'success' ? handleDone : onClose}>
+            <X size={20} aria-hidden="true" />
+          </button>
         </div>
 
         {step !== 'success' && (
@@ -346,10 +359,6 @@ function RescheduleModal({ booking, onClose, onRescheduled }) {
 
             {step === 'time' && selectedDateKey && (
               <div className="bk-step" id="rsStepTime">
-                <button className="bk-back" onClick={() => setStep('date')}>
-                  <i className="fa-solid fa-arrow-left"></i> Back to date
-                </button>
-
                 <p className="bk-choose-label bk-choose-label--heading">Pick a {duration}-hour slot on {formatDateLabel(selectedDateKey)}</p>
 
                 {error && (
@@ -396,7 +405,7 @@ function RescheduleModal({ booking, onClose, onRescheduled }) {
                                 onKeyDown={state === 'available' ? (e) => { if (e.key === 'Enter' || e.key === ' ') handleSelectHour(hour); } : undefined}
                               >
                                 <span className="bk-slot-time">{formatHour(hour)}</span>
-                                <span className={`bk-slot-status${statusTone}`}>{state === 'available' ? 'Available' : 'Unavailable'}</span>
+                                <span className={`bk-slot-status${statusTone}`}>{state === 'available' ? hour >= 24 ? 'Next day · Available' : 'Available' : 'Unavailable'}</span>
                               </div>
                             );
                           })}
@@ -410,10 +419,6 @@ function RescheduleModal({ booking, onClose, onRescheduled }) {
 
             {step === 'confirm' && selectedDateKey && selectedHour !== null && (
               <div className="bk-step" id="rsStepConfirm">
-                <button className="bk-back" onClick={() => setStep('time')}>
-                  <i className="fa-solid fa-arrow-left"></i> Back to time
-                </button>
-
                 <p className="bk-choose-label bk-choose-label--heading">Review your new schedule</p>
 
                 <div className="bk-review-section">
@@ -435,7 +440,7 @@ function RescheduleModal({ booking, onClose, onRescheduled }) {
                   <div className="bk-review-card">
                     <div className="bk-summary-row">
                       <span className="bk-sr-label"><i className="fa-solid fa-calendar-check"></i> Date</span>
-                      <span className="bk-sr-value">{formatDateLabel(selectedDateKey)}</span>
+                      <span className="bk-sr-value">{formatDateLabel(newBookingDate)}{selectedHour >= 24 ? ' (next day)' : ''}</span>
                     </div>
                     <div className="bk-summary-row">
                       <span className="bk-sr-label"><i className="fa-solid fa-clock"></i> Time</span>

@@ -549,6 +549,7 @@
   cursor: pointer;
 }
 .bk-addon-option--selected { border-color: var(--teal); background: var(--teal-soft); }
+.bk-room-option-discount,.room-card-discount{display:inline-block;margin-top:4px;color:var(--teal-text);font-size:.72rem;font-weight:700;line-height:1.35;}
 .bk-addon-option input { width: 18px; height: 18px; accent-color: var(--teal-text); }
 .bk-addon-option-icon { display: grid; place-items: center; width: 36px; height: 36px; border-radius: var(--radius-sm); background: var(--teal-soft); color: var(--teal-text); }
 .bk-addon-option strong, .bk-addon-option small { display: block; }

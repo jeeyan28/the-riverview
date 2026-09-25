@@ -1,12 +1,11 @@
 import { Fragment, useEffect, useRef, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { resolveImageUrl } from '../utils/resolveImageUrl';
-import fallbackRoomImg from '../assets/pictures/Billiard.jpg';
+import { facilityImage } from '../utils/facilityImage';
 import RoomOptionCard from './RoomOptionCard';
 import { bookingsService } from '../services/bookings';
 import { useCountdownClock } from '../hooks/useCountdownClock';
 import { useToast } from '../hooks/useToast';
-import { formatHour, openBookingReceipt, guestPhoneDisplay } from '../utils/receipt';
+import { formatHour, openBookingReceipt } from '../utils/receipt';
 import {
   dateKey,
   getPaxCapacity,
@@ -22,7 +21,6 @@ import {
   isHourBooked,
   canBookDuration,
   getSlotState,
-  getLatestStartTime,
   buildHourCounts,
   getDayAvailability,
   getTimePeriod,
@@ -35,6 +33,7 @@ import ModalPortal from './ModalPortal';
 import Toast from './Toast';
 import { buildLoginPath, buildRoomReservationPath } from '../utils/auth';
 import { businessDate } from '../utils/businessDate';
+import { slotBookingFields, slotStartMs } from '../utils/bookingHours';
 
 const PAYMONGO_API_BASE = import.meta.env.VITE_PAYMONGO_API_BASE || 'https://api.paymongo.com/v1';
 
@@ -105,14 +104,18 @@ function BookingSummaryContents({
   room, selectedVariant, selectedDate, selectedHour, selectedDuration,
   guestName, guestContact, guestCount, guestNote, hasCorkage,
   selectedMethod, subtotal, downPayment, remainingBalance,
+  priceBreakdown, paymentChoice,
   step,
 }) {
   if (!room) return null;
 
-  const image = selectedVariant?.image ? resolveImageUrl(selectedVariant.image) : fallbackRoomImg;
-  const dateLabel = selectedDate ? `${MONTHS[selectedDate.m]} ${selectedDate.d}, ${selectedDate.y}` : null;
+  const image = facilityImage(selectedVariant?.image, room.name, selectedVariant?.label, room.image);
+  const serviceDate = selectedDate ? dateKey(selectedDate.y, selectedDate.m, selectedDate.d) : null;
+  const bookingDate = serviceDate && selectedHour !== null ? slotBookingFields(serviceDate, selectedHour).date : serviceDate;
+  const [bookingYear, bookingMonth, bookingDay] = bookingDate ? bookingDate.split('-').map(Number) : [];
+  const dateLabel = bookingDate ? `${MONTHS[bookingMonth - 1]} ${bookingDay}, ${bookingYear}` : null;
   const timeLabel = selectedHour !== null
-    ? `${formatHour(selectedHour)} – ${formatHour(selectedHour + selectedDuration)}`
+    ? `${formatHour(selectedHour)} – ${formatHour(selectedHour + selectedDuration)}${selectedHour + selectedDuration >= 24 && selectedHour < 24 ? ' next day' : ''}`
     : null;
   const durationLabel = `${selectedDuration} hour${selectedDuration === 1 ? '' : 's'}`;
   const methodLabel = PAYMENT_METHODS.find((m) => m.key === selectedMethod)?.label;
@@ -132,7 +135,7 @@ function BookingSummaryContents({
         {selectedVariant ? (
           <div className="bk-summary-panel-room">
             <div className="bk-summary-panel-img">
-              <img src={image} alt={selectedVariant.label} />
+              {image ? <img src={image} alt={selectedVariant.label} /> : <span className="facility-name-placeholder">{selectedVariant.label}</span>}
             </div>
             <div>
               <p className="bk-summary-panel-room-name">{selectedVariant.label}</p>
@@ -260,10 +263,23 @@ function BookingSummaryContents({
                   <span>Rate</span>
                   <span>{variantRateLabel(selectedVariant)}</span>
                 </div>
+                {timeLabel && <div className="bk-summary-panel-cost-row"><span>Room charge</span><span>₱{priceBreakdown.roomCharge.toLocaleString()}</span></div>}
                 {timeLabel && hasCorkage && (
                   <div className="bk-summary-panel-cost-row">
                     <span>Corkage</span>
                     <span>₱{CORKAGE_FEE.toLocaleString()}</span>
+                  </div>
+                )}
+                {timeLabel && priceBreakdown.addOns.map((service) => (
+                  <div className="bk-summary-panel-cost-row" key={service.name}>
+                    <span>{service.name}</span>
+                    <span>₱{Number(service.fee).toLocaleString()}</span>
+                  </div>
+                ))}
+                {timeLabel && priceBreakdown.discountAmount > 0 && (
+                  <div className="bk-summary-panel-cost-row">
+                    <span>Pay-in-full discount ({priceBreakdown.discountPercent}%)</span>
+                    <span>−₱{priceBreakdown.discountAmount.toLocaleString()}</span>
                   </div>
                 )}
                 {timeLabel && (
@@ -273,7 +289,7 @@ function BookingSummaryContents({
                       <span>₱{subtotal.toLocaleString()}</span>
                     </div>
                     <div className="bk-summary-panel-cost-row bk-summary-panel-cost-row--accent">
-                      <span>{remainingBalance > 0 ? 'Down payment due now' : 'Full payment due now'}</span>
+                      <span>{paymentChoice === 'deposit' ? '1-hour down payment due now' : 'Full payment due now'}</span>
                       <span>₱{downPayment.toLocaleString()}</span>
                     </div>
                     <div className="bk-summary-panel-cost-row bk-summary-panel-cost-row--total">
@@ -284,7 +300,9 @@ function BookingSummaryContents({
                 )}
               </div>
               {timeLabel ? (
-                <p className="bk-summary-panel-note">{remainingBalance > 0 ? 'Your down payment confirms the booking. Pay the remaining balance when you arrive.' : 'Your full payment confirms the booking. No balance remains at the venue.'}</p>
+                <p className="bk-summary-panel-note">{paymentChoice === 'deposit'
+                  ? `Your down payment confirms the booking. ${priceBreakdown.eligibleDiscount > 0 ? `Ask staff for your ₱${priceBreakdown.eligibleDiscount.toLocaleString()} room discount at the venue. ` : ''}Pay the remaining balance when you arrive.`
+                  : 'Your full payment confirms the booking. No balance remains at the venue.'}</p>
               ) : (
                 <p className="bk-summary-panel-note">Choose a start time to see the total and payment breakdown.</p>
               )}
@@ -296,14 +314,14 @@ function BookingSummaryContents({
   );
 }
 
-function BookingSuccess({ booking, room, selectedVariant, onDone, onViewBooking }) {
+function BookingSuccess({ booking, room, selectedVariant, onDone }) {
   if (!booking) {
     return (
       <>
         <div className="bk-confirm-icon"><i className="fa-solid fa-check"></i></div>
-        <h3>Booking successful!</h3>
-        <p>Your payment is confirmed. View your reservation details and receipt in Profile → Reservations.</p>
-        <button className="bk-done" onClick={onDone}>Back to Home</button>
+        <h3>Reservation confirmed</h3>
+        <p>Your payment is confirmed. Your reservation and receipt are saved in Profile → Reservations.</p>
+        <button type="button" className="bk-done" onClick={onDone}>Back to Home</button>
       </>
     );
   }
@@ -320,19 +338,7 @@ function BookingSuccess({ booking, room, selectedVariant, onDone, onViewBooking 
     : '—';
   const startHour = parseInt(String(booking.timeIn || '0').split(':')[0], 10) || 0;
   const duration = booking.duration || 0;
-  const timeLabel = `${formatHour(startHour)} – ${formatHour(startHour + duration)} (${duration} hour${duration === 1 ? '' : 's'})`;
-
-  const bookedOnLabel = booking.createdAt
-    ? new Date(booking.createdAt).toLocaleString('en-PH', {
-        timeZone: 'Asia/Manila',
-        month: 'long',
-        day: 'numeric',
-        year: 'numeric',
-        hour: 'numeric',
-        minute: '2-digit',
-        hour12: true,
-      })
-    : '—';
+  const timeLabel = `${formatHour(startHour)} – ${formatHour(startHour + duration)}${startHour + duration >= 24 ? ' next day' : ''} · ${duration} hour${duration === 1 ? '' : 's'}`;
 
   const downPayment = Number(booking.downPayment || 0);
   const remaining = Math.max(0, Number(booking.amount || 0) - downPayment);
@@ -343,38 +349,24 @@ function BookingSuccess({ booking, room, selectedVariant, onDone, onViewBooking 
 
   return (
     <>
-      <div className="bk-confirm-icon"><i className="fa-solid fa-check"></i></div>
-      <h3>Booking successful!</h3>
-      <p>Your reservation is confirmed. Download your receipt below, or view the details and receipt later in Profile → Reservations.</p>
+      <div className="bk-success-intro">
+        <div className="bk-confirm-icon"><i className="fa-solid fa-check"></i></div>
+        <h3>Reservation confirmed</h3>
+        <p>Your payment is complete. Your booking details and receipt are saved in Profile → Reservations.</p>
+      </div>
 
       <div className="bk-success-card">
+        <div className="bk-success-reference">
+          <span className="bk-summary-label">Reservation code</span>
+          <strong className="bk-success-code">{booking.reservationCode || '—'}</strong>
+        </div>
         <div className="bk-success-grid">
           <div className="bk-success-item">
-            <span className="bk-summary-label">Reservation Code</span>
-            <span className="bk-success-code">{booking.reservationCode || '—'}</span>
+            <span className="bk-summary-label">Facility · room</span>
+            <span className="bk-summary-value">{facility} · {roomName}</span>
           </div>
           <div className="bk-success-item">
-            <span className="bk-summary-label">Reserved By</span>
-            <span className="bk-summary-value">{booking.guestName || '—'}</span>
-          </div>
-          <div className="bk-success-item">
-            <span className="bk-summary-label">Contact No.</span>
-            <span className="bk-summary-value">{guestPhoneDisplay(booking.guestContact)}</span>
-          </div>
-          <div className="bk-success-item">
-            <span className="bk-summary-label">Email</span>
-            <span className="bk-summary-value">{booking.guestEmail || '—'}</span>
-          </div>
-          <div className="bk-success-item">
-            <span className="bk-summary-label">Room</span>
-            <span className="bk-summary-value">{roomName}</span>
-          </div>
-          <div className="bk-success-item">
-            <span className="bk-summary-label">Facility</span>
-            <span className="bk-summary-value">{facility}</span>
-          </div>
-          <div className="bk-success-item">
-            <span className="bk-summary-label">Reservation Date</span>
+            <span className="bk-summary-label">Reservation date</span>
             <span className="bk-summary-value">{dateLabel}</span>
           </div>
           <div className="bk-success-item">
@@ -384,16 +376,6 @@ function BookingSuccess({ booking, room, selectedVariant, onDone, onViewBooking 
           <div className="bk-success-item">
             <span className="bk-summary-label">Guests</span>
             <span className="bk-summary-value">{booking.guestCount || 1}</span>
-          </div>
-          {Number(booking.corkageFee) > 0 && (
-            <div className="bk-success-item">
-              <span className="bk-summary-label">Corkage</span>
-              <span className="bk-summary-value">₱{Number(booking.corkageFee).toLocaleString()}</span>
-            </div>
-          )}
-          <div className="bk-success-item">
-            <span className="bk-summary-label">Reserved On</span>
-            <span className="bk-summary-value">{bookedOnLabel}</span>
           </div>
         </div>
 
@@ -410,10 +392,10 @@ function BookingSuccess({ booking, room, selectedVariant, onDone, onViewBooking 
       </div>
 
       <div className="bk-success-actions-row">
-        <button className="bk-back-btn" onClick={handleOpenReceipt}>
+        <button type="button" className="bk-back-btn" onClick={handleOpenReceipt}>
           <i className="fa-solid fa-download"></i> Download Receipt
         </button>
-        <button className="bk-confirm bk-continue" onClick={onDone}>
+        <button type="button" className="bk-confirm bk-continue" onClick={onDone}>
           Back to Home
         </button>
       </div>
@@ -450,7 +432,8 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
   const maxDuration = Number.isFinite(Number(settings?.operatingHours?.maxOnlineDurationHours))
     ? Number(settings.operatingHours.maxOnlineDurationHours) : 5;
   const [selectedDuration, setSelectedDuration] = useState(minDuration);
-  const [downPaymentHours, setDownPaymentHours] = useState(1);
+  const [paymentChoice, setPaymentChoice] = useState('deposit');
+  const [selectedAddOns, setSelectedAddOns] = useState([]);
 
   const [guestName, setGuestName] = useState('');
   const [guestContact, setGuestContact] = useState('');
@@ -532,6 +515,8 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
     setSelectedDuration(minDuration);
     setGuestNote('');
     setHasCorkage(false);
+    setSelectedAddOns([]);
+    setPaymentChoice('deposit');
     setGuestCount(1);
     setPaxError('');
     setNameError('');
@@ -704,7 +689,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
   }, [room, selectedVariant, guestCount]);
 
   useEffect(() => {
-    setDownPaymentHours(1);
+    setPaymentChoice('deposit');
   }, [selectedDuration]);
 
   useEffect(() => {
@@ -726,8 +711,8 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
         }
 
         const { y, m, d } = selectedDate;
-        const dateStr = dateKey(y, m, d);
-        const timeStr = `${String(selectedHour).padStart(2, '0')}:00`;
+        const serviceDate = dateKey(y, m, d);
+        const { date: dateStr, timeIn: timeStr } = slotBookingFields(serviceDate, selectedHour);
 
         const res = await fetch(`${API_BASE_URL}/api/payments/paymongo/intent`, {
           method: 'POST',
@@ -744,7 +729,8 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
             date: dateStr,
             timeIn: timeStr,
             duration: selectedDuration,
-            downPaymentHours,
+            paymentChoice,
+            selectedAddOns,
           }),
         });
         const data = await res.json().catch(() => ({}));
@@ -758,8 +744,12 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
           throw new Error(data.message || 'Could not start online payment.');
         }
 
-        clearReservedHours(room._id, dateStr);
+        clearReservedHours(room._id, serviceDate);
         clearMonthAvailability(room._id, y, m + 1);
+        if (dateStr !== serviceDate) {
+          const [bookingYear, bookingMonth] = dateStr.split('-').map(Number);
+          clearMonthAvailability(room._id, bookingYear, bookingMonth);
+        }
 
         if (!cancelled) setPmIntent({ paymentIntentId: data.paymentIntentId, clientKey: data.clientKey, amount: data.amount });
       } catch (err) {
@@ -777,7 +767,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
     return () => {
       cancelled = true;
     };
-  }, [step, room, selectedVariant, selectedDate, selectedHour, selectedDuration, downPaymentHours, hasCorkage, paymentInitVersion]);
+  }, [step, room, selectedVariant, selectedDate, selectedHour, selectedDuration, paymentChoice, selectedAddOns, hasCorkage, paymentInitVersion]);
 
   function handleClose() {
     stopPolling();
@@ -787,6 +777,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
 
   function handleChooseOption(opt) {
     setSelectedVariant(opt);
+    setSelectedAddOns([]);
     setViewDate(new Date(`${businessDate()}T12:00:00`));
     setStep('schedule');
   }
@@ -867,8 +858,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
     setLockLoading(true);
     try {
       const { y, m, d } = selectedDate;
-      const dateStr = dateKey(y, m, d);
-      const timeStr = `${String(selectedHour).padStart(2, '0')}:00`;
+      const { date: dateStr, timeIn: timeStr } = slotBookingFields(dateKey(y, m, d), selectedHour);
       const result = await bookingsService.lockSlot({
         roomId: room._id,
         variantLabel: selectedVariant?.label,
@@ -1273,7 +1263,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
       const isToday = dStr === todayKey;
       const holiday = isHolidayDate(dStr, settings?.holidays);
       const closedDay = !isOperatingDay(thisDate, settings?.operatingHours);
-      const past = dStr < todayKey;
+      const past = slotStartMs(dStr, closeHour) <= Date.now();
 
       const { availableStarts, nearlyFull } = getDayAvailability(monthBookings[dStr], openHour, closeHour, totalRooms, selectedDuration, dStr);
       const fullyBooked = availableStarts === 0;
@@ -1310,33 +1300,36 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
   const { firstDay, days: calendarDays } = step === 'schedule' ? buildCalendarDays() : { firstDay: 0, days: [] };
   const cap = getPaxCapacity(selectedVariant?.pax);
 
-  const selectedDateLabel = selectedDate
-    ? `${WEEKDAYS[new Date(selectedDate.y, selectedDate.m, selectedDate.d).getDay()]}, ${MONTHS[selectedDate.m]} ${selectedDate.d}`
+  const serviceDateKey = selectedDate ? dateKey(selectedDate.y, selectedDate.m, selectedDate.d) : null;
+  const selectedBookingDateKey = serviceDateKey && selectedHour !== null ? slotBookingFields(serviceDateKey, selectedHour).date : serviceDateKey;
+  const selectedBookingDate = selectedBookingDateKey ? new Date(`${selectedBookingDateKey}T12:00:00`) : null;
+  const selectedDateLabel = selectedBookingDate
+    ? `${WEEKDAYS[selectedBookingDate.getDay()]}, ${MONTHS[selectedBookingDate.getMonth()]} ${selectedBookingDate.getDate()}${selectedHour >= 24 ? ' (next day)' : ''}`
     : '';
   const selectedOptionLabel = selectedVariant ? `${selectedVariant.label} · ${variantRateLabel(selectedVariant)}` : '';
-  const startTimeLabel = selectedHour !== null ? formatHour(selectedHour) : '—';
-  const endTimeLabel = selectedHour !== null ? formatHour(selectedHour + selectedDuration) : '—';
+  const startTimeLabel = selectedHour !== null ? `${formatHour(selectedHour)}${selectedHour >= 24 ? ' next day' : ''}` : '—';
+  const endTimeLabel = selectedHour !== null ? `${formatHour(selectedHour + selectedDuration)}${selectedHour + selectedDuration >= 24 ? ' next day' : ''}` : '—';
   const durationLabel = `${selectedDuration} hour${selectedDuration === 1 ? '' : 's'}`;
 
   const priceBreakdown = selectedVariant
     ? calculateBookingPrice({
+        room,
         variant: selectedVariant,
         startHour: selectedHour ?? 0,
         duration: selectedDuration,
         guestCount,
         hasCorkage,
-        downPaymentHours,
+        paymentChoice,
+        selectedAddOns,
       })
-    : { amount: 0, roomCharge: 0, corkageFee: 0, downPayment: 0, hourlyRates: [] };
+    : { amount: 0, roomCharge: 0, corkageFee: 0, downPayment: 0, discountAmount: 0, eligibleDiscount: 0, addOns: [], addOnFee: 0, hourlyRates: [] };
   const subtotalAmount = priceBreakdown.amount;
   const downPaymentAmount = priceBreakdown.downPayment;
   const remainingBalanceAmount = Math.max(0, subtotalAmount - downPaymentAmount);
-  const downPaymentOptions = selectedDuration === 1
-    ? [{ hours: 1, label: 'Full payment', amount: subtotalAmount }]
-    : [
-        { hours: 1, label: '1 hour', amount: priceBreakdown.hourlyRates[0] || 0 },
-        { hours: selectedDuration, label: 'Full payment', amount: subtotalAmount },
-      ];
+  const downPaymentOptions = [
+    { choice: 'deposit', label: '1-hour down payment', amount: Math.min(priceBreakdown.roomCharge + priceBreakdown.corkageFee + priceBreakdown.addOnFee, priceBreakdown.hourlyRates[0] || 0) },
+    { choice: 'full', label: 'Pay in full', amount: Math.max(0, priceBreakdown.roomCharge - priceBreakdown.eligibleDiscount + priceBreakdown.corkageFee + priceBreakdown.addOnFee) },
+  ];
   const visiblePaymentMethods = allowedPaymentMethodKeys
     ? PAYMENT_METHODS.filter((m) => allowedPaymentMethodKeys.includes(m.key))
     : PAYMENT_METHODS;
@@ -1346,20 +1339,21 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
   const contactMessengerUrl = settings?.contact?.messengerUrl;
   const contactPhone = settings?.contact?.phone;
   const isPaymentReturn = step === 'paymongoReturn';
+  const isConfirmedReturn = isPaymentReturn && pmReturn.phase === 'confirmed';
 
   return (
     <ModalPortal>
       <div className={`bk-overlay${open ? ' open' : ''}`} id="booking-modal" role="dialog" aria-modal="true" aria-labelledby="booking-modal-title">
-        <div className={'bk-modal' + (showSummaryPanel ? '' : ' bk-modal--compact') + (isPaymentReturn ? ' bk-modal--payment-return' : '') + (isPaymentReturn && pmReturn.phase === 'loading' ? ' bk-modal--payment-loading' : '')}>
-          <div className="bk-header">
-          <button type="button" className="bk-modal-back" aria-label="Go back" onClick={handleBack}>
+        <div className={'bk-modal' + (showSummaryPanel ? '' : ' bk-modal--compact') + (isPaymentReturn ? ' bk-modal--payment-return' : '') + (isConfirmedReturn ? ' bk-modal--payment-confirmed' : '') + (isPaymentReturn && pmReturn.phase === 'loading' ? ' bk-modal--payment-loading' : '')}>
+          <div className={`bk-header${isConfirmedReturn ? ' bk-header--success' : ''}`}>
+          {!isConfirmedReturn && <button type="button" className="bk-modal-back" aria-label="Go back" onClick={handleBack}>
             <ArrowLeft size={18} aria-hidden="true" />
             <span>Back</span>
-          </button>
+          </button>}
           <div className="bk-header-identity">
             <div>
               <p className="bk-eyebrow">Reservation</p>
-              <h2 id="booking-modal-title">{step === 'paymongoReturn' ? 'Online payment' : room?.name}</h2>
+              <h2 id="booking-modal-title">{isConfirmedReturn ? 'Your reservation' : isPaymentReturn ? 'Online payment' : room?.name}</h2>
             </div>
           </div>
           <button type="button" className="bk-close" aria-label="Close reservation" onClick={handleClose}>
@@ -1415,12 +1409,14 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
               subtotal={subtotalAmount}
               downPayment={downPaymentAmount}
               remainingBalance={remainingBalanceAmount}
+              priceBreakdown={priceBreakdown}
+              paymentChoice={paymentChoice}
               step={step}
             />
           </div>
         )}
 
-        <div className={'bk-content' + (isPaymentReturn ? ' bk-content--payment-return' : '') + (isPaymentReturn && pmReturn.phase === 'loading' ? ' bk-content--payment-loading' : '')}>
+        <div className={'bk-content' + (isPaymentReturn ? ' bk-content--payment-return' : '') + (isConfirmedReturn ? ' bk-content--payment-confirmed' : '') + (isPaymentReturn && pmReturn.phase === 'loading' ? ' bk-content--payment-loading' : '')}>
           <div className="bk-body">
             {step === 'price' && room && (
               <div className="bk-step" id="bkStepPrice">
@@ -1566,14 +1562,6 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
                       </p>
                     )}
 
-                    {(() => {
-                      const latestStart = getLatestStartTime(openHour, closeHour, selectedDuration);
-                      const helperText = latestStart !== null
-                        ? `Booking for ${selectedDuration} hour${selectedDuration === 1 ? '' : 's'}. Latest start: ${formatHour(latestStart)}.`
-                        : `This duration is longer than today's operating hours. Choose a shorter duration.`;
-                      return <p className="bk-slot-helper-msg">{helperText}</p>;
-                    })()}
-
                     {slotsLoading ? (
                       <div className="bk-skeleton-grid">
                         {Array.from({ length: 6 }).map((_, i) => (
@@ -1584,10 +1572,10 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
                       (() => {
                         const selectedKey = dateKey(selectedDate.y, selectedDate.m, selectedDate.d);
 
-                        const groups = { Morning: [], Afternoon: [], Evening: [] };
+                        const groups = { Morning: [], Afternoon: [], Evening: [], 'After midnight · next day': [] };
                         let anyAvailable = false;
-                        for (let h = openHour; h < Math.min(closeHour, 24); h++) {
-                          if (Date.parse(`${selectedKey}T${String(h).padStart(2, '0')}:00:00+08:00`) <= Date.now()) continue;
+                        for (let h = openHour; h < closeHour; h++) {
+                          if (slotStartMs(selectedKey, h) <= Date.now()) continue;
 
                           const state = getSlotState(h, selectedDuration, closeHour, reserved, totalRooms);
                           const fits = state === 'available';
@@ -1601,7 +1589,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
                           } else if (state === 'insufficient') {
                             slotStatusLabel = 'Ends after closing';
                           } else if (isSelected) {
-                            slotStatusLabel = `Selected · ends ${formatHour(h + selectedDuration)}`;
+                            slotStatusLabel = `Selected · ends ${formatHour(h + selectedDuration)}${h + selectedDuration >= 24 ? ' next day' : ''}`;
                           } else {
                             const availableCount = getAvailableRoomCountForDuration(
                               reserved,
@@ -1629,7 +1617,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
                               onClick={fits ? () => handleSelectHour(h) : undefined}
                               disabled={!fits}
                               aria-pressed={fits ? isSelected : undefined}
-                              aria-label={`${formatHour(h)}, ${slotStatusLabel}`}
+                              aria-label={`${formatHour(h)}${h >= 24 ? ' next day' : ''}, ${slotStatusLabel}`}
                             >
                               <span className="bk-slot-time">{formatHour(h)}</span>
                               <span className={`bk-slot-status${slotStatusTone}`}>{slotStatusLabel}</span>
@@ -1783,6 +1771,25 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
                       <small>Includes the required ₱{CORKAGE_FEE.toLocaleString()} corkage fee.</small>
                     </span>
                   </label>
+                  {(room.addOns || []).length > 0 && (
+                    <div className="bk-optional-services">
+                      <strong>Optional services</strong>
+                      <p>Choose any extras you want for this reservation.</p>
+                      {room.addOns.map((service) => (
+                        <label className={`bk-addon-option${selectedAddOns.includes(service.name) ? ' bk-addon-option--selected' : ''}`} key={service.name}>
+                          <input
+                            type="checkbox"
+                            checked={selectedAddOns.includes(service.name)}
+                            onChange={(event) => setSelectedAddOns((current) => event.target.checked
+                              ? [...current, service.name]
+                              : current.filter((name) => name !== service.name))}
+                          />
+                          <span className="bk-addon-option-icon"><i className="fa-solid fa-circle-plus" aria-hidden="true"></i></span>
+                          <span><strong>{service.name}</strong><small>+₱{Number(service.fee).toLocaleString()} per booking</small></span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 <div className="bk-detail-actions">
@@ -1800,12 +1807,12 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
                 </div>
 
                 <div className="bk-downpayment-card">
-                  <p className="bk-summary-label">{remainingBalanceAmount > 0 ? 'Down payment' : 'Full payment'}</p>
+                  <p className="bk-summary-label">{paymentChoice === 'deposit' ? '1-hour down payment' : 'Full payment'}</p>
                   <p className="bk-downpayment-amount">
                     ₱{downPaymentAmount.toLocaleString()}
                   </p>
-                  <p className="bk-downpayment-duration">{remainingBalanceAmount > 0
-                    ? `Confirms your booking. ₱${remainingBalanceAmount.toLocaleString()} remains to pay at the venue. First hour is non-refundable if you cancel.`
+                  <p className="bk-downpayment-duration">{paymentChoice === 'deposit'
+                    ? `Confirms your booking. ₱${remainingBalanceAmount.toLocaleString()} remains before any venue discount. First hour is non-refundable if you cancel.`
                     : downPaymentAmount > (priceBreakdown.hourlyRates[0] || 0)
                       ? 'Confirms your booking. If you cancel, contact admin for a refund minus the first hour.'
                       : 'Confirms your booking. Non-refundable if you cancel.'}</p>
@@ -1813,20 +1820,20 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
 
                 <div className="bk-payment-methods">
                   <span className="bk-payment-methods-label" id="bk-payment-hours-label">Pay now</span>
-                  <p className="bk-payment-methods-help">{selectedDuration === 1 ? 'Pay the full booking total today.' : 'Choose 1 hour or pay the full booking total today.'}</p>
+                  <p className="bk-payment-methods-help">Pay in full to apply the room discount now. A 1-hour down payment keeps the discount for settlement at the venue.</p>
                   <div className="bk-payment-methods-grid bk-payment-duration-grid" role="group" aria-labelledby="bk-payment-hours-label">
-                    {downPaymentOptions.map(({ hours, label, amount }) => (
+                    {downPaymentOptions.map(({ choice, label, amount }) => (
                       <button
-                        key={hours}
+                        key={choice}
                         type="button"
                         className={
                           'bk-payment-method-tile bk-payment-duration-tile' +
-                          (downPaymentHours === hours ? ' bk-payment-method-tile--selected' : '') +
+                          (paymentChoice === choice ? ' bk-payment-method-tile--selected' : '') +
                           (payLoading ? ' bk-payment-method-tile--disabled' : '')
                         }
                         disabled={payLoading}
-                        aria-pressed={downPaymentHours === hours}
-                        onClick={() => setDownPaymentHours(hours)}
+                        aria-pressed={paymentChoice === choice}
+                        onClick={() => setPaymentChoice(choice)}
                       >
                         <span className="bk-payment-choice-copy">
                           <strong>{label}</strong>
@@ -2020,7 +2027,6 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
                     room={room}
                     selectedVariant={selectedVariant}
                     onDone={handleDone}
-                    onViewBooking={onViewBooking}
                   />
                 ) : pmReturn.phase === 'paidSlotUnavailable' ? (
                   <div className="bk-payment-fallback" role="alert">
@@ -2116,8 +2122,10 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
                 selectedMethod={selectedMethod}
                 subtotal={subtotalAmount}
                 downPayment={downPaymentAmount}
-                remainingBalance={remainingBalanceAmount}
-                step={step}
+              remainingBalance={remainingBalanceAmount}
+              priceBreakdown={priceBreakdown}
+              paymentChoice={paymentChoice}
+              step={step}
               />
             </div>
           )}

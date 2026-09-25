@@ -18,30 +18,22 @@ import Toast from '../components/Toast';
 import { API_BASE_URL } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { buildLoginPath } from '../utils/auth';
+import { resolveImageUrl } from '../utils/resolveImageUrl';
+import heroBgImg from '../assets/images/main.png';
+import venueHero from '../assets/pictures/RiverView_8.jpg';
+import billiardsHero from '../assets/pictures/Billiard.jpg';
+import ktvHero from '../assets/pictures/KTV.jpg';
+import courtHero from '../assets/pictures/basketball.jpg';
 import '../styles/home-refinement.css';
 import '../styles/our-spaces.css';
 
-import heroImg4 from '../assets/pictures/RiverView_4.jpg';
-import heroImg5 from '../assets/pictures/RiverView_5.jpg';
-import heroImg6 from '../assets/pictures/RiverView_6.jpg';
-import heroImg7 from '../assets/pictures/RiverView_7.jpg';
-import heroImg8 from '../assets/pictures/RiverView_8.jpg';
-import heroBgImg from '../assets/images/main.png';
-import billiardsSpaceImg from '../assets/images/about-billiards.png';
-import courtSpaceImg from '../assets/images/about-court.png';
-import ktvSpaceImg from '../assets/images/about-ktv.png';
-import billiardsDetailImg from '../assets/pictures/Billiard.jpg';
-import courtDetailImg from '../assets/images/court.png';
-import ktvDetailImg from '../assets/pictures/RiverView_6.jpg';
 
 const HERO_CAROUSEL_INTERVAL_MS = 4000;
-
 const HERO_SLIDES = [
-  { src: heroImg4, alt: 'The Riverview' },
-  { src: heroImg5, alt: 'Court' },
-  { src: heroImg6, alt: 'VIP' },
-  { src: heroImg7, alt: 'Billiards' },
-  { src: heroImg8, alt: 'Court 2' },
+  { key: 'venue', src: venueHero, alt: 'Guests at The Riverview' },
+  { key: 'billiards', src: billiardsHero, alt: 'Guests at the billiards tables' },
+  { key: 'ktv', src: ktvHero, alt: 'Guests in a KTV room' },
+  { key: 'court', src: courtHero, alt: 'Basketball game at The Riverview' },
 ];
 
 function getOffset(index, current, total) {
@@ -56,30 +48,18 @@ const SPACE_ITEMS = [
     type: 'billiards',
     title: 'Billiards Room',
     navLabel: 'Billiards',
-    image: billiardsSpaceImg,
-    imageAlt: 'Billiards tables at The Riverview',
-    detailImage: billiardsDetailImg,
-    detailImageAlt: 'Friends playing billiards at The Riverview',
     description: 'Multiple tables, great lighting, and a chill atmosphere. Perfect for a quick session or a long evening with friends.',
   },
   {
     type: 'court',
     title: 'Basketball Court',
     navLabel: 'Court',
-    image: courtSpaceImg,
-    imageAlt: 'The basketball court at The Riverview',
-    detailImage: courtDetailImg,
-    detailImageAlt: 'Basketball players on the court',
     description: 'Full-size court with proper flooring. Includes scoreboard, timer, and sound system for official games.',
   },
   {
     type: 'ktv',
     title: 'KTV Room',
     navLabel: 'KTV',
-    image: ktvSpaceImg,
-    imageAlt: 'A KTV room at The Riverview',
-    detailImage: ktvDetailImg,
-    detailImageAlt: 'Guests enjoying a KTV room',
     description: 'Private rooms with updated song libraries. Bring your barkada, bring your voice. No judgment here.',
   },
 ];
@@ -128,14 +108,15 @@ const AMENITY_ITEMS = [
   { icon: UsersRound, title: 'Plan with the team', desc: 'Message us when you need help choosing a room or arranging a visit.' },
 ];
 
-function HeroCarousel() {
+function HeroCarousel({ slides }) {
   const [current, setCurrent] = useState(0);
   const timerRef = useRef(null);
 
   function start() {
     stop();
+    if (slides.length < 2) return;
     timerRef.current = setInterval(() => {
-      setCurrent((c) => (c + 1) % HERO_SLIDES.length);
+      setCurrent((c) => (c + 1) % slides.length);
     }, HERO_CAROUSEL_INTERVAL_MS);
   }
 
@@ -147,27 +128,27 @@ function HeroCarousel() {
   useEffect(() => {
     start();
     return stop;
-  }, []);
+  }, [slides.length]);
 
   function goTo(index) {
-    setCurrent((index + HERO_SLIDES.length) % HERO_SLIDES.length);
+    setCurrent((index + slides.length) % slides.length);
     start();
   }
 
   return (
     <div className="hero-carousel" id="heroCarousel" onMouseEnter={stop} onMouseLeave={start}>
-      <button
+      {slides.length > 1 && <button
         type="button"
         className="hero-carousel-arrow hero-carousel-arrow-prev"
         aria-label="Previous slide"
         onClick={() => goTo(current - 1)}
       >
         <i className="fa-solid fa-chevron-left"></i>
-      </button>
+      </button>}
 
       <div className="hero-carousel-stage" id="heroCarouselTrack">
-        {HERO_SLIDES.map((slide, i) => {
-          const offset = getOffset(i, current, HERO_SLIDES.length);
+        {slides.map((slide, i) => {
+          const offset = getOffset(i, current, slides.length);
           const abs = Math.abs(offset);
           const isActive = offset === 0;
           const cardStyle = {
@@ -179,7 +160,7 @@ function HeroCarousel() {
           return (
             <button
               type="button"
-              key={slide.src}
+              key={slide.key}
               className={`hero-carousel-card${isActive ? ' is-active' : ''}`}
               style={cardStyle}
               aria-label={isActive ? undefined : `Go to ${slide.alt}`}
@@ -188,21 +169,21 @@ function HeroCarousel() {
               onClick={() => goTo(i)}
             >
               <span className="hero-carousel-frame">
-                <img src={slide.src} alt={slide.alt} />
+                {slide.src ? <img src={slide.src} alt={slide.alt} /> : <span className="facility-name-placeholder">{slide.alt}</span>}
               </span>
             </button>
           );
         })}
       </div>
 
-      <button
+      {slides.length > 1 && <button
         type="button"
         className="hero-carousel-arrow hero-carousel-arrow-next"
         aria-label="Next slide"
         onClick={() => goTo(current + 1)}
       >
         <i className="fa-solid fa-chevron-right"></i>
-      </button>
+      </button>}
     </div>
   );
 }
@@ -227,6 +208,9 @@ function Home() {
   const activeSpace = SPACE_ITEMS[activeSpaceIndex];
   const activeManagedRoom = rooms?.find((room) => matchesSpace(room, activeSpace.type));
   const activeSpaceHref = activeManagedRoom?._id ? `/rooms/${encodeURIComponent(activeManagedRoom._id)}` : '/rooms';
+  const spaceMainImage = activeManagedRoom?.image ? resolveImageUrl(activeManagedRoom.image) : '';
+  const spaceDetailVariant = activeManagedRoom?.variants?.find((variant) => variant.image);
+  const spaceDetailImage = spaceDetailVariant ? resolveImageUrl(spaceDetailVariant.image) : '';
   const previousSpace = SPACE_ITEMS[(activeSpaceIndex - 1 + SPACE_ITEMS.length) % SPACE_ITEMS.length];
   const nextSpace = SPACE_ITEMS[(activeSpaceIndex + 1) % SPACE_ITEMS.length];
 
@@ -393,7 +377,7 @@ function Home() {
   return (
     <>
       <section className="hero" id="home">
-        <div className="hero-bg" style={{ '--hero-bg-image': `url(${heroBgImg})` }}></div>
+        <div className="hero-bg" style={{ '--hero-bg-image': `url("${heroBgImg}")` }}></div>
 
         <div className="hero-inner">
           <div className="hero-content">
@@ -408,7 +392,7 @@ function Home() {
             </div>
           </div>
 
-          <HeroCarousel />
+          <HeroCarousel slides={HERO_SLIDES} />
         </div>
       </section>
 
@@ -527,11 +511,9 @@ function Home() {
               </div>
               <div className="space-carousel-media">
                 <div className="space-carousel-main-image">
-                  <img src={activeSpace.image} alt={activeSpace.imageAlt} loading="lazy" decoding="async" />
+                  {spaceMainImage ? <img src={spaceMainImage} alt={activeManagedRoom.name} loading="lazy" decoding="async" /> : <span className="facility-name-placeholder">{activeManagedRoom?.name || activeSpace.title}</span>}
                 </div>
-                <div className="space-carousel-detail-image">
-                  <img src={activeSpace.detailImage} alt={activeSpace.detailImageAlt} loading="lazy" decoding="async" />
-                </div>
+                {spaceDetailImage && <div className="space-carousel-detail-image"><img src={spaceDetailImage} alt={`${activeManagedRoom.name} — ${spaceDetailVariant.label}`} loading="lazy" decoding="async" /></div>}
               </div>
               <div className="space-carousel-copy">
                 <p>{activeSpace.description}</p>

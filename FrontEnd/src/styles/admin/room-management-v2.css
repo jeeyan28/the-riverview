@@ -748,6 +748,21 @@
   transition: transform 420ms cubic-bezier(.2,.7,.2,1);
 }
 
+#app #panel-room-management .facility-catalog-media > .facility-name-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  min-height: 210px;
+  padding: 30px;
+  color: #f3fbfb;
+  text-align: center;
+  font-size: 1.2rem;
+  font-weight: 750;
+}
+
+#app .fm-editor-modal .fm-room-card-media .facility-name-placeholder { font-size: .85rem; padding: 12px; }
+
 #app #panel-room-management .facility-catalog-row:hover .facility-catalog-media img {
   transform: scale(1.025);
 }
@@ -1194,6 +1209,8 @@
   border-color: color-mix(in srgb, var(--teal) 58%, var(--border));
   background-color: color-mix(in srgb, var(--teal) 5%, var(--navy2));
 }
+#app .fm-editor-modal .image-upload-preview.is-dragging { background: var(--teal-soft); }
+#app .fm-editor-modal .fm-upload-zone:has(.image-upload-preview.is-dragging) { border-color: var(--teal); }
 #app .fm-editor-modal .image-upload-preview:focus-visible {
   outline: 0;
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--teal) 15%, transparent);
@@ -1222,6 +1239,7 @@
   color: var(--teal);
 }
 #app .fm-editor-modal .image-upload-empty strong { color: var(--text); font-size: .75rem; }
+#app .fm-editor-modal .image-upload-empty > span:nth-last-child(2) { color: var(--text); font-size: .7rem; }
 #app .fm-editor-modal .image-upload-empty > span:last-child { color: var(--muted); font-size: .65rem; }
 #app .fm-editor-modal .image-upload-change {
   position: absolute;
@@ -1603,3 +1621,9 @@
     transition: none;
   }
 }
+.fm-addon-row{align-items:end;margin-top:12px;}
+.fm-addon-row .ffield:first-child{flex:2;}
+.fm-addon-row .ffield:nth-child(2){flex:1;}
+.fm-addon-row > button{flex:none;min-width:42px;min-height:42px;}
+.fm-add-service{display:inline-flex;align-items:center;gap:8px;margin-top:12px;}
+.fm-preview-col .room-card-discount,.fm-preview-col .bk-room-option-discount{display:block;}

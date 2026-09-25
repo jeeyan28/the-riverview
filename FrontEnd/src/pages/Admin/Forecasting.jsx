@@ -5,8 +5,6 @@ import { Chart } from 'chart.js/auto';
 import { formatPeso } from '../../utils/currency';
 import { API_BASE_URL } from '../../services/api';
 
-const TREND_WORD = { up: 'Trending up', down: 'Trending down', flat: 'Flat' };
-const VOLATILITY_WORD = { low: 'Low', moderate: 'Moderate', high: 'High' };
 const DEFAULT_RANGES = [
   { value: 'daily', label: 'Daily', forecastLabel: 'next 14 days' },
   { value: 'weekly', label: 'Weekly', forecastLabel: 'next 8 weeks' },
@@ -262,10 +260,10 @@ function Forecasting() {
 
   const projRevenue = data ? data.projection.reduce((s, p) => s + p.projectedRevenue, 0) : 0;
   const projBookings = data ? data.projection.reduce((s, p) => s + p.projectedBookings, 0) : 0;
-  const revenuePercent = data?.trend?.revenuePercent ?? 0;
-  const bookingPercent = data?.trend?.bookingPercent ?? 0;
   const bestDay = data?.seasonality?.revenue?.best;
-  const volatility = data?.volatility;
+  const recentPeriods = data?.history.slice(-data.window) || [];
+  const priorPeriods = data?.history.slice(-2 * data.window, -data.window) || [];
+  const periodTotal = (periods, field) => periods.reduce((sum, item) => sum + Number(item[field] || 0), 0);
 
   const weekdayMax = data
     ? Math.max(1, ...data.seasonality.revenue.byWeekday.map((w) => w.average))
@@ -276,37 +274,35 @@ function Forecasting() {
 
   return (
     <div className="panel active" id="panel-forecasting">
+      <div className="fc-filter-bar">
+        <label htmlFor="fc-forecast-range">Forecast range
+          <select id="fc-forecast-range" className="users-filter-input" value={forecastRange} onChange={(event) => setForecastRange(event.target.value)}>
+            {rangeOptions.map((option) => <option key={option.value} value={option.value}>{option.label} · {option.forecastLabel}</option>)}
+          </select>
+        </label>
+        <label htmlFor="fc-sma-window">Average over
+          <select id="fc-sma-window" className="users-filter-input" value={smaWindow} onChange={(event) => setSmaWindow(Number(event.target.value))}>
+            {windowOptions.map((window) => <option key={window} value={window}>{window} days</option>)}
+          </select>
+        </label>
+      </div>
       <div className="metric-row" id="forecast-metrics">
         <div className="mc">
-          <div className="mc-label"><i className="ti ti-trending-up"></i>Revenue Trend</div>
+          <div className="mc-label"><i className="ti ti-trending-up"></i>Revenue · last {data?.window || smaWindow} days</div>
           <div className="mc-val" id="fc-revenue-trend">
-            {data ? TREND_WORD[data.trend.revenueDirection] : '—'}
+            {data ? formatPeso(periodTotal(recentPeriods, 'revenue')) : '—'}
           </div>
-          <div className={`mc-sub ${data && data.trend.revenueDirection === 'up' ? 'up' : data && data.trend.revenueDirection === 'down' ? 'dn' : ''}`} id="fc-revenue-trend-sub">
-            {error ? error : loading && !data ? 'Loading…' : data ? (
-              <>
-                {data.trend.revenueDirection !== 'flat' && (
-                  <i className={`ti ${data.trend.revenueDirection === 'up' ? 'ti-trending-up' : 'ti-trending-down'}`}></i>
-                )}
-                {data.trend.revenueDirection === 'flat' ? 'Flat vs prior period' : `${revenuePercent > 0 ? '+' : ''}${revenuePercent}% vs prior period`}
-              </>
-            ) : `based on last ${historyDays} days`}
+          <div className="mc-sub" id="fc-revenue-trend-sub">
+            {error ? error : loading && !data ? 'Loading…' : data ? `${formatPeso(periodTotal(priorPeriods, 'revenue'))} in the previous ${data.window} days` : 'Recorded revenue'}
           </div>
         </div>
         <div className="mc">
-          <div className="mc-label"><i className="ti ti-calendar-stats"></i>Reservation Trend</div>
+          <div className="mc-label"><i className="ti ti-calendar-stats"></i>Reservations · last {data?.window || smaWindow} days</div>
           <div className="mc-val" id="fc-booking-trend">
-            {data ? TREND_WORD[data.trend.bookingDirection] : '—'}
+            {data ? periodTotal(recentPeriods, 'bookingCount') : '—'}
           </div>
-          <div className={`mc-sub ${data && data.trend.bookingDirection === 'up' ? 'up' : data && data.trend.bookingDirection === 'down' ? 'dn' : ''}`} id="fc-booking-trend-sub">
-            {loading && !data ? 'Loading…' : data ? (
-              <>
-                {data.trend.bookingDirection !== 'flat' && (
-                  <i className={`ti ${data.trend.bookingDirection === 'up' ? 'ti-trending-up' : 'ti-trending-down'}`}></i>
-                )}
-                {data.trend.bookingDirection === 'flat' ? 'Flat vs prior period' : `${bookingPercent > 0 ? '+' : ''}${bookingPercent}% vs prior period`}
-              </>
-            ) : `based on last ${historyDays} days`}
+          <div className="mc-sub" id="fc-booking-trend-sub">
+            {loading && !data ? 'Loading…' : data ? `${periodTotal(priorPeriods, 'bookingCount')} in the previous ${data.window} days` : 'Confirmed reservations'}
           </div>
         </div>
         <div className="mc">
@@ -314,58 +310,14 @@ function Forecasting() {
           <div className="mc-val" id="fc-projected-revenue">
             {data ? formatPeso(projRevenue) : '—'}
           </div>
-          <div className="mc-sub">trend-adjusted SMA, 80% confidence</div>
+          <div className="mc-sub">Estimate based on recent activity</div>
         </div>
         <div className="mc">
           <div className="mc-label"><i className="ti ti-calendar-event"></i>Projected Reservations ({forecastLabel})</div>
           <div className="mc-val" id="fc-projected-bookings">
             {data ? projBookings : '—'}
           </div>
-          <div className="mc-sub">trend-adjusted SMA, 80% confidence</div>
-        </div>
-        <div className="mc">
-          <div className="mc-label"><i className="ti ti-chart-histogram"></i>Revenue Volatility</div>
-          <div className="mc-val" id="fc-volatility">
-            {volatility ? VOLATILITY_WORD[volatility.level] : '—'}
-          </div>
-          <div className="mc-sub">{volatility ? `±${formatPeso(volatility.revenueStdDev)} / day` : `based on last ${historyDays} days`}</div>
-        </div>
-        <div className="mc">
-          <div className="mc-label"><i className="ti ti-calendar-heart"></i>Best Day</div>
-          <div className="mc-val" id="fc-best-day">
-            {bestDay ? bestDay.day : '—'}
-          </div>
-          <div className="mc-sub">{bestDay ? `avg ${formatPeso(bestDay.average)} revenue` : 'not enough data yet'}</div>
-        </div>
-        <div className="mc">
-          <label className="mc-label" htmlFor="fc-forecast-range"><i className="ti ti-calendar-forward"></i>Forecast Range</label>
-          <select
-            id="fc-forecast-range"
-            className="users-filter-input fc-sma-select"
-            value={forecastRange}
-            onChange={(event) => setForecastRange(event.target.value)}
-          >
-            {rangeOptions.map((option) => (
-              <option key={option.value} value={option.value}>{option.label} · {option.forecastLabel}</option>
-            ))}
-          </select>
-          <div className="mc-sub">planning horizon</div>
-        </div>
-        <div className="mc">
-          <label className="mc-label" htmlFor="fc-sma-window"><i className="ti ti-adjustments-horizontal"></i>SMA Window</label>
-          <select
-            id="fc-sma-window"
-            className="users-filter-input fc-sma-select"
-            value={smaWindow}
-            onChange={(e) => setSmaWindow(Number(e.target.value))}
-          >
-            {windowOptions.map((w) => (
-              <option key={w} value={w}>
-                {w} days
-              </option>
-            ))}
-          </select>
-          <div className="mc-sub">averaging window</div>
+          <div className="mc-sub">Estimate based on recent bookings</div>
         </div>
       </div>
 
@@ -525,7 +477,7 @@ function Forecasting() {
             <div className="card">
               <div className="card-head">
                 <span className="card-title">Revenue by Day of Week</span>
-                <p className="card-subtitle">Average revenue per weekday, last {historyDays} days.</p>
+                <p className="card-subtitle">Average revenue per weekday, last {historyDays} days.{bestDay ? ` Best day: ${bestDay.day} (${formatPeso(bestDay.average)} average).` : ''}</p>
               </div>
               <div className="fc-weekday-list">
                 {data.seasonality.revenue.byWeekday.map((w) => (
@@ -534,7 +486,7 @@ function Forecasting() {
                     <span className="fc-weekday-bar-track">
                       <span
                         className={`fc-weekday-bar-fill ${data.seasonality.revenue.best?.day === w.day ? 'best' : ''} ${data.seasonality.revenue.worst?.day === w.day ? 'worst' : ''}`}
-                        style={{ width: `${Math.max(4, (w.average / weekdayMax) * 100)}%` }}
+                        style={{ width: `${w.average > 0 ? Math.max(4, (w.average / weekdayMax) * 100) : 0}%` }}
                       />
                     </span>
                     <span className="fc-weekday-val">{formatPeso(w.average)}</span>

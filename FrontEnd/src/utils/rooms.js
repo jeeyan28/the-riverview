@@ -1,4 +1,5 @@
 import { API_BASE_URL } from '../services/api.js';
+import { slotStartMs } from './bookingHours.js';
 
 export function dateKey(y, m, d) {
   return `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
@@ -243,8 +244,8 @@ export function getDayAvailability(dayBookings, openHour, closeHour, totalRooms,
   const reserved = buildHourCounts(dayBookings);
   let availableStarts = 0;
   let mostRoomsAvailable = 0;
-  for (let hour = openHour; hour < Math.min(closeHour, 24); hour++) {
-    const start = dateStr ? Date.parse(`${dateStr}T${String(hour).padStart(2, '0')}:00:00+08:00`) : null;
+  for (let hour = openHour; hour < closeHour; hour++) {
+    const start = dateStr ? slotStartMs(dateStr, hour) : null;
     if (dateStr && (!Number.isFinite(start) || start <= nowMs)) continue;
     if (getSlotState(hour, duration, closeHour, reserved, totalRooms) !== 'available') continue;
     availableStarts++;
@@ -266,6 +267,7 @@ export function getBookableStartCount(dayBookings, openHour, closeHour, totalRoo
 }
 
 export function getTimePeriod(hour) {
+  if (hour >= 24) return 'After midnight · next day';
   if (hour < 12) return 'Morning';
   if (hour < 17) return 'Afternoon';
   return 'Evening';

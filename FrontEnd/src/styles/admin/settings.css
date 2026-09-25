@@ -7,24 +7,18 @@
 .set-subpanel{display:none;flex-direction:column;gap:16px;}
 .set-subpanel.active{display:flex;}
 
-.sched-2col{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:14px;}
+.sched-2col{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-bottom:10px;}
 .sched-field label{display:block;font-size:.72rem;color:var(--muted);margin-bottom:6px;}
-.sched-time-control{display:flex;align-items:center;gap:6px;min-height:56px;padding:5px 6px 5px 14px;border:1px solid var(--border);border-radius:10px;background:var(--navy3);color:var(--text);}
-.sched-time-control>i{margin-right:4px;color:var(--muted);font-size:16px;}
-#app .sched-time-control input{width:32px;min-width:0;min-height:44px;padding:0;border:0;border-bottom:1px dashed var(--muted);outline:0;border-radius:0;background:transparent;color:var(--text);font:700 1rem var(--font-body);text-align:right;font-variant-numeric:tabular-nums;}
-#app .sched-time-control input:focus{border:0;border-bottom:2px solid var(--teal);box-shadow:none;}
-.sched-time-minutes{color:var(--text);font-size:1rem;font-weight:700;font-variant-numeric:tabular-nums;}
-.sched-time-control:focus-within{border-color:var(--teal);box-shadow:0 0 0 2px var(--teal-soft);}
-.sched-period{display:flex;gap:2px;margin-left:auto;padding:3px;border:1px solid var(--border);border-radius:8px;background:var(--navy2);}
-.sched-period button{min-width:44px;min-height:44px;padding:5px;border:0;border-radius:6px;background:transparent;color:var(--muted);font:700 .75rem var(--font-body);cursor:pointer;}
-.sched-period button.active{background:var(--teal-soft);color:var(--teal);}
-.sched-period button:focus-visible{outline:2px solid var(--teal);outline-offset:1px;}
-.sched-summary{margin:0 0 16px;color:var(--muted);font-size:.77rem;line-height:1.5;}
+#app .sched-time-select{width:100%;min-height:46px;padding:9px 12px;border:1px solid var(--border);border-radius:9px;background:var(--navy3);color:var(--text);font:600 .9rem var(--font-body);cursor:pointer;}
+#app .sched-time-select:focus-visible{outline:2px solid var(--teal);outline-offset:2px;}
+.sched-summary{margin:0 0 18px;color:var(--text);font-size:.79rem;line-height:1.5;}
 .sched-days-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:9px;}
 .sched-days-head label{margin:0;}
-.sched-day-presets{display:flex;gap:5px;}
-.sched-day-presets button{padding:5px 9px;border:1px solid var(--border);border-radius:7px;background:transparent;color:var(--teal);font:600 .72rem var(--font-body);cursor:pointer;}
-.sched-day-presets button:hover{background:var(--teal-soft);}
+.sched-all-days{padding:5px 9px;border:0;border-radius:7px;background:transparent;color:var(--teal);font:600 .72rem var(--font-body);cursor:pointer;}
+.sched-all-days:hover{background:var(--teal-soft);}
+.sched-save-status{margin:14px 0 0;color:var(--muted);font-size:.76rem;line-height:1.4;}
+.sched-save-status.is-dirty{color:var(--amber);}
+.sched-save-status.is-error{color:var(--red);}
 .sched-inline{display:flex;align-items:center;gap:8px;}
 .sched-inline select{
   background:var(--navy3);border:1px solid var(--border);border-radius:9px;padding:9px 10px;

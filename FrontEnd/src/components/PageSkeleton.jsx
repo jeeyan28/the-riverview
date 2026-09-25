@@ -1,7 +1,5 @@
-import RiverviewLoader from './RiverviewLoader';
-
 function PageSkeleton() {
-  return <RiverviewLoader message="Preparing the venue for you…" />;
+  return <div className="route-fallback" role="status">Opening page…</div>;
 }
 
 export default PageSkeleton;

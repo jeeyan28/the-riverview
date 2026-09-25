@@ -9,27 +9,58 @@
 .rm-page-sub{font-size:.78rem;color:var(--muted);}
 .rm-toolbar-head{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;}
 .rm-toolbar-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+#app #panel-monitor .rm-reservations-button{background:var(--teal);border-color:var(--teal);color:#062e29;box-shadow:none;}
+#app #panel-monitor .rm-reservations-button:hover{filter:brightness(1.06);}
+.rm-toolbar-links{display:flex;align-items:center;gap:4px;padding-left:12px;border-left:1px solid var(--border);}
+.rm-toolbar-link{display:inline-flex;align-items:center;gap:8px;min-height:36px;padding:8px 12px;border-radius:var(--radius-sm);color:var(--muted);font-size:.76rem;font-weight:600;text-decoration:none;white-space:nowrap;}
+.rm-toolbar-link:hover,.rm-toolbar-link:focus-visible{background:var(--navy3);color:var(--text);}
 .rm-due-wrap{margin-top:14px;margin-bottom:14px;}
 .rm-due-head{
   display:flex;align-items:center;justify-content:space-between;gap:10px;
   padding:14px 16px;border-bottom:1px solid var(--border);
 }
-.rm-due-head .rm-group-count{
-  background:var(--navy3);border-radius:20px;padding:2px 10px;font-weight:600;
-}
 .rm-schedule-heading{display:grid;gap:3px;}
-.rm-schedule-heading .card-title{display:flex;align-items:center;gap:8px;}
-.rm-schedule-heading .card-title i{color:var(--teal);}
-.rm-schedule-today{padding-left:23px;color:var(--muted);font-size:.76rem;}
-.rm-schedule-date-row td{padding:9px 16px !important;border-bottom:1px solid var(--border);background:var(--navy3);color:var(--muted) !important;font-size:.72rem;font-weight:700;letter-spacing:.02em;}
-.rm-due-wrap .rm-table tbody tr.rm-schedule-row--due{background:color-mix(in srgb,var(--amber) 5%,var(--navy2));}
-.rm-due-wrap .rm-table tbody tr.rm-schedule-row--overdue{background:color-mix(in srgb,var(--red) 5%,var(--navy2));}
-.rm-due-wrap .rm-table tbody tr.rm-schedule-row--due td:first-child{border-left:3px solid var(--amber);}
-.rm-due-wrap .rm-table tbody tr.rm-schedule-row--overdue td:first-child{border-left:3px solid var(--red);}
-.rm-due-wrap .rm-status-pill.status-warning{background:color-mix(in srgb,var(--amber) 13%,var(--navy2));color:var(--amber);}
-.rm-due-wrap .rm-status-pill.status-expired{background:color-mix(in srgb,var(--red) 13%,var(--navy2));color:var(--red);animation:none;}
-.rm-due-wrap .rm-status-pill.status-occupied{background:color-mix(in srgb,var(--teal) 12%,var(--navy2));color:var(--teal);}
-.rm-schedule-time{font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap;}
+.rm-schedule-heading .card-title{font-size:1.08rem;font-weight:700;}
+.rm-schedule-today{color:var(--muted);font-size:.76rem;line-height:1.4;}
+.session-reservation-deadline{margin:8px 0 0;color:var(--text);font-size:.8rem;font-weight:700;font-variant-numeric:tabular-nums;}
+.modal-bg.rm-schedule-backdrop,#app .modal-bg.rm-schedule-backdrop{align-items:stretch;justify-content:flex-end;padding:0;background:rgba(5,13,27,.64);backdrop-filter:blur(3px);}
+.modal-box.rm-schedule-drawer,#app .modal-box.rm-schedule-drawer{
+  flex:none;width:min(620px,100%);max-width:620px;height:100dvh;max-height:100dvh;
+  margin:0;padding:0;border-radius:var(--radius-lg) 0 0 var(--radius-lg);
+  background:var(--navy2);overflow-x:hidden;overflow-y:auto;
+}
+.modal-bg.open > .modal-box.rm-schedule-drawer{margin:0;}
+.rm-schedule-drawer .rm-due-wrap,#app .rm-schedule-drawer .rm-due-wrap{margin:0;border:0;border-radius:0;box-shadow:none;overflow:visible;}
+.rm-schedule-drawer .rm-schedule-top,#app .rm-schedule-drawer .rm-schedule-top{position:sticky;top:0;z-index:2;background:var(--navy2);}
+.rm-schedule-drawer .rm-due-head,#app .rm-schedule-drawer .rm-due-head{padding:22px 22px 16px;border-bottom:0;align-items:flex-start;}
+.rm-schedule-close{flex:none;padding:8px 12px;}
+.rm-schedule-tabs{display:flex;gap:20px;padding:0 22px;border-bottom:1px solid var(--border);}
+.rm-schedule-tabs button{display:inline-flex;align-items:center;gap:6px;padding:0 2px 12px;border:0;border-bottom:2px solid transparent;background:none;color:var(--muted);font:600 .8rem var(--font-body);cursor:pointer;}
+.rm-schedule-tabs button:hover{color:var(--text);}
+.rm-schedule-tabs button.active{color:var(--teal-text);border-bottom-color:var(--teal);}
+.rm-schedule-tabs button span{font-variant-numeric:tabular-nums;}
+.rm-schedule-item{display:grid;grid-template-columns:88px minmax(0,1fr) 106px;column-gap:16px;}
+.rm-schedule-list{padding-bottom:16px;}
+.rm-schedule-date{margin:0;padding:14px 22px 6px;color:var(--muted);font-size:.74rem;font-weight:700;}
+.rm-schedule-item{align-items:start;padding:18px 22px;border-bottom:1px solid var(--border);}
+.rm-schedule-item:last-child{border-bottom:0;}
+.rm-schedule-slot{display:grid;gap:4px;font-variant-numeric:tabular-nums;white-space:nowrap;}
+.rm-schedule-slot strong{color:var(--text);font-size:.78rem;}
+.rm-schedule-slot small{color:var(--muted);font-size:.68rem;}
+.rm-schedule-item--due .rm-schedule-slot strong{color:var(--amber);}
+.rm-schedule-reservation{display:grid;align-content:start;gap:8px;min-width:0;}
+.rm-schedule-reservation .rm-guest-name{color:var(--text);font-size:.82rem;line-height:1.35;overflow-wrap:anywhere;}
+.rm-schedule-location,.rm-schedule-collected{color:var(--muted);font-size:.72rem;line-height:1.4;overflow-wrap:anywhere;}
+.rm-schedule-location.needs-review,.rm-schedule-warning{color:var(--amber);}
+.rm-schedule-warning{font-size:.72rem;line-height:1.4;}
+.rm-schedule-payment{font-size:.73rem;line-height:1.4;overflow-wrap:anywhere;}
+.rm-schedule-payment.paid{color:var(--green);}
+.rm-schedule-payment.due{color:var(--amber);}
+.rm-schedule-action{display:flex;flex-direction:column;align-items:flex-end;gap:10px;white-space:nowrap;}
+.rm-schedule-state{color:var(--muted);font-size:.74rem;font-weight:600;}
+.rm-schedule-state.is-due{color:var(--teal-text);}
+.rm-schedule-action .rm-btn{flex:none;padding:8px 10px;font-size:.73rem;}
+.rm-schedule-empty{margin:0;padding:28px 22px;color:var(--muted);font-size:.84rem;}
 .live-badge{
   display:inline-flex;align-items:center;gap:5px;padding:2px 9px;border-radius:20px;
   background:rgba(22,163,74,.12);color:var(--green);font-size:.7rem;font-weight:700;
@@ -44,6 +75,12 @@
   transition:background .15s,border-color .15s,color .15s;
 }
 .fac-chip:hover{color:var(--text);}
+.rm-sort-control{display:flex;align-items:center;gap:8px;margin-left:auto;color:var(--muted);font-size:.76rem;font-weight:600;white-space:nowrap;}
+.rm-sort-select{
+  min-height:36px;padding:8px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);
+  background:var(--navy3);color:var(--text);font-family:var(--font-body);font-size:.76rem;cursor:pointer;
+}
+.rm-sort-select:focus-visible{outline:2px solid var(--teal-text);outline-offset:2px;}
 .fac-chip.active{background:var(--teal);color:#fff;border-color:var(--teal);}
 .rm-group{display:flex;flex-direction:column;gap:12px;}
 .rm-group-head{font-size:.86rem;font-weight:600;color:var(--text);}
@@ -203,6 +240,7 @@
 }
 .view-toggle-btn:hover{color:var(--text);}
 .view-toggle-btn.active{background:var(--teal);color:#fff;}
+#app #panel-monitor .view-toggle-btn.active{background:var(--teal-soft);color:var(--teal-text);}
 
 .rm-table-wrap{margin-top:0;}
 .rm-table{width:100%;border-collapse:collapse;font-size:.84rem;}
@@ -290,19 +328,6 @@
 .rm-stat--overdue{border-left-color:var(--red);}
 .rm-stat--overdue .rm-stat-value{color:var(--red);}
 
-.rm-search-row{position:relative;display:flex;align-items:center;margin-bottom:12px;}
-.rm-search-ico{position:absolute;left:14px;color:var(--muted);font-size:.9rem;pointer-events:none;}
-.rm-search-input{
-  width:100%;padding:9px 36px;border-radius:9px;border:1px solid var(--border);
-  background:var(--navy3);color:var(--text);font-size:.84rem;font-family:var(--font-body);
-}
-.rm-search-input:focus{outline:none;border-color:var(--teal);}
-.rm-search-clear{
-  position:absolute;right:10px;background:none;border:none;color:var(--muted);cursor:pointer;
-  padding:4px;font-size:.8rem;
-}
-.rm-search-clear:hover{color:var(--text);}
-
 .rm-quick-actions{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) 40px;gap:8px;margin-top:auto;padding-top:14px;}
 .rm-quick-actions--no-extend{grid-template-columns:minmax(0,1fr) 40px;}
 .rm-quick-actions .rm-btn{min-width:0;justify-content:center;padding:8px 10px;font-size:.78rem;}
@@ -367,16 +392,26 @@
 
 @media (max-width:900px){
   .rm-toolbar-actions{width:100%;justify-content:flex-start;}
+  .rm-toolbar-links{padding-left:0;border-left:0;}
   .room-grid{grid-template-columns:1fr;}
   .rm-timer-big{font-size:1.2rem;}
   .rm-actions--table{flex-wrap:wrap;}
 }
 @media (max-width:640px){
+  .modal-box.rm-schedule-drawer,#app .modal-box.rm-schedule-drawer{width:100%;max-width:none;border-radius:0;}
+  .rm-schedule-item{grid-template-columns:72px minmax(0,1fr);row-gap:10px;}
+  .rm-schedule-slot{grid-row:1 / span 2;}
+  .rm-schedule-reservation,.rm-schedule-action{grid-column:2;}
+  .rm-schedule-action{flex-direction:row;align-items:center;justify-content:space-between;flex-wrap:wrap;}
+  .rm-sort-control{width:100%;margin-left:0;justify-content:space-between;}
+  .rm-sort-select{flex:1;min-width:0;}
   #app #panel-monitor .room-grid--all{grid-template-columns:minmax(0,1fr);}
 }
 @media (max-width:640px){
   .rm-page-head{flex-wrap:wrap;}
   .rm-toolbar-actions{flex-direction:column;align-items:stretch;}
+  .rm-toolbar-links{width:100%;gap:8px;}
+  .rm-toolbar-link{flex:1;justify-content:center;}
   .rm-toolbar-actions .rm-btn{text-align:center;}
   .rm-toolbar-actions .btn-teal{justify-content:center;}
 }

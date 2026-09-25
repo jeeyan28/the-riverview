@@ -8,6 +8,7 @@ const AppError = require("./appError");
 const { sendReceiptEmail } = require("./mailer");
 const { TIME_ZONE } = require("./constants");
 const { bookingStartMs, financialFields } = require("./bookingLifecycle");
+const { HOUR_MS, nearbyDates, operatingWindowForStart, occupiedCountAt } = require("./bookingSchedule");
 const { calculateBookingPrice, computeDownPayment, parsePaxCapacity } = require("./roomPricing");
 const { getPaymongoPaymentMethodLabel } = require("./paymongo");
 
@@ -98,34 +99,31 @@ async function validateAndPriceBooking({ roomId, variantLabel, date, timeIn, dur
     }
   }
 
-  const startHour = parseInt(String(timeIn).split(":")[0], 10);
+  const startMs = bookingStartMs(date, timeIn);
   const capacity = getSlotCapacity(room, variantLabel);
   const query = Booking.find({
     room: room._id,
     variantLabel: variantLabel || null,
-    date,
+    date: { $in: nearbyDates(date) },
     status: { $nin: ["Cancelled", "Rejected", "No Show"] },
     ...(excludeBookingId ? { _id: { $ne: excludeBookingId } } : {}),
-  }).select("timeIn duration");
+  }).select("date timeIn duration");
   const existing = await (session ? query.session(session) : query);
 
   const lockFilter = {
     room: room._id,
     variantLabel: variantLabel || null,
-    date,
+    date: { $in: nearbyDates(date) },
     expiresAt: { $gt: new Date() },
   };
   if (excludeLockUserId) lockFilter.lockedBy = { $ne: excludeLockUserId };
-  const lockQuery = BookingLock.find(lockFilter).select("timeIn duration");
+  const lockQuery = BookingLock.find(lockFilter).select("date timeIn duration");
   const activeLocks = await (session ? lockQuery.session(session) : lockQuery);
   const occupied = [...existing, ...activeLocks];
 
-  const endHourExclusive = Math.ceil(startHour + duration);
-  for (let hour = startHour; hour < endHourExclusive; hour++) {
-    const bookedCount = occupied.filter(b => {
-      const bStart = parseInt(String(b.timeIn).split(":")[0], 10);
-      return hour >= bStart && hour < bStart + b.duration;
-    }).length;
+  for (let hour = 0; hour < duration; hour++) {
+    const hourStart = startMs + hour * HOUR_MS;
+    const bookedCount = occupiedCountAt(occupied, hourStart);
     if (bookedCount >= capacity) {
       throw new AppError(409, "That time slot is fully booked. Please pick another.");
     }
@@ -140,10 +138,11 @@ async function validateAndPriceBooking({ roomId, variantLabel, date, timeIn, dur
     hasCorkage,
   });
   if (!isAdminBooking) {
-    const isHoliday = (settings.holidays || []).some(h => h.date === date && h.fullDay);
     const oh = settings.operatingHours || {};
+    const { serviceDate, serviceHour, openHour, closeHour } = operatingWindowForStart(date, timeIn, oh.openTime, oh.closeTime);
+    const isHoliday = (settings.holidays || []).some(h => h.date === serviceDate && h.fullDay);
     const openDays = oh.openDays;
-    const [yy, mm, dd] = String(date).split("-").map(Number);
+    const [yy, mm, dd] = String(serviceDate).split("-").map(Number);
     const dayOfWeek = new Date(yy, (mm || 1) - 1, dd || 1).getDay();
     const isClosedDay = Array.isArray(openDays) && openDays.length > 0 && !openDays.includes(dayOfWeek);
 
@@ -151,20 +150,12 @@ async function validateAndPriceBooking({ roomId, variantLabel, date, timeIn, dur
       throw new AppError(409, "We're closed on the selected date. Please choose another day.");
     }
 
-    const parseHour = (str, fallback) => {
-      const h = parseInt(String(str || "").split(":")[0], 10);
-      return Number.isFinite(h) ? h : fallback;
-    };
-    const openHour = parseHour(oh.openTime, 0);
-    let closeHour = parseHour(oh.closeTime, 24);
-    if (closeHour <= openHour) closeHour += 24;
-    const endHour = startHour + duration;
-    if (startHour < openHour || endHour > closeHour) {
+    if (serviceHour < openHour || serviceHour + duration > closeHour) {
       throw new AppError(409, "That time is outside our operating hours. Please choose another slot.");
     }
   }
 
-  return { room, ...pricing };
+  return { room, selectedVariant, ...pricing };
 }
 
 
@@ -267,6 +258,12 @@ async function finalizeBookingFromPayment({ paymentIntentId, metadata, paidPayme
         duration: Number(duration),
         amount: Number(metadata.amount),
         roomCharge: Number(metadata.roomCharge) || pricing.roomCharge,
+        discountPercent: Number(metadata.discountPercent) || 0,
+        discountAmount: Number(metadata.discountAmount) || 0,
+        eligibleDiscount: Number(metadata.eligibleDiscount) || 0,
+        addOns: (() => { try { return JSON.parse(metadata.addOns || "[]"); } catch { return []; } })(),
+        addOnFee: Number(metadata.addOnFee) || 0,
+        paymentChoice: metadata.paymentChoice === "full" ? "full" : "deposit",
         hourlyRates: paidHourlyRates,
         firstHourPayment: computeDownPayment(paidHourlyRates, 1),
         corkageFee: Number(metadata.corkageFee) || 0,

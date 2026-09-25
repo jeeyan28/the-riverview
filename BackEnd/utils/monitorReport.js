@@ -31,7 +31,7 @@ function sessionRow(session) {
   const balance = money(Math.max(0, amount - collected));
   const paymentStatus = amount > 0 && collected >= amount ? 'Paid' : collected > 0 ? 'Partial' : 'Unpaid';
   const start = new Date(session.startTime);
-  const scheduledEnd = new Date(start.getTime() + Number(session.duration || 0) * 3600000);
+  const scheduledEnd = session.scheduledEndTime ? new Date(session.scheduledEndTime) : new Date(start.getTime() + Number(session.duration || 0) * 3600000);
   const booking = session.booking && typeof session.booking === 'object' ? session.booking : null;
 
   return {
@@ -41,6 +41,7 @@ function sessionRow(session) {
     timeOut: localTime(scheduledEnd),
     closedAt: localTime(session.endedAt),
     startTime: session.startTime,
+    scheduledEndTime: session.scheduledEndTime || null,
     endedAt: session.endedAt || null,
     duration: Number(session.duration) || 0,
     facilityName: session.facilityName || 'Other',

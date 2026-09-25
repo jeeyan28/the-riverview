@@ -70,7 +70,7 @@ function salesRows(bookings, sessions) {
     const rate = money(session?.rate ?? hourlyRates[0] ?? (duration ? amount / duration : 0));
     const roomType = session?.roomName || booking?.variantLabel || booking?.roomLabel || 'Standard';
     const unitNumber = session?.roomNumber || '';
-    const scheduledEnd = startTime && duration ? new Date(new Date(startTime).getTime() + duration * 3600000) : null;
+    const scheduledEnd = session?.scheduledEndTime ? new Date(session.scheduledEndTime) : startTime && duration ? new Date(new Date(startTime).getTime() + duration * 3600000) : null;
     return {
       id: booking ? `booking:${idOf(booking)}` : `session:${idOf(session)}`,
       bookingId: idOf(booking) || idOf(session?.booking) || null,

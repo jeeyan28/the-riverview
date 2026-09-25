@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { completeReservationFields } = require('../utils/bookingLifecycle');
+const { bookingSessionEnd, completeReservationFields } = require('../utils/bookingLifecycle');
 
 const reservation = { status: 'Confirmed', date: '2026-09-23', timeIn: '13:00', duration: 1 };
 const at = (time) => Date.parse(`2026-09-23T${time}:00+08:00`);
@@ -17,4 +17,11 @@ test('an expired confirmed reservation can be marked done even before the no-sho
 
 test('linked sessions still finish through Room Monitoring', () => {
   assert.throws(() => completeReservationFields({ ...reservation, status: 'No Show' }, { hasMonitorSession: true }), /Room Monitoring/);
+});
+
+test('a late arrival keeps the original reservation end time', () => {
+  const morning = { ...reservation, timeIn: '08:00' };
+  assert.equal(bookingSessionEnd(morning, at('08:15')).getTime(), at('09:00'));
+  assert.throws(() => bookingSessionEnd(morning, at('07:59')), /not started/);
+  assert.throws(() => bookingSessionEnd(morning, at('09:00')), /time has ended/);
 });

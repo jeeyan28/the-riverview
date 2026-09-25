@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { monitorRoomsService, roomSessionsService } from '../services/monitoring';
+import { roomsService } from '../services/rooms';
+import { filterMonitorInventory } from '../utils/monitorInventory';
 
 export const MONITOR_WARNING_MS = 10 * 60 * 1000;
 export const MONITOR_CRITICAL_MS = 60 * 1000;
@@ -44,6 +46,7 @@ export function sessionStart(session) {
   return new Date(session.startTime);
 }
 export function sessionEnd(session) {
+  if (session.scheduledEndTime) return new Date(session.scheduledEndTime);
   return new Date(sessionStart(session).getTime() + session.duration * 60 * 60 * 1000);
 }
 export function formatStartTime(session) {
@@ -137,10 +140,10 @@ export function useRoomMonitorData(namespace = 'admin') {
     const generation = generationRef.current;
     const request = (async () => {
       try {
-        const [nextRooms, nextSessions] = await Promise.all([monitorRoomsService.list(), roomSessionsService.list()]);
+        const [nextRooms, nextSessions, facilities] = await Promise.all([monitorRoomsService.list(), roomSessionsService.list(), roomsService.list().catch(() => null)]);
         if (!Array.isArray(nextRooms) || !Array.isArray(nextSessions)) throw new Error('Invalid monitoring response.');
         if (!mountedRef.current || generation !== generationRef.current) return;
-        setRooms(nextRooms.map(normalizeRoom));
+        setRooms((Array.isArray(facilities) ? filterMonitorInventory(nextRooms, facilities) : nextRooms).map(normalizeRoom));
         setSessions(nextSessions);
         setRefreshError('');
         setLastUpdatedAt(Date.now());

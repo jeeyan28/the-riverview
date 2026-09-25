@@ -1,3 +1,9 @@
+.bk-quick-views{display:flex;gap:8px;overflow-x:auto;padding:2px 1px 12px;scrollbar-width:thin;}
+.bk-quick-view{display:inline-flex;align-items:center;gap:9px;flex:none;min-height:42px;padding:8px 12px;border:1px solid var(--border);border-radius:10px;background:var(--navy2);color:var(--muted);font:600 .78rem var(--font-body);white-space:nowrap;cursor:pointer;}
+.bk-quick-view strong{min-width:20px;padding:2px 6px;border-radius:99px;background:var(--navy3);color:var(--text);font-size:.7rem;text-align:center;font-variant-numeric:tabular-nums;}
+.bk-quick-view:hover,.bk-quick-view:focus-visible{border-color:var(--teal);color:var(--text);}
+.bk-quick-view.is-active{border-color:var(--teal);background:var(--teal-soft);color:var(--teal-text);}
+.bk-quick-view.is-active strong{background:rgba(0,201,167,.18);color:var(--teal-text);}
 .bk-toolbar-card{display:flex;flex-direction:column;gap:10px;padding:14px 16px;}
 .bk-toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;}
 .bk-search-wrap{position:relative;flex:1;min-width:220px;max-width:340px;}
@@ -30,6 +36,8 @@
 .tbl-action-btn:active{transform:translateY(1px);}
 
 .bk-code{font-family:var(--font-display);font-size:.78rem;font-weight:600;color:var(--text);}
+.bk-code-wrap{display:inline-flex;align-items:center;gap:7px;flex-wrap:wrap;}
+.bk-new-badge{padding:2px 6px;border-radius:99px;background:var(--teal-soft);color:var(--teal-text);font-size:.62rem;font-weight:700;}
 
 .bk-customer{display:flex;align-items:center;gap:10px;}
 .bk-avatar{
@@ -51,6 +59,7 @@ button.bk-payment-pill{cursor:pointer;}
 .bk-status-cell{display:inline-flex;align-items:flex-start;flex-direction:column;gap:4px;}
 .bk-status-note{font-size:.67rem;line-height:1.25;color:var(--muted);}
 .bk-status-note--overdue{color:var(--red);font-weight:600;}
+.bk-status-note--warning{color:var(--amber);font-weight:700;}
 
 #app .modal-box.walkin-booking-modal{max-width:800px;}
 #app .walkin-booking-form{display:flex;flex-direction:column;gap:20px;}
@@ -110,8 +119,8 @@ button.bk-payment-pill{cursor:pointer;}
 .bd-field p{font-size:.85rem;color:var(--text);font-weight:500;word-break:break-word;margin:0;}
 .bd-notes-label{font-size:.68rem;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);margin-bottom:6px;}
 .bd-notes-body{font-size:.84rem;color:var(--text);line-height:1.5;white-space:pre-wrap;margin:0;}
-.bd-financial-grid .bd-field:first-child{grid-column:1/-1;}
-.bd-financial-grid .bd-field:first-child p{font-size:1.05rem;font-weight:700;font-variant-numeric:tabular-nums;}
+.bd-financial-grid .bd-field--total{grid-column:1/-1;border-color:rgba(0,201,167,.32);}
+.bd-financial-grid .bd-field--total p{font-size:1.05rem;font-weight:700;font-variant-numeric:tabular-nums;}
 .bd-spec-grid{grid-template-columns:repeat(3,minmax(0,1fr));}
 .bd-support-value{margin:0;font-size:.92rem;font-weight:700;color:var(--text);}
 .bd-support-caption{margin:5px 0 0;font-size:.76rem;line-height:1.45;color:var(--muted);}

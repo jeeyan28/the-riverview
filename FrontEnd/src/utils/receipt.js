@@ -40,6 +40,9 @@ export function getBookingReceiptData(booking, overrides = {}) {
   const showRefundToArrange = Boolean(booking.cancellationSource || booking.cancellationRequestedAt);
 
   const costRows = [
+    ...(Number(booking.discountAmount) > 0 ? [{ label: 'Pay-in-full discount', value: -Number(booking.discountAmount) }] : []),
+    ...(booking.addOns || []).map((service) => ({ label: service.name, value: Number(service.fee) || 0 })),
+    ...(Number(booking.corkageFee) > 0 ? [{ label: 'Corkage', value: Number(booking.corkageFee) }] : []),
     { label: 'Total amount', value: amount },
     { label: 'Paid online', value: downPayment },
     ...(paidAtVenue > 0 ? [{ label: 'Paid later', value: paidAtVenue }] : []),
@@ -50,6 +53,9 @@ export function getBookingReceiptData(booking, overrides = {}) {
     ] : [{ label: 'Remaining balance', value: remaining }]),
   ];
   const notes = [];
+  if (booking.paymentChoice === 'deposit' && Number(booking.eligibleDiscount) > 0) {
+    notes.push(`Ask staff to apply your ₱${Number(booking.eligibleDiscount).toLocaleString()} room discount at the venue.`);
+  }
   if (status === 'Cancelled' && payment.customerCancelled) {
     notes.push(refundException ? 'A refund exception was approved.' : 'The first-hour charge is non-refundable for a customer cancellation.');
     if (payment.refundRemaining > 0) notes.push('Contact admin to arrange the remaining manual refund.');
@@ -169,7 +175,8 @@ function drawReceiptImage(data) {
     ctx.fillStyle = row.label === 'Remaining balance' || row.label === 'Refund to arrange' ? '#a15f08' : '#0b7067';
     ctx.font = '700 16px Arial, sans-serif';
     ctx.textAlign = 'right';
-    ctx.fillText(`₱${Number(row.value || 0).toLocaleString('en-PH', { maximumFractionDigits: 2 })}`, width - 36, lineY);
+    const value = Number(row.value || 0);
+    ctx.fillText(`${value < 0 ? '−' : ''}₱${Math.abs(value).toLocaleString('en-PH', { maximumFractionDigits: 2 })}`, width - 36, lineY);
   });
   ctx.textAlign = 'left';
   y += costHeight + 28;

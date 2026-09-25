@@ -21,3 +21,14 @@ test('played-session report includes only finished sessions paid in full', () =>
   assert.equal(report.summary.sessions, 1);
   assert.equal(report.summary.collected, 300);
 });
+
+test('late arrival report keeps actual check-in and booked check-out', () => {
+  const report = buildMonitorReport([{
+    _id: 'late', startTime: new Date('2026-09-23T08:15:00+08:00'),
+    scheduledEndTime: new Date('2026-09-23T09:00:00+08:00'), duration: 1,
+    amount: 150, paidAmount: 150, refundedAmount: 0, rate: 150,
+    facilityName: 'Billiards', roomName: 'Shared Room', roomNumber: '1', status: 'Finished',
+  }], { from: '2026-09-23', to: '2026-09-23' });
+  assert.equal(report.rows[0].timeIn, '8:15 AM');
+  assert.equal(report.rows[0].timeOut, '9:00 AM');
+});

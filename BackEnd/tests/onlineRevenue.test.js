@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { calculateBookingPrice, calculateSessionExtension, computeDownPayment } = require('../utils/roomPricing');
+const { calculateBookingPrice, calculateSessionExtension, computeDownPayment, quoteOnlineBooking, repriceExistingBooking } = require('../utils/roomPricing');
 const { buildSalesReport } = require('../utils/salesLedger');
 const { extendSessionFields, financialFields } = require('../utils/bookingLifecycle');
 
@@ -34,16 +34,35 @@ test('online 1-hour payment is partial revenue with the remaining balance due', 
 
 test('online full payment includes corkage and has no venue balance', async () => {
   const { calculateBookingPrice: previewPrice } = await import('../../FrontEnd/src/utils/roomPricing.js');
-  const preview = previewPrice({ variant, startHour: 16, duration: 3, hasCorkage: true, downPaymentHours: 3 });
+  const preview = previewPrice({ variant, startHour: 16, duration: 3, hasCorkage: true, paymentChoice: 'full' });
   assert.equal(preview.downPayment, price.amount);
   const oneHour = previewPrice({ variant, startHour: 16, duration: 1, hasCorkage: true });
-  assert.equal(oneHour.downPayment, oneHour.amount);
+  assert.equal(oneHour.downPayment, 300);
   assert.equal(oneHour.amount, 500);
   const result = report([booking(price.amount)]);
   assert.equal(result.summary.collected, 1300);
   assert.equal(result.summary.outstanding, 0);
   assert.equal(result.rows[0].paymentStatus, 'Paid');
   assert.equal(financialFields(price.amount, price.amount).paymentStatus, 'Paid');
+});
+
+test('room discounts apply only to explicit full payment; services and corkage stay undiscounted', async () => {
+  const { calculateBookingPrice: previewPrice } = await import('../../FrontEnd/src/utils/roomPricing.js');
+  const room = { discountPercent: 20, addOns: [{ name: 'Referee', fee: 150 }] };
+  const basePrice = calculateBookingPrice({ variant, timeIn: '16:00', duration: 1, hasCorkage: true });
+  const full = quoteOnlineBooking({ room, variant, basePrice, paymentChoice: 'full', selectedAddOns: ['Referee'] });
+  const deposit = quoteOnlineBooking({ room, variant, basePrice, paymentChoice: 'deposit', selectedAddOns: ['Referee'] });
+  assert.deepEqual({ amount: full.amount, downPayment: full.downPayment, discountAmount: full.discountAmount }, { amount: 590, downPayment: 590, discountAmount: 60 });
+  assert.deepEqual({ amount: deposit.amount, downPayment: deposit.downPayment, eligibleDiscount: deposit.eligibleDiscount }, { amount: 650, downPayment: 300, eligibleDiscount: 60 });
+  const preview = previewPrice({ room, variant, startHour: 16, duration: 1, hasCorkage: true, paymentChoice: 'full', selectedAddOns: ['Referee'] });
+  assert.equal(preview.amount, full.amount);
+  assert.equal(preview.downPayment, full.downPayment);
+  assert.throws(() => quoteOnlineBooking({ room, variant, basePrice, selectedAddOns: ['Unknown'] }), /no longer available/);
+  const changedTime = { ...basePrice, roomCharge: 400 };
+  assert.deepEqual(
+    repriceExistingBooking(changedTime, { paymentChoice: 'full', discountPercent: 20, addOns: [{ name: 'Referee', fee: 150 }] }),
+    { eligibleDiscount: 80, discountAmount: 80, addOnFee: 150, amount: 670 }
+  );
 });
 
 test('a linked session carries the online payment once, then adds venue collection', () => {
