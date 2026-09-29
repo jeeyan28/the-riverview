@@ -7,6 +7,7 @@ import { useAuth } from './context/AuthContext';
 import Login from './pages/Login';
 import { isAdminReturnPath } from './utils/auth';
 import PageSkeleton from './components/PageSkeleton';
+import { isLobbyPresentationReceiver } from './utils/lobbyPresentation';
 
 const Home = lazy(() => import('./pages/Home'));
 const Rooms = lazy(() => import('./pages/Rooms'));
@@ -34,6 +35,13 @@ function RequirePermission({ permission, children }) {
     return <Navigate to="/admin" replace />;
   }
   return children;
+}
+
+function LobbyMonitorRoute() {
+  const { initializing } = useAuth();
+  if (isLobbyPresentationReceiver()) return <LobbyMonitor />;
+  if (initializing) return <PageSkeleton />;
+  return <RequirePermission permission="room:view"><LobbyMonitor /></RequirePermission>;
 }
 
 function AdminLanding() {
@@ -67,7 +75,7 @@ function App() {
         <Route path="/admin/login" element={<LegacyAdminLoginRedirect />} />
       </Route>
 
-      <Route path="/lobby-monitor" element={<RequirePermission permission="room:view"><LobbyMonitor /></RequirePermission>} />
+      <Route path="/lobby-monitor" element={<LobbyMonitorRoute />} />
 
       <Route path="/admin" element={<AdminLayout />}>
         <Route index element={<AdminLanding />} />

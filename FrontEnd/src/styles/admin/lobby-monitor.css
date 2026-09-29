@@ -138,6 +138,19 @@
 .lobby-golive-btn:hover { filter: brightness(1.08); }
 .lobby-display[data-theme="light"] .lobby-golive-btn { color: #ffffff; }
 .lobby-golive-btn:active { transform: translateY(1px); }
+.lobby-golive-btn:disabled { opacity: .6; cursor: not-allowed; transform: none; }
+.lobby-golive-btn:focus-visible, .lobby-fallback-btn:focus-visible { outline: 2px solid var(--lobby-accent); outline-offset: 3px; }
+.lobby-topbar-right { flex-wrap: wrap; }
+.lobby-cast-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.lobby-cast-panel { flex-shrink: 0; margin-bottom: 16px; }
+.lobby-cast-status { margin: 0 0 6px; color: var(--lobby-text); font-size: .85rem; }
+.lobby-cast-help { margin: 0 0 8px; color: var(--lobby-muted); font-size: .78rem; line-height: 1.5; }
+.lobby-fallback-btn {
+  padding: 7px 10px; border: 1px solid var(--lobby-border); border-radius: 8px;
+  background: var(--lobby-panel); color: var(--lobby-text); font: inherit; font-size: .8rem; cursor: pointer;
+}
+.lobby-fallback-btn:hover { border-color: var(--lobby-accent); }
+.lobby-fallback-btn:disabled { opacity: .6; cursor: not-allowed; }
 
 .lobby-setup-note {
   display: flex; align-items: flex-start; gap: 8px; margin: 0 0 16px; padding: 10px 14px;
