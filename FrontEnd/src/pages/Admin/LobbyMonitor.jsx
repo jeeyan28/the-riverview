@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Navigate } from 'react-router-dom';
 import '../../styles/admin/lobby-monitor.css';
-import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../hooks/useTheme';
 import { useCountdownClock } from '../../hooks/useCountdownClock';
+import { useLobbyPresentation, useLobbyPresentationReceiver } from '../../hooks/useLobbyPresentation';
+import { isLobbyPresentationReceiver, lobbySnapshot, LOBBY_STALE_MS } from '../../utils/lobbyPresentation';
 import {
   useRoomMonitorData,
   sessionEnd,
@@ -38,20 +38,54 @@ function lobbyStatus(r, sessions) {
 const STATUS_RANK = { expired: 0, 'ending-soon': 1, occupied: 2, available: 3, other: 4 };
 
 function LobbyMonitor() {
-  const { initializing, isAdmin } = useAuth();
-  const [theme, toggleTheme] = useTheme();
+  return isLobbyPresentationReceiver() ? <LobbyReceiver /> : <LobbyController />;
+}
+
+function LobbyController() {
+  const monitor = useRoomMonitorData('lobby');
+  return <LobbyMonitorView monitor={monitor} />;
+}
+
+function LobbyReceiver() {
+  const receiver = useLobbyPresentationReceiver();
+  return <LobbyMonitorView monitor={receiver.snapshot || lobbySnapshot()} receiver={receiver} />;
+}
+
+function LobbyMonitorView({ monitor, receiver }) {
+  const [localTheme, toggleTheme] = useTheme();
+  const theme = receiver?.snapshot?.selection.theme || localTheme;
   const now = useCountdownClock(true);
   const clockDateObj = new Date(now);
   const [clockTime, clockAmPm] = clockDateObj.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true }).split(' ');
   const clockDate = `${clockDateObj.toLocaleDateString([], { month: 'long', day: 'numeric', year: 'numeric' })} · ${clockDateObj.toLocaleDateString([], { weekday: 'long' })}`;
 
-  const { rooms, sessions, loading, viewMode, changeViewMode } = useRoomMonitorData('lobby');
+  const { sessions, loading, changeViewMode } = monitor;
+  const viewMode = receiver?.snapshot?.selection.viewMode || monitor.viewMode || 'grid';
+  const dataWarning = monitor.refreshError || (monitor.lastUpdatedAt && now - monitor.lastUpdatedAt > LOBBY_STALE_MS
+    ? 'Live data is delayed. Check the laptop’s connection; these values may be out of date.' : '')
+    || (receiver?.receivedAt && now - receiver.receivedAt > LOBBY_STALE_MS
+      ? 'Updates from the laptop stopped. Check its connection and reconnect to the TV.' : '');
+  const rooms = useMemo(() => dataWarning
+    ? monitor.rooms.map((room) => room.status === 'Available' ? { ...room, status: 'Status unavailable' } : room)
+    : monitor.rooms, [monitor.rooms, dataWarning]);
 
-  const [facilityFilter, setFacilityFilter] = useState('All');
-  const [roomTypeFilter, setRoomTypeFilter] = useState('All');
-  const [sortBy, setSortBy] = useState('default');
-  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [localFacilityFilter, setFacilityFilter] = useState('All');
+  const [localRoomTypeFilter, setRoomTypeFilter] = useState('All');
+  const [localSortBy, setSortBy] = useState('default');
+  const facilityFilter = receiver?.snapshot?.selection.facilityFilter ?? localFacilityFilter;
+  const roomTypeFilter = receiver?.snapshot?.selection.roomTypeFilter ?? localRoomTypeFilter;
+  const sortBy = receiver?.snapshot?.selection.sortBy ?? localSortBy;
+  const [fullscreen, setIsFullscreen] = useState(false);
+  const isFullscreen = fullscreen || Boolean(receiver);
+  const [fullscreenError, setFullscreenError] = useState('');
   const [displaySize, setDisplaySize] = useState({ width: 0, height: 0 });
+  const snapshot = useMemo(() => lobbySnapshot({
+    rooms, sessions, loading, refreshError: dataWarning, lastUpdatedAt: monitor.lastUpdatedAt,
+    selection: { facilityFilter, roomTypeFilter, sortBy, viewMode, theme },
+  }), [rooms, sessions, loading, dataWarning, monitor.lastUpdatedAt, facilityFilter, roomTypeFilter, sortBy, viewMode, theme]);
+  const casting = useLobbyPresentation(snapshot, !receiver);
+  const castBusy = ['selecting', 'connecting', 'stopping'].includes(casting.phase);
+  const castLabel = { connected: 'Casting to TV', disconnected: 'Reconnect to TV', selecting: 'Choose a TV…', connecting: 'Connecting…', stopping: 'Stopping…' }[casting.phase] || 'View on TV';
 
   const scrollRef = useRef(null);
 
@@ -64,7 +98,13 @@ function LobbyMonitor() {
   }, []);
 
   function goLive() {
-    document.documentElement.requestFullscreen().catch(() => {});
+    setFullscreenError('');
+    try {
+      const result = document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen();
+      result.catch(() => setFullscreenError('Fullscreen could not open. Use Chrome’s fullscreen control or press F11.'));
+    } catch {
+      setFullscreenError('Fullscreen is unavailable here. Use Chrome’s fullscreen control or press F11.');
+    }
   }
 
   useEffect(() => {
@@ -82,7 +122,7 @@ function LobbyMonitor() {
       window.removeEventListener('resize', updateSize);
       observer?.disconnect();
     };
-  }, [initializing, isAdmin]);
+  }, []);
 
   const facilities = useMemo(() => [...new Set(rooms.map((r) => r.facilityName))], [rooms]);
   const roomTypes = useMemo(() => [...new Set(rooms.map((r) => r.roomName))], [rooms]);
@@ -153,56 +193,59 @@ function LobbyMonitor() {
   const tableFont = Math.max(0.55, Math.min(0.84, (displaySize.height || 700) / Math.max(visibleRooms.length, 1) / 35));
   const tablePad = Math.max(1, Math.min(8, Math.floor(((displaySize.height || 700) / Math.max(visibleRooms.length, 1) - tableFont * 16 * 1.3) / 2)));
 
-  if (initializing) {
-    return (
-      <div style={{ padding: '3rem', fontFamily: 'sans-serif', color: '#94A3B8' }}>
-        Checking your session…
-      </div>
-    );
-  }
-  if (!isAdmin) {
-    return <Navigate to="/login" replace />;
-  }
-
   return (
     <div className={`lobby-display${isFullscreen ? ' lobby-display--live' : ''}`} data-theme={theme}>
       <div className="lobby-topbar">
         <div className="lobby-brand">
           <div className="lobby-brand-mark"><i className="bi bi-building"></i></div>
           <h1>Room Availability</h1>
-          <span className="lobby-live"><span className="dot"></span>{isFullscreen ? 'Live' : 'Preview'}</span>
+          <span className="lobby-live"><span className="dot"></span>{dataWarning ? 'Updates paused' : loading ? 'Waiting' : isFullscreen ? 'Live' : 'Preview'}</span>
         </div>
         <div className="lobby-topbar-right">
-          <div className="lobby-view-toggle" role="group" aria-label="Switch view">
+          {!receiver && <div className="lobby-view-toggle" role="group" aria-label="Switch view">
             <button type="button" className={`lobby-view-btn${viewMode === 'grid' ? ' active' : ''}`} onClick={() => changeViewMode('grid')}>
               <i className="bi bi-grid" aria-hidden="true"></i>Grid
             </button>
             <button type="button" className={`lobby-view-btn${viewMode === 'table' ? ' active' : ''}`} onClick={() => changeViewMode('table')}>
               <i className="bi bi-list-ul" aria-hidden="true"></i>Table
             </button>
-          </div>
-          <button type="button" className="lobby-theme-btn" onClick={toggleTheme} aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`} title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}>
+          </div>}
+          {!receiver && <button type="button" className="lobby-theme-btn" onClick={toggleTheme} aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`} title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}>
             <i className={`bi ${theme === 'dark' ? 'bi-sun' : 'bi-moon-stars'}`} aria-hidden="true"></i>
-          </button>
+          </button>}
           <div className="lobby-clock">
             <div className="lobby-clock-time">{clockTime} <span className="lobby-clock-ampm">{clockAmPm}</span></div>
             <div className="lobby-clock-date">{clockDate}</div>
           </div>
-          {!isFullscreen && (
-            <>
-              <button type="button" className="lobby-golive-btn" onClick={goLive}>
-                <i className="bi bi-tv"></i>Display on TV
+          {!receiver && (
+            <div className="lobby-cast-actions">
+              <button type="button" className="lobby-golive-btn" onClick={casting.start} disabled={!casting.supported || castBusy} aria-describedby="lobby-cast-status">
+                <i className="bi bi-cast" aria-hidden="true"></i>{castLabel}
               </button>
-            </>
+              {casting.canStop && <button type="button" className="lobby-fallback-btn" onClick={casting.stop} disabled={casting.phase === 'stopping'}>Stop casting</button>}
+            </div>
           )}
         </div>
       </div>
+
+      {!receiver && (
+        <div className="lobby-cast-panel">
+          <p id="lobby-cast-status" className="lobby-cast-status" role="status" aria-live="polite">{casting.message}</p>
+          {casting.availability === 'unavailable' && !casting.canStop && <p className="lobby-cast-help">No compatible TV detected yet. Turn on your Chromecast and try the device picker.</p>}
+          {!isFullscreen && <p className="lobby-cast-help">Use desktop Google Chrome over HTTPS (or localhost for development), with the laptop and Chromecast on the same Wi-Fi. Keep this tab open and the laptop awake while casting. Every new session requires choosing a device.</p>}
+          <button type="button" className="lobby-fallback-btn" onClick={goLive}>{fullscreen ? 'Exit fullscreen' : 'Fullscreen on this screen (fallback)'}</button>
+          {!isFullscreen && <span className="lobby-cast-help"> For HDMI or Chrome’s manual Cast tab option.</span>}
+          {fullscreenError && <p className="lobby-cast-status" role="alert">{fullscreenError}</p>}
+        </div>
+      )}
+
+      {dataWarning && <p className="lobby-setup-note" role="status">{dataWarning}</p>}
 
       {!isFullscreen && (
         <>
           <p className="lobby-setup-note">
             <i className="bi bi-info-circle"></i>
-            <span>This is a setup preview. Pick what this screen should show below, then select <strong>Display on TV</strong>. Grid and Table both fit the visible rooms on one TV screen.</span>
+            <span>Pick what the TV should show below, then select <strong>View on TV</strong> and choose your Chromecast. Grid, Table, filters, sorting, and theme stay in sync while casting.</span>
           </p>
           <div className="lobby-filters">
             <div className="lobby-filter-row">
@@ -252,7 +295,7 @@ function LobbyMonitor() {
 
       <div className="lobby-scroll" ref={scrollRef}>
         {loading ? (
-          <div className="lobby-empty">Loading rooms…</div>
+          <div className="lobby-empty" role="status">{receiver?.message || 'Loading rooms…'}</div>
         ) : rooms.length === 0 ? (
           <div className="lobby-empty">No rooms configured yet.</div>
         ) : visibleRooms.length === 0 ? (
