@@ -627,14 +627,6 @@ function AuthForm({ mode, resetLogin, onSwitchMode, onForgotPassword, onAuthSucc
             <ArrowRight size={16} className="btn-social-arrow" />
           </button>
           {renderBrowserHandoff()}
-          <button
-            type="button"
-            className="btn-guest"
-            onClick={openGuestModal}
-            disabled={guestLoading}
-          >
-            Reserve as a guest
-          </button>
           <div className="signup-row">
             New here?{' '}
             <button type="button" className="link-button" onClick={onSwitchMode}>

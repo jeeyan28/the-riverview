@@ -344,7 +344,7 @@ function Monitor() {
         const { occupancy, remaining, isPastEnd, isCritical, isWarning } = buildRoomView(r, sessions);
         if (!occupancy) return <span className="rm-board-empty">—</span>;
         const end = sessionEnd(occupancy);
-        return <div className="rm-board-time"><strong>{boardClock(end)}</strong><small className={`rm-timer${isWarning ? ' warn' : ''}${(isPastEnd || isCritical) ? ' expired' : ''}`}>{isPastEnd ? 'Overdue' : `${formatTimeRemaining(remaining, false)} left`}</small></div>;
+        return <div className="rm-board-time"><strong>{boardClock(end)}</strong><small className={`rm-timer${isWarning ? ' warn' : ''}${(isPastEnd || isCritical) ? ' expired' : ''}`}>{isPastEnd ? `Overdue ${formatTimeRemaining(remaining, true)}` : `${formatTimeRemaining(remaining, false)} left`}</small></div>;
       },
     },
     {
@@ -689,10 +689,11 @@ function Monitor() {
                   <>
                     <div className="rm-timer-row">
                       <div>
+                        {isPastEnd && <div className="rm-timer-caption">Overdue</div>}
                         <div className={`rm-timer-big${isWarning ? ' warn' : ''}${(isPastEnd || isCritical) ? ' expired' : ''}`}>
                           {formatTimeRemaining(remaining, isPastEnd)}
                         </div>
-                        <div className="rm-timer-caption">Time left</div>
+                        {!isPastEnd && <div className="rm-timer-caption">Time left</div>}
                       </div>
                       <span className={`pay-pill ${isPaid ? 'pay-paid' : 'pay-unpaid'}`}>
                         {isPaid ? 'Paid' : 'Unpaid'}
@@ -977,8 +978,9 @@ function RoomDetailModal({ room, view, onClose, canManage, canOperate, onExtend,
           {view.occupancy ? (
             <>
               <div className={`rmd-timer-block${view.isWarning ? ' warn' : ''}${(view.isPastEnd || view.isCritical) ? ' expired' : ''}`}>
+                {view.isPastEnd && <div className="rmd-timer-caption">Overdue</div>}
                 <div className="rmd-timer-value">{formatTimeRemaining(view.remaining, view.isPastEnd)}</div>
-                <div className="rmd-timer-caption">Time left</div>
+                {!view.isPastEnd && <div className="rmd-timer-caption">Time left</div>}
               </div>
 
               {view.occupancy.guestName && (
