@@ -24,6 +24,7 @@
 }
 .bk-clear-btn:hover{background:var(--navy3);color:var(--text);}
 .bk-results-row{font-size:.76rem;color:var(--muted);padding-top:2px;border-top:1px solid var(--border-soft);padding-top:10px;}
+#app .admin-table-scroll > .bk-reservations-table{min-width:1140px;}
 
 .tbl-action-btn{
   display:inline-flex;align-items:center;gap:4px;
@@ -56,6 +57,7 @@
 .bk-schedule{display:flex;flex-direction:column;gap:1px;}
 .bk-payment-pill{font:inherit;line-height:1.25;text-align:left;white-space:normal;}
 button.bk-payment-pill{cursor:pointer;}
+.bk-balance{font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap;}
 .bk-status-cell{display:inline-flex;align-items:flex-start;flex-direction:column;gap:4px;}
 .bk-status-note{font-size:.67rem;line-height:1.25;color:var(--muted);}
 .bk-status-note--overdue{color:var(--red);font-weight:600;}

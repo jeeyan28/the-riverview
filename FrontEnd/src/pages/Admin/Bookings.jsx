@@ -114,7 +114,6 @@ function isFullPayment(b) {
 
 function paymentPlanLabel(b) {
   const paid = netCollected(b);
-  const balance = outstandingBalance(b);
   const refunded = Number(b?.refundedAmount) || 0;
   const cancellation = cancellationAmounts(b);
   if (reservationPresentation(b).status === 'No Show') return paid > 0
@@ -126,8 +125,8 @@ function paymentPlanLabel(b) {
   if (refunded > 0) return `${formatPeso(refunded)} refunded · ${isFullPayment(b) ? 'Paid ' : ''}${formatPeso(paid)} retained`;
   if (['Cancelled', 'Rejected'].includes(reservationPresentation(b).status)) return paid > 0 ? `${isFullPayment(b) ? 'Paid ' : ''}${formatPeso(paid)} retained` : 'No payment retained';
   if (isFullPayment(b)) return b?.paymentChoice === 'deposit' && Number(b?.duration) === 1 ? `1-hour payment ${formatPeso(paid)}` : `Paid ${formatPeso(paid)}`;
-  if (paid > 0) return `${formatPeso(paid)} paid · ${formatPeso(balance)} remaining`;
-  return `${formatPeso(balance)} remaining`;
+  if (paid > 0) return `${formatPeso(paid)} paid`;
+  return 'No payment';
 }
 
 function paymentPlanPillClass(b) {
@@ -138,6 +137,21 @@ function initials(name) {
   const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
   if (!parts.length) return '?';
   return (parts[0][0] + (parts[1]?.[0] || '')).toUpperCase();
+}
+
+function reservationNameParts(name) {
+  const fullName = String(name || '').trim().replace(/\s+/g, ' ');
+  const commaIndex = fullName.indexOf(',');
+  if (commaIndex > 0 && commaIndex < fullName.length - 1) {
+    return {
+      firstName: fullName.slice(commaIndex + 1).trim(),
+      lastName: fullName.slice(0, commaIndex).trim(),
+    };
+  }
+  const spaceIndex = fullName.indexOf(' ');
+  return spaceIndex < 0
+    ? { firstName: fullName, lastName: '' }
+    : { firstName: fullName.slice(0, spaceIndex), lastName: fullName.slice(spaceIndex + 1) };
 }
 
 function formatDate(dateStr) {
@@ -409,16 +423,26 @@ function Bookings() {
       render: (b) => <span className="bk-code-wrap"><span className="bk-code">{b.reservationCode || shortBookingId(b)}</span>{matchesQuickView(b, 'new', clockMs, today) && <span className="bk-new-badge">New</span>}</span>,
     },
     {
-      key: 'guestName',
-      label: 'Customer',
+      key: 'lastName',
+      label: 'Last name',
       sortable: true,
+      sortValue: (b) => reservationNameParts(b.guestName).lastName,
       render: (b) => (
         <div className="bk-customer">
           <span className="bk-avatar">{initials(b.guestName)}</span>
-          <div className="bk-customer-info">
-            <span className="bk-customer-name">{b.guestName || '—'}</span>
-            <span className="bk-customer-phone">{guestPhoneDisplay(b.guestContact)}</span>
-          </div>
+          <span className="bk-customer-name">{reservationNameParts(b.guestName).lastName || '—'}</span>
+        </div>
+      ),
+    },
+    {
+      key: 'firstName',
+      label: 'First name',
+      sortable: true,
+      sortValue: (b) => reservationNameParts(b.guestName).firstName,
+      render: (b) => (
+        <div className="bk-customer-info">
+          <span className="bk-customer-name">{reservationNameParts(b.guestName).firstName || '—'}</span>
+          <span className="bk-customer-phone">{guestPhoneDisplay(b.guestContact)}</span>
         </div>
       ),
     },
@@ -463,6 +487,13 @@ function Bookings() {
         ) : (
           <span className={`pill bk-payment-pill ${paymentPlanPillClass(b)}`}>{paymentPlanLabel(b)}</span>
         ),
+    },
+    {
+      key: 'balance',
+      label: 'Balance',
+      sortable: true,
+      sortValue: (b) => outstandingBalance(b),
+      render: (b) => <span className="bk-balance">{formatPeso(outstandingBalance(b))}</span>,
     },
     {
       key: 'status',
@@ -589,6 +620,7 @@ function Bookings() {
         <DataTable
           columns={columns}
           rows={bookings}
+          tableClassName="tbl bk-reservations-table"
           loading={loading}
           emptyMessage={loadError ? 'Could not load reservations.' : 'No reservations match your filters.'}
           getRowKey={(b) => b._id}
