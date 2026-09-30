@@ -33,7 +33,7 @@ For a deployed build, use the site's **HTTPS** address and its existing deployme
 
 ## Fallback and troubleshooting
 
-- **Fullscreen on this screen (fallback)** preserves the old fullscreen action. Use it with HDMI, or choose Chrome's manual **Cast → Sources → Cast tab** option and select the Chromecast. Manual tab casting is controlled and stopped through Chrome's Cast menu.
+- **Fullscreen** sits beside **View on TV** until a TV session starts. Use it with HDMI, or choose Chrome's manual **Cast → Sources → Cast tab** option and select the Chromecast. Manual tab casting is controlled and stopped through Chrome's Cast menu.
 - **Cancelled / permission denied:** click View on TV again when ready. A new session always needs a device selection.
 - **No compatible TV:** check Chromecast power, the TV's HDMI input, and the Wi-Fi network. Guest-network isolation, VPN routing, or managed-network rules can prevent discovery. Try Chrome's own Cast menu to check whether it detects the device.
 - **Unsupported browser / blocked origin:** open the dashboard directly in desktop Chrome over HTTPS or localhost. The app feature-detects `PresentationRequest`, `navigator.presentation`, and `isSecureContext`; availability detection is advisory and does not prevent a new picker attempt.

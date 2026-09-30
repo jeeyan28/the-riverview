@@ -259,7 +259,7 @@ function Dashboard() {
                   <span className="dash-room-identity"><strong>{r.roomName || 'Room'} · Table No. {r.roomNumber}</strong><small>{r.facilityName}</small></span>
                   {view.occupancy && (
                     <span className={`dash-room-time${view.isCritical || view.isPastEnd ? ' critical' : view.isWarning ? ' warning' : ''}`}>
-                      {formatTimeRemaining(view.remaining, view.isPastEnd)}
+                      {view.isPastEnd ? `Overdue ${formatTimeRemaining(view.remaining, true)}` : formatTimeRemaining(view.remaining, false)}
                     </span>
                   )}
                   <span className={`pill ${ROOM_STATUS_PILL_CLASS[r.status] || 'pill-vacant'}`}>{r.status}</span>

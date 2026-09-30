@@ -56,12 +56,12 @@ export function formatEndTime(session) {
   return sessionEnd(session).toLocaleTimeString('en-US', { timeZone: 'Asia/Manila', hour: 'numeric', minute: '2-digit', hour12: true });
 }
 export function formatTimeRemaining(ms, isPastEnd) {
-  if (isPastEnd) return '00:00:00';
-  const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+  const totalSeconds = Math.max(0, Math.floor((isPastEnd ? -ms : ms) / 1000));
   const h = Math.floor(totalSeconds / 3600);
   const m = Math.floor((totalSeconds % 3600) / 60);
   const s = totalSeconds % 60;
-  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  const clock = `${isPastEnd ? h : String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  return isPastEnd ? `- ${clock}` : clock;
 }
 export function findRoomOccupancy(roomId, sessions) {
   const matches = sessions.filter((s) => s.status === 'Active' && String(s.room?._id || s.room) === String(roomId));

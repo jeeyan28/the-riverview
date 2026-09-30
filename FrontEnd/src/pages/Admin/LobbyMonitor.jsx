@@ -86,6 +86,7 @@ function LobbyMonitorView({ monitor, receiver }) {
   const casting = useLobbyPresentation(snapshot, !receiver);
   const castBusy = ['selecting', 'connecting', 'stopping'].includes(casting.phase);
   const castLabel = { connected: 'Casting to TV', disconnected: 'Reconnect to TV', selecting: 'Choose a TV…', connecting: 'Connecting…', stopping: 'Stopping…' }[casting.phase] || 'View on TV';
+  const showCastStatus = !casting.supported || (casting.phase !== 'idle' && casting.phase !== 'terminated');
 
   const scrollRef = useRef(null);
 
@@ -182,14 +183,41 @@ function LobbyMonitorView({ monitor, receiver }) {
     }));
   }, [visibleRooms, sortBy, sessions]);
 
-  const liveColumns = Math.min(
-    Math.max(visibleRooms.length, 1),
-    Math.max(1, Math.ceil(Math.sqrt(visibleRooms.length * (displaySize.width || 1920) / (displaySize.height || 800))))
-  );
-  const liveRows = Math.max(1, Math.ceil(visibleRooms.length / liveColumns));
-  const liveGridHeight = displaySize.height > 0
-    ? Math.min(displaySize.height, liveRows * 150 + (liveRows - 1) * 8)
-    : undefined;
+  const liveTight = (displaySize.height || 800) < 640;
+
+  const liveLayout = useMemo(() => {
+    const width = displaySize.width || 1920;
+    const height = displaySize.height || 800;
+    const gap = liveTight ? 6 : 8;
+    const typeMin = height >= 860 ? 360 : height >= 700 ? 320 : 280;
+    const cardMin = height >= 860 ? 180 : height >= 700 ? 150 : 112;
+    const typePadX = (liveTight ? 10 : 12) * 2 + 2;
+    const facilityBlock = liveTight ? 56 : 68;
+    const typeBlock = (liveTight ? 8 * 2 + 2 : 10 * 2 + 2) + (liveTight ? 24 : 28);
+    const perTypeRow = Math.max(1, Math.floor((width + gap) / (typeMin + gap)));
+    let rows = 0;
+    let overhead = 0;
+    groups.forEach(({ types }) => {
+      let facilityRows = 0;
+      let chunks = 0;
+      for (let i = 0; i < types.length; i += perTypeRow) {
+        const chunk = types.slice(i, i + perTypeRow);
+        const typeWidth = (width - (chunk.length - 1) * gap) / chunk.length;
+        const cols = Math.max(1, Math.floor((typeWidth - typePadX + gap) / (cardMin + gap)));
+        facilityRows += Math.max(...chunk.map((t) => Math.ceil(t.rooms.length / cols)));
+        chunks += 1;
+      }
+      rows += facilityRows;
+      overhead += facilityBlock + chunks * typeBlock + Math.max(0, facilityRows - 1) * gap;
+    });
+    return { width, height, gap, typeMin, cardMin, rows, overhead };
+  }, [groups, displaySize.width, displaySize.height, liveTight]);
+
+  const liveCellH = useMemo(() => {
+    const usable = liveLayout.height - liveLayout.overhead - 16;
+    return Math.round(Math.max(48, Math.min(260, (usable / Math.max(1, liveLayout.rows)) * 1.12)));
+  }, [liveLayout]);
+
   const tableFont = Math.max(0.55, Math.min(0.84, (displaySize.height || 700) / Math.max(visibleRooms.length, 1) / 35));
   const tablePad = Math.max(1, Math.min(8, Math.floor(((displaySize.height || 700) / Math.max(visibleRooms.length, 1) - tableFont * 16 * 1.3) / 2)));
 
@@ -199,10 +227,10 @@ function LobbyMonitorView({ monitor, receiver }) {
         <div className="lobby-brand">
           <div className="lobby-brand-mark"><i className="bi bi-building"></i></div>
           <h1>Room Availability</h1>
-          <span className="lobby-live"><span className="dot"></span>{dataWarning ? 'Updates paused' : loading ? 'Waiting' : isFullscreen ? 'Live' : 'Preview'}</span>
+          {!isFullscreen && <span className="lobby-live"><span className="dot"></span>{dataWarning ? 'Updates paused' : loading ? 'Waiting' : 'Preview'}</span>}
         </div>
         <div className="lobby-topbar-right">
-          {!receiver && <div className="lobby-view-toggle" role="group" aria-label="Switch view">
+          {!receiver && !isFullscreen && <div className="lobby-view-toggle" role="group" aria-label="Switch view">
             <button type="button" className={`lobby-view-btn${viewMode === 'grid' ? ' active' : ''}`} onClick={() => changeViewMode('grid')}>
               <i className="bi bi-grid" aria-hidden="true"></i>Grid
             </button>
@@ -219,34 +247,33 @@ function LobbyMonitorView({ monitor, receiver }) {
           </div>
           {!receiver && (
             <div className="lobby-cast-actions">
-              <button type="button" className="lobby-golive-btn" onClick={casting.start} disabled={!casting.supported || castBusy} aria-describedby="lobby-cast-status">
-                <i className="bi bi-cast" aria-hidden="true"></i>{castLabel}
-              </button>
+              {isFullscreen ? (
+                <button type="button" className="lobby-fallback-btn lobby-exit-btn" onClick={goLive}>
+                  <i className="bi bi-fullscreen-exit" aria-hidden="true"></i>Exit fullscreen
+                </button>
+              ) : (
+                <div className="lobby-cast-primary-actions">
+                  <button type="button" className="lobby-golive-btn" onClick={casting.start} disabled={!casting.supported || castBusy} aria-describedby={showCastStatus ? 'lobby-cast-status' : undefined}>
+                    <i className="bi bi-cast" aria-hidden="true"></i>{castLabel}
+                  </button>
+                  {!casting.canStop && <button type="button" className="lobby-fallback-btn" onClick={goLive}>
+                    <i className="bi bi-fullscreen" aria-hidden="true"></i>Fullscreen
+                  </button>}
+                </div>
+              )}
               {casting.canStop && <button type="button" className="lobby-fallback-btn" onClick={casting.stop} disabled={casting.phase === 'stopping'}>Stop casting</button>}
             </div>
           )}
         </div>
       </div>
 
-      {!receiver && (
-        <div className="lobby-cast-panel">
-          <p id="lobby-cast-status" className="lobby-cast-status" role="status" aria-live="polite">{casting.message}</p>
-          {casting.availability === 'unavailable' && !casting.canStop && <p className="lobby-cast-help">No compatible TV detected yet. Turn on your Chromecast and try the device picker.</p>}
-          {!isFullscreen && <p className="lobby-cast-help">Use desktop Google Chrome over HTTPS (or localhost for development), with the laptop and Chromecast on the same Wi-Fi. Keep this tab open and the laptop awake while casting. Every new session requires choosing a device.</p>}
-          <button type="button" className="lobby-fallback-btn" onClick={goLive}>{fullscreen ? 'Exit fullscreen' : 'Fullscreen on this screen (fallback)'}</button>
-          {!isFullscreen && <span className="lobby-cast-help"> For HDMI or Chrome’s manual Cast tab option.</span>}
-          {fullscreenError && <p className="lobby-cast-status" role="alert">{fullscreenError}</p>}
-        </div>
-      )}
+      {!receiver && !isFullscreen && showCastStatus && <p id="lobby-cast-status" className="lobby-cast-status" role="status" aria-live="polite">{casting.message}</p>}
+      {fullscreenError && <p className="lobby-cast-status" role="alert">{fullscreenError}</p>}
 
       {dataWarning && <p className="lobby-setup-note" role="status">{dataWarning}</p>}
 
       {!isFullscreen && (
         <>
-          <p className="lobby-setup-note">
-            <i className="bi bi-info-circle"></i>
-            <span>Pick what the TV should show below, then select <strong>View on TV</strong> and choose your Chromecast. Grid, Table, filters, sorting, and theme stay in sync while casting.</span>
-          </p>
           <div className="lobby-filters">
             <div className="lobby-filter-row">
               <span className="lobby-filter-label"><i className="bi bi-funnel"></i>Facilities</span>
@@ -300,25 +327,49 @@ function LobbyMonitorView({ monitor, receiver }) {
           <div className="lobby-empty">No rooms configured yet.</div>
         ) : visibleRooms.length === 0 ? (
           <div className="lobby-empty">No rooms match the current filters.</div>
-        ) : isFullscreen && viewMode === 'grid' ? (
-          <div className="lobby-live-grid" style={{ '--lobby-columns': liveColumns, '--lobby-rows': liveRows, height: liveGridHeight ?? '100%' }}>
-            {sortRooms(visibleRooms).map((r) => {
-              const { occupancy, remaining, isPastEnd } = buildRoomView(r, sessions);
-              const status = lobbyStatus(r, sessions);
-              const unit = r.facilityName === 'Billiards' ? 'Table' : r.facilityName === 'Court' ? 'Court' : 'Room';
-              return (
-                <div className={`lobby-card lobby-card--${status.key}${status.critical ? ' lobby-card--critical' : ''}`} key={r._id}>
-                  <div className="lobby-card-top">
-                    <span className="lobby-live-card-identity">
-                      <strong>{unit} {r.roomNumber}</strong>
-                      <small>{r.facilityName} · {r.roomName}</small>
-                    </span>
-                    <span className={`lobby-badge lobby-badge--${status.key}${status.critical ? ' lobby-badge--critical' : ''}`}><span className="dot"></span>{status.label}</span>
-                  </div>
-                  <div className="lobby-timer">{occupancy ? formatTimeRemaining(remaining, isPastEnd) : status.key === 'available' ? 'Ready for guests' : status.label}</div>
+        ) : isFullscreen ? (
+          <div
+            className="lobby-live-boards"
+            data-tight={liveTight ? '' : undefined}
+            style={{
+              '--lobby-cell-h': `${liveCellH}px`,
+              '--lobby-type-min': `${liveLayout.typeMin}px`,
+              '--lobby-card-min': `${liveLayout.cardMin}px`,
+            }}
+          >
+            {groups.map(({ facilityName, types }) => (
+              <div className="lobby-facility" key={facilityName}>
+                <div className="lobby-facility-head">
+                  <i className={`bi ${FACILITY_ICONS[facilityName] || FACILITY_ICON_DEFAULT}`}></i>
+                  {facilityName}
                 </div>
-              );
-            })}
+                <div className="lobby-types-row">
+                  {types.map(({ roomName, rooms: typeRooms }) => (
+                    <div className="lobby-type" key={`${facilityName}::${roomName}`}>
+                      <div className="lobby-type-head">
+                        {roomName} <span className="lobby-type-count">· {typeRooms.length}</span>
+                      </div>
+                      <div className="lobby-card-grid">
+                        {typeRooms.map((r) => {
+                          const { occupancy, remaining, isPastEnd } = buildRoomView(r, sessions);
+                          const status = lobbyStatus(r, sessions);
+                          const unit = r.facilityName === 'Billiards' ? 'Table' : r.facilityName === 'Court' ? 'Court' : 'Room';
+                          return (
+                            <div className={`lobby-card lobby-card--${status.key}${status.critical ? ' lobby-card--critical' : ''}`} key={r._id}>
+                              <div className="lobby-live-card-inner">
+                                <span className="lobby-live-card-num">{unit} {r.roomNumber}</span>
+                                <span className={`lobby-badge lobby-badge--${status.key}${status.critical ? ' lobby-card--critical' : ''}`}><span className="dot"></span>{status.label}</span>
+                                <div className="lobby-timer">{occupancy ? formatTimeRemaining(remaining, isPastEnd) : '—'}</div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
           </div>
         ) : viewMode === 'grid' ? (
           groups.map(({ facilityName, types }) => (
@@ -388,7 +439,7 @@ function LobbyMonitorView({ monitor, receiver }) {
                       <td><strong>₱{Number(occupancy?.rate || r.price || 0).toLocaleString()}</strong><small>per hour</small></td>
                       <td><strong>{unit} {r.roomNumber}</strong><small>{r.facilityName} · {r.roomName}</small></td>
                       <td>{occupancy ? new Date(occupancy.startTime).toLocaleTimeString('en-US', { timeZone: 'Asia/Manila', hour: 'numeric', minute: '2-digit' }) : '—'}</td>
-                      <td>{end ? <><strong>{end.toLocaleTimeString('en-US', { timeZone: 'Asia/Manila', hour: 'numeric', minute: '2-digit' })}</strong><small className={isPastEnd || isCritical ? 'is-urgent' : isWarning ? 'is-warning' : ''}>{isPastEnd ? 'Overdue' : `${formatTimeRemaining(remaining, false)} left`}</small></> : '—'}</td>
+                      <td>{end ? <><strong>{end.toLocaleTimeString('en-US', { timeZone: 'Asia/Manila', hour: 'numeric', minute: '2-digit' })}</strong><small className={isPastEnd || isCritical ? 'is-urgent' : isWarning ? 'is-warning' : ''}>{isPastEnd ? `Overdue ${formatTimeRemaining(remaining, true)}` : `${formatTimeRemaining(remaining, false)} left`}</small></> : '—'}</td>
                       <td><span className={`lobby-badge lobby-badge--${status.key}${status.critical ? ' lobby-badge--critical' : ''}`}><span className="dot"></span>{status.label}</span>{occupancy && <small>{occupancy.guestName || 'Walk-in guest'}</small>}</td>
                       <td>{occupancy ? <><strong className={balance > 0 ? 'is-warning' : 'is-paid'}>{balance > 0 ? `₱${balance.toLocaleString()} due` : 'Paid in full'}</strong><small>{balance > 0 ? `₱${Math.max(0, paid - (Number(occupancy.refundedAmount) || 0)).toLocaleString()} paid` : `₱${paid.toLocaleString()} collected`}</small></> : '—'}</td>
                     </tr>

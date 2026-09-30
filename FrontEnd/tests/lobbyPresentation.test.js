@@ -157,7 +157,7 @@ test('malformed messages are ignored and unknown selection values are normalized
 });
 
 for (const [name, text] of [
-  ['NotAllowedError', /cancelled/], ['AbortError', /cancelled/], ['NotFoundError', /No compatible TV/],
+  ['NotAllowedError', /cancelled/], ['AbortError', /cancelled/], ['NotFoundError', /TV not found/],
   ['NotSupportedError', /cannot stream/], ['SecurityError', /HTTPS or localhost/],
   ['InvalidAccessError', /direct click/], ['OperationError', /device picker/], ['NetworkError', /Wi-Fi/],
 ]) {

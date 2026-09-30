@@ -27,7 +27,7 @@ export function presentationErrorMessage(error) {
     case 'AbortError':
       return 'Casting was cancelled or permission was denied. Click View on TV to choose a device again.';
     case 'NotFoundError':
-      return 'No compatible TV was found. Turn on your Chromecast and connect it and this laptop to the same Wi-Fi, then try again.';
+      return 'TV not found. Check Chromecast, then try again.';
     case 'NotSupportedError':
       return 'This browser or device cannot stream this page. Try desktop Chrome with Chromecast, or use the fullscreen fallback.';
     case 'SecurityError':

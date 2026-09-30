@@ -26,12 +26,12 @@
   --lobby-fs-legend-val: 1.7rem;
   --lobby-fs-legend-label: .82rem;
   --lobby-fs-legend-hint: .72rem;
-  --lobby-fs-facility: 1.05rem;
-  --lobby-fs-type: .88rem;
-  --lobby-fs-room: 1rem;
-  --lobby-fs-timer: 1.15rem;
-  --lobby-fs-badge: .64rem;
-  --lobby-fs-price: .72rem;
+  --lobby-fs-facility: 1.1rem;
+  --lobby-fs-type: .92rem;
+  --lobby-fs-room: 1.06rem;
+  --lobby-fs-timer: 1.24rem;
+  --lobby-fs-badge: .7rem;
+  --lobby-fs-price: .78rem;
   --lobby-fs-table: .86rem;
   --lobby-fs-table-head: .72rem;
   --lobby-table-pad: 12px 16px;
@@ -74,16 +74,17 @@
 }
 
 .lobby-display--live {
-  --lobby-fs-h1: clamp(1.15rem, 1rem + .5vw, 1.5rem);
+  --lobby-fs-h1: clamp(1.2rem, 1rem + .55vw, 1.65rem);
   --lobby-fs-clock: clamp(1.4rem, 1.1rem + 1vw, 2rem);
   --lobby-fs-clock-date: .72rem;
   --lobby-fs-legend-val: clamp(1.35rem, 1rem + 1vw, 2rem);
   --lobby-fs-legend-label: .78rem;
   --lobby-fs-legend-hint: .7rem;
-  --lobby-fs-room: clamp(.85rem, .72rem + .35vw, 1.08rem);
-  --lobby-fs-timer: clamp(1rem, .86rem + .5vw, 1.4rem);
-  --lobby-fs-badge: .64rem;
-  --lobby-card-pad: 10px 12px;
+  --lobby-fs-room: clamp(1.05rem, .9rem + .5vw, 1.7rem);
+  --lobby-fs-timer: clamp(1.3rem, 1.05rem + .9vw, 2.4rem);
+  --lobby-fs-badge: clamp(.7rem, .66rem + .2vw, .92rem);
+  --lobby-card-pad: 12px 14px;
+  --lobby-gap: 8px;
   --lobby-pad: 14px 18px;
   overflow: hidden;
 }
@@ -142,15 +143,19 @@
 .lobby-golive-btn:focus-visible, .lobby-fallback-btn:focus-visible { outline: 2px solid var(--lobby-accent); outline-offset: 3px; }
 .lobby-topbar-right { flex-wrap: wrap; }
 .lobby-cast-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
-.lobby-cast-panel { flex-shrink: 0; margin-bottom: 16px; }
-.lobby-cast-status { margin: 0 0 6px; color: var(--lobby-text); font-size: .85rem; }
-.lobby-cast-help { margin: 0 0 8px; color: var(--lobby-muted); font-size: .78rem; line-height: 1.5; }
+.lobby-cast-primary-actions { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
+.lobby-cast-status { margin: 0 0 16px; color: var(--lobby-text); font-size: .85rem; }
 .lobby-fallback-btn {
+  display: inline-flex; align-items: center; gap: 7px;
   padding: 7px 10px; border: 1px solid var(--lobby-border); border-radius: 8px;
   background: var(--lobby-panel); color: var(--lobby-text); font: inherit; font-size: .8rem; cursor: pointer;
 }
 .lobby-fallback-btn:hover { border-color: var(--lobby-accent); }
 .lobby-fallback-btn:disabled { opacity: .6; cursor: not-allowed; }
+.lobby-exit-btn {
+  display: inline-flex; align-items: center; gap: 7px;
+  border-color: var(--lobby-accent); color: var(--lobby-accent); font-weight: 700;
+}
 
 .lobby-setup-note {
   display: flex; align-items: flex-start; gap: 8px; margin: 0 0 16px; padding: 10px 14px;
@@ -214,23 +219,58 @@
 .lobby-display--live .lobby-legend { margin-bottom: 10px; }
 .lobby-display--live .lobby-legend-item { gap: 8px; padding: 8px 12px; border-radius: 9px; }
 .lobby-display--live .lobby-legend-hint { display: none; }
-.lobby-display--live .lobby-scroll { overflow: hidden; }
-.lobby-live-grid {
-  display: grid;
-  grid-template-columns: repeat(var(--lobby-columns), minmax(0, 1fr));
-  grid-template-rows: repeat(var(--lobby-rows), minmax(0, 1fr));
-  gap: 8px;
-  width: 100%;
-  max-height: 100%;
+.lobby-display--live .lobby-scroll { overflow: auto; }
+.lobby-live-boards { display: flex; flex-direction: column; gap: 26px; width: 100%; --lobby-gap: 8px; }
+.lobby-live-boards[data-tight] { gap: 14px; --lobby-gap: 6px; }
+.lobby-live-boards .lobby-facility { margin-bottom: 0; }
+.lobby-live-boards .lobby-type { padding: 10px 12px; }
+.lobby-live-boards[data-tight] .lobby-type { padding: 8px 10px; }
+.lobby-live-boards .lobby-card-grid { grid-auto-rows: var(--lobby-cell-h, 96px); }
+.lobby-live-boards .lobby-card {
+  container-type: size;
+  --lobby-u: min(1cqh, .66cqw);
+  display: block;
+  min-width: 0;
+  min-height: 0;
   overflow: hidden;
+  padding: 0;
 }
-.lobby-live-grid .lobby-card { min-width: 0; min-height: 0; overflow: hidden; justify-content: space-between; gap: 6px; }
-.lobby-live-grid .lobby-card-top { align-items: flex-start; }
-.lobby-live-card-identity { display: grid; min-width: 0; gap: 3px; }
-.lobby-live-card-identity strong { color: var(--lobby-text); font-size: var(--lobby-fs-room); line-height: 1.15; }
-.lobby-live-card-identity small { overflow: hidden; color: var(--lobby-muted); font-size: .7rem; line-height: 1.25; text-overflow: ellipsis; white-space: nowrap; }
-.lobby-live-grid .lobby-badge { padding: 3px 7px; }
-.lobby-live-grid .lobby-timer { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lobby-live-card-inner {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  height: 100%;
+  gap: max(1px, calc(var(--lobby-u) * 3));
+  padding: max(2px, calc(var(--lobby-u) * 6)) max(3px, calc(var(--lobby-u) * 7));
+}
+.lobby-live-card-inner > * { flex-shrink: 0; }
+.lobby-live-card-num {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--lobby-text);
+  font-size: clamp(10px, calc(var(--lobby-u) * 24), 36px);
+  font-weight: 800;
+  line-height: 1.1;
+}
+.lobby-live-boards .lobby-badge {
+  align-self: flex-start;
+  gap: max(2px, calc(var(--lobby-u) * 3));
+  padding: max(2px, calc(var(--lobby-u) * 2.4)) max(4px, calc(var(--lobby-u) * 5));
+  font-size: clamp(7px, calc(var(--lobby-u) * 10.5), 17px);
+}
+.lobby-live-boards .lobby-badge .dot {
+  width: max(3px, calc(var(--lobby-u) * 3.2));
+  height: max(3px, calc(var(--lobby-u) * 3.2));
+}
+.lobby-live-boards .lobby-timer {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 .lobby-empty { padding: 60px 0; text-align: center; color: var(--lobby-muted); font-size: 1rem; }
 
@@ -294,6 +334,10 @@
 .lobby-card--available .lobby-timer,
 .lobby-card--other .lobby-timer { color: var(--lobby-muted); font-size: calc(var(--lobby-fs-timer) * .62); font-weight: 600; }
 .lobby-card--critical .lobby-timer { color: var(--lobby-critical); }
+.lobby-live-boards .lobby-card .lobby-timer {
+  font-size: clamp(9px, calc(var(--lobby-u) * 28.5), 44px);
+  font-weight: 800;
+}
 
 .lobby-card-foot { display: flex; align-items: center; justify-content: flex-end; }
 .lobby-price { color: var(--lobby-muted); font-weight: 700; font-size: var(--lobby-fs-price); }
