@@ -1,6 +1,17 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { openBookingReceipt } from '../src/utils/receipt.js';
+import { getBookingReceiptData, openBookingReceipt } from '../src/utils/receipt.js';
+
+test('closure refund receipts show processing until confirmed and avoid manual-refund instructions during provider processing', () => {
+  const closed = { status: 'Cancelled', reservationCode: 'BIL-CLOSURE', roomLabel: 'Billiards', amount: 600, paidAmount: 300, downPayment: 300, refundedAmount: 0, paymentProvider: 'paymongo', paymentMethod: 'GCash', cancellationSource: 'admin', cancellationRefundException: true, closureRefund: { status: 'processing', amount: 300, processedAmount: 0 } };
+  const receipt = getBookingReceiptData(closed);
+  assert.ok(receipt.costRows.some(row => row.label === 'Refund processing' && row.value === 300));
+  assert.ok(receipt.notes.some(note => note.includes('Refund processing')));
+  assert.equal(receipt.notes.some(note => /arrange.*manual refund/i.test(note)), false);
+  const completed = getBookingReceiptData({ ...closed, refundedAmount: 300, closureRefund: { ...closed.closureRefund, status: 'completed', processedAmount: 300 } });
+  assert.ok(completed.costRows.some(row => row.label === 'Refunded' && row.value === 300));
+  assert.equal(completed.costRows.some(row => row.label === 'Refund processing'), false);
+});
 
 const booking = {
   status: 'Confirmed', reservationCode: 'BIL-123', roomLabel: 'Billiards', variantLabel: 'Big Rooms',

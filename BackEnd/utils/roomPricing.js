@@ -1,4 +1,3 @@
-const { CORKAGE_FEE } = require("./constants");
 const AppError = require("./appError");
 
 function roundMoney(value) {
@@ -39,7 +38,7 @@ function rateForHour(variant, hour, guestCount = 1) {
   return roundMoney(scheduledRate + guestSurcharge);
 }
 
-function calculateBookingPrice({ variant, basePrice, timeIn, duration, guestCount = 1, hasCorkage = false }) {
+function calculateBookingPrice({ variant, basePrice, timeIn, duration, guestCount = 1 }) {
   const hours = Number(duration);
   const startHour = parseHour(timeIn, NaN);
   if (!Number.isFinite(hours) || hours <= 0 || !Number.isInteger(startHour)) {
@@ -60,13 +59,11 @@ function calculateBookingPrice({ variant, basePrice, timeIn, duration, guestCoun
     index += 1;
   }
   roomCharge = roundMoney(roomCharge);
-  const corkageFee = hasCorkage ? CORKAGE_FEE : 0;
 
   return {
     hourlyRates,
     roomCharge,
-    corkageFee,
-    amount: roundMoney(roomCharge + corkageFee),
+    amount: roomCharge,
     unitPrice: hourlyRates[0],
   };
 }
@@ -94,7 +91,7 @@ function quoteOnlineBooking({ room, variant, basePrice, paymentChoice = "deposit
     return { name: item.name, fee: Number(item.fee) };
   });
   const addOnFee = roundMoney(addOns.reduce((sum, item) => sum + item.fee, 0));
-  const amount = roundMoney(roomCharge - discountAmount + addOnFee + Number(basePrice.corkageFee || 0));
+  const amount = roundMoney(roomCharge - discountAmount + addOnFee);
   const downPayment = fullPayment ? amount : Math.min(amount, computeDownPayment(basePrice.hourlyRates, 1));
   return { discountPercent, eligibleDiscount, discountAmount, addOns, addOnFee, amount, downPayment };
 }
@@ -109,7 +106,7 @@ function repriceExistingBooking(basePrice, booking) {
     eligibleDiscount,
     discountAmount,
     addOnFee,
-    amount: roundMoney(roomCharge - discountAmount + addOnFee + Number(basePrice.corkageFee || 0)),
+    amount: roundMoney(roomCharge - discountAmount + addOnFee),
   };
 }
 
@@ -143,7 +140,6 @@ function calculateSessionExtension({ session, room, addedHours, startHour }) {
 }
 
 module.exports = {
-  CORKAGE_FEE,
   calculateBookingPrice,
   computeDownPayment,
   quoteOnlineBooking,

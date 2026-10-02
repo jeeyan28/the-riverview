@@ -6,6 +6,7 @@ const settingsItemIdParamsSchema = Joi.object({
   id: Joi.string().trim().hex().length(24).required(),
 });
 const emptyBodySchema = Joi.object({}).default({});
+const closureImpactQuerySchema = Joi.object({ date: dateStr.required() });
 
 const operatingHoursSchema = Joi.object({
   openTime: timeStr,
@@ -66,6 +67,7 @@ const updateEmergencyContactSchema = Joi.object(emergencyContactFields).min(1);
 module.exports = {
   settingsItemIdParamsSchema,
   emptyBodySchema,
+  closureImpactQuerySchema,
   operatingHoursSchema,
   createHolidaySchema,
   createAnnouncementSchema,

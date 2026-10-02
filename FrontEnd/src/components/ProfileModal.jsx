@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { bookingsService } from '../services/bookings';
 import { API_BASE_URL } from '../services/api';
-import { openBookingReceipt } from '../utils/receipt';
+import { guestPhoneDisplay, openBookingReceipt } from '../utils/receipt';
+import { reservationDisplayName } from '../utils/reservationName';
 import { cancellationAmounts } from '../utils/cancellationPolicy';
 import { reservationPresentation, reservationWindow } from '../utils/reservationStatus';
 import { formatTime12 } from '../utils/time';
@@ -11,9 +12,11 @@ import { useSiteSettings } from '../hooks/useSiteSettings';
 import PasswordInput from './PasswordInput';
 import { PASSWORD_REQUIREMENTS } from '../utils/password';
 import RescheduleModal, { canRescheduleBooking } from './RescheduleModal';
-import LogoutConfirmDialog from './LogoutConfirmDialog';
 import { AlertTriangle, CalendarDays, CheckCircle2, Download, X } from 'lucide-react';
 import ModalPortal from './ModalPortal';
+import ClosureResolution from './ClosureResolution';
+import { refreshNotifications } from '../hooks/useNotifications';
+import { isClosurePending } from '../utils/closureRefund';
 
 const EMPTY_DETAILS = { firstName: '', lastName: '', phone: '', email: '' };
 const EMPTY_PASSWORD = { currentPassword: '', newPassword: '', confirmPassword: '' };
@@ -49,7 +52,7 @@ function paymentBreakdown(booking, now) {
 
 function ProfileModal({ open, onClose, reservationIntent }) {
   const navigate = useNavigate();
-  const { user: authUser, revalidate, updateUser, logout } = useAuth();
+  const { user: authUser, revalidate, updateUser } = useAuth();
   const { settings } = useSiteSettings();
 
   const [user, setUser] = useState(null);
@@ -68,12 +71,12 @@ function ProfileModal({ open, onClose, reservationIntent }) {
   const [loadingBookings, setLoadingBookings] = useState(false);
   const [bookingsError, setBookingsError] = useState('');
   const [viewingBooking, setViewingBooking] = useState(null);
+  const detailsRef = useRef(null);
   const [reschedulingBooking, setReschedulingBooking] = useState(null);
   const [cancellingBooking, setCancellingBooking] = useState(null);
 
   const [toast, setToast] = useState({ visible: false, message: '', type: 'success' });
   const toastTimer = useRef(null);
-  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   function pfShowToast(message, type = 'success') {
     setToast({ visible: true, message, type });
@@ -86,7 +89,7 @@ function ProfileModal({ open, onClose, reservationIntent }) {
       firstName: u.firstName || '',
       lastName: u.lastName || '',
       phone: u.phone || '',
-      email: u.isGuest ? '' : (u.email || ''),
+      email: u.email || '',
     });
   }
 
@@ -147,6 +150,52 @@ function ProfileModal({ open, onClose, reservationIntent }) {
   }, [open, reservationIntent?.code, reservationIntent?.action]);
 
   useEffect(() => {
+    if (!open || !authUser?._id) return;
+    let cancelled = false;
+    let refreshing = false;
+    async function refreshReservations() {
+      if (document.hidden || refreshing) return;
+      refreshing = true;
+      try {
+        const data = await bookingsService.mine();
+        if (!cancelled && Array.isArray(data)) {
+          setBookings(data);
+          setViewingBooking(previous => previous ? data.find(item => item._id === previous._id) || previous : null);
+        }
+      } catch { /* Keep the last successful reservation view during a retry. */ }
+      finally { refreshing = false; }
+    }
+    const timer = setInterval(refreshReservations, 15000);
+    window.addEventListener('focus', refreshReservations);
+    return () => { cancelled = true; clearInterval(timer); window.removeEventListener('focus', refreshReservations); };
+  }, [open, authUser?._id]);
+
+  useEffect(() => {
+    if (!viewingBooking) return;
+    const previousFocus = document.activeElement;
+    const dialog = () => reschedulingBooking ? document.getElementById('reschedule-modal') : cancellingBooking ? document.querySelector('[aria-label="Request reservation cancellation"]') : detailsRef.current;
+    const frame = requestAnimationFrame(() => dialog()?.querySelector('button:not([disabled])')?.focus({ preventScroll: true }));
+    function onKeyDown(event) {
+      const current = dialog();
+      if (!current) return;
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        if (reschedulingBooking) setReschedulingBooking(null);
+        else if (cancellingBooking) setCancellingBooking(null);
+        else setViewingBooking(null);
+      }
+      if (event.key !== 'Tab') return;
+      const fields = [...current.querySelectorAll('button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex="0"]')].filter(element => element.getClientRects().length);
+      const first = fields[0], last = fields.at(-1);
+      if (!first) return;
+      if (event.shiftKey && (document.activeElement === first || !current.contains(document.activeElement))) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && (document.activeElement === last || !current.contains(document.activeElement))) { event.preventDefault(); first.focus(); }
+    }
+    document.addEventListener('keydown', onKeyDown);
+    return () => { cancelAnimationFrame(frame); document.removeEventListener('keydown', onKeyDown); if (previousFocus?.isConnected) previousFocus.focus({ preventScroll: true }); };
+  }, [viewingBooking?._id, Boolean(reschedulingBooking), Boolean(cancellingBooking)]);
+
+  useEffect(() => {
     if (!open) return;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
@@ -160,16 +209,6 @@ function ProfileModal({ open, onClose, reservationIntent }) {
 
   function handleClose() {
     onClose?.();
-  }
-
-  async function handleLogout() {
-    setShowLogoutConfirm(true);
-  }
-
-  async function confirmLogout() {
-    setShowLogoutConfirm(false);
-    await logout();
-    window.location.href = '/';
   }
 
   async function handleDetailsSubmit(e) {
@@ -273,6 +312,8 @@ function ProfileModal({ open, onClose, reservationIntent }) {
         role="dialog"
         aria-modal="true"
         aria-labelledby="profile-modal-title"
+        aria-hidden={viewingBooking ? true : undefined}
+        inert={viewingBooking ? '' : undefined}
       >
         <div className="pf-modal pf-modal--account">
           <div className="pf-modal-head">
@@ -314,9 +355,9 @@ function ProfileModal({ open, onClose, reservationIntent }) {
                   )}
                 </div>
                 <div className="pf-identity">
-                  <strong>{`${details.firstName} ${details.lastName}`.trim() || 'Riverview guest'}</strong>
-                  <span>{details.email || 'Guest account'}</span>
-                  <em className="pf-account-type">{authUser?.isGuest ? 'Guest account' : 'Customer account'}</em>
+                  <strong>{`${details.firstName} ${details.lastName}`.trim() || 'Riverview customer'}</strong>
+                  <span>{details.email || '—'}</span>
+                  <em className="pf-account-type">Customer account</em>
                 </div>
                 <div className="pf-avatar-stats" aria-label="Reservation summary">
                   <span><strong>{bookings.length}</strong><small>Reservations</small></span>
@@ -351,7 +392,6 @@ function ProfileModal({ open, onClose, reservationIntent }) {
                     type="email"
                     id="pfEmailReadonly"
                     value={details.email}
-                    placeholder={authUser?.isGuest ? 'Not set — claim your account to add one' : ''}
                     disabled
                     readOnly
                   />
@@ -522,7 +562,7 @@ function ProfileModal({ open, onClose, reservationIntent }) {
                   <div className="pf-booking-right">
                     <div className="pf-booking-price">₱{Number(b.amount || 0).toLocaleString()}</div>
                     <span className={`pf-chip pf-chip--${historyStatusClass(presentation.status)}`}>{presentation.status}</span>
-                    {presentation.warning === 'Overdue' && <small className="pf-reservation-warning">Overdue</small>}
+                    {presentation.warning && <small className="pf-reservation-warning">{presentation.warning}</small>}
                     {presentation.status !== 'No Show' && <span className={`pf-payment-state pf-payment-state--${payment.balance === 0 && payment.paid > 0 ? 'paid' : payment.paid > 0 ? 'partial' : 'unpaid'}`}>{payment.status}{payment.balance > 0 ? ` · ₱${payment.balance.toLocaleString()} remaining` : ''}</span>}
                   </div>
                   <button
@@ -544,17 +584,14 @@ function ProfileModal({ open, onClose, reservationIntent }) {
             </div>
           </div>
 
-          <button type="button" className="pf-logout" id="pfLogoutBtn" onClick={handleLogout}>
-            <i className="fa-solid fa-arrow-right-from-bracket"></i>Log out
-          </button>
         </div>
       </div>
 
       {viewingBooking && (
-        <div className="pf-overlay open">
+        <div className="pf-overlay open" role="dialog" aria-modal="true" aria-labelledby="reservation-details-title" aria-hidden={reschedulingBooking || cancellingBooking ? true : undefined} inert={reschedulingBooking || cancellingBooking ? '' : undefined} ref={detailsRef}>
           <div className="pf-modal">
             <div className="pf-modal-head">
-              <div><h2 className="pf-modal-title">Reservation details</h2><p className="pf-modal-subtitle">{viewingBooking.reservationCode || 'Reservation record'}</p></div>
+              <div><h2 className="pf-modal-title" id="reservation-details-title">Reservation details</h2><p className="pf-modal-subtitle">{viewingBooking.reservationCode || 'Reservation record'}</p></div>
               <button className="pf-close" aria-label="Close" onClick={() => setViewingBooking(null)}>
                 <X size={19} aria-hidden="true" />
               </button>
@@ -569,8 +606,10 @@ function ProfileModal({ open, onClose, reservationIntent }) {
                   {Number(viewingBooking.discountAmount) > 0 && <div><span>{viewingBooking.venueDiscountApplied ? 'Room discount settled at venue' : 'Room discount applied online'}</span><strong>₱{Number(viewingBooking.discountAmount).toLocaleString()}</strong></div>}
                   {viewingBooking.paymentChoice === 'deposit' && !viewingBooking.venueDiscountApplied && Number(viewingBooking.eligibleDiscount) > 0 && <div><span>{Number(viewingBooking.duration) === 1 ? 'Room discount to return at venue' : 'Room discount to deduct at venue'}</span><strong>₱{Number(viewingBooking.eligibleDiscount).toLocaleString()}</strong></div>}
                   <div><span>Paid</span><strong>₱{payment.paid.toLocaleString()}</strong></div>
-                  <div className={payment.balance > 0 ? 'has-balance' : 'is-settled'}><span>{['Cancelled', 'Rejected'].includes(viewingBooking.status) ? 'Cancellation refund' : viewingBooking.status === 'No Show' ? 'Balance' : payment.balance > 0 ? 'Pay at venue' : 'Balance'}</span><strong>₱{(['Cancelled', 'Rejected'].includes(viewingBooking.status) ? payment.cancellationRefunded : payment.balance).toLocaleString()}</strong></div>
-                  <p>{viewingBooking.status === 'Cancelled' && cancellation.customerCancelled
+                  <div className={payment.balance > 0 ? 'has-balance' : 'is-settled'}><span>{isClosurePending(viewingBooking) ? 'Balance if rescheduled' : ['Cancelled', 'Rejected'].includes(viewingBooking.status) ? 'Cancellation refund' : viewingBooking.status === 'No Show' ? 'Balance' : payment.balance > 0 ? 'Pay at venue' : 'Balance'}</span><strong>₱{(['Cancelled', 'Rejected'].includes(viewingBooking.status) ? payment.cancellationRefunded : payment.balance).toLocaleString()}</strong></div>
+                  <p>{isClosurePending(viewingBooking) ? 'This date is closed. Choose a new date or cancel using the closure options below.'
+                    : viewingBooking.closureRefund ? 'Venue closure: the full amount paid is refundable. See the refund status below.'
+                    : viewingBooking.status === 'Cancelled' && cancellation.customerCancelled
                     ? viewingBooking.cancellationRefundException
                       ? cancellation.refundRemaining > 0
                         ? `A refund exception was approved. Contact admin to arrange the remaining ₱${cancellation.refundRemaining.toLocaleString()} manual refund.`
@@ -593,6 +632,11 @@ function ProfileModal({ open, onClose, reservationIntent }) {
               );
             })()}
 
+            <ClosureResolution key={viewingBooking._id} booking={viewingBooking} contactUrl={settings?.contact?.messengerUrl} onReschedule={() => setReschedulingBooking(viewingBooking)} onUpdated={updated => {
+              setBookings(previous => previous.map(item => item._id === updated._id ? { ...item, ...updated } : item));
+              setViewingBooking(previous => ({ ...previous, ...updated }));
+            }} />
+
             <div className="pf-detail-list">
               <div className="pf-detail-row">
                 <span className="pf-detail-label">Reservation code</span>
@@ -600,15 +644,15 @@ function ProfileModal({ open, onClose, reservationIntent }) {
               </div>
               <div className="pf-detail-row">
                 <span className="pf-detail-label">Reserved by</span>
-                <span className="pf-detail-value">{viewingBooking.guestName || '—'}</span>
+                <span className="pf-detail-value">{reservationDisplayName(viewingBooking.guestName)}</span>
               </div>
               <div className="pf-detail-row">
                 <span className="pf-detail-label">Contact no.</span>
-                <span className="pf-detail-value">{viewingBooking.guestContact || '—'}</span>
+                <span className="pf-detail-value">{guestPhoneDisplay(viewingBooking.guestContact)}</span>
               </div>
               <div className="pf-detail-row">
                 <span className="pf-detail-label">Email</span>
-                <span className="pf-detail-value">{viewingBooking.guestEmail || '—'}</span>
+                <span className="pf-detail-value">{viewingBooking.guestEmail || (String(viewingBooking.guestContact || '').includes('@') ? viewingBooking.guestContact : '—')}</span>
               </div>
               <div className="pf-detail-row">
                 <span className="pf-detail-label">Room</span>
@@ -676,7 +720,7 @@ function ProfileModal({ open, onClose, reservationIntent }) {
               <button type="button" className="pf-btn pf-btn-ghost" onClick={() => setViewingBooking(null)}>
                 Close
               </button>
-              {canRescheduleBooking(viewingBooking) && (
+              {canRescheduleBooking(viewingBooking) && !isClosurePending(viewingBooking) && (
                 <button
                   type="button"
                   className="pf-btn pf-btn-ghost"
@@ -685,7 +729,7 @@ function ProfileModal({ open, onClose, reservationIntent }) {
                   <i className="fa-solid fa-calendar-clock"></i> Reschedule
                 </button>
               )}
-              {viewingBooking.status === 'Confirmed' && ['Confirmed', 'Overdue'].includes(reservationPresentation(viewingBooking, clockMs).status) && viewingBooking.cancellationStatus !== 'Requested' && viewingBooking.cancellationStatus !== 'Approved' && (
+              {!isClosurePending(viewingBooking) && viewingBooking.status === 'Confirmed' && ['Confirmed', 'Overdue'].includes(reservationPresentation(viewingBooking, clockMs).status) && viewingBooking.cancellationStatus !== 'Requested' && viewingBooking.cancellationStatus !== 'Approved' && (
                 <button type="button" className="pf-btn pf-btn-ghost pf-btn-danger" onClick={() => setCancellingBooking(viewingBooking)}>
                   <i className="fa-solid fa-ban"></i> Request cancellation
                 </button>
@@ -706,6 +750,7 @@ function ProfileModal({ open, onClose, reservationIntent }) {
             setBookings((prev) => prev.map((b) => (b._id === updated._id ? { ...b, ...updated } : b)));
             setViewingBooking((v) => (v && v._id === updated._id ? { ...v, ...updated } : v));
             setReschedulingBooking(null);
+            refreshNotifications();
           }}
         />
       )}
@@ -730,12 +775,6 @@ function ProfileModal({ open, onClose, reservationIntent }) {
         <span id="pfToastMsg">{toast.message}</span>
       </div>
 
-      <LogoutConfirmDialog
-        open={showLogoutConfirm}
-        isGuest={!!authUser?.isGuest}
-        onConfirm={confirmLogout}
-        onCancel={() => setShowLogoutConfirm(false)}
-      />
     </ModalPortal>
   );
 }

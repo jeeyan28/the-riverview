@@ -32,7 +32,7 @@ One service-date ledger connects each reservation or walk-in to its exact facili
 
 - Paid services are limited to billiards, KTV, and court rental.
 - Online and live-monitor sessions use whole-hour increments only; customer bookings are 1–5 hours.
-- Pricing is calculated per facility type and per hour, including court time bands, VIP guest surcharges, and the flat corkage add-on.
+- Pricing is calculated per facility type and per hour, including court time bands, VIP guest surcharges, and optional services configured per facility.
 - Online downpayment confirms a reservation automatically. A confirmed reservation can retain an outstanding on-site balance.
 - Monitoring has its own daily, monthly, or custom-date operational report with time in, time out, hours, rate, charges, collected amount, balance, source, and payment status.
 - Forecasting is deterministic/statistical; it does not call an LLM.

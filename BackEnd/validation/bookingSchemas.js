@@ -5,6 +5,9 @@ const objectId = Joi.string().hex().length(24);
 const dateStr = Joi.string().pattern(/^\d{4}-\d{2}-\d{2}$/);
 const timeStr = Joi.string().pattern(/^(?:[01]\d|2[0-3]):00$/);
 const duration = Joi.number().integer().min(1).max(5);
+const guestPhone = Joi.string().trim().min(7).max(40).pattern(/^\+?[0-9() .-]+$/)
+  .custom((value, helpers) => value.replace(/\D/g, '').length >= 7 ? value : helpers.message('Phone number must contain at least 7 digits.'));
+const guestEmail = Joi.string().trim().lowercase().email({ tlds: { allow: false } }).max(254);
 const bookingIdParamsSchema = Joi.object({ id: objectId.required() });
 const emptyBodySchema = Joi.object({}).default({});
 
@@ -18,10 +21,9 @@ const lockSchema = Joi.object({
 
 const createBookingSchema = Joi.object({
   guestName: Joi.string().trim().min(1).max(120).required(),
-  guestContact: Joi.string().trim().allow("").max(120),
-  guestEmail: Joi.string().trim().allow("").max(120),
+  guestContact: guestPhone.required(),
+  guestEmail: guestEmail.required(),
   guestCount: Joi.number().integer().min(1).max(100),
-  hasCorkage: Joi.boolean().default(false),
   specialRequests: Joi.string().trim().allow("").max(500),
   roomId: objectId.required(),
   variantLabel: Joi.string().allow("", null),
@@ -29,6 +31,7 @@ const createBookingSchema = Joi.object({
   timeIn: timeStr.required(),
   duration: duration.required(),
   paymentMethod: Joi.string().trim().max(60).allow(""),
+  paymentChoice: Joi.string().valid("deposit", "full"),
   paidAmount: Joi.number().min(0).precision(2),
   status: Joi.string().valid("Pending", "Confirmed"),
 });
@@ -45,10 +48,9 @@ const updateBookingSchema = Joi.object({
   timeIn: timeStr,
   date: dateStr,
   guestName: Joi.string().trim().min(1).max(120),
-  guestEmail: Joi.string().trim().allow("").max(120),
-  guestContact: Joi.string().trim().allow("").max(120),
+  guestEmail,
+  guestContact: guestPhone,
   guestCount: Joi.number().integer().min(1).max(100),
-  hasCorkage: Joi.boolean(),
   downPayment: Joi.number().min(0),
   paymentStatus: Joi.string().valid(...Object.values(Booking.PAYMENT_STATUS)),
   paidAmount: Joi.number().min(0).precision(2),

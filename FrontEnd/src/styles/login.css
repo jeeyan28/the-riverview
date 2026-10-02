@@ -1,22 +1,3 @@
-.login-page, .claim-modal-scope{
-    --bg:#0D1726;
-    --card:rgba(16,24,40,.58);
-    --text:#ffffff;
-    --muted:#94A3B8;
-    --accent:#19D8C3;
-    --accent2:#26E6D1;
-    --border:rgba(255,255,255,.08);
-    --shadow:0 30px 80px rgba(0,0,0,.42);
-    --blur:28px;
-    --transition:.28s cubic-bezier(.22,.61,.36,1);
-    --ovl-04:rgba(255,255,255,.04);
-    --ovl-06:rgba(255,255,255,.06);
-    --ovl-07:rgba(255,255,255,.07);
-    --ovl-08:rgba(255,255,255,.08);
-    --ovl-14:rgba(255,255,255,.14);
-    --ovl-16:rgba(255,255,255,.16);
-    --muted-2:#6D829B;
-}
 .login-page{
     position: relative;
     width: 100%;
@@ -26,14 +7,14 @@
     color: var(--text);
 }
 
-:is(.login-page, .claim-modal-scope) .login-background{
+.login-page .login-background{
     position:absolute;
     inset:0;
     overflow:hidden;
     z-index:0;
 }
 
-:is(.login-page, .claim-modal-scope) .login-background-image{
+.login-page .login-background-image{
     position:absolute;
     inset:-3%;
     background-size:cover;
@@ -49,10 +30,10 @@
 }
 
 @media (prefers-reduced-motion: reduce){
-    :is(.login-page, .claim-modal-scope) .login-background-image{ animation: none; }
+    .login-page .login-background-image{ animation: none; }
 }
 
-:is(.login-page, .claim-modal-scope) .login-background-tint{
+.login-page .login-background-tint{
     position:absolute;
     inset:0;
     background:
@@ -63,7 +44,7 @@
     opacity:.6;
 }
 
-:is(.login-page, .claim-modal-scope) .login-background-overlay{
+.login-page .login-background-overlay{
     position:absolute;
     inset:0;
     background:
@@ -71,7 +52,7 @@
         linear-gradient(to bottom, rgba(9,16,27,.55) 0%, rgba(9,16,27,.05) 26%, rgba(9,16,27,.05) 68%, rgba(9,16,27,.75) 100%);
 }
 
-:is(.login-page, .claim-modal-scope) .login-header{
+.login-page .login-header{
     position:absolute;
     top:0;
     left:0;
@@ -83,7 +64,7 @@
     z-index:10;
 }
 
-:is(.login-page, .claim-modal-scope) .login-brand .login-logo{
+.login-page .login-brand .login-logo{
     width:40px !important;
     height:40px !important;
     max-width:40px !important;
@@ -94,17 +75,17 @@
     flex-shrink:0;
 }
 
-:is(.login-page, .claim-modal-scope) .login-brand{
+.login-page .login-brand{
     display:flex;
     align-items:center;
     gap:12px;
 }
 
-:is(.login-page, .claim-modal-scope) .login-brand-title{
+.login-page .login-brand-title{
     letter-spacing:-.02em;
 }
 
-:is(.login-page, .claim-modal-scope) .login-layout{
+.login-page .login-layout{
     position:relative;
     z-index:2;
     display:grid;
@@ -116,14 +97,14 @@
     padding: 100px 64px 64px;
 }
 
-:is(.login-page, .claim-modal-scope) .login-copy{
+.login-page .login-copy{
     max-width:480px;
     padding-right:80px;
     animation:fadeUp .5s var(--ease-out, ease);
     text-shadow: 0 2px 24px rgba(0,0,0,.35);
 }
 
-:is(.login-page, .claim-modal-scope) .login-badge{
+.login-page .login-badge{
     display:inline-flex;
     align-items:center;
     padding: 8px 14px;
@@ -137,7 +118,7 @@
     margin-bottom:28px;
 }
 
-:is(.login-page, .claim-modal-scope) .login-copy h1{
+.login-page .login-copy h1{
     font-size:clamp(3rem,5vw,4.8rem);
     line-height:1.02;
     letter-spacing:-.05em;
@@ -145,14 +126,14 @@
     margin:0 0 24px;
 }
 
-:is(.login-page, .claim-modal-scope) .login-copy p{
+.login-page .login-copy p{
     font-size:1.08rem;
     color:var(--muted);
     line-height:1.8;
     max-width:420px;
 }
 
-:is(.login-page, .claim-modal-scope) .login-card{
+.login-page .login-card{
     width:100%;
     max-width:440px;
     margin-left:auto;
@@ -168,7 +149,7 @@
     flex-direction:column;
 }
 
-:is(.login-page, .claim-modal-scope) .login-avatar{
+.login-page .login-avatar{
     width:40px;
     height:40px;
     border-radius:50%;
@@ -181,7 +162,7 @@
     margin-bottom:14px;
 }
 
-:is(.login-page, .claim-modal-scope) .login-card-header{
+.login-page .login-card-header{
     margin-bottom:22px;
     flex-shrink:0;
 }
@@ -224,19 +205,19 @@
     line-height:1.42;
 }
 
-:is(.login-page, .claim-modal-scope) .login-card-header h2 .wave{
+.login-page .login-card-header h2 .wave{
     display:inline-block;
     font-size:.85em;
 }
 
-:is(.login-page, .claim-modal-scope) .auth-card-inner{
+.login-page .auth-card-inner{
     display:flex;
     flex-direction:column;
     flex:1 1 auto;
     min-height:0;
 }
 
-:is(.login-page, .claim-modal-scope) .auth-card-body{
+.login-page .auth-card-body{
     flex:1 1 auto;
     min-height:0;
     overflow-y:auto;
@@ -245,11 +226,11 @@
     margin-right:-6px;
 }
 
-:is(.login-page, .claim-modal-scope) .auth-card-inner.slide-to-register{
+.login-page .auth-card-inner.slide-to-register{
     animation:authSlideInRight .24s var(--ease-out, ease);
 }
 
-:is(.login-page, .claim-modal-scope) .auth-card-inner.slide-to-login{
+.login-page .auth-card-inner.slide-to-login{
     animation:authSlideInLeft .24s var(--ease-out, ease);
 }
 
@@ -275,36 +256,36 @@
     }
 }
 
-:is(.login-page, .claim-modal-scope) .auth-card-body{
+.login-page .auth-card-body{
     scrollbar-width:thin;
     scrollbar-color:rgba(25,216,195,.45) transparent;
 }
 
-:is(.login-page, .claim-modal-scope) .auth-card-body::-webkit-scrollbar{
+.login-page .auth-card-body::-webkit-scrollbar{
     width:6px;
 }
 
-:is(.login-page, .claim-modal-scope) .auth-card-body::-webkit-scrollbar-track{
+.login-page .auth-card-body::-webkit-scrollbar-track{
     background:transparent;
 }
 
-:is(.login-page, .claim-modal-scope) .auth-card-body::-webkit-scrollbar-thumb{
+.login-page .auth-card-body::-webkit-scrollbar-thumb{
     background:rgba(25,216,195,.45);
     border-radius:999px;
 }
 
-:is(.login-page, .claim-modal-scope) .auth-card-body::-webkit-scrollbar-thumb:hover{
+.login-page .auth-card-body::-webkit-scrollbar-thumb:hover{
     background:rgba(25,216,195,.7);
 }
 
-:is(.login-page, .claim-modal-scope) .login-card-header h2{
+.login-page .login-card-header h2{
     font-size:1.6rem;
     font-weight:700;
     margin-bottom:6px;
     letter-spacing:-.03em;
 }
 
-:is(.login-page, .claim-modal-scope) .login-card-header p{
+.login-page .login-card-header p{
     color:var(--muted);
     line-height:1.5;
     font-size:.92rem;
@@ -321,22 +302,22 @@
     }
 }
 
-:is(.login-page, .claim-modal-scope) .profile-tab { color: var(--muted); }
-:is(.login-page, .claim-modal-scope) .profile-tab.active { color: var(--text); border-color: var(--accent); }
+.login-page .profile-tab { color: var(--muted); }
+.login-page .profile-tab.active { color: var(--text); border-color: var(--accent); }
 
-:is(.login-page, .claim-modal-scope) .login-form{
+.login-page .login-form{
     display:flex;
     flex-direction:column;
     gap:15px;
 }
 
-:is(.login-page, .claim-modal-scope) .field{
+.login-page .field{
     display:flex;
     flex-direction:column;
     gap:7px;
 }
 
-:is(.login-page, .claim-modal-scope) .field label{
+.login-page .field label{
     font-size:.78rem;
     font-weight:600;
     letter-spacing:.08em;
@@ -344,11 +325,11 @@
     color:var(--muted);
 }
 
-:is(.login-page, .claim-modal-scope) .input-wrap{
+.login-page .input-wrap{
     position:relative;
 }
 
-:is(.login-page, .claim-modal-scope) .input-icon{
+.login-page .input-icon{
     position:absolute;
     left:16px;
     top:50%;
@@ -358,7 +339,7 @@
     pointer-events:none;
 }
 
-:is(.login-page, .claim-modal-scope) .field input{
+.login-page .field input{
     width:100%;
     height:46px;
     padding: 0 16px 0 46px;
@@ -371,25 +352,25 @@
     transition:var(--transition);
 }
 
-:is(.login-page, .claim-modal-scope) .field input::placeholder{
+.login-page .field input::placeholder{
     color:var(--muted-2);
 }
 
-:is(.login-page, .claim-modal-scope) .field input:focus{
+.login-page .field input:focus{
     border-color:rgba(25,216,195,.65);
     background: var(--ovl-06);
     box-shadow: 0 0 0 4px rgba(25,216,195,.10);
 }
 
-:is(.login-page, .claim-modal-scope) .input-wrap:focus-within .input-icon{
+.login-page .input-wrap:focus-within .input-icon{
     color:var(--accent);
 }
 
-:is(.login-page, .claim-modal-scope) .input-wrap:has(.toggle-pw) input{
+.login-page .input-wrap:has(.toggle-pw) input{
     padding-right:42px;
 }
 
-:is(.login-page, .claim-modal-scope) .toggle-pw{
+.login-page .toggle-pw{
     position:absolute;
     right:14px;
     top:50%;
@@ -404,26 +385,26 @@
     transition:var(--transition);
 }
 
-:is(.login-page, .claim-modal-scope) .toggle-pw:hover{
+.login-page .toggle-pw:hover{
     color:var(--accent);
 }
 
-:is(.login-page, .claim-modal-scope) .field.has-error input{
+.login-page .field.has-error input{
     border-color:#FF6B6B;
 }
 
-:is(.login-page, .claim-modal-scope) .field-error{
+.login-page .field-error{
     font-size:.78rem;
     color:#FF6B6B;
 }
 
-:is(.login-page, .claim-modal-scope) .password-row{
+.login-page .password-row{
     display:flex;
     justify-content:space-between;
     align-items:center;
 }
 
-:is(.login-page, .claim-modal-scope) .forgot-link{
+.login-page .forgot-link{
     color:var(--accent);
     font-size:.82rem;
     transition:var(--transition);
@@ -434,11 +415,11 @@
     cursor:pointer;
 }
 
-:is(.login-page, .claim-modal-scope) .forgot-link:hover{
+.login-page .forgot-link:hover{
     opacity:.75;
 }
 
-:is(.login-page, .claim-modal-scope) .forgot-modal-backdrop{
+.login-page .forgot-modal-backdrop{
     position:fixed;
     inset:0;
     z-index:100;
@@ -457,7 +438,7 @@
     to{ opacity:1; }
 }
 
-:is(.login-page, .claim-modal-scope) .forgot-modal{
+.login-page .forgot-modal{
     position:relative;
     width:100%;
     max-width:440px;
@@ -478,7 +459,7 @@
     }
 }
 
-:is(.login-page, .claim-modal-scope) .forgot-modal-close{
+.login-page .forgot-modal-close{
     position:absolute;
     top:20px;
     right:20px;
@@ -496,18 +477,18 @@
     transition:var(--transition);
 }
 
-:is(.login-page, .claim-modal-scope) .forgot-modal-close:hover{
+.login-page .forgot-modal-close:hover{
     color:var(--text);
     border-color:var(--ovl-16);
     background:var(--ovl-07);
 }
 
-:is(.login-page, .claim-modal-scope) .otp-input-group{
+.login-page .otp-input-group{
     display:flex;
     gap:10px;
 }
 
-:is(.login-page, .claim-modal-scope) .otp-input-group .otp-input{
+.login-page .otp-input-group .otp-input{
     width:100%;
     height:56px;
     padding:0;
@@ -522,36 +503,36 @@
     transition:var(--transition);
 }
 
-:is(.login-page, .claim-modal-scope) .otp-input-group .otp-input:focus{
+.login-page .otp-input-group .otp-input:focus{
     outline:none;
     border-color:rgba(25,216,195,.65);
     background:var(--ovl-06);
     box-shadow:0 0 0 4px rgba(25,216,195,.10);
 }
 
-:is(.login-page, .claim-modal-scope) .otp-expiry{
+.login-page .otp-expiry{
     font-size:.78rem;
     color:var(--muted);
 }
 
-:is(.login-page, .claim-modal-scope) .signup-row .link-button:disabled{
+.login-page .signup-row .link-button:disabled{
     color:var(--muted);
     cursor:not-allowed;
     opacity:.7;
 }
 
-:is(.login-page, .claim-modal-scope) .signup-row .link-button:disabled:hover{
+.login-page .signup-row .link-button:disabled:hover{
     text-decoration:none;
 }
 
-:is(.login-page, .claim-modal-scope) .forgot-success{
+.login-page .forgot-success{
     display:flex;
     flex-direction:column;
     align-items:center;
     text-align:center;
 }
 
-:is(.login-page, .claim-modal-scope) .forgot-success-icon{
+.login-page .forgot-success-icon{
     width:56px;
     height:56px;
     border-radius:50%;
@@ -566,7 +547,7 @@
     font-weight:700;
 }
 
-:is(.login-page, .claim-modal-scope) .password-requirements{
+.login-page .password-requirements{
     list-style:none;
     margin:8px 0 0;
     padding:0;
@@ -575,7 +556,7 @@
     gap:4px 12px;
 }
 
-:is(.login-page, .claim-modal-scope) .password-requirements li{
+.login-page .password-requirements li{
     display:flex;
     align-items:center;
     gap:6px;
@@ -584,35 +565,35 @@
     transition:color .15s ease;
 }
 
-:is(.login-page, .claim-modal-scope) .password-requirements li.met{
+.login-page .password-requirements li.met{
     color:var(--accent);
 }
 
-:is(.login-page, .claim-modal-scope) .password-requirements .requirement-icon{
+.login-page .password-requirements .requirement-icon{
     font-size:.68rem;
     line-height:1;
     min-width:1em;
 }
 
-:is(.login-page, .claim-modal-scope) .btn-submit:focus-visible,
-:is(.login-page, .claim-modal-scope) .btn-social:focus-visible,
-:is(.login-page, .claim-modal-scope) .forgot-link:focus-visible,
-:is(.login-page, .claim-modal-scope) .custom-check:focus-visible{
+.login-page .btn-submit:focus-visible,
+.login-page .btn-social:focus-visible,
+.login-page .forgot-link:focus-visible,
+.login-page .custom-check:focus-visible{
     outline:2px solid var(--accent);
     outline-offset:2px;
 }
 
-:is(.login-page, .claim-modal-scope) .btn-submit:disabled{
+.login-page .btn-submit:disabled{
     opacity:.5;
     cursor:not-allowed;
 }
 
-:is(.login-page, .claim-modal-scope) .forgot-modal-actions{
+.login-page .forgot-modal-actions{
     display:flex;
     gap:12px;
 }
 
-:is(.login-page, .claim-modal-scope) .forgot-modal-actions .btn-cancel{
+.login-page .forgot-modal-actions .btn-cancel{
     flex:1;
     height:56px;
     border-radius:16px;
@@ -625,30 +606,30 @@
     transition:var(--transition);
 }
 
-:is(.login-page, .claim-modal-scope) .forgot-modal-actions .btn-cancel:hover{
+.login-page .forgot-modal-actions .btn-cancel:hover{
     background:var(--ovl-07);
     border-color:var(--ovl-16);
 }
 
-:is(.login-page, .claim-modal-scope) .forgot-modal-actions .btn-submit{
+.login-page .forgot-modal-actions .btn-submit{
     flex:1.4;
 }
 
-:is(.login-page, .claim-modal-scope) .remember-row{
+.login-page .remember-row{
     display:flex;
     align-items:center;
     gap:10px;
     margin-top:-4px;
 }
 
-:is(.login-page, .claim-modal-scope) .remember-label{
+.login-page .remember-label{
     font-size:.83rem;
     color:var(--muted);
     user-select:none;
     cursor:pointer;
 }
 
-:is(.login-page, .claim-modal-scope) .custom-check{
+.login-page .custom-check{
     width:18px;
     height:18px;
     border-radius:5px;
@@ -662,20 +643,20 @@
     flex-shrink:0;
 }
 
-:is(.login-page, .claim-modal-scope) .custom-check.checked{
+.login-page .custom-check.checked{
     background:var(--accent);
     border-color:var(--accent);
 }
 
-:is(.login-page, .claim-modal-scope) .custom-check svg{
+.login-page .custom-check svg{
     display:none;
 }
 
-:is(.login-page, .claim-modal-scope) .custom-check.checked svg{
+.login-page .custom-check.checked svg{
     display:block;
 }
 
-:is(.login-page, .claim-modal-scope) .btn-submit{
+.login-page .btn-submit{
     width:100%;
     height:48px;
     border:none;
@@ -694,30 +675,30 @@
     gap:8px;
 }
 
-:is(.login-page, .claim-modal-scope) .btn-submit .btn-text{
+.login-page .btn-submit .btn-text{
     display:flex;
     align-items:center;
     gap:8px;
 }
 
-:is(.login-page, .claim-modal-scope) .btn-submit:hover{
+.login-page .btn-submit:hover{
     transform:translateY(-2px);
     box-shadow: 0 20px 50px rgba(25,216,195,.28);
 }
 
-:is(.login-page, .claim-modal-scope) .btn-submit:active{
+.login-page .btn-submit:active{
     transform:translateY(0);
 }
 
-:is(.login-page, .claim-modal-scope) .btn-text{
+.login-page .btn-text{
     transition:.25s;
 }
 
-:is(.login-page, .claim-modal-scope) .btn-submit.loading .btn-text{
+.login-page .btn-submit.loading .btn-text{
     opacity:0;
 }
 
-:is(.login-page, .claim-modal-scope) .btn-spinner{
+.login-page .btn-spinner{
     position:absolute;
     inset:0;
     display:flex;
@@ -727,11 +708,11 @@
     transition:.2s;
 }
 
-:is(.login-page, .claim-modal-scope) .btn-submit.loading .btn-spinner{
+.login-page .btn-submit.loading .btn-spinner{
     opacity:1;
 }
 
-:is(.login-page, .claim-modal-scope) .spinner-ring{
+.login-page .spinner-ring{
     width:18px;
     height:18px;
     border-radius:50%;
@@ -746,7 +727,7 @@
     }
 }
 
-:is(.login-page, .claim-modal-scope) .divider{
+.login-page .divider{
     display:flex;
     align-items:center;
     gap:14px;
@@ -757,15 +738,15 @@
     margin:-2px 0;
 }
 
-:is(.login-page, .claim-modal-scope) .divider::before,
-:is(.login-page, .claim-modal-scope) .divider::after{
+.login-page .divider::before,
+.login-page .divider::after{
     content:"";
     flex:1;
     height:1px;
     background: var(--ovl-08);
 }
 
-:is(.login-page, .claim-modal-scope) .btn-social{
+.login-page .btn-social{
     width:100%;
     height:48px;
     border-radius:13px;
@@ -783,58 +764,32 @@
     transition:var(--transition);
 }
 
-:is(.login-page, .claim-modal-scope) .btn-social .btn-social-label{
+.login-page .btn-social .btn-social-label{
     display:flex;
     align-items:center;
     gap:10px;
 }
 
-:is(.login-page, .claim-modal-scope) .btn-social .btn-social-arrow{
+.login-page .btn-social .btn-social-arrow{
     color:#8A9BB0;
     display:flex;
 }
 
-:is(.login-page, .claim-modal-scope) .btn-social:hover{
+.login-page .btn-social:hover{
     background: #f2f2f2;
     border-color: var(--ovl-16);
     transform:translateY(-2px);
 }
 
-:is(.login-page, .claim-modal-scope) .btn-guest{
-    width:100%;
-    height:44px;
-    border-radius:13px;
-    border: 1px solid var(--ovl-08);
-    background: transparent;
-    color:var(--muted);
-    font-size:.86rem;
-    font-weight:600;
-    display:flex;
-    justify-content:center;
-    align-items:center;
-    cursor:pointer;
-    transition:var(--transition);
-}
-
-:is(.login-page, .claim-modal-scope) .btn-guest:hover{
-    background: var(--ovl-08);
-    color:#1a1a1a;
-}
-
-:is(.login-page, .claim-modal-scope) .btn-guest:disabled{
-    opacity:.6;
-    cursor:not-allowed;
-}
-
-:is(.login-page, .claim-modal-scope) .signup-row{
+.login-page .signup-row{
     margin-top:2px;
     text-align:center;
     color:var(--muted);
     font-size:.86rem;
 }
 
-:is(.login-page, .claim-modal-scope) .signup-row a,
-:is(.login-page, .claim-modal-scope) .signup-row .link-button{
+.login-page .signup-row a,
+.login-page .signup-row .link-button{
     color:var(--accent);
     font-weight:600;
     background:none;
@@ -845,54 +800,54 @@
     cursor:pointer;
 }
 
-:is(.login-page, .claim-modal-scope) .signup-row a:hover,
-:is(.login-page, .claim-modal-scope) .signup-row .link-button:hover{
+.login-page .signup-row a:hover,
+.login-page .signup-row .link-button:hover{
     text-decoration:underline;
 }
 
 @media (max-width:1080px){
-    :is(.login-page, .claim-modal-scope) .login-layout{
+    .login-page .login-layout{
         grid-template-columns:1fr;
         justify-items:center;
         text-align:center;
         padding:120px 32px 48px;
         gap:48px;
     }
-    :is(.login-page, .claim-modal-scope) .login-copy{
+    .login-page .login-copy{
         padding-right:0;
         max-width:560px;
     }
-    :is(.login-page, .claim-modal-scope) .login-copy p{
+    .login-page .login-copy p{
         margin:0 auto;
     }
-    :is(.login-page, .claim-modal-scope) .login-card{
+    .login-page .login-card{
         margin-left:0;
     }
 }
 
 @media (max-width:640px){
-    :is(.login-page, .claim-modal-scope) .login-header{
+    .login-page .login-header{
         padding:0 20px;
     }
-    :is(.login-page, .claim-modal-scope) .login-layout{
+    .login-page .login-layout{
         padding:100px 20px 32px;
     }
-    :is(.login-page, .claim-modal-scope) .login-copy h1{
+    .login-page .login-copy h1{
         font-size:clamp(2.2rem,10vw,3rem);
     }
-    :is(.login-page, .claim-modal-scope) .login-card{
+    .login-page .login-card{
         padding:24px;
         border-radius:20px;
     }
-    :is(.login-page, .claim-modal-scope) .forgot-modal-backdrop{
+    .login-page .forgot-modal-backdrop{
         padding:max(12px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) max(12px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left));
     }
-    :is(.login-page, .claim-modal-scope) .forgot-modal{
+    .login-page .forgot-modal{
         max-height:calc(100dvh - 24px);
     }
 }
 
-:is(.login-page, .claim-modal-scope) .rf-scope {
+.login-page .rf-scope {
     --navy:    #0A1628;
     --surface-alt: #16243f;
     --card-light: #1c2c4a;
@@ -903,19 +858,19 @@
     font-family: 'Inter', sans-serif;
 }
 
-:is(.login-page, .claim-modal-scope) .rf-scope .signup-form {
+.login-page .rf-scope .signup-form {
     display: flex;
     flex-direction: column;
     gap: 1rem;
 }
 
-:is(.login-page, .claim-modal-scope) .rf-scope .field {
+.login-page .rf-scope .field {
     display: flex;
     flex-direction: column;
     gap: .4rem;
 }
 
-:is(.login-page, .claim-modal-scope) .rf-scope .field label {
+.login-page .rf-scope .field label {
     font-size: .78rem;
     font-weight: 600;
     color: var(--muted);
@@ -923,11 +878,11 @@
     text-transform: uppercase;
 }
 
-:is(.login-page, .claim-modal-scope) .rf-scope .input-wrap {
+.login-page .rf-scope .input-wrap {
     position: relative;
 }
 
-:is(.login-page, .claim-modal-scope) .rf-scope .input-wrap .input-icon {
+.login-page .rf-scope .input-wrap .input-icon {
     position: absolute;
     left: 1rem;
     top: 50%;
@@ -938,7 +893,7 @@
     transition: color .2s;
 }
 
-:is(.login-page, .claim-modal-scope) .rf-scope .field input:not(.otp-input) {
+.login-page .rf-scope .field input:not(.otp-input) {
     width: 100%;
     height: 56px;
     background: var(--surface-alt);
@@ -955,24 +910,24 @@
     appearance: none;
 }
 
-:is(.login-page, .claim-modal-scope) .rf-scope .field input::placeholder { color: #4a5d72; }
-:is(.login-page, .claim-modal-scope) .rf-scope .field input:not(.otp-input):focus {
+.login-page .rf-scope .field input::placeholder { color: #4a5d72; }
+.login-page .rf-scope .field input:not(.otp-input):focus {
     border-color: var(--teal);
     background: var(--card-light);
     box-shadow: var(--glow-teal, 0 0 0 4px rgba(0,201,167,.14));
 }
 
-:is(.login-page, .claim-modal-scope) .rf-scope .input-wrap:focus-within .input-icon { color: var(--teal); }
-:is(.login-page, .claim-modal-scope) .rf-scope .input-wrap:has(.toggle-pw) input { padding-right: 2.75rem; }
-:is(.login-page, .claim-modal-scope) .rf-scope .field-error {
+.login-page .rf-scope .input-wrap:focus-within .input-icon { color: var(--teal); }
+.login-page .rf-scope .input-wrap:has(.toggle-pw) input { padding-right: 2.75rem; }
+.login-page .rf-scope .field-error {
     font-size: .75rem;
     color: var(--error);
     display: none;
 }
 
-:is(.login-page, .claim-modal-scope) .rf-scope .field.has-error input { border-color: var(--error); }
-:is(.login-page, .claim-modal-scope) .rf-scope .field.has-error .field-error { display: block; }
-:is(.login-page, .claim-modal-scope) .rf-scope .password-requirements {
+.login-page .rf-scope .field.has-error input { border-color: var(--error); }
+.login-page .rf-scope .field.has-error .field-error { display: block; }
+.login-page .rf-scope .password-requirements {
     list-style: none;
     margin: 0;
     padding: 0;
@@ -981,7 +936,7 @@
     gap: .3rem;
 }
 
-:is(.login-page, .claim-modal-scope) .rf-scope .password-requirements li {
+.login-page .rf-scope .password-requirements li {
     display: flex;
     align-items: center;
     gap: .5rem;
@@ -991,14 +946,14 @@
     transition: color .15s ease;
 }
 
-:is(.login-page, .claim-modal-scope) .rf-scope .password-requirements li.met { color: var(--teal); }
-:is(.login-page, .claim-modal-scope) .rf-scope .password-requirements .requirement-icon {
+.login-page .rf-scope .password-requirements li.met { color: var(--teal); }
+.login-page .rf-scope .password-requirements .requirement-icon {
     font-size: .7rem;
     line-height: 1;
     min-width: 1em;
 }
 
-:is(.login-page, .claim-modal-scope) .rf-scope .toggle-pw {
+.login-page .rf-scope .toggle-pw {
     position: absolute;
     right: .9rem;
     top: 50%;
@@ -1013,14 +968,14 @@
     line-height: 1;
 }
 
-:is(.login-page, .claim-modal-scope) .rf-scope .toggle-pw:hover { color: var(--teal); }
-:is(.login-page, .claim-modal-scope) .rf-scope .terms-row {
+.login-page .rf-scope .toggle-pw:hover { color: var(--teal); }
+.login-page .rf-scope .terms-row {
     display: flex;
     align-items: flex-start;
     gap: .6rem;
 }
 
-:is(.login-page, .claim-modal-scope) .rf-scope .custom-check {
+.login-page .rf-scope .custom-check {
     width: 18px;
     height: 18px;
     min-width: 18px;
@@ -1036,15 +991,15 @@
     margin-top: 2px;
 }
 
-:is(.login-page, .claim-modal-scope) .rf-scope .custom-check.checked {
+.login-page .rf-scope .custom-check.checked {
     background: var(--teal);
     border-color: var(--teal);
 }
 
-:is(.login-page, .claim-modal-scope) .rf-scope .custom-check svg { display: none; }
-:is(.login-page, .claim-modal-scope) .rf-scope .custom-check.checked svg { display: block; }
-:is(.login-page, .claim-modal-scope) .rf-scope #terms-input { display: none; }
-:is(.login-page, .claim-modal-scope) .rf-scope .terms-label {
+.login-page .rf-scope .custom-check svg { display: none; }
+.login-page .rf-scope .custom-check.checked svg { display: block; }
+.login-page .rf-scope #terms-input { display: none; }
+.login-page .rf-scope .terms-label {
     font-size: .82rem;
     color: var(--muted);
     cursor: pointer;
@@ -1052,7 +1007,7 @@
     line-height: 1.5;
 }
 
-:is(.login-page, .claim-modal-scope) .rf-scope .terms-label button {
+.login-page .rf-scope .terms-label button {
     padding: 0;
     border: 0;
     background: transparent;
@@ -1061,8 +1016,8 @@
     font-weight: 600;
     cursor: pointer;
 }
-:is(.login-page, .claim-modal-scope) .rf-scope .terms-label button:hover { text-decoration: underline; }
-:is(.login-page, .claim-modal-scope) .rf-scope .divider {
+.login-page .rf-scope .terms-label button:hover { text-decoration: underline; }
+.login-page .rf-scope .divider {
     display: flex;
     align-items: center;
     gap: .75rem;
@@ -1070,14 +1025,14 @@
     font-size: .75rem;
 }
 
-:is(.login-page, .claim-modal-scope) .rf-scope .divider::before, :is(.login-page, .claim-modal-scope) .rf-scope .divider::after {
+.login-page .rf-scope .divider::before, .login-page .rf-scope .divider::after {
     content: '';
     flex: 1;
     height: 1px;
     background: var(--border);
 }
 
-:is(.login-page, .claim-modal-scope) .rf-scope .btn-submit {
+.login-page .rf-scope .btn-submit {
     width: 100%;
     height: 56px;
     background: var(--teal);
@@ -1096,24 +1051,24 @@
     overflow: hidden;
 }
 
-:is(.login-page, .claim-modal-scope) .rf-scope .btn-submit:hover {
+.login-page .rf-scope .btn-submit:hover {
     opacity: .88;
     transform: translateY(-1px);
     box-shadow: var(--shadow-soft, 0 8px 24px rgba(10,22,40,.06));
 }
 
-:is(.login-page, .claim-modal-scope) .rf-scope .btn-submit:active { transform: scale(.98); }
-:is(.login-page, .claim-modal-scope) .rf-scope .btn-submit:disabled {
+.login-page .rf-scope .btn-submit:active { transform: scale(.98); }
+.login-page .rf-scope .btn-submit:disabled {
     opacity: .4;
     cursor: not-allowed;
     transform: none;
     box-shadow: none;
 }
 
-:is(.login-page, .claim-modal-scope) .rf-scope .btn-submit.loading { pointer-events: none; }
-:is(.login-page, .claim-modal-scope) .rf-scope .btn-submit .btn-text { transition: opacity .2s; }
-:is(.login-page, .claim-modal-scope) .rf-scope .btn-submit.loading .btn-text { opacity: 0; }
-:is(.login-page, .claim-modal-scope) .rf-scope .btn-spinner {
+.login-page .rf-scope .btn-submit.loading { pointer-events: none; }
+.login-page .rf-scope .btn-submit .btn-text { transition: opacity .2s; }
+.login-page .rf-scope .btn-submit.loading .btn-text { opacity: 0; }
+.login-page .rf-scope .btn-spinner {
     position: absolute;
     inset: 0;
     display: flex;
@@ -1123,8 +1078,8 @@
     transition: opacity .2s;
 }
 
-:is(.login-page, .claim-modal-scope) .rf-scope .btn-submit.loading .btn-spinner { opacity: 1; }
-:is(.login-page, .claim-modal-scope) .rf-scope .spinner-ring {
+.login-page .rf-scope .btn-submit.loading .btn-spinner { opacity: 1; }
+.login-page .rf-scope .spinner-ring {
     width: 20px;
     height: 20px;
     border: 2px solid rgba(10,22,40,.3);
@@ -1134,7 +1089,7 @@
 }
 
 @keyframes rf-spin { to { transform: rotate(360deg); } }
-:is(.login-page, .claim-modal-scope) .rf-scope .btn-social {
+.login-page .rf-scope .btn-social {
     width: 100%;
     height: 56px;
     background: #ffffff;
@@ -1155,21 +1110,21 @@
     box-shadow var(--dur-fast, .2s) var(--ease-out, ease);
 }
 
-:is(.login-page, .claim-modal-scope) .rf-scope .btn-social:hover {
+.login-page .rf-scope .btn-social:hover {
     background: #f2f2f2;
     border-color: rgba(10,22,40,.16);
     transform: translateY(-1px);
     box-shadow: var(--shadow-soft, 0 8px 24px rgba(10,22,40,.06));
 }
 
-:is(.login-page, .claim-modal-scope) .rf-scope .login-row {
+.login-page .rf-scope .login-row {
     text-align: center;
     font-size: .83rem;
     color: var(--muted);
 }
 
-:is(.login-page, .claim-modal-scope) .rf-scope .login-row a,
-:is(.login-page, .claim-modal-scope) .rf-scope .login-row .link-button {
+.login-page .rf-scope .login-row a,
+.login-page .rf-scope .login-row .link-button {
     color: var(--teal);
     font-weight: 600;
     background: none;
@@ -1180,8 +1135,8 @@
     cursor: pointer;
 }
 
-:is(.login-page, .claim-modal-scope) .rf-scope .login-row a:hover,
-:is(.login-page, .claim-modal-scope) .rf-scope .login-row .link-button:hover { text-decoration: underline; }
+.login-page .rf-scope .login-row a:hover,
+.login-page .rf-scope .login-row .link-button:hover { text-decoration: underline; }
 
 :is(.login-page) .login-background{
     transition:opacity .24s var(--ease-out, ease);

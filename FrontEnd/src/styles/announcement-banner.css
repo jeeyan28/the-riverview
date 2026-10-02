@@ -1,0 +1,201 @@
+.public-site #site-header {
+  top: var(--announcement-height, 0px);
+}
+
+.public-site > main {
+  padding-top: var(--announcement-height, 0px);
+}
+
+.public-site section[id] {
+  scroll-margin-top: calc(var(--header-h) + var(--announcement-height, 0px) + var(--space-4));
+}
+
+.public-site .announcement-banner {
+  position: fixed;
+  inset: 0 0 auto;
+  z-index: 201;
+  background: var(--teal);
+  color: var(--teal-ink);
+}
+
+.public-site .announcement-banner-inner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  min-height: 52px;
+  padding: var(--space-1) max(var(--page-gutter), env(safe-area-inset-right)) var(--space-1) max(var(--page-gutter), env(safe-area-inset-left));
+}
+
+.public-site .announcement-banner-label {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: var(--space-2);
+  padding-right: var(--space-4);
+  border-right: 1px solid color-mix(in srgb, var(--teal-ink) 28%, transparent);
+  font-size: .72rem;
+  font-weight: 750;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.public-site .announcement-banner-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.public-site .announcement-banner-copy {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: .82rem;
+  line-height: 1.5;
+}
+
+.public-site .announcement-banner-copy strong {
+  font-weight: 750;
+}
+
+.public-site .announcement-banner-message::before {
+  content: '\00b7';
+  margin-inline: var(--space-2);
+}
+
+.public-site .announcement-banner-actions,
+.public-site .announcement-banner-pagination {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: var(--space-1);
+}
+
+.public-site .announcement-banner button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  min-width: 44px;
+  min-height: 44px;
+  padding: var(--space-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: inherit;
+  font-size: .75rem;
+  font-weight: 700;
+}
+
+.public-site .announcement-banner button:focus-visible {
+  outline: 2px solid var(--teal-ink);
+  outline-offset: -4px;
+}
+
+.public-site .announcement-banner-count {
+  min-width: 32px;
+  text-align: center;
+  font-size: .72rem;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+.public-site .announcement-banner-dismiss {
+  margin-left: var(--space-2);
+}
+
+.public-site .announcement-banner-progress {
+  position: absolute;
+  inset: auto 0 0;
+  height: 3px;
+  background: color-mix(in srgb, var(--teal-ink) 18%, transparent);
+  overflow: hidden;
+}
+
+.public-site .announcement-banner-progress > span {
+  display: block;
+  height: 100%;
+  background: color-mix(in srgb, var(--teal-ink) 70%, transparent);
+  transform-origin: left center;
+  animation: announcement-countdown linear both;
+}
+
+@keyframes announcement-countdown {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .public-site .announcement-banner-progress > span { animation: none; }
+}
+
+.public-site .announcement-banner.is-expanded .announcement-banner-inner {
+  align-items: flex-start;
+  padding-block: var(--space-2);
+  max-height: min(360px, 45dvh);
+  overflow-y: auto;
+}
+
+.public-site .announcement-banner.is-expanded .announcement-banner-label {
+  min-height: 44px;
+}
+
+.public-site .announcement-banner.is-expanded .announcement-banner-content {
+  padding-block: var(--space-3);
+}
+
+.public-site .announcement-banner.is-expanded .announcement-banner-copy {
+  overflow: visible;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.public-site .announcement-banner.is-expanded .announcement-banner-message {
+  display: block;
+  margin-top: var(--space-1);
+  white-space: pre-line;
+}
+
+.public-site .announcement-banner.is-expanded .announcement-banner-message::before {
+  content: none;
+}
+
+.public-site .announcement-banner.is-expanded .announcement-banner-expand svg {
+  transform: rotate(180deg);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .public-site .announcement-banner button:hover {
+    background: color-mix(in srgb, var(--teal-ink) 12%, transparent);
+  }
+}
+
+@media (max-width: 1200px) {
+  .public-site .mobile-header-actions .announcements-bell {
+    position: static;
+  }
+
+  .public-site #announcements-panel-mobile {
+    position: absolute;
+    top: calc(100% + var(--space-2));
+    right: max(var(--space-3), env(safe-area-inset-right));
+    max-height: calc(100dvh - var(--header-h) - var(--announcement-height, 0px) - var(--app-nav-height, 0px) - var(--space-6));
+  }
+}
+
+@media (max-width: 900px) {
+  .public-site .announcement-banner-inner { gap: var(--space-2); }
+  .public-site .announcement-banner-label { padding-right: var(--space-2); }
+  .public-site .announcement-banner-label > span { display: none; }
+}
+
+@media (max-width: 640px) {
+  .public-site .announcement-banner-inner { flex-wrap: wrap; }
+  .public-site .announcement-banner-copy { font-size: .78rem; }
+  .public-site .announcement-banner-actions { gap: 0; }
+  .public-site .announcement-banner .announcement-banner-previous,
+  .public-site .announcement-banner-expand > span { display: none; }
+  .public-site .announcement-banner-count { min-width: 24px; font-size: .65rem; }
+  .public-site .announcement-banner-dismiss { margin-left: 0; }
+  .public-site .announcement-banner.is-expanded .announcement-banner-content { flex-basis: calc(100% - 44px); }
+  .public-site .announcement-banner.is-expanded .announcement-banner-actions { margin-left: auto; }
+}

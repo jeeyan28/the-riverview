@@ -3,167 +3,6 @@
    compact app scale. 901px and wider deliberately keep the desktop shell so
    Chrome's mobile "Desktop site" mode matches the real desktop layout. */
 
-/* Guest account conversion is a short task, so it reads as one compact panel. */
-.claim-modal-scope .claim-account-modal {
-  width: min(100%, 420px);
-  padding: 22px;
-  border-radius: 20px;
-}
-
-.claim-modal-scope .claim-account-heading {
-  display: grid;
-  grid-template-columns: 40px minmax(0, 1fr);
-  align-items: start;
-  gap: 12px;
-}
-
-.claim-modal-scope .claim-account-mark {
-  display: grid;
-  width: 40px;
-  height: 40px;
-  place-items: center;
-  color: var(--accent);
-  border: 1px solid rgba(25, 216, 195, .22);
-  border-radius: 13px;
-  background: rgba(25, 216, 195, .1);
-}
-
-.claim-modal-scope .claim-account-heading .login-card-header {
-  margin: 0;
-  padding: 0 28px 0 0;
-}
-
-.claim-modal-scope .claim-account-kicker {
-  display: block;
-  margin: 1px 0 4px;
-  color: var(--accent);
-  font-size: .62rem;
-  font-weight: 800;
-  letter-spacing: .12em;
-}
-
-.claim-modal-scope .claim-account-heading h2 {
-  margin: 0 0 3px;
-  font-size: 1.2rem;
-  line-height: 1.2;
-}
-
-.claim-modal-scope .claim-account-heading p {
-  margin: 0;
-  font-size: .78rem;
-  line-height: 1.45;
-}
-
-.claim-modal-scope .claim-account-note {
-  margin: 13px 0 11px;
-  padding: 9px 10px;
-  color: color-mix(in srgb, var(--muted) 90%, white);
-  border-left: 2px solid var(--accent);
-  border-radius: 0 9px 9px 0;
-  background: rgba(25, 216, 195, .065);
-  font-size: .72rem;
-  line-height: 1.45;
-}
-
-.claim-modal-scope .profile-tabs {
-  gap: 3px;
-  margin: 0 0 12px;
-  padding: 3px;
-  border: 1px solid var(--ovl-08);
-  border-radius: 12px;
-  background: var(--ovl-04);
-}
-
-.claim-modal-scope .profile-tab {
-  min-height: 38px;
-  padding: 6px 9px;
-  border: 0;
-  border-radius: 9px;
-  font-size: .75rem;
-}
-
-.claim-modal-scope .profile-tab.active {
-  background: var(--ovl-08);
-  box-shadow: inset 0 0 0 1px rgba(25, 216, 195, .25);
-}
-
-.claim-modal-scope .login-form { gap: 11px; }
-.claim-modal-scope .field { gap: 5px; }
-.claim-modal-scope .field label { font-size: .67rem; }
-.claim-modal-scope .field input { height: 44px; border-radius: 11px; }
-.claim-modal-scope .password-requirements { margin-top: 5px; gap: 2px 8px; }
-.claim-modal-scope .password-requirements li { font-size: .66rem; line-height: 1.3; }
-
-.claim-modal-scope .forgot-modal-actions {
-  display: grid;
-  grid-template-columns: minmax(92px, .75fr) minmax(0, 1.25fr);
-  gap: 8px;
-  margin-top: 2px;
-}
-
-.claim-modal-scope .forgot-modal-actions :is(.btn-cancel, .btn-submit, .btn-social) {
-  width: 100%;
-  min-height: 44px;
-  height: 44px;
-  margin: 0;
-  border-radius: 11px;
-  font-size: .78rem;
-  white-space: normal;
-}
-
-.claim-modal-scope .claim-google-actions {
-  grid-template-columns: minmax(0, 1.45fr) minmax(84px, .55fr);
-}
-
-.claim-modal-scope .claim-google-actions .btn-social { grid-column: 1; grid-row: 1; }
-.claim-modal-scope .claim-google-actions .btn-cancel { grid-column: 2; grid-row: 1; }
-.claim-modal-scope .otp-input-group .otp-input { height: 44px; border-radius: 10px; font-size: 1.08rem; }
-.claim-modal-scope .signup-row { margin-top: 10px; font-size: .75rem; }
-
-@media (max-width: 640px) {
-  .claim-modal-scope .forgot-modal-backdrop {
-    align-items: flex-end;
-    padding: 0;
-  }
-
-  .claim-modal-scope .claim-account-modal {
-    width: 100%;
-    max-width: none;
-    max-height: calc(100dvh - env(safe-area-inset-top));
-    padding: 24px max(18px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(18px, env(safe-area-inset-left));
-    border-radius: 20px 20px 0 0;
-    overscroll-behavior: contain;
-  }
-
-  .claim-modal-scope .forgot-modal-close {
-    top: 14px;
-    right: max(14px, env(safe-area-inset-right));
-    width: 44px;
-    height: 44px;
-  }
-
-  .claim-modal-scope .claim-account-heading .login-card-header {
-    padding-right: 34px;
-  }
-
-  .claim-modal-scope .profile-tab {
-    flex: 1;
-    min-width: 0;
-    min-height: 44px;
-  }
-
-  .claim-modal-scope .otp-input-group {
-    width: 100%;
-    gap: 5px;
-  }
-
-  .claim-modal-scope .otp-input-group .otp-input {
-    flex: 1 1 0;
-    min-width: 0;
-    width: 0;
-  }
-}
-
 @media (min-width: 641px) and (max-width: 900px) {
   .public-site,
   #app { --app-nav-height: 64px; }
@@ -281,7 +120,7 @@
 
   .public-site .hero-inner {
     min-height: min(650px, calc(100svh - var(--app-nav-height)));
-    padding: calc(var(--header-h) + var(--guest-banner-h) + 22px) 14px 24px;
+    padding: calc(var(--header-h) + 22px) 14px 24px;
   }
 
   .public-site .hero-content { max-width: 32rem; }
@@ -467,10 +306,10 @@
   }
 
   .public-site #announcements-panel-mobile {
-    top: calc(var(--header-h) + var(--guest-banner-h) + 8px);
+    top: calc(var(--header-h) + 8px);
     right: 10px;
     width: min(286px, calc(100vw - 20px));
-    max-height: min(360px, calc(100dvh - var(--header-h) - var(--guest-banner-h) - var(--app-nav-height) - 18px));
+    max-height: min(360px, calc(100dvh - var(--header-h) - var(--app-nav-height) - 18px));
     border-radius: 12px;
   }
   .public-site #announcements-panel-mobile .announcements-panel-header { gap: 7px; padding: 8px 9px; }
@@ -530,7 +369,7 @@
   .login-page .field label { font-size: .66rem; }
   .login-page .field input,
   .login-page .rf-scope .field input:not(.otp-input) { height: 44px; min-height: 44px; border-radius: 11px; font-size: 16px; }
-  .login-page :is(.btn-submit, .btn-social, .btn-guest),
+  .login-page :is(.btn-submit, .btn-social),
   .login-page .rf-scope :is(.btn-submit, .btn-social) { height: 44px; min-height: 44px; border-radius: 11px; font-size: .76rem; }
   .login-page .divider,
   .login-page :is(.signup-row, .login-row) { font-size: .72rem; }

@@ -30,4 +30,4 @@ function pricedMonitorRoom(monitorRoom, catalogRoom) {
   };
 }
 
-module.exports = { pricedMonitorRoom };
+module.exports = { pricedMonitorRoom, catalogVariantForMonitorRoom };

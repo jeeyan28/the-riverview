@@ -13,10 +13,10 @@
 .public-site > main { min-height: 65vh; }
 .public-site :is(h1, h2, h3, h4, .logo-name) { font-family: var(--font-body); }
 .public-site :is(h1, h2, h3, h4, p) { margin-top: 0; }
-.public-site section[id] { scroll-margin-top: calc(var(--header-h) + var(--guest-banner-h) + var(--space-4)); }
+.public-site section[id] { scroll-margin-top: calc(var(--header-h) + var(--space-4)); }
 
 .public-site #site-header {
-  top: var(--guest-banner-h);
+  top: 0;
   height: var(--header-h);
   padding: 0 var(--page-gutter);
   border-bottom: 1px solid var(--border);
@@ -139,7 +139,7 @@
   width: min(100%, calc(var(--content-max) + 2 * var(--page-gutter)));
   min-height: min(880px, 100svh);
   margin: 0 auto;
-  padding: calc(var(--header-h) + var(--guest-banner-h) + 72px) var(--page-gutter) 72px;
+  padding: calc(var(--header-h) + 72px) var(--page-gutter) 72px;
 }
 .public-site .hero-content { max-width: 620px; }
 .public-site .hero-eyebrow,
@@ -372,7 +372,7 @@
 /* Facility catalog */
 .public-site .rp-page { min-height: 70vh; background: var(--surface); }
 .public-site .rp-hero {
-  padding: calc(var(--header-h) + var(--guest-banner-h) + 64px) var(--page-gutter) 56px;
+  padding: calc(var(--header-h) + 64px) var(--page-gutter) 56px;
   border-bottom: 1px solid var(--border);
   background: var(--surface-alt);
 }
@@ -432,7 +432,7 @@
 }
 
 /* Contact */
-.public-site .contact-page { padding: calc(var(--header-h) + var(--guest-banner-h) + 64px) var(--page-gutter) var(--section-space); background: var(--surface); }
+.public-site .contact-page { padding: calc(var(--header-h) + 64px) var(--page-gutter) var(--section-space); background: var(--surface); }
 .public-site .contact-inner { max-width: var(--content-max); }
 .public-site .contact-header { max-width: 720px; margin-bottom: var(--space-10); }
 .public-site .contact-header p { color: var(--text-muted-light); }
@@ -529,11 +529,11 @@
   border-radius: var(--radius-sm);
   background: rgba(255,255,255,.055);
 }
-.login-page :is(.btn-submit, .btn-social, .btn-guest) { min-height: 48px; border-radius: var(--radius-sm); }
+.login-page :is(.btn-submit, .btn-social) { min-height: 48px; border-radius: var(--radius-sm); }
 .login-page .btn-submit { background: var(--accent); color: #073b35; }
 .login-page .btn-social { border-color: rgba(255,255,255,.14); background: rgba(255,255,255,.045); }
-.login-page :is(.btn-social, .btn-guest) { color: #f1f3f7; }
-.login-page :is(.btn-social, .btn-guest) svg { color: #a9b3c4; }
+.login-page :is(.btn-social) { color: #f1f3f7; }
+.login-page :is(.btn-social) svg { color: #a9b3c4; }
 
 .bk-addon-option {
   display: grid;
@@ -575,7 +575,7 @@
 
 @media (max-width: 900px) {
   .public-site .hero { min-height: 0; }
-  .public-site .hero-inner { grid-template-columns: 1fr; min-height: 760px; padding-block: calc(var(--header-h) + var(--guest-banner-h) + 64px) 56px; }
+  .public-site .hero-inner { grid-template-columns: 1fr; min-height: 760px; padding-block: calc(var(--header-h) + 64px) 56px; }
   .public-site .hero-content { max-width: 680px; }
   .public-site .hero-carousel { width: min(100%, 520px); height: 260px; margin-inline: auto; }
   .public-site .rp-hero-inner { grid-template-columns: 1fr; }
@@ -591,7 +591,7 @@
 @media (max-width: 640px) {
   .public-site { --page-gutter: 20px; --section-space: 64px; }
   .public-site #site-header .logo-name { display: inline; font-size: .9rem; }
-  .public-site .hero-inner { min-height: 680px; padding-block: calc(var(--header-h) + var(--guest-banner-h) + 48px) 48px; }
+  .public-site .hero-inner { min-height: 680px; padding-block: calc(var(--header-h) + 48px) 48px; }
   .public-site .hero h1 { font-size: clamp(2.6rem, 13vw, 4rem); }
   .public-site .hero-carousel { display: none; }
   .public-site .hero-actions { flex-direction: column; }
@@ -615,7 +615,7 @@
   .public-site .rp-filter-list { width: 100%; flex-wrap: nowrap; overflow-x: auto; padding-bottom: var(--space-2); scrollbar-width: thin; }
   .public-site .rp-filter-button { flex: 0 0 auto; }
   .public-site .rp-hero-note { grid-template-columns: 1fr; }
-  .public-site .contact-page { padding-top: calc(var(--header-h) + var(--guest-banner-h) + 48px); }
+  .public-site .contact-page { padding-top: calc(var(--header-h) + 48px); }
   .public-site .map-embed { min-height: 300px; }
   .login-page .login-header { height: 68px; }
   .login-page .login-layout { gap: var(--space-6); padding: 96px 16px 24px; }

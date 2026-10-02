@@ -33,6 +33,7 @@ export async function apiRequest(path, opts = {}) {
   const res = await fetch(`${API_BASE_URL}${path}`, {
     method,
     credentials: 'include',
+    ...(opts.signal ? { signal: opts.signal } : {}),
     ...(finalHeaders ? { headers: finalHeaders } : {}),
     ...(body !== undefined ? { body: isFormData ? body : JSON.stringify(body) } : {}),
   });

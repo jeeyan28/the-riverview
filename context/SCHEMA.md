@@ -8,7 +8,7 @@ The implementation now enforces the context decisions that affect booking, monit
 
 1. **Reschedule cutoff:** `RESCHEDULE_CUTOFF_HOURS = 3` and `MAX_RESCHEDULES = 2` are enforced server-side.
 2. **Operating hours:** the default schedule is `07:00–00:00` every day, and the Settings screen can update the singleton schedule. Existing deployments use the backed-up `align:prd:apply` migration to replace the legacy default.
-3. **Cancellation and no-show:** cancellation is requested, reviewed by an admin, and manually refunded when appropriate. A missed confirmed booking becomes `No Show` after its scheduled end and forfeits the downpayment.
+3. **Cancellation and no-show:** ordinary cancellation is requested, reviewed by an admin, and manually refunded when appropriate. Venue closures hold affected bookings outside no-show expiry and offer rescheduling or a full provider refund, with staff handling cash remainders. A missed confirmed booking without an unresolved closure becomes `No Show` after its scheduled end and forfeits the downpayment.
 4. **Canonical finance:** linked booking and room-session records are folded into one ledger row; explicit payment and refund amounts drive collected and outstanding totals. Legacy `Paid` flags without an amount are review-only and are excluded from collected revenue.
 5. **Partial payment:** a verified online downpayment remains recorded on its booking and active room session while the rest is payable at the venue. Walk-ins pay in full before or after play, and a charged session can finish only after full payment.
 6. **Whole-hour operations:** booking mutations and Live Monitor sessions/extensions accept 1–5 whole hours.
@@ -40,7 +40,6 @@ erDiagram
         string role "user|staff|manager|super_admin"
         string googleId
         boolean isVerified
-        boolean isGuest
         date lockUntil
     }
 
@@ -142,7 +141,6 @@ Core account record for customers, staff, and admins alike — same model, diffe
 | `googleId` | String | sparse index — set only for Google sign-in accounts |
 | `failedLoginAttempts`, `lockUntil` | — | account lockout after repeated failed logins |
 | `isVerified` | Boolean | email verified via OTP |
-| `isGuest`, `guestDeletedAt`, `guestRecovery*` | — | supports a guest-account flow with a recovery path (guest can later "claim" the account with a real password) |
 | `resetOtp*`, `verifyOtp*` | — | password reset / email verification OTP state, all `select: false` |
 
 **Note:** Owner and Supervisor being "basically the same access" (per PRD) is implemented as `super_admin` and `manager` being adjacent, high tiers in the same `ROLE_LEVEL` hierarchy — not a special-cased "these two are identical" rule. If a permission is ever added that should apply to one but not the other, it's a straightforward addition to `permissions.js`, not a schema change.
@@ -153,10 +151,11 @@ The core transactional record — one per reservation, online or walk-in.
 | Field | Type | Notes |
 |---|---|---|
 | `reservationCode` | String | required, unique, immutable |
+| `guestName`, `guestContact`, `guestEmail` | String | new reservations use `Last name, First name`, a required phone number, and a separate required email; older records may still have missing or combined contact data |
 | `room` | ObjectId → Room | required |
 | `date`, `timeIn` | String | stored as plain strings, not a combined Date — avoids timezone parsing bugs |
 | `duration` | Number (hours) | persisted max 24 for legacy compatibility; validated booking mutations accept 1–5 whole hours |
-| `amount`, `roomCharge`, `hourlyRates[]`, `corkageFee` | Number(s) | immutable-at-payment pricing snapshot; `amount = roomCharge + corkageFee` |
+| `amount`, `roomCharge`, `hourlyRates[]`, `addOns[]`, `addOnFee` | Number(s) | immutable-at-payment pricing snapshot; `amount = roomCharge - discountAmount + addOnFee` |
 | `status` | enum | `Pending`, `Pending Payment Verification`, `Awaiting Online Payment`, `Confirmed`, `Rejected`, `Ongoing`, `Done`, `Overdue`, `Cancelled`, `No Show` |
 | `paymentStatus` | enum | `Unpaid`, `Partial`, `Paid`, `Rejected` |
 | `source` | enum | `online` \| `walk-in` — distinguishes the two booking paths from ARCHITECTURE.md |
@@ -166,6 +165,8 @@ The core transactional record — one per reservation, online or walk-in.
 | `downPayment`, `downPaymentHours` | Number | verified online deposit and the number of hourly charges it covers |
 | `paidAmount`, `refundedAmount` | Number | explicit money values used by the canonical sales ledger; finance uses the greater valid recorded value from `paidAmount`/legacy `downPayment`, then subtracts refunds |
 | `cancellationStatus`, `cancellationReason`, `cancellationReview*` | — | customer request plus admin review/refund trail |
+| `venueClosure` | Optional subdocument | holiday/date/reason, verified customer owner, pending/rescheduled/refund_requested/reopened resolution and timestamps |
+| `closureRefund` | Optional subdocument | durable provider refund request, stable request key, verified original payment/refund IDs, gateway/processed amounts, submission/reconciliation state and timestamps |
 | `noShowAt` | Date | set when the scheduled end passes without completion; downpayment is forfeited |
 | `rescheduleCount` | Number | capped at `MAX_RESCHEDULES = 2` (matches PRD) |
 | `bookedBy`, `reviewedBy` | ObjectId → User | who created it / who approved-rejected it (walk-in path) |
@@ -205,7 +206,7 @@ Sessions retain their `paidAmount` and `refundedAmount` when finished or cancell
 | `MonitorRoom` | `facilityName`, `roomName`, `roomNumber` | exact physical unit shown in Live Monitor |
 | `MonitorRoom` | `price`, `pricingMode`, `eveningPrice`, `eveningStartTime` | hourly pricing copied from the admin-managed catalog |
 | `MonitorRoom` | `includedGuests`, `extraGuestFee`, `pax` | capacity and per-guest pricing snapshot |
-| `RoomSession` | `startTime`, `duration`, `hourlyRates[]`, `rate`, `amount`, `corkageFee` | scheduled whole-hour usage and immutable calculated charge |
+| `RoomSession` | `startTime`, `duration`, `hourlyRates[]`, `rate`, `roomCharge`, `amount` | scheduled whole-hour usage and immutable calculated charge |
 | `RoomSession` | `booking` | optional reservation link used to carry its deposit and avoid duplicate ledger rows |
 | `RoomSession` | `paidAmount`, `refundedAmount`, `paymentStatus`, `paymentTiming` | actual collection, balance state (`Paid`/`Partial`/`Unpaid`), and before/after-play intent |
 | `RoomSession` | `status`, `endedAt`, `cancellationReason` | operational lifecycle (`Active`/`Finished`/`Cancelled`) and audit data |
@@ -226,6 +227,6 @@ Holding area for signup-in-progress until OTP verification completes; **TTL-inde
 ## 3. Cross-Cutting Rules
 
 - **Dates as strings, not `Date` objects**, for anything user-facing/schedulable (`Booking.date`, `Booking.timeIn`, `Settings.holidays[].date`) — deliberate, to sidestep timezone-conversion bugs. Don't "fix" this into a `Date` type without checking every comparison that relies on string equality.
-- **TTL indexes over cleanup jobs** where possible (`BookingLock`, `PendingRegistration`) — Mongo handles expiry natively; only the guest-account purge uses an actual cron job (`scripts/purgeExpiredGuests.js`), because that flow needs conditional logic TTL can't express (e.g. only guests who never converted).
+- **TTL indexes** expire `BookingLock` and `PendingRegistration` records natively.
 - **Snapshot fields for history**, not just references (`LoginHistory.name/email/role`) — history that changes when the underlying record changes isn't real history.
 - **`select: false` on all sensitive/secret fields** (password, OTP hashes, reset tokens) — they must be explicitly `.select("+password")`'d to ever appear in a query result.

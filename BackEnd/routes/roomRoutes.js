@@ -3,7 +3,7 @@ const router = express.Router();
 const Room = require("../model/room");
 const { MonitorRoom } = require("../model/monitoring");
 const upload = require("../middleware/upload");
-const { requirePermission } = require("../middleware/adminAuth");
+const { requirePermission, requireAnyPermission } = require("../middleware/adminAuth");
 const { validate } = require("../middleware/validate");
 const { PERMISSIONS } = require("../utils/permissions");
 const { canonicalServiceName, escapeRegExp } = require("../utils/roomCatalog");
@@ -91,7 +91,7 @@ router.get("/", async (req, res) => {
   }
 });
 
-router.get("/admin", requirePermission(PERMISSIONS.ROOM_MANAGE), async (req, res) => {
+router.get("/admin", requireAnyPermission(PERMISSIONS.ROOM_MANAGE, PERMISSIONS.BOOKING_VIEW), async (req, res) => {
   try {
     const rooms = await Room.find().sort({ name: 1 });
     res.json(rooms);

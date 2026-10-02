@@ -79,4 +79,4 @@ Documenting what's already consistent in the codebase, so new code matches:
 ## 11. Known Debt (flagged, not yet fixed)
 
 1. **Error-shape inconsistency:** some legacy routes use `err.status`/`err.message` passthrough instead of the standardized `{ message: "Server error." }` shape — see Section 4.
-2. Reschedule cutoff, operating hours, Court time-band pricing, guest surcharges, and corkage are resolved in the shared pricing path; keep ARCHITECTURE.md and SCHEMA.md synchronized if those policies change.
+2. Reschedule cutoff, operating hours, Court time-band pricing, guest surcharges, and optional services are resolved in the shared pricing path; keep ARCHITECTURE.md and SCHEMA.md synchronized if those policies change.

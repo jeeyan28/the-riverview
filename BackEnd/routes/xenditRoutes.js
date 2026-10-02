@@ -53,6 +53,16 @@ async function webhookHandler(req, res) {
     return res.status(401).json({ message: "Invalid webhook token." });
   }
   const event = req.body;
+  if (["refund.succeeded", "refund.failed"].includes(event?.event)) {
+    try {
+      await require("../utils/closureRefunds").handleRefundWebhook("xendit", event.data);
+      await require("../utils/reservationNotifications").deliverNotificationEmails({ limit: 5 });
+      return res.status(200).json({ received: true });
+    } catch (error) {
+      console.error("Xendit refund webhook failed:", error.name);
+      return res.status(500).json({ message: "Refund verification will be retried." });
+    }
+  }
   if (event?.event !== "payment_session.completed") return res.status(200).json({ received: true });
   const attempt = await XenditPaymentAttempt.findOne({ sessionId: event?.data?.payment_session_id });
   if (!attempt) return res.status(404).json({ message: "Unknown payment session." });

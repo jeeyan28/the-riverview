@@ -18,6 +18,8 @@ import './styles/responsive-content.css'
 import './styles/system-refinement.css'
 import './styles/mobile-density.css'
 import './styles/admin/admin-experience.css'
+import './styles/announcement-banner.css'
+import './styles/reservation-notifications.css'
 
 
 ReactDOM.createRoot(document.getElementById('root')).render(

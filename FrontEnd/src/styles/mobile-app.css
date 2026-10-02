@@ -148,15 +148,6 @@
     background-repeat: no-repeat;
     background-size: 40px 100%, 40px 100%, 12px 100%, 12px 100%;
   }
-
-  #app :is(.monitor-section-tabs, .set-tabs, .um-tabs, .fac-chips) {
-    scrollbar-width: none;
-    scroll-padding-inline: var(--space-4, 16px);
-  }
-
-  #app :is(.monitor-section-tabs, .set-tabs, .um-tabs, .fac-chips)::-webkit-scrollbar {
-    display: none;
-  }
 }
 
 @media (max-width: 640px) {
@@ -217,7 +208,7 @@
 
   .public-site .hero-inner {
     min-height: calc(100svh - var(--app-nav-height));
-    padding-top: calc(var(--header-h) + var(--guest-banner-h) + var(--space-8, 32px));
+    padding-top: calc(var(--header-h) + var(--space-8, 32px));
     padding-bottom: var(--space-8, 32px);
   }
 
@@ -240,7 +231,7 @@
   }
 
   .public-site .rp-hero {
-    padding-top: calc(var(--header-h) + var(--guest-banner-h) + var(--space-10, 40px));
+    padding-top: calc(var(--header-h) + var(--space-10, 40px));
   }
 
   .public-site .rp-facilities {
@@ -360,18 +351,6 @@
   #app :is(.bk-toolbar-card, .um-toolbar-card, .fac-toolbar-card) {
     position: static;
     box-shadow: var(--shadow-sm);
-  }
-
-  #app :is(.set-tabs, .um-tabs, .fac-chips) {
-    flex-wrap: nowrap;
-    justify-content: flex-start;
-    overflow-x: auto;
-    scroll-snap-type: inline mandatory;
-  }
-
-  #app :is(.set-tabs, .um-tabs, .fac-chips) > * {
-    flex: 0 0 auto;
-    scroll-snap-align: start;
   }
 
   #app .monitor-section-tabs {

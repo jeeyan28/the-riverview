@@ -69,7 +69,14 @@ const settingsSchema = new mongoose.Schema({
   updatedAt:      { type: Date, default: Date.now },
 });
 
-settingsSchema.statics.getSingleton = async function () {
+settingsSchema.statics.getSingleton = async function ({ session } = {}) {
+  // Closure creation and customer reservations share a transaction lock so a
+  // booking cannot slip in between closing the date and notifying its guests.
+  if (session) {
+    let locked = await this.findOneAndUpdate({ _id: "global" }, { $inc: { __v: 1 } }, { returnDocument: "after", session });
+    if (!locked) [locked] = await this.create([{ _id: "global" }], { session });
+    return locked;
+  }
   let doc = await this.findById("global");
   if (!doc) {
     doc = await this.create({ _id: "global" });

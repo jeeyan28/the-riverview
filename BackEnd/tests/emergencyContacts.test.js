@@ -23,9 +23,9 @@ test('emergency contact validation accepts local and national dial numbers', () 
 });
 
 test('admin-only read and management-only write guards enforce directory access', async () => {
-  const originalFindById = User.findById;
+  const originalFindOne = User.findOne;
   const check = (role, middleware) => new Promise((resolve) => {
-    User.findById = async () => ({ role, isActive: true });
+    User.findOne = async () => ({ role, isActive: true });
     const req = { session: { userId: 'user-id', cookie: {} } };
     const res = { statusCode: 200, status(code) { this.statusCode = code; return this; }, json() { resolve(this.statusCode); } };
     middleware(req, res, () => resolve(200));
@@ -37,6 +37,6 @@ test('admin-only read and management-only write guards enforce directory access'
     assert.equal(await check('manager', requirePermission('settings:manage')), 200);
     assert.equal(await check('super_admin', requirePermission('settings:manage')), 200);
   } finally {
-    User.findById = originalFindById;
+    User.findOne = originalFindOne;
   }
 });

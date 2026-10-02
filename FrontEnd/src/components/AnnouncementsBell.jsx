@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { Bell, BellOff, Check, Megaphone } from 'lucide-react';
-import { timeAgo } from '../utils/time';
+import { Bell, BellOff, CalendarX2, CheckCircle2, Clock3, RotateCcw } from 'lucide-react';
+import '../styles/reservation-notifications.css';
 
-function AnnouncementsBell({ items = [], unreadCount = 0, markRead, variant = 'desktop' }) {
+function AnnouncementsBell({ variant = 'desktop', items = [], unreadCount = 0, loading = false, error = '', refresh, markRead, markAllRead, onOpenReservation }) {
   const [open, setOpen] = useState(false);
+  const [reading, setReading] = useState(false);
+  const [readError, setReadError] = useState('');
   const rootRef = useRef(null);
   const idFor = (name) => `announcements-${name}-${variant}`;
 
@@ -35,85 +37,49 @@ function AnnouncementsBell({ items = [], unreadCount = 0, markRead, variant = 'd
         type="button"
         className="announcements-bell-btn"
         id={idFor('bell-btn')}
-        aria-label="Announcements"
+        aria-label={`Notifications${unreadCount ? `, ${unreadCount} unread` : ''}`}
         aria-expanded={open}
         aria-controls={idFor('panel')}
         onClick={(e) => {
           e.stopPropagation();
+          if (!open) refresh?.();
           setOpen((o) => !o);
         }}
       >
         <Bell size={18} aria-hidden="true" />
-        {unreadCount > 0 && (
-          <span className="announcements-bell-badge" id={idFor('bell-badge')}>
-            {unreadCount > 99 ? '99+' : unreadCount}
-          </span>
-        )}
+        {unreadCount > 0 && <span className="rv-notification-count">{unreadCount > 99 ? '99+' : unreadCount}</span>}
       </button>
 
-      <div className={`announcements-panel${open ? ' open' : ''}`} id={idFor('panel')} role="dialog" aria-label="Venue announcements">
+      <div className={`announcements-panel${open ? ' open' : ''}`} id={idFor('panel')} role="dialog" aria-label="Notifications" hidden={!open}>
         <div className="announcements-panel-header">
-          <div><span className="announcements-panel-title">Venue updates</span><span className="announcements-panel-subtitle">{unreadCount > 0 ? `${unreadCount > 99 ? '99+' : unreadCount} unread` : 'You’re up to date'}</span></div>
-          {unreadCount > 0 && (
-            <button
-              type="button"
-              className="announcements-mark-all"
-              aria-label="Mark all announcements as read"
-              onClick={() => items.filter((item) => !item.isRead).forEach((item) => markRead(item._id))}
-            >
-              <Check size={14} />
-              <span>Mark all read</span>
-            </button>
-          )}
+          <div><span className="announcements-panel-title">Notifications</span><span className="announcements-panel-subtitle">{unreadCount ? `${unreadCount} unread reservation update${unreadCount === 1 ? '' : 's'}` : 'You’re all caught up'}</span></div>
+          {unreadCount > 0 && <button type="button" className="rv-notification-read-all" disabled={reading} onClick={async () => {
+            setReading(true); setReadError('');
+            try { await markAllRead?.(); } catch { setReadError('Could not mark notifications read. Try again.'); }
+            finally { setReading(false); }
+          }}>Mark all read</button>}
         </div>
 
-        {items.length === 0 ? (
-          <div className="announcements-empty" id={idFor('empty')}>
-            <div className="announcements-empty-icon">
-              <BellOff size={22} aria-hidden="true" />
-            </div>
-            <p>No venue updates right now.</p>
+        {(error || readError) && <div className="rv-notification-error" role="status">{readError || error}{error && <button type="button" onClick={refresh}>Retry</button>}</div>}
+        {items.length > 0 && <div className="rv-notification-list">
+          {items.map(item => {
+            const Icon = item.type === 'closure' ? CalendarX2 : item.type === 'refund_completed' ? CheckCircle2 : item.type === 'refund_processing' ? Clock3 : RotateCcw;
+            return <button type="button" key={item._id} className={`rv-notification-item${item.readAt ? '' : ' is-unread'}`} onClick={() => {
+              if (!item.readAt) markRead?.(item._id).catch(() => setReadError('Could not mark this update read. Try again.'));
+              setOpen(false); onOpenReservation?.(item);
+            }}>
+              <Icon size={19} aria-hidden="true" />
+              <span><strong>{item.title}</strong><span className="rv-notification-message">{item.message}</span><small>{item.reservationCode} · {new Date(item.createdAt).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })}</small></span>
+              {!item.readAt && <span className="rv-notification-dot" aria-label="Unread" />}
+            </button>;
+          })}
+        </div>}
+        {!items.length && !error && <div className="announcements-empty" id={idFor('empty')}>
+          <div className="announcements-empty-icon">
+            <BellOff size={22} aria-hidden="true" />
           </div>
-        ) : (
-          <ul className="announcements-list" id={idFor('list')}>
-            {items.map((a) => (
-              <li
-                key={a._id}
-                className={`announcement-item${a.isRead ? ' is-read' : ''}`}
-                role={a.isRead ? undefined : 'button'}
-                tabIndex={a.isRead ? undefined : 0}
-                aria-label={a.isRead ? undefined : `Mark ${a.title} as read`}
-                onClick={() => {
-                  if (!a.isRead) markRead(a._id);
-                }}
-                onKeyDown={(event) => {
-                  if (a.isRead || (event.key !== 'Enter' && event.key !== ' ')) return;
-                  event.preventDefault();
-                  markRead(a._id);
-                }}
-              >
-                <span className="announcement-item-icon">
-                  <Megaphone size={17} aria-hidden="true" />
-                </span>
-                <div className="announcement-item-body">
-                  <div className="announcement-item-top">
-                    <p className="announcement-item-title">{a.title}</p>
-                    <span className="announcement-item-time">{timeAgo(a.createdAt)}</span>
-                  </div>
-                  <p className="announcement-item-message">{a.message}</p>
-                </div>
-                {!a.isRead && (
-                  <span
-                    className="announcement-item-close"
-                    aria-hidden="true"
-                  >
-                    <Check size={14} aria-hidden="true" />
-                  </span>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
+          <p>{loading ? 'Loading notifications…' : 'No notifications yet.'}</p>
+        </div>}
       </div>
     </div>
   );

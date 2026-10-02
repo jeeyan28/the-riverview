@@ -13,6 +13,8 @@ import { useSiteSettings } from '../../hooks/useSiteSettings';
 import { useConfirm } from '../../hooks/useConfirm';
 import { PASSWORD_REQUIREMENTS } from '../../utils/password';
 import { BellRing, History, Settings2, UserRound } from 'lucide-react';
+import { businessDate } from '../../utils/businessDate';
+import '../../styles/reservation-notifications.css';
 
 
 const SETTINGS_TABS = [
@@ -131,7 +133,8 @@ function OperatingScheduleAndHolidays() {
   const [scheduleError, setScheduleError] = useState('');
   const [addingHoliday, setAddingHoliday] = useState(false);
   const [holidayModalOpen, setHolidayModalOpen] = useState(false);
-  const [holidayDraft, setHolidayDraft] = useState({ name: '', date: '' });
+  const [holidayDraft, setHolidayDraft] = useState({ name: '', date: '', note: '' });
+  const [closureImpact, setClosureImpact] = useState(null);
   const [holidayError, setHolidayError] = useState('');
   const [deletingHolidayId, setDeletingHolidayId] = useState(null);
   const [holidayListError, setHolidayListError] = useState('');
@@ -156,6 +159,19 @@ function OperatingScheduleAndHolidays() {
     fetchSettings();
   }, [fetchSettings]);
 
+  useEffect(() => {
+    if (!holidayModalOpen || !holidayDraft.date) { setClosureImpact(null); return; }
+    let cancelled = false;
+    const date = holidayDraft.date;
+    setClosureImpact({ date, loading: true });
+    settingsService.closureImpact(date).then(data => {
+      if (!cancelled) setClosureImpact({ ...data, date, loading: false });
+    }).catch(error => {
+      if (!cancelled) setClosureImpact({ date, loading: false, error: error.message });
+    });
+    return () => { cancelled = true; };
+  }, [holidayModalOpen, holidayDraft.date]);
+
   function toggleDay(day) {
     setOpenDays((days) => (days.includes(day) ? (days.length > 1 ? days.filter((d) => d !== day) : days) : [...days, day]));
   }
@@ -178,7 +194,7 @@ function OperatingScheduleAndHolidays() {
 
   function handleAddHoliday() {
     if (!guardPermission(SETTINGS_MANAGE_PERMISSION, "You don't have permission to add holidays.")) return;
-    setHolidayDraft({ name: '', date: '' });
+    setHolidayDraft({ name: '', date: '', note: '' });
     setHolidayError('');
     setHolidayModalOpen(true);
   }
@@ -194,7 +210,7 @@ function OperatingScheduleAndHolidays() {
     setAddingHoliday(true);
     setHolidayError('');
     try {
-      await settingsService.addHoliday({ name, date, fullDay: true });
+      await settingsService.addHoliday({ name, date, note: holidayDraft.note.trim(), fullDay: true });
       await fetchSettings();
       try { await refreshSiteSettings(); } catch {}
       setHolidayModalOpen(false);
@@ -294,8 +310,8 @@ function OperatingScheduleAndHolidays() {
           </button>
         </div>
         <div className="holiday-note">
-          Customers cannot reserve on these dates. The reservation calendar will automatically block them, and each
-          upcoming date also appears in the announcement banner at the top of the homepage.
+          These dates are blocked in the reservation calendar. Customers with existing reservations receive a personal
+          notification and email with options to reschedule or receive a full refund of the amount paid.
         </div>
         {holidayListError && <p className="settings-form-error" role="alert">{holidayListError}</p>}
         <div className="holiday-list" style={{ marginTop: 10 }}>
@@ -333,11 +349,20 @@ function OperatingScheduleAndHolidays() {
 
       <Modal open={holidayModalOpen} onClose={() => !addingHoliday && setHolidayModalOpen(false)} title="Add closure date">
         <form className="settings-modal-form" onSubmit={saveHoliday}>
-          <p className="settings-modal-copy">This date will be blocked in the customer reservation calendar and shown as a venue closure.</p>
+          <p className="settings-modal-copy">Closing a date blocks new reservations. Existing guests can reschedule without using their normal allowance or cancel for a full refund.</p>
           <div className="mfield"><label htmlFor="holiday-name">Closure name</label><input id="holiday-name" type="text" maxLength="100" value={holidayDraft.name} onChange={(event) => setHolidayDraft((draft) => ({ ...draft, name: event.target.value }))} placeholder="e.g. Christmas Day" autoFocus /></div>
-          <div className="mfield"><label htmlFor="holiday-date">Date</label><input id="holiday-date" type="date" value={holidayDraft.date} onChange={(event) => setHolidayDraft((draft) => ({ ...draft, date: event.target.value }))} /></div>
+          <div className="mfield"><label htmlFor="holiday-date">Date</label><input id="holiday-date" type="date" min={businessDate()} value={holidayDraft.date} onChange={(event) => setHolidayDraft((draft) => ({ ...draft, date: event.target.value }))} required /></div>
+          <div className="mfield"><label htmlFor="holiday-note">Message for affected guests (optional)</label><textarea id="holiday-note" rows="2" maxLength="300" value={holidayDraft.note} onChange={event => setHolidayDraft(draft => ({ ...draft, note: event.target.value }))} placeholder="e.g. We’re sorry for the change and can help you choose another date." /></div>
+          {holidayDraft.date && <div className="closure-impact" role="status">
+            {closureImpact?.date !== holidayDraft.date || closureImpact?.loading ? <p>Checking existing reservations…</p> : closureImpact?.error ? <p>{closureImpact.error} Choose the date again to retry.</p> : <>
+              <p><strong>{closureImpact?.count || 0} existing reservation{closureImpact?.count === 1 ? '' : 's'} affected</strong></p>
+              <p>{closureImpact?.count > 0 ? 'Closing this date will notify these customers in their bell and by email where an email address is available. No first-hour charge will be retained.' : 'There are no existing guests to notify. New reservations will be blocked.'}</p>
+              {closureImpact?.reservations?.length > 0 && <ul>{closureImpact.reservations.slice(0, 4).map(item => <li key={item._id}>{item.reservationCode} · {item.guestName} · {scheduleTimeLabel(item.timeIn)}</li>)}</ul>}
+              {closureImpact?.count > 4 && <p>Plus {closureImpact.count - 4} other reservations.</p>}
+            </>}
+          </div>}
           {holidayError && <p className="settings-form-error" role="alert">{holidayError}</p>}
-          <div className="modal-actions"><button type="button" className="btn-cancel" onClick={() => setHolidayModalOpen(false)} disabled={addingHoliday}>Cancel</button><button type="submit" className="btn-confirm" disabled={addingHoliday}>{addingHoliday ? 'Adding…' : 'Add closure'}</button></div>
+          <div className="modal-actions"><button type="button" className="btn-cancel" onClick={() => setHolidayModalOpen(false)} disabled={addingHoliday}>Cancel</button><button type="submit" className="btn-confirm" disabled={addingHoliday || !holidayDraft.date || closureImpact?.date !== holidayDraft.date || closureImpact?.loading || Boolean(closureImpact?.error)}>{addingHoliday ? 'Closing date…' : closureImpact?.count > 0 ? 'Close date & notify guests' : 'Close date'}</button></div>
         </form>
       </Modal>
 
@@ -466,8 +491,8 @@ function AnnouncementsTab() {
         </button>
       </div>
       <p style={{ margin: '8px 0 0', fontSize: '.78rem', color: 'var(--muted)' }}>
-        Active announcements appear as the dismissible banner at the top of the public homepage. Inactive or expired
-        ones stay here but won't show to guests.
+        Active announcements appear above the navigation on customer pages, even before sign-in. Inactive or expired
+        ones stay here but won't show to guests. Announcements do not appear in the notification bell.
       </p>
       {listError && <p className="settings-form-error" role="alert">{listError}</p>}
       <Modal

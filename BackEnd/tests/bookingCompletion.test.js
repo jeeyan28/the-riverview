@@ -15,6 +15,12 @@ test('an expired confirmed reservation can be marked done even before the no-sho
   assert.throws(() => completeReservationFields(reservation, { now: at('12:59') }), /before its start time/);
 });
 
+test('a legacy overdue reservation can be corrected to done only after it starts', () => {
+  const legacy = { ...reservation, status: 'Overdue' };
+  assert.deepEqual(completeReservationFields(legacy, { now: at('14:01') }), { status: 'Done', noShowAt: null });
+  assert.throws(() => completeReservationFields(legacy, { now: at('12:59') }), /before its start time/);
+});
+
 test('linked sessions still finish through Room Monitoring', () => {
   assert.throws(() => completeReservationFields({ ...reservation, status: 'No Show' }, { hasMonitorSession: true }), /Room Monitoring/);
 });

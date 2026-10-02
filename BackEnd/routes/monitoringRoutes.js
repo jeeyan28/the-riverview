@@ -7,6 +7,7 @@ const { PERMISSIONS, hasPermission } = require("../utils/permissions");
 const { bookingCollected, venueDiscountSettlement, bookingSessionEnd, financialFields, fullOrDeferredPaymentFields, extendSessionFields, endSessionFields } = require("../utils/bookingLifecycle");
 const { calculateBookingPrice, calculateSessionExtension, parsePaxCapacity } = require("../utils/roomPricing");
 const { pricedMonitorRoom } = require("../utils/monitorRoomRate");
+const { getExtensionAvailability, getSessionStartAvailability } = require("../utils/sessionAvailability");
 const { releasedMonitorStatus, visibleMonitorRoom } = require("../utils/syncRoomInventory");
 const { logAudit } = require("../utils/auditLog");
 const { TIME_ZONE, MAX_MONITOR_SESSION_HOURS } = require("../utils/constants");
@@ -21,6 +22,7 @@ const {
   monitorRoomCreateSchema,
   monitorRoomUpdateSchema,
   sessionCreateSchema,
+  sessionStartQuoteSchema,
   sessionExtendSchema,
   sessionExtendQuoteSchema,
   sessionEndSchema,
@@ -45,6 +47,7 @@ async function quoteSessionExtension(session, addedHours) {
     throw new AppError(400, `Total session duration cannot exceed ${MAX_MONITOR_SESSION_HOURS} hours.`);
   }
   const room = await MonitorRoom.findById(session.room);
+  if (!room) throw new AppError(404, "Table not found.");
   if (!session.rate) {
     session.rate = room?.price || 0;
     if (!session.amount) session.amount = session.rate * session.duration;
@@ -58,7 +61,9 @@ async function quoteSessionExtension(session, addedHours) {
   if (!(pricing.addedCharge > 0)) throw new AppError(409, "Set a valid room rate before extending this session.");
   const fields = extendSessionFields(session, addedHours, pricing.amount);
   const currentBalance = Math.max(0, Number(session.amount) - Number(session.paidAmount || 0) + Number(session.refundedAmount || 0));
-  return { pricing, fields, currentBalance, scheduledEndTime: new Date(endTime + Number(addedHours) * 3600000) };
+  const scheduledEndTime = new Date(endTime + Number(addedHours) * 3600000);
+  const availability = await getExtensionAvailability(session, room, endTime, scheduledEndTime.getTime());
+  return { pricing, fields, currentBalance, scheduledEndTime, availability };
 }
 
 function sessionAuditLabel(session) {
@@ -82,8 +87,7 @@ async function syncBookingFromSession(session, status) {
     status,
     duration: session.duration,
     amount: session.amount,
-    roomCharge: Math.max(0, Number(session.amount || 0) - Number(session.corkageFee || 0)),
-    corkageFee: Number(session.corkageFee) || 0,
+    roomCharge: Number(session.roomCharge) || Number(session.amount) || 0,
     hourlyRates: session.hourlyRates || [],
     paidAmount: Number(session.paidAmount) || 0,
     refundedAmount: Number(session.refundedAmount) || 0,
@@ -99,9 +103,10 @@ async function releaseSessionRoom(roomId, currentRoom) {
   const catalog = room.isTemporary
     ? null
     : await Room.findOne({ name: room.facilityName }).select("variants").lean();
-  await MonitorRoom.updateOne(
+  return MonitorRoom.findOneAndUpdate(
     { _id: roomId, status: "Occupied" },
-    { $set: { status: releasedMonitorStatus(room, catalog) } }
+    { $set: { status: releasedMonitorStatus(room, catalog) } },
+    { returnDocument: "after" }
   );
 }
 
@@ -238,9 +243,21 @@ sessionsRouter.get("/", ensureAdmin, async (req, res) => {
   }
 });
 
+sessionsRouter.get("/start-availability", requirePermission(PERMISSIONS.ROOM_OPERATE), validate(sessionStartQuoteSchema, "query"), async (req, res) => {
+  try {
+    const room = await MonitorRoom.findById(req.query.roomId);
+    if (!room) return res.status(404).json({ message: "Table not found." });
+    if (room.status !== "Available") return res.status(409).json({ message: "This table is no longer available." });
+    res.json(await getSessionStartAvailability(room, Number(req.query.duration)));
+  } catch (err) {
+    console.error(err);
+    res.status(err.status || 500).json({ message: err.message || "Server error." });
+  }
+});
+
 sessionsRouter.post("/", requireAnyPermission(PERMISSIONS.ROOM_OPERATE, PERMISSIONS.BOOKING_MANAGE), validate(sessionCreateSchema), async (req, res) => {
   try {
-    const { roomId, duration, paymentMethod, paymentStatus, paidAmount: requestedPaidAmount, paymentTiming, guestName, guestCount: requestedGuestCount, hasCorkage, bookingId, roomTarget, applyVenueDiscount } = req.body;
+    const { roomId, duration, paymentMethod, paymentStatus, paidAmount: requestedPaidAmount, paymentTiming, guestName, guestCount: requestedGuestCount, bookingId, roomTarget, applyVenueDiscount } = req.body;
 
     if (!bookingId && !hasPermission(req.user, PERMISSIONS.ROOM_OPERATE)) {
       return res.status(403).json({ message: "You do not have permission to do that." });
@@ -264,6 +281,7 @@ sessionsRouter.post("/", requireAnyPermission(PERMISSIONS.ROOM_OPERATE, PERMISSI
     if (bookingId) {
       booking = await Booking.findById(bookingId);
       if (!booking) return res.status(404).json({ message: "Reservation not found." });
+      if (booking.venueClosure?.status === "pending") return res.status(409).json({ message: "This reservation is affected by a venue closure. Reschedule or refund it before starting a session." });
       if (booking.status !== Booking.BOOKING_STATUS.CONFIRMED) {
         return res.status(400).json({ message: "This reservation cannot be started (already started or not confirmed)." });
       }
@@ -363,7 +381,6 @@ sessionsRouter.post("/", requireAnyPermission(PERMISSIONS.ROOM_OPERATE, PERMISSI
       timeIn: `${String(currentBusinessHour()).padStart(2, "0")}:00`,
       duration,
       guestCount,
-      hasCorkage: !!hasCorkage,
     });
     const rate = booking ? (booking.hourlyRates?.[0] || booking.amount / booking.duration) : directPricing.unitPrice;
     const discount = venueSettlement?.discount || 0;
@@ -387,6 +404,10 @@ sessionsRouter.post("/", requireAnyPermission(PERMISSIONS.ROOM_OPERATE, PERMISSI
     }
 
     if (await RoomSession.exists({ room: room._id, status: "Active" })) return res.status(409).json({ message: "This room already has an active session." });
+    if (!booking) {
+      const availability = await getSessionStartAvailability(room, sessionDuration);
+      if (!availability.canStart) return res.status(409).json({ message: availability.notice });
+    }
     const claimedRoom = await MonitorRoom.findOneAndUpdate(
       { _id: room._id, status: "Available" },
       { $set: { status: "Occupied" } },
@@ -406,7 +427,7 @@ sessionsRouter.post("/", requireAnyPermission(PERMISSIONS.ROOM_OPERATE, PERMISSI
       scheduledEndTime,
       rate,
       amount,
-      corkageFee: booking ? Number(booking.corkageFee) || 0 : directPricing.corkageFee,
+      roomCharge: booking ? Number(booking.roomCharge) || Number(booking.amount) : directPricing.roomCharge,
       hourlyRates: booking ? booking.hourlyRates || [] : directPricing.hourlyRates,
       paidAmount,
       refundedAmount: booking ? refundedAmount : 0,
@@ -417,6 +438,10 @@ sessionsRouter.post("/", requireAnyPermission(PERMISSIONS.ROOM_OPERATE, PERMISSI
     });
 
     try {
+      if (!booking) {
+        const availability = await getSessionStartAvailability(claimedRoom, sessionDuration);
+        if (!availability.canStart) throw new AppError(409, availability.notice);
+      }
       await session.save();
     } catch (err) {
       await MonitorRoom.updateOne({ _id: claimedRoom._id, status: "Occupied" }, { $set: { status: "Available" } });
@@ -437,7 +462,17 @@ sessionsRouter.post("/", requireAnyPermission(PERMISSIONS.ROOM_OPERATE, PERMISSI
       booking.paymentStatus = resolvedPaymentStatus;
       booking.paymentUpdatedAt = new Date();
       if (paymentMethod) booking.paymentMethod = paymentMethod;
-      await booking.save();
+      const _id = booking._id;
+      const fields = { status: booking.status, amount: booking.amount, paidAmount: booking.paidAmount, paymentStatus: booking.paymentStatus, paymentUpdatedAt: booking.paymentUpdatedAt,
+        ...(paymentMethod ? { paymentMethod: booking.paymentMethod } : {}),
+        ...(discount > 0 ? { discountAmount: booking.discountAmount, venueDiscountApplied: true, venueDiscountRefunded: booking.venueDiscountRefunded, refundedAmount: booking.refundedAmount } : {}),
+      };
+      const updatedBooking = await Booking.findOneAndUpdate({ _id, status: Booking.BOOKING_STATUS.CONFIRMED, "venueClosure.status": { $ne: "pending" } }, { $set: fields }, { returnDocument: "after", runValidators: true });
+      if (!updatedBooking) {
+        await RoomSession.deleteOne({ _id: session._id });
+        await MonitorRoom.updateOne({ _id: claimedRoom._id, status: "Occupied" }, { $set: { status: "Available" } });
+        throw new AppError(409, "The reservation changed while starting. Refresh it before continuing.");
+      }
       if (discount > 0) await logAudit({ category: "Booking", action: "updated", description: `applied ₱${discount.toFixed(2)} venue discount to reservation ${booking.reservationCode || (booking.guestName ? `${booking.guestName}'s reservation` : "reservation")}${cashReturned > 0 ? `, including ₱${cashReturned.toFixed(2)} returned to the guest` : ''}`, user: req.user });
     }
 
@@ -454,8 +489,9 @@ sessionsRouter.get("/:id/extend", requirePermission(PERMISSIONS.ROOM_OPERATE), v
   try {
     const session = await RoomSession.findById(req.params.id);
     if (!session) return res.status(404).json({ message: "Session not found." });
-    const { pricing, fields, currentBalance, scheduledEndTime } = await quoteSessionExtension(session, req.query.addedHours);
+    const { pricing, fields, currentBalance, scheduledEndTime, availability } = await quoteSessionExtension(session, req.query.addedHours);
     res.json({
+      ...availability,
       addedHours: req.query.addedHours,
       addedCharge: pricing.addedCharge,
       currentBalance,
@@ -474,7 +510,8 @@ sessionsRouter.put("/:id/extend", requirePermission(PERMISSIONS.ROOM_OPERATE), v
     const { addedHours, collectNow, expectedCharge, paymentMethod } = req.body;
     const session = await RoomSession.findById(req.params.id);
     if (!session) return res.status(404).json({ message: "Session not found." });
-    const { pricing, scheduledEndTime } = await quoteSessionExtension(session, addedHours);
+    const { pricing, scheduledEndTime, availability } = await quoteSessionExtension(session, addedHours);
+    if (!availability.canExtend) throw new AppError(409, availability.notice);
     if (Math.abs(pricing.addedCharge - expectedCharge) >= 0.01) {
       return res.status(409).json({ message: "The extension charge changed. Review the updated amount before confirming." });
     }
@@ -483,6 +520,7 @@ sessionsRouter.put("/:id/extend", requirePermission(PERMISSIONS.ROOM_OPERATE), v
 
     session.duration = fields.duration;
     session.scheduledEndTime = scheduledEndTime;
+    session.roomCharge = Math.round(((Number(session.roomCharge) || Number(session.amount)) + pricing.addedCharge) * 100) / 100;
     session.amount = fields.amount;
     session.hourlyRates = pricing.hourlyRates;
     session.paidAmount = fields.paidAmount;
@@ -580,16 +618,20 @@ sessionsRouter.put("/:id", requirePermission(PERMISSIONS.ROOM_OPERATE), validate
 
 sessionsRouter.delete("/:id", requirePermission(PERMISSIONS.ROOM_OPERATE), validate(idParamsSchema, "params"), validate(sessionCancelSchema), async (req, res) => {
   try {
-    const session = await RoomSession.findById(req.params.id);
-    if (!session) return res.status(404).json({ message: "Session not found." });
-    if (session.status !== "Active") return res.status(409).json({ message: "Only an active session can be cancelled." });
-    session.status = "Cancelled";
-    session.endedAt = new Date();
-    session.cancellationReason = String(req.body?.reason || "Session cancelled by staff").slice(0, 500);
-    await session.save();
-    await releaseSessionRoom(session.room);
-    if (session.booking) await Booking.findByIdAndUpdate(session.booking, { status: Booking.BOOKING_STATUS.CONFIRMED });
-    res.json({ message: "Session cancelled.", session });
+    const session = await RoomSession.findOneAndUpdate(
+      { _id: req.params.id, status: "Active" },
+      { $set: { status: "Cancelled", endedAt: new Date(), cancellationReason: req.body?.reason || "Session cancelled by staff" } },
+      { returnDocument: "after", runValidators: true }
+    );
+    if (!session) {
+      const exists = await RoomSession.exists({ _id: req.params.id });
+      return res.status(exists ? 409 : 404).json({ message: exists ? "Only an active session can be cancelled." : "Session not found." });
+    }
+    const [room] = await Promise.all([
+      releaseSessionRoom(session.room),
+      session.booking ? Booking.findByIdAndUpdate(session.booking, { status: Booking.BOOKING_STATUS.CONFIRMED }) : Promise.resolve(),
+    ]);
+    res.json({ message: "Session cancelled.", session, room: room ? { _id: room._id, status: room.status } : null });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Server error." });

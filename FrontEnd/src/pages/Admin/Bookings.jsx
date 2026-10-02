@@ -6,18 +6,24 @@ import Modal from '../../components/Modal';
 import ReservationTimePicker, { reservationSelectionKey } from '../../components/ReservationTimePicker';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import { useConfirm } from '../../hooks/useConfirm';
+import Toast from '../../components/Toast';
+import { useToast } from '../../hooks/useToast';
 import { dateKey } from '../../utils/rooms';
 import { resolveImageUrl } from '../../utils/resolveImageUrl';
 import { formatPeso } from '../../utils/currency';
 import { guestPhoneDisplay } from '../../utils/receipt';
+import { reservationDisplayName } from '../../utils/reservationName';
+import { repeatCustomerLookupTerm, repeatCustomerSuggestions } from '../../utils/repeatCustomers';
 import { businessDate } from '../../utils/businessDate';
 import { cancellationAmounts } from '../../utils/cancellationPolicy';
 import { useAuth } from '../../context/AuthContext';
 import { useSiteSettings } from '../../hooks/useSiteSettings';
 import { roomsService } from '../../services/rooms';
 import { bookingsService } from '../../services/bookings';
-import { CORKAGE_FEE, calculateBookingPrice } from '../../utils/roomPricing';
+import { calculateBookingPrice } from '../../utils/roomPricing';
 import { RESERVATION_STATUS_FILTERS, reservationPresentation, reservationWindow } from '../../utils/reservationStatus';
+import ClosureResolution from '../../components/ClosureResolution';
+import { AUTOMATIC_REFUND_STATUSES, isClosurePending } from '../../utils/closureRefund';
 
 
 
@@ -36,18 +42,18 @@ const QUICK_VIEWS = [
   ['ongoing', 'Ongoing'], ['finished', 'Finished'], ['review', 'Needs review'],
 ];
 const CLOSED_STATUSES = ['Done', 'No Show', 'Cancelled', 'Rejected'];
-const OPEN_ONLY_VIEWS = ['all', 'new', 'today', 'upcoming'];
+const OPEN_ONLY_VIEWS = ['new', 'today', 'upcoming'];
 const PAYMENT_METHODS = ['Cash', 'GCash', 'Maya', 'QR Ph', 'Credit / Debit Card'];
 const SEARCH_DEBOUNCE_MS = 350;
 const BOOKINGS_POLL_MS = 15000;
 const WEEKDAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-function ReservationStatus({ booking, now }) {
+function ReservationStatus({ booking, now, showWarning = true }) {
   const { status, warning } = reservationPresentation(booking, now);
   return (
     <span className="bk-status-cell">
       <span className={`pill ${warning === 'Cancellation requested' ? 'pill-pending' : STATUS_PILL_CLASS[status] || 'pill-pending'}`}>{status}</span>
-      {warning && <span className={`bk-status-note${warning === 'Cancellation requested' ? ' bk-status-note--warning' : ''}`}>{warning}</span>}
+      {showWarning && warning && <span className={`bk-status-note${warning === 'Cancellation requested' ? ' bk-status-note--warning' : ''}`}>{warning}</span>}
     </span>
   );
 }
@@ -139,20 +145,8 @@ function initials(name) {
   return (parts[0][0] + (parts[1]?.[0] || '')).toUpperCase();
 }
 
-function reservationNameParts(name) {
-  const fullName = String(name || '').trim().replace(/\s+/g, ' ');
-  const commaIndex = fullName.indexOf(',');
-  if (commaIndex > 0 && commaIndex < fullName.length - 1) {
-    return {
-      firstName: fullName.slice(commaIndex + 1).trim(),
-      lastName: fullName.slice(0, commaIndex).trim(),
-    };
-  }
-  const spaceIndex = fullName.indexOf(' ');
-  return spaceIndex < 0
-    ? { firstName: fullName, lastName: '' }
-    : { firstName: fullName.slice(0, spaceIndex), lastName: fullName.slice(spaceIndex + 1) };
-}
+const validGuestPhone = (value) => value.trim().length >= 7 && value.trim().length <= 40 && /^\+?[0-9() .-]+$/.test(value.trim()) && value.replace(/\D/g, '').length >= 7;
+const validGuestEmail = (value) => value.trim().length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
 
 function formatDate(dateStr) {
   if (!dateStr) return '—';
@@ -179,6 +173,7 @@ function Bookings() {
   const { initializing, hasPermission, guardPermission } = useAuth();
   const canManage = hasPermission('booking:manage');
   const { confirm, confirmProps } = useConfirm();
+  const { toast, showToast } = useToast();
   const { minDuration, maxDuration } = useSiteSettings();
 
   const [search, setSearch] = useState('');
@@ -198,6 +193,8 @@ function Bookings() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [rooms, setRooms] = useState([]);
+  const [roomsLoading, setRoomsLoading] = useState(true);
+  const [roomsError, setRoomsError] = useState('');
 
   const [calendarViewDate, setCalendarViewDate] = useState(() => new Date());
 
@@ -207,20 +204,27 @@ function Bookings() {
   const [cancellationReviewId, setCancellationReviewId] = useState(null);
   const [manualBookingOpen, setManualBookingOpen] = useState(() => new URLSearchParams(window.location.search).get('openManualBooking') === '1');
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
+  const fetchRooms = useCallback(async () => {
+    setRoomsLoading(true);
+    setRoomsError('');
+    try {
+      let data;
       try {
-        const data = await roomsService.list();
-        if (!cancelled) setRooms(Array.isArray(data) ? data : []);
-      } catch (err) {
-        console.error(err);
+        data = await roomsService.adminList();
+      } catch (error) {
+        if (error.status !== 403 && error.status !== 404) throw error;
+        data = await roomsService.list();
       }
-    })();
-    return () => {
-      cancelled = true;
-    };
+      setRooms(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error(error);
+      setRoomsError(error.message || 'Could not load facilities.');
+    } finally {
+      setRoomsLoading(false);
+    }
   }, []);
+
+  useEffect(() => { fetchRooms(); }, [fetchRooms]);
 
   const fetchBookings = useCallback(async ({ silent = false } = {}) => {
     if (!silent) setLoading(true);
@@ -303,13 +307,15 @@ function Bookings() {
   }
 
   async function updateBookingStatus(id, status) {
-    if (!guardPermission('booking:manage')) return;
+    if (!guardPermission('booking:manage')) return false;
     try {
       await bookingsService.update(id, { status });
       await fetchBookings();
+      return true;
     } catch (err) {
       console.error(err);
       alert(err.message || 'Could not update this reservation.');
+      return false;
     }
   }
 
@@ -423,26 +429,16 @@ function Bookings() {
       render: (b) => <span className="bk-code-wrap"><span className="bk-code">{b.reservationCode || shortBookingId(b)}</span>{matchesQuickView(b, 'new', clockMs, today) && <span className="bk-new-badge">New</span>}</span>,
     },
     {
-      key: 'lastName',
-      label: 'Last name',
+      key: 'guestName',
+      label: 'Customer name',
       sortable: true,
-      sortValue: (b) => reservationNameParts(b.guestName).lastName,
+      sortValue: (b) => reservationDisplayName(b.guestName),
       render: (b) => (
         <div className="bk-customer">
           <span className="bk-avatar">{initials(b.guestName)}</span>
-          <span className="bk-customer-name">{reservationNameParts(b.guestName).lastName || '—'}</span>
-        </div>
-      ),
-    },
-    {
-      key: 'firstName',
-      label: 'First name',
-      sortable: true,
-      sortValue: (b) => reservationNameParts(b.guestName).firstName,
-      render: (b) => (
-        <div className="bk-customer-info">
-          <span className="bk-customer-name">{reservationNameParts(b.guestName).firstName || '—'}</span>
-          <span className="bk-customer-phone">{guestPhoneDisplay(b.guestContact)}</span>
+          <span className="bk-customer-info">
+            <span className="bk-customer-name">{reservationDisplayName(b.guestName)}</span>
+          </span>
         </div>
       ),
     },
@@ -500,7 +496,7 @@ function Bookings() {
       label: 'Status',
       sortable: true,
       sortValue: (b) => reservationPresentation(b, clockMs).status,
-      render: (b) => <ReservationStatus booking={b} now={clockMs} />,
+      render: (b) => <ReservationStatus booking={b} now={clockMs} showWarning={false} />,
     },
     {
       key: 'actions',
@@ -628,7 +624,7 @@ function Bookings() {
       </div>
 
       <EditBookingModal booking={editBooking} rooms={rooms} onClose={() => setEditId(null)} onSaved={fetchBookings} minDuration={minDuration} maxDuration={maxDuration} />
-      <CreateBookingModal open={manualBookingOpen} rooms={rooms} onClose={() => setManualBookingOpen(false)} onCreated={fetchBookings} minDuration={minDuration} maxDuration={maxDuration} />
+      <CreateBookingModal open={manualBookingOpen} rooms={rooms} roomsLoading={roomsLoading} roomsError={roomsError} onReloadRooms={fetchRooms} onClose={() => setManualBookingOpen(false)} onCreated={fetchBookings} minDuration={minDuration} maxDuration={maxDuration} />
 
       <Modal open={!!proofBooking} onClose={() => setProofId(null)} title="Payment Screenshot">
         {proofBooking && (
@@ -683,7 +679,7 @@ function Bookings() {
                 <div className="bd-card">
                   <div className="bd-section-title"><i className="ti ti-user"></i> Customer Information</div>
                   <div className="bd-grid">
-                    <div className="bd-field"><label>Customer Name</label><p>{detailBooking.guestName || '—'}</p></div>
+                    <div className="bd-field"><label>Customer Name</label><p>{reservationDisplayName(detailBooking.guestName)}</p></div>
                     <div className="bd-field">
                       <label>Email</label>
                       <p>{detailBooking.guestEmail || (String(detailBooking.guestContact || '').includes('@') ? detailBooking.guestContact : '—')}</p>
@@ -699,10 +695,9 @@ function Bookings() {
                 <div className="bd-card">
                   <div className="bd-section-title"><i className="ti ti-credit-card"></i> Payment Breakdown</div>
                   <div className="bd-grid bd-financial-grid">
-                    <div className="bd-field"><label>Room charge</label><p>{formatPeso(Math.max(0, Number(detailBooking.roomCharge ?? (Number(detailBooking.amount || 0) - Number(detailBooking.corkageFee || 0)))))}</p></div>
+                    <div className="bd-field"><label>Room charge</label><p>{formatPeso(Math.max(0, Number(detailBooking.roomCharge ?? (Number(detailBooking.amount || 0)))))}</p></div>
                     {Number(detailBooking.discountAmount) > 0 && <div className="bd-field"><label>{detailBooking.venueDiscountApplied ? 'Room discount settled at venue' : 'Pay-in-full discount'} ({detailBooking.discountPercent}%)</label><p>−{formatPeso(detailBooking.discountAmount)}</p></div>}
                     {(detailBooking.addOns || []).map((service) => <div className="bd-field" key={service.name}><label>{service.name}</label><p>{formatPeso(service.fee)}</p></div>)}
-                    <div className="bd-field"><label>Corkage</label><p>{formatPeso(detailBooking.corkageFee || 0)}</p></div>
                     {detailBooking.paymentChoice === 'deposit' && !detailBooking.venueDiscountApplied && Number(detailBooking.eligibleDiscount) > 0 && <div className="bd-field"><label>{Number(detailBooking.duration) === 1 ? 'Discount to return at venue' : 'Discount to deduct at venue'}</label><p>{formatPeso(detailBooking.eligibleDiscount)}</p></div>}
                     {Number(detailBooking.venueDiscountRefunded) > 0 && <div className="bd-field"><label>Room discount returned to guest</label><p>{formatPeso(detailBooking.venueDiscountRefunded)}</p></div>}
                     <div className="bd-field bd-field--total"><label>Total charge</label><p>{formatPeso(detailBooking.amount)}</p></div>
@@ -721,6 +716,7 @@ function Bookings() {
                   <div className="bd-field"><label>Check-in Time</label><p>{formatTime(detailBooking.timeIn)}</p></div>
                   <div className="bd-field"><label>Check-out Time</label><p>{formatCheckoutTime(detailBooking)}</p></div>
                   <div className="bd-field"><label>Duration</label><p>{detailBooking.duration ? `${detailBooking.duration} hr${detailBooking.duration > 1 ? 's' : ''}` : '—'}</p></div>
+                  <div className="bd-field"><label>Reservation source</label><p>{detailBooking.source === 'walk-in' ? 'Manual · entered by staff' : detailBooking.source === 'online' ? 'Online · booked through website' : 'Not recorded'}</p></div>
                   <div className="bd-field"><label>Reserved On</label><p>{detailBooking.createdAt ? new Date(detailBooking.createdAt).toLocaleString('en-PH', { timeZone: 'Asia/Manila', month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true }) : '—'}</p></div>
                 </div>
               </div>
@@ -751,19 +747,22 @@ function Bookings() {
                 </div>
               </div>
 
+              {(isClosurePending(detailBooking) || detailBooking.closureRefund) && <ClosureResolution key={detailBooking._id} booking={detailBooking} admin={canManage} readOnly={!canManage} onReschedule={canManage ? () => { const id = detailBooking._id; setDetailId(null); openEditBooking(id); } : undefined} onUpdated={updated => {
+                setBookings(previous => previous.map(item => item._id === updated._id ? { ...item, ...updated } : item));
+              }} />}
               {detailBooking.cancellationStatus && detailBooking.cancellationStatus !== 'None' && (
                 <div className="bd-card">
                   <div className="bd-section-title"><i className="ti ti-file-x"></i> Cancellation review</div>
                   <p className="bd-notes-body">Status: <strong>{detailBooking.cancellationStatus}</strong>{detailBooking.cancellationReason ? ` · ${detailBooking.cancellationReason}` : ''}</p>
                   {detailBooking.cancellationReviewNote && <p className="bd-screenshot-hint">Review note: {detailBooking.cancellationReviewNote}</p>}
                   {detailBooking.cancellationRefundNote && <p className="bd-screenshot-hint">Refund note: {detailBooking.cancellationRefundNote}</p>}
-                  {detailBooking.status === 'Cancelled' && cancellationAmounts(detailBooking).refundRemaining > 0 && (
+                  {detailBooking.status === 'Cancelled' && !AUTOMATIC_REFUND_STATUSES.includes(detailBooking.closureRefund?.status) && cancellationAmounts(detailBooking).refundRemaining > 0 && (
                     <p className="bd-screenshot-hint">Refund to arrange with the guest: {formatPeso(cancellationAmounts(detailBooking).refundRemaining)}. Record it after the manual transfer.</p>
                   )}
                   {canManage && detailBooking.cancellationStatus === 'Requested' && (
                     <button type="button" className="btn-confirm" style={{ marginTop: 12 }} onClick={() => setCancellationReviewId(detailBooking._id)}>Review request</button>
                   )}
-                  {canManage && detailBooking.cancellationStatus === 'Approved' && recordedPayment(detailBooking) > Number(detailBooking.refundedAmount || 0) && (
+                  {canManage && !AUTOMATIC_REFUND_STATUSES.includes(detailBooking.closureRefund?.status) && detailBooking.cancellationStatus === 'Approved' && recordedPayment(detailBooking) > Number(detailBooking.refundedAmount || 0) && (
                     <button type="button" className="btn-confirm" style={{ marginTop: 12 }} onClick={() => setCancellationReviewId(detailBooking._id)}>{cancellationAmounts(detailBooking).refundRemaining > 0 ? 'Record manual refund' : 'Review refund exception'}</button>
                   )}
                 </div>
@@ -788,7 +787,7 @@ function Bookings() {
                     Delete
                   </button>
                 )}
-                {canManage && ['Confirmed', 'Overdue', 'No Show'].includes(reservationPresentation(detailBooking, clockMs).status) && detailBooking.status !== 'Ongoing' && detailBooking.cancellationStatus !== 'Requested' && (detailBooking.status === 'No Show' || clockMs >= (reservationWindow(detailBooking)?.start ?? Infinity)) && (
+                {canManage && !isClosurePending(detailBooking) && ['Confirmed', 'Overdue', 'No Show'].includes(reservationPresentation(detailBooking, clockMs).status) && detailBooking.status !== 'Ongoing' && detailBooking.cancellationStatus !== 'Requested' && (detailBooking.status === 'No Show' || clockMs >= (reservationWindow(detailBooking)?.start ?? Infinity)) && (
                   <button
                     className="btn-cancel"
                     style={{ color: 'var(--teal)', borderColor: 'rgba(45,212,191,.35)' }}
@@ -797,20 +796,25 @@ function Bookings() {
                     {reservationPresentation(detailBooking, clockMs).status === 'No Show' ? 'Correct to Done' : 'Mark Done'}
                   </button>
                 )}
-                {canManage && ['Pending', 'Confirmed'].includes(detailBooking.status) && reservationPresentation(detailBooking, clockMs).status !== 'No Show' && (
+                {canManage && !isClosurePending(detailBooking) && ['Pending', 'Confirmed'].includes(detailBooking.status) && reservationPresentation(detailBooking, clockMs).status !== 'No Show' && (
                   <button
                     className="btn-cancel"
                     style={{ color: 'var(--amber)', borderColor: 'rgba(245,165,36,.35)' }}
                     onClick={async () => {
-                      if (!(await confirm('Cancel this reservation on behalf of the venue? Use cancellation review for a customer request. The guest will need to rebook if they still want the slot.', { danger: true, confirmText: 'Cancel Reservation' }))) return;
-                      await updateBookingStatus(detailBooking._id, 'Cancelled');
-                      setDetailId(null);
+                      const message = detailBooking.cancellationStatus === 'Requested'
+                        ? 'Cancel this reservation as requested by the customer? Any refund must be recorded separately.'
+                        : 'Cancel this reservation? The reserved slot will be released. Any refund must be recorded separately.';
+                      if (!(await confirm(message, { danger: true, confirmText: 'Cancel Reservation' }))) return;
+                      if (await updateBookingStatus(detailBooking._id, 'Cancelled')) {
+                        setDetailId(null);
+                        showToast('Reservation cancelled.');
+                      }
                     }}
                   >
                     Cancel Reservation
                   </button>
                 )}
-                {canManage && ['Pending', 'Pending Payment Verification'].includes(detailBooking.status) && (detailBooking.status === 'Pending Payment Verification' || recordedPayment(detailBooking) === 0) && (
+                {canManage && !isClosurePending(detailBooking) && ['Pending', 'Pending Payment Verification'].includes(detailBooking.status) && (detailBooking.status === 'Pending Payment Verification' || recordedPayment(detailBooking) === 0) && (
                   <button
                     className="btn-cancel"
                     style={{ color: 'var(--red)', borderColor: 'rgba(225,29,72,.3)' }}
@@ -854,50 +858,126 @@ function Bookings() {
       />
 
       <ConfirmDialog {...confirmProps} />
+      <Toast {...toast} />
     </div>
   );
 }
 
-function CreateBookingModal({ open, rooms, onClose, onCreated, minDuration = 1, maxDuration = 5 }) {
+function CreateBookingModal({ open, rooms, roomsLoading, roomsError, onReloadRooms, onClose, onCreated, minDuration = 1, maxDuration = 5 }) {
   const [guestName, setGuestName] = useState('');
+  const [selectedCustomerName, setSelectedCustomerName] = useState('');
+  const [customerMatches, setCustomerMatches] = useState([]);
+  const [customerLookupState, setCustomerLookupState] = useState('idle');
+  const [customerNameFocused, setCustomerNameFocused] = useState(false);
+  const [customerPrefillNotice, setCustomerPrefillNotice] = useState('');
+  const customerNameRef = useRef(null);
+  const customerOptionRefs = useRef([]);
   const [guestContact, setGuestContact] = useState('');
+  const [guestEmail, setGuestEmail] = useState('');
   const [guestCount, setGuestCount] = useState('1');
   const [roomId, setRoomId] = useState('');
   const [variantLabel, setVariantLabel] = useState('');
   const [date, setDate] = useState('');
   const [timeIn, setTimeIn] = useState('');
   const [duration, setDuration] = useState(String(minDuration));
-  const [paidAmount, setPaidAmount] = useState('0');
+  const [paymentChoice, setPaymentChoice] = useState('deposit');
   const [paymentMethod, setPaymentMethod] = useState('Cash');
-  const [hasCorkage, setHasCorkage] = useState(false);
   const [specialRequests, setSpecialRequests] = useState('');
   const [availability, setAvailability] = useState({ key: '', status: 'incomplete' });
   const [saving, setSaving] = useState(false);
-  const selectedRoom = rooms.find((room) => room._id === roomId);
+  const selectableRooms = useMemo(() => rooms.filter((room) => room.status !== 'Unavailable' && (!room.variants?.length || room.variants.some((variant) => variant.status !== 'Unavailable'))), [rooms]);
+  const selectedRoom = selectableRooms.find((room) => room._id === roomId);
   const variants = Array.isArray(selectedRoom?.variants) ? selectedRoom.variants.filter((variant) => variant.status !== 'Unavailable') : [];
   const selectedVariant = variants.find((variant) => variant.label === variantLabel) || null;
-  const estimatedCharge = selectedRoom
-    ? calculateBookingPrice({ variant: selectedVariant || selectedRoom, startHour: Number.parseInt(timeIn, 10) || 0, duration: Number(duration) || 1, guestCount: Number(guestCount) || 1, hasCorkage }).amount
-    : 0;
+  const priceBreakdown = selectedRoom
+    ? calculateBookingPrice({ variant: selectedVariant || selectedRoom, startHour: Number.parseInt(timeIn, 10) || 0, duration: Number(duration) || 1, guestCount: Number(guestCount) || 1 })
+    : null;
+  const estimatedCharge = priceBreakdown?.amount || 0;
+  const firstHourPayment = Math.min(estimatedCharge, priceBreakdown?.hourlyRates?.[0] || 0);
+  const selectedPaymentChoice = Number(duration) === 1 ? 'deposit' : paymentChoice;
+  const amountReceived = selectedPaymentChoice === 'full' ? estimatedCharge : firstHourPayment;
   const selectionKey = reservationSelectionKey({ roomId, variantLabel, date, duration, timeIn });
   const available = availability.key === selectionKey && availability.status === 'available';
 
   useEffect(() => {
     if (!open) return;
     setGuestName('');
+    setSelectedCustomerName('');
+    setCustomerMatches([]);
+    setCustomerLookupState('idle');
+    setCustomerNameFocused(false);
+    setCustomerPrefillNotice('');
     setGuestContact('');
+    setGuestEmail('');
     setGuestCount('1');
-    setRoomId(rooms[0]?._id || '');
+    setRoomId(selectableRooms[0]?._id || '');
     setVariantLabel('');
     setDate('');
     setTimeIn('');
     setDuration(String(minDuration));
-    setPaidAmount('0');
+    setPaymentChoice('deposit');
     setPaymentMethod('Cash');
-    setHasCorkage(false);
     setSpecialRequests('');
     setAvailability({ key: '', status: 'incomplete' });
-  }, [open, rooms, minDuration]);
+  // A late room-list refresh must not erase the customer and schedule being entered.
+  }, [open]);
+
+  useEffect(() => {
+    const lookupTerm = repeatCustomerLookupTerm(guestName);
+    if (!open || lookupTerm.length < 2 || guestName.trim() === selectedCustomerName) {
+      setCustomerMatches([]);
+      setCustomerLookupState('idle');
+      return;
+    }
+    if (roomsLoading) {
+      setCustomerMatches([]);
+      setCustomerLookupState('loading');
+      return;
+    }
+    let cancelled = false;
+    setCustomerMatches([]);
+    setCustomerLookupState('loading');
+    const timer = setTimeout(async () => {
+      try {
+        const history = await bookingsService.repeatCustomers(lookupTerm);
+        if (!cancelled) {
+          setCustomerMatches(repeatCustomerSuggestions(history, guestName, selectableRooms, minDuration, maxDuration));
+          setCustomerLookupState('ready');
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setCustomerMatches([]);
+          setCustomerLookupState('error');
+        }
+      }
+    }, 250);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [open, guestName, selectedCustomerName, selectableRooms, roomsLoading, minDuration, maxDuration]);
+
+  function choosePreviousCustomer(customer) {
+    setGuestName(customer.name);
+    setSelectedCustomerName(customer.name);
+    setGuestContact((current) => customer.phone || current);
+    setGuestEmail((current) => customer.email || current);
+    setGuestCount(String(customer.preference?.guestCount || 1));
+    if (customer.preference) {
+      setRoomId(customer.preference.roomId);
+      setVariantLabel(customer.preference.variantLabel);
+    }
+    setDuration(String(customer.preference?.duration || minDuration));
+    setTimeIn('');
+    setAvailability({ key: '', status: 'incomplete' });
+    setPaymentChoice('deposit');
+    setPaymentMethod('Cash');
+    setCustomerPrefillNotice(customer.preference
+      ? `Usual choice selected: ${customer.preference.roomName}${customer.preference.variantLabel ? ` · ${customer.preference.variantLabel}` : ''}. Choose a new date and available time.`
+      : 'Previous customer selected. Confirm the facility and room type, then choose a new date and time.');
+    setCustomerNameFocused(true);
+    customerNameRef.current?.focus();
+  }
 
   useEffect(() => {
     if (variants.length && !variants.some((variant) => variant.label === variantLabel)) setVariantLabel(variants[0].label);
@@ -906,11 +986,18 @@ function CreateBookingModal({ open, rooms, onClose, onCreated, minDuration = 1, 
 
   async function submit(event) {
     event.preventDefault();
-    const amountReceived = Number(paidAmount);
     const parsedDuration = Number(duration);
     const parsedGuestCount = Number(guestCount);
     if (!guestName.trim() || !roomId || !date || !/^([01]\d|2[0-3]):00$/.test(timeIn) || !Number.isInteger(parsedDuration) || parsedDuration < minDuration || parsedDuration > maxDuration || !Number.isInteger(parsedGuestCount) || parsedGuestCount < 1 || !Number.isFinite(amountReceived) || amountReceived < 0) {
       alert('Complete the guest, room, hourly schedule, and payment fields.');
+      return;
+    }
+    if (!validGuestPhone(guestContact)) {
+      alert('Enter a valid phone number for the reservation.');
+      return;
+    }
+    if (!validGuestEmail(guestEmail)) {
+      alert('Enter a valid email address for the reservation.');
       return;
     }
     if (!available) {
@@ -923,7 +1010,7 @@ function CreateBookingModal({ open, rooms, onClose, onCreated, minDuration = 1, 
     }
     setSaving(true);
     try {
-      await bookingsService.create({ guestName: guestName.trim(), guestContact: guestContact.trim(), guestCount: parsedGuestCount, hasCorkage, specialRequests: specialRequests.trim(), roomId, variantLabel: variantLabel || undefined, date, timeIn, duration: parsedDuration, paidAmount: amountReceived, paymentMethod });
+      await bookingsService.create({ guestName: guestName.trim(), guestContact: guestContact.trim(), guestEmail: guestEmail.trim(), guestCount: parsedGuestCount, specialRequests: specialRequests.trim(), roomId, variantLabel: variantLabel || undefined, date, timeIn, duration: parsedDuration, paymentChoice: selectedPaymentChoice, paidAmount: amountReceived, paymentMethod });
       onClose();
       await onCreated();
     } catch (err) {
@@ -936,13 +1023,66 @@ function CreateBookingModal({ open, rooms, onClose, onCreated, minDuration = 1, 
   return (
     <Modal open={open} onClose={onClose} title="Add manual reservation" size="2xl" className="walkin-booking-modal">
       <form onSubmit={submit} className="walkin-booking-form">
-        <p className="walkin-form-intro">Enter the guest and choose an available time. The reservation will be confirmed when you create it.</p>
+        <p className="walkin-form-intro">Start typing a returning customer's name to reuse their usual reservation details. Choose a new date and available time for every booking.</p>
 
         <section className="walkin-form-section" aria-labelledby="walkin-guest-heading">
           <h3 id="walkin-guest-heading" className="walkin-section-title">Guest</h3>
           <div className="booking-form-grid walkin-guest-grid">
-            <div className="mfield"><label htmlFor="manual-guest-name">Guest name</label><input id="manual-guest-name" required value={guestName} onChange={(event) => setGuestName(event.target.value)} placeholder="e.g. Juan Dela Cruz" /></div>
-            <div className="mfield"><label htmlFor="manual-guest-contact">Phone or email <span className="walkin-optional">Optional</span></label><input id="manual-guest-contact" value={guestContact} onChange={(event) => setGuestContact(event.target.value)} placeholder="Contact details" /></div>
+            <div className="mfield manual-customer-field" onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setCustomerNameFocused(false); }}>
+              <label htmlFor="manual-guest-name">Customer name (Last, First)</label>
+              <input
+                id="manual-guest-name"
+                ref={customerNameRef}
+                required
+                autoComplete="off"
+                value={guestName}
+                onFocus={() => setCustomerNameFocused(true)}
+                onChange={(event) => { setGuestName(event.target.value); setSelectedCustomerName(''); setCustomerPrefillNotice(''); setCustomerNameFocused(true); }}
+                onKeyDown={(event) => {
+                  if (event.key === 'ArrowDown' && customerMatches.length) {
+                    event.preventDefault();
+                    setCustomerNameFocused(true);
+                    requestAnimationFrame(() => customerOptionRefs.current[0]?.focus());
+                  }
+                  if (event.key === 'Escape' && customerNameFocused) { event.stopPropagation(); setCustomerNameFocused(false); }
+                }}
+                aria-controls="manual-customer-suggestions"
+                aria-expanded={customerNameFocused && repeatCustomerLookupTerm(guestName).length >= 2 && guestName.trim() !== selectedCustomerName}
+                aria-autocomplete="list"
+                role="combobox"
+                placeholder="e.g. Dela Cruz, Juan"
+              />
+              {customerNameFocused && repeatCustomerLookupTerm(guestName).length >= 2 && guestName.trim() !== selectedCustomerName && (
+                <div className="manual-customer-suggestions" id="manual-customer-suggestions" role="listbox" aria-label="Previous customers">
+                  {customerLookupState === 'loading' && <p className="manual-customer-suggestion-message">Looking for previous customers…</p>}
+                  {customerLookupState === 'error' && <p className="manual-customer-suggestion-message">Could not load previous customers. You can enter the details manually.</p>}
+                  {customerLookupState === 'ready' && !customerMatches.length && <p className="manual-customer-suggestion-message">No matching previous customer. Continue entering a new reservation.</p>}
+                  {customerMatches.map((customer, index) => (
+                    <button
+                      type="button"
+                      role="option"
+                      aria-selected="false"
+                      className="manual-customer-suggestion"
+                      key={customer.key}
+                      ref={(element) => { customerOptionRefs.current[index] = element; }}
+                      onClick={() => choosePreviousCustomer(customer)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'ArrowDown') { event.preventDefault(); customerOptionRefs.current[Math.min(index + 1, customerMatches.length - 1)]?.focus(); }
+                        if (event.key === 'ArrowUp') { event.preventDefault(); (index ? customerOptionRefs.current[index - 1] : customerNameRef.current)?.focus(); }
+                        if (event.key === 'Escape') { event.stopPropagation(); customerNameRef.current?.focus(); setCustomerNameFocused(false); }
+                      }}
+                    >
+                      <span className="manual-customer-suggestion-name">{customer.name}<small>{customer.reservationCount} reservation{customer.reservationCount === 1 ? '' : 's'} on file</small></span>
+                      <span className="manual-customer-suggestion-detail">{customer.phone || customer.email || 'No contact on file'}</span>
+                      {customer.preference && <span className="manual-customer-suggestion-usual">Usually {customer.preference.roomName}{customer.preference.variantLabel ? ` · ${customer.preference.variantLabel}` : ''} · {customer.preference.duration}h</span>}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {customerPrefillNotice && <p className="manual-customer-prefill-notice" role="status">{customerPrefillNotice}</p>}
+            </div>
+            <div className="mfield"><label htmlFor="manual-guest-contact">Phone number</label><input id="manual-guest-contact" type="tel" autoComplete="tel" required maxLength={40} value={guestContact} onChange={(event) => setGuestContact(event.target.value)} placeholder="0912 345 6789" /></div>
+            <div className="mfield"><label htmlFor="manual-guest-email">Email</label><input id="manual-guest-email" type="email" autoComplete="email" required maxLength={254} value={guestEmail} onChange={(event) => setGuestEmail(event.target.value)} placeholder="guest@example.com" /></div>
             <div className="mfield"><label htmlFor="manual-guest-count">Guests</label><input id="manual-guest-count" type="number" min="1" required value={guestCount} onChange={(event) => setGuestCount(event.target.value)} /></div>
           </div>
         </section>
@@ -950,12 +1090,13 @@ function CreateBookingModal({ open, rooms, onClose, onCreated, minDuration = 1, 
         <section className="walkin-form-section" aria-labelledby="walkin-schedule-heading">
           <h3 id="walkin-schedule-heading" className="walkin-section-title">Facility & schedule</h3>
           <div className="booking-form-grid walkin-facility-grid">
-            <div className="mfield"><label htmlFor="manual-room">Facility</label><select id="manual-room" required value={roomId} onChange={(event) => { setRoomId(event.target.value); setTimeIn(''); }}><option value="">Choose a facility</option>{rooms.map((room) => <option key={room._id} value={room._id}>{room.name}</option>)}</select></div>
+            <div className="mfield"><label htmlFor="manual-room">Facility</label><select id="manual-room" required value={roomId} disabled={roomsLoading || !selectableRooms.length} onChange={(event) => { setRoomId(event.target.value); setTimeIn(''); }}><option value="">{roomsLoading ? 'Loading facilities…' : 'Choose a facility'}</option>{selectableRooms.map((room) => <option key={room._id} value={room._id}>{room.name}</option>)}</select></div>
             <div className="mfield"><label htmlFor="manual-variant">Room type</label><select id="manual-variant" required={variants.length > 0} value={variantLabel} onChange={(event) => { setVariantLabel(event.target.value); setTimeIn(''); }} disabled={!variants.length}><option value="">{variants.length ? 'Choose a room type' : 'Base price'}</option>{variants.map((variant) => <option key={variant.label} value={variant.label}>{variant.label}</option>)}</select></div>
           </div>
+          {!roomsLoading && (roomsError || !selectableRooms.length) && <p className="admin-slot-hint admin-slot-hint--warning" role="alert">{roomsError || 'No facilities are available for manual reservations.'} <button type="button" className="admin-slot-retry" onClick={onReloadRooms}>Try again</button></p>}
           <div className="booking-form-grid walkin-time-grid">
             <div className="mfield"><label htmlFor="manual-date">Date</label><input id="manual-date" type="date" required value={date} min={businessDate()} onChange={(event) => { setDate(event.target.value); setTimeIn(''); }} /></div>
-            <div className="mfield"><label htmlFor="manual-duration">Duration (hours)</label><select id="manual-duration" value={duration} onChange={(event) => { setDuration(event.target.value); setTimeIn(''); }}>{Array.from({ length: maxDuration - minDuration + 1 }, (_, index) => String(minDuration + index)).map((hours) => <option key={hours} value={hours}>{hours} hour{hours === '1' ? '' : 's'}</option>)}</select></div>
+            <div className="mfield"><label htmlFor="manual-duration">Duration (hours)</label><select id="manual-duration" value={duration} onChange={(event) => { setDuration(event.target.value); if (event.target.value === '1') setPaymentChoice('deposit'); setTimeIn(''); }}>{Array.from({ length: maxDuration - minDuration + 1 }, (_, index) => String(minDuration + index)).map((hours) => <option key={hours} value={hours}>{hours} hour{hours === '1' ? '' : 's'}</option>)}</select></div>
           </div>
           <ReservationTimePicker room={selectedRoom} variantLabel={variantLabel} date={date} duration={duration} timeIn={timeIn} onSelect={setTimeIn} onAvailabilityChange={setAvailability} />
         </section>
@@ -963,15 +1104,30 @@ function CreateBookingModal({ open, rooms, onClose, onCreated, minDuration = 1, 
         <section className="walkin-form-section" aria-labelledby="walkin-payment-heading">
           <h3 id="walkin-payment-heading" className="walkin-section-title">Payment</h3>
           <div className="manual-payment-layout">
-            <div className="manual-charge"><span>Total reservation charge</span><strong>{available ? formatPeso(estimatedCharge) : '—'}</strong><small>{available ? 'Includes selected hours and any corkage.' : 'Choose an available time to see the charge.'}</small></div>
-            <div className="mfield"><label htmlFor="manual-paid">Amount received</label><input id="manual-paid" type="number" min="0" max={estimatedCharge} step="0.01" value={paidAmount} onChange={(event) => setPaidAmount(event.target.value)} disabled={!available} /><p className="booking-form-help">Leave at ₱0 to collect at the venue.</p></div>
-            {Number(paidAmount) > 0 && <div className="mfield"><label htmlFor="manual-payment-method">Payment method</label><select id="manual-payment-method" value={paymentMethod} onChange={(event) => setPaymentMethod(event.target.value)}>{PAYMENT_METHODS.map((method) => <option key={method} value={method}>{method}</option>)}</select></div>}
+            <div className="manual-charge"><span>Total reservation charge</span><strong>{available ? formatPeso(estimatedCharge) : '—'}</strong><small>{available ? 'Includes the selected hours.' : 'Choose an available time to see the charge.'}</small></div>
+            <fieldset className="manual-payment-options" disabled={!available}>
+              <legend>Amount received</legend>
+              <div className="manual-payment-choice-list">
+                <label className={`manual-payment-option${selectedPaymentChoice === 'deposit' ? ' is-selected' : ''}`}>
+                  <input type="radio" name="manual-payment-choice" value="deposit" checked={selectedPaymentChoice === 'deposit'} onChange={() => setPaymentChoice('deposit')} />
+                  <span><b>{Number(duration) === 1 ? '1-hour reservation payment' : '1-hour down payment'}</b><small>{Number(duration) === 1 ? 'Covers the full reservation' : `Balance ${formatPeso(Math.max(0, estimatedCharge - firstHourPayment))} due at the venue`}</small></span>
+                  <strong>{available ? formatPeso(firstHourPayment) : '—'}</strong>
+                </label>
+                {Number(duration) > 1 && (
+                  <label className={`manual-payment-option${selectedPaymentChoice === 'full' ? ' is-selected' : ''}`}>
+                    <input type="radio" name="manual-payment-choice" value="full" checked={selectedPaymentChoice === 'full'} onChange={() => setPaymentChoice('full')} />
+                    <span><b>Full payment</b><small>Nothing left to pay at the venue</small></span>
+                    <strong>{available ? formatPeso(estimatedCharge) : '—'}</strong>
+                  </label>
+                )}
+              </div>
+            </fieldset>
+            {available && amountReceived > 0 && <div className="mfield manual-payment-method"><label htmlFor="manual-payment-method">Payment method</label><select id="manual-payment-method" value={paymentMethod} onChange={(event) => setPaymentMethod(event.target.value)}>{PAYMENT_METHODS.map((method) => <option key={method} value={method}>{method}</option>)}</select></div>}
           </div>
         </section>
 
         <section className="walkin-form-section" aria-labelledby="walkin-notes-heading">
-          <h3 id="walkin-notes-heading" className="walkin-section-title">Add-ons & notes</h3>
-          <label className="booking-addon-check manual-corkage"><input type="checkbox" checked={hasCorkage} onChange={(event) => setHasCorkage(event.target.checked)} /><span><strong>Outside food or drinks</strong><small>Apply the corkage fee to this reservation.</small></span><b>+{formatPeso(CORKAGE_FEE)}</b></label>
+          <h3 id="walkin-notes-heading" className="walkin-section-title">Notes</h3>
           <div className="mfield manual-notes"><label htmlFor="manual-notes">Special requests / notes <span className="walkin-optional">Optional</span></label><textarea id="manual-notes" rows="3" value={specialRequests} onChange={(event) => setSpecialRequests(event.target.value)} placeholder="Add details the staff should know" /></div>
         </section>
 
@@ -1074,7 +1230,6 @@ function EditBookingModal({ booking, rooms, onClose, onSaved, minDuration, maxDu
   const [timeIn, setTimeIn] = useState('');
   const [duration, setDuration] = useState(1);
   const [paymentMethod, setPaymentMethod] = useState('Cash');
-  const [hasCorkage, setHasCorkage] = useState(false);
   const [specialRequests, setSpecialRequests] = useState('');
   const [availability, setAvailability] = useState({ key: '', status: 'incomplete' });
   const [saving, setSaving] = useState(false);
@@ -1082,8 +1237,8 @@ function EditBookingModal({ booking, rooms, onClose, onSaved, minDuration, maxDu
   useEffect(() => {
     if (booking) {
       setGuestName(booking.guestName || '');
-      setGuestEmail(booking.guestEmail || '');
-      setGuestContact(booking.guestContact || '');
+      setGuestEmail(booking.guestEmail || (String(booking.guestContact || '').includes('@') ? booking.guestContact : ''));
+      setGuestContact(guestPhoneDisplay(booking.guestContact) === 'N/A' ? '' : booking.guestContact);
       setGuestCount(booking.guestCount ?? '');
       setRoomId(booking.room?._id || booking.room || '');
       setVariantLabel(booking.variantLabel || '');
@@ -1091,7 +1246,6 @@ function EditBookingModal({ booking, rooms, onClose, onSaved, minDuration, maxDu
       setTimeIn(booking.timeIn || '');
       setDuration(booking.duration || 1);
       setPaymentMethod(booking.paymentMethod || 'Cash');
-      setHasCorkage(Number(booking.corkageFee) > 0);
       setSpecialRequests(booking.specialRequests || '');
     }
   }, [booking]);
@@ -1101,6 +1255,8 @@ function EditBookingModal({ booking, rooms, onClose, onSaved, minDuration, maxDu
   const selectionKey = reservationSelectionKey({ roomId, variantLabel, date, duration, timeIn });
   const scheduleChanged = booking && (roomId !== String(booking.room?._id || booking.room) || (variantLabel || '') !== (booking.variantLabel || '') || date !== booking.date || timeIn !== booking.timeIn || Number(duration) !== Number(booking.duration));
   const available = availability.key === selectionKey && availability.status === 'available';
+  const recordedPhone = !!booking?.guestContact && guestPhoneDisplay(booking.guestContact) !== 'N/A';
+  const recordedEmail = !!booking?.guestEmail;
 
   function handleRoomChange(nextRoomId) {
     setRoomId(nextRoomId);
@@ -1113,6 +1269,14 @@ function EditBookingModal({ booking, rooms, onClose, onSaved, minDuration, maxDu
     if (!guardPermission('booking:manage')) return;
     if (!guestName.trim()) {
       alert('Guest name is required.');
+      return;
+    }
+    if ((guestContact.trim() || recordedPhone) && !validGuestPhone(guestContact)) {
+      alert('Enter a valid phone number for the reservation.');
+      return;
+    }
+    if ((guestEmail.trim() || recordedEmail) && !validGuestEmail(guestEmail)) {
+      alert('Enter a valid email address for the reservation.');
       return;
     }
     if (!roomId) {
@@ -1132,8 +1296,8 @@ function EditBookingModal({ booking, rooms, onClose, onSaved, minDuration, maxDu
     try {
       await bookingsService.update(booking._id, {
         guestName: guestName.trim(),
-        guestEmail: guestEmail.trim(),
-        guestContact: guestContact.trim(),
+        ...(guestEmail.trim() ? { guestEmail: guestEmail.trim() } : {}),
+        ...(guestContact.trim() ? { guestContact: guestContact.trim() } : {}),
         guestCount: guestCount === '' ? undefined : Number(guestCount),
         room: roomId,
         variantLabel: variantLabel || null,
@@ -1141,7 +1305,6 @@ function EditBookingModal({ booking, rooms, onClose, onSaved, minDuration, maxDu
         timeIn,
         duration: d,
         paymentMethod,
-        hasCorkage,
         specialRequests: specialRequests.trim(),
       });
       onClose();
@@ -1173,11 +1336,11 @@ function EditBookingModal({ booking, rooms, onClose, onSaved, minDuration, maxDu
               </div>
               <div className="mfield">
                 <label>Email</label>
-                <input type="email" value={guestEmail} onChange={(e) => setGuestEmail(e.target.value)} />
+                <input type="email" required={recordedEmail} maxLength={254} value={guestEmail} onChange={(e) => setGuestEmail(e.target.value)} />
               </div>
               <div className="mfield">
                 <label>Phone number</label>
-                <input type="text" value={guestContact} onChange={(e) => setGuestContact(e.target.value)} />
+                <input type="tel" required={recordedPhone} maxLength={40} value={guestContact} onChange={(e) => setGuestContact(e.target.value)} />
               </div>
               <div className="mfield">
                 <label>Number of guests</label>
@@ -1201,9 +1364,8 @@ function EditBookingModal({ booking, rooms, onClose, onSaved, minDuration, maxDu
               </div>
               <div className="mfield">
                 <label>Current total charge</label>
-                <p className="mfield-note">{formatPeso(booking.amount)} · recalculated automatically when room, time, guests, or corkage changes.</p>
+                <p className="mfield-note">{formatPeso(booking.amount)} · recalculated automatically when room, time, or guests change.</p>
               </div>
-              <label className="booking-addon-check"><input type="checkbox" checked={hasCorkage} onChange={(event) => setHasCorkage(event.target.checked)} /><span><strong>Outside food or drinks</strong><small>Apply the ₱{CORKAGE_FEE.toLocaleString()} corkage fee.</small></span></label>
             </div>
           </div>
 

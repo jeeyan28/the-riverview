@@ -1,8 +1,11 @@
 const nodemailer = require("nodemailer");
+const { readFileSync } = require("node:fs");
+const path = require("node:path");
 const { OTP_TTL_MS } = require("./otp");
 const { EMAIL_RE } = require("./constants");
 
 const OTP_TTL_MINUTES = Math.round(OTP_TTL_MS / 60000);
+const notificationLogo = readFileSync(path.join(__dirname, "../assets/riverview-logo.png"));
 
 function reservationActionUrl(booking, action) {
   const origins = (process.env.APP_BASE_URL || '').split(',').map((origin) => origin.trim());
@@ -21,6 +24,9 @@ function reservationActionUrl(booking, action) {
 
 const transporter = nodemailer.createTransport({
   service: "gmail",
+  connectionTimeout: 8000,
+  greetingTimeout: 8000,
+  socketTimeout: 10000,
   auth: {
     user: process.env.GMAIL_USER,
     pass: process.env.GMAIL_APP_PASSWORD,
@@ -82,14 +88,14 @@ async function sendOtpEmail(user, otp, purpose = "reset") {
         <td align="center">
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px; background-color:#0f1e35; border-radius:14px; overflow:hidden; border:1px solid rgba(255,255,255,0.08);">
 
-            
+
             <tr>
               <td style="padding:32px 40px 24px; text-align:center; border-bottom:1px solid rgba(255,255,255,0.08);">
                 <span style="font-family:Georgia, 'Times New Roman', serif; font-size:22px; font-weight:700; color:#ffffff; letter-spacing:.02em;">The Riverview</span>
               </td>
             </tr>
 
-            
+
             <tr>
               <td style="padding:40px;">
                 <p style="margin:0 0 6px; font-size:11px; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:#00C9A7;">${copy.eyebrow}</p>
@@ -114,7 +120,7 @@ async function sendOtpEmail(user, otp, purpose = "reset") {
               </td>
             </tr>
 
-            
+
             <tr>
               <td style="padding:20px 40px 32px; text-align:center;">
                 <p style="margin:0; font-size:12px; color:#4a5d72;">© ${new Date().getFullYear()} The Riverview</p>
@@ -271,4 +277,67 @@ async function sendReceiptEmail(booking) {
   });
 }
 
-module.exports = { sendOtpEmail, sendReceiptEmail, buildReceiptEmail };
+function buildNotificationEmail(notification) {
+  const url = reservationActionUrl(notification, "closure");
+  const details = notification.details || {};
+  const variants = {
+    closure: { label: "Venue closure", title: "Your reservation date is closed", action: "Choose reschedule or refund" },
+    rescheduled: { label: "Schedule updated", action: "View updated reservation" },
+    reopened: { label: "Venue reopened", action: "View reservation" },
+    refund_processing: { label: "Refund update", action: "View refund status" },
+    refund_completed: { label: "Refund processed", action: "View reservation" },
+  };
+  const variant = variants[notification.type] || { label: "Reservation update", action: "View reservation" };
+  const title = variant.title || notification.title;
+  const dateLabel = value => /^\d{4}-\d{2}-\d{2}$/.test(value || "") && Number.isFinite(Date.parse(`${value}T12:00:00+08:00`))
+    ? new Date(`${value}T12:00:00+08:00`).toLocaleDateString("en-PH", { timeZone: "Asia/Manila", month: "long", day: "numeric", year: "numeric" }) : value || "";
+  const timeLabel = /^\d{2}:\d{2}$/.test(details.timeIn || "")
+    ? `${formatHour(details.timeIn.split(":")[0]).replace(":00", `:${details.timeIn.split(":")[1]}`)}${details.duration ? ` · ${details.duration} hour${details.duration === 1 ? "" : "s"}` : ""}` : "";
+  const amount = details.refundAmount === undefined || details.refundAmount === null ? "" : `₱${Number(details.refundAmount).toLocaleString("en-PH", { minimumFractionDigits: 2 })}`;
+  const rows = [
+    ["Reservation", notification.reservationCode],
+    ["Facility", [details.roomLabel, details.variantLabel].filter(Boolean).join(" · ")],
+    ["Date", dateLabel(details.date)], ["Time (Philippine time)", timeLabel],
+    [notification.type === "closure" ? "Full refund available" : "Refund amount", amount],
+    ["Payment method", details.paymentMethod],
+  ].filter(([, value]) => value !== undefined && value !== null && value !== "");
+  const paragraphs = notification.type === "closure" && details.closureName
+    ? [`We’re closed on ${dateLabel(details.closureDate)} for ${details.closureName}.${details.closureNote ? ` ${details.closureNote}` : ""}`, "Your reservation is affected. Choose to reschedule or cancel for a full refund of any payment collected. No first-hour charge will be kept."]
+    : String(notification.message || "").split(/\n\s*\n/);
+  const options = notification.type === "closure" ? `<h2 style="margin:26px 0 10px;font-size:17px;line-height:1.4;color:#14243b">Your options</h2><p style="margin:0 0 10px;font-size:15px;line-height:1.7;color:#44556a"><strong style="color:#14243b">Reschedule.</strong> Choose a future, available slot. The normal cutoff and two-change limit do not apply to this closure.</p><p style="margin:0 0 24px;font-size:15px;line-height:1.7;color:#44556a"><strong style="color:#14243b">${Number(details.refundAmount) > 0 ? "Full refund." : "Cancel."}</strong> ${Number(details.refundAmount) > 0 ? "Cancel and return the payment through the original online method. Staff handles cash or manual payments." : "Cancel the reservation; any payment collected remains eligible for a full closure refund."}</p>` : "";
+  const contactUrl = url ? new URL("/contact", url).toString() : "";
+  const actionHtml = url ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:24px 0 14px"><tr><td style="background:#126c63;border-radius:8px"><a href="${escapeHtml(url)}" style="display:inline-block;padding:15px 22px;font-size:14px;line-height:1.4;font-weight:700;color:#ffffff;text-decoration:none">${escapeHtml(variant.action)}</a></td></tr></table><p style="margin:0;font-size:13px;line-height:1.7;color:#637287">Sign in to view your reservation. <a href="${escapeHtml(contactUrl)}" style="color:#126c63;text-decoration:underline">Contact the venue</a> if you need help or staff booked for you.</p>` : "";
+  const html = `<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(title)}</title><style>@media only screen and (max-width:600px){.rv-email-shell{padding:16px 8px!important}.rv-email-content{padding:26px 22px!important}.rv-email-header{padding:22px!important}.rv-email-title{font-size:26px!important}}</style></head>
+<body style="margin:0;padding:0;background:#f6f3ed;font-family:Arial,Helvetica,sans-serif;color:#14243b">
+<div style="display:none;font-size:1px;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden">${escapeHtml(notification.title)} · ${escapeHtml(notification.reservationCode)}</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f6f3ed"><tr><td class="rv-email-shell" align="center" style="padding:32px 16px">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;background:#ffffff;border:1px solid #dbe1e6;border-radius:16px;overflow:hidden">
+<tr><td class="rv-email-header" style="padding:24px 32px;background:#14243b"><table role="presentation" cellpadding="0" cellspacing="0" width="100%"><tr><td width="76" valign="middle"><img src="cid:riverview-notification-logo" width="60" height="60" alt="The Riverview logo" style="display:block;width:60px;height:60px;border:0"></td><td valign="middle"><p style="margin:0 0 5px;font-size:20px;font-weight:700;letter-spacing:.01em;color:#ffffff">The Riverview</p><p style="margin:0;font-size:13px;color:#c7d5e5">Reservation &amp; payment updates</p></td></tr></table></td></tr>
+<tr><td class="rv-email-content" style="padding:32px"><p style="margin:0 0 12px;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#126c63">${escapeHtml(variant.label)}</p><h1 class="rv-email-title" style="margin:0 0 20px;font-size:30px;line-height:1.2;letter-spacing:-.02em;color:#14243b">${escapeHtml(title)}</h1>
+${details.guestName ? `<p style="margin:0 0 12px;font-size:16px;line-height:1.7;color:#44556a">Hi ${escapeHtml(details.guestName)},</p>` : ""}
+${paragraphs.map(paragraph => `<p style="margin:0 0 18px;font-size:16px;line-height:1.7;color:#44556a">${escapeHtml(paragraph)}</p>`).join("")}
+${actionHtml}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:24px 0 0;border-top:1px solid #dbe1e6;border-bottom:1px solid #dbe1e6">${rows.map(([label, value]) => `<tr><td valign="top" style="padding:10px 8px 10px 0;width:45%;font-size:13px;line-height:1.5;color:#637287">${escapeHtml(label)}</td><td valign="top" align="right" style="padding:10px 0;font-size:14px;line-height:1.5;font-weight:700;color:#14243b;word-break:break-word">${escapeHtml(value)}</td></tr>`).join("")}</table>
+${options}
+</td></tr><tr><td style="padding:18px 32px;background:#f3f6f8;border-top:1px solid #dbe1e6"><p style="margin:0;font-size:12px;line-height:1.6;color:#637287">This update is about your Riverview reservation. Keep your reservation code when contacting staff.</p></td></tr>
+</table><p style="margin:18px 0 0;font-size:12px;line-height:1.6;color:#637287">© ${new Date().getFullYear()} The Riverview</p>
+</td></tr></table></body></html>`;
+  return {
+    html,
+    text: `${title}\n\n${paragraphs.join("\n\n")}\n\n${rows.map(([label, value]) => `${label}: ${value}`).join("\n")}\n\n${url ? `${variant.action}: ${url}\nSign in to view your reservation. Contact the venue if staff booked for you: ${contactUrl}\n` : ""}`,
+    attachments: [{ filename: "riverview-logo.png", content: notificationLogo, cid: "riverview-notification-logo", contentType: "image/png" }],
+  };
+}
+
+async function sendNotificationEmail(notification) {
+  if (notification.type === "refund_attention") return;
+  if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) throw new Error("SMTP_NOT_CONFIGURED");
+  if (!EMAIL_RE.test(notification.email || "")) throw new Error("INVALID_RECIPIENT");
+  await transporter.sendMail({
+    from: `"The Riverview" <${process.env.GMAIL_USER}>`, to: notification.email,
+    subject: `${notification.title} — ${notification.reservationCode}`, ...buildNotificationEmail(notification),
+  });
+}
+
+module.exports = { sendOtpEmail, sendReceiptEmail, buildReceiptEmail, sendNotificationEmail, buildNotificationEmail };

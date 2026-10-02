@@ -2,6 +2,7 @@ import '../../styles/admin/monitor.css';
 import '../../styles/admin/finance.css';
 import { Fragment, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { TriangleAlert } from 'lucide-react';
 import Modal from '../../components/Modal';
 import DataTable from '../../components/DataTable';
 import ConfirmDialog from '../../components/ConfirmDialog';
@@ -10,8 +11,8 @@ import { useAuth } from '../../context/AuthContext';
 import { monitorRoomsService, roomSessionsService } from '../../services/monitoring';
 import { bookingsService } from '../../services/bookings';
 import { businessDate } from '../../utils/businessDate';
-import { reservationWindow, showOnRoomMonitor } from '../../utils/reservationStatus';
-import { CORKAGE_FEE, calculateBookingPrice, variantRateLabel } from '../../utils/roomPricing';
+import { reservationWindow, roomMonitorSchedule } from '../../utils/reservationStatus';
+import { calculateBookingPrice, variantRateLabel } from '../../utils/roomPricing';
 import { getBookingRoomTarget } from '../../utils/monitorInventory';
 import {
   useRoomMonitorData,
@@ -59,6 +60,12 @@ function paymentSummary(record, isBooking = false) {
 const money = (value) => `₱${Number(value || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const boardClock = (date) => date.toLocaleTimeString('en-US', { timeZone: 'Asia/Manila', hour: 'numeric', minute: '2-digit', hour12: true }).replace(/\s+/g, '').toLowerCase();
 const scheduleDate = (date) => new Date(`${date}T12:00:00+08:00`).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', month: 'long', day: 'numeric', year: 'numeric' });
+const reservationNoticeTime = (value) => {
+  const startMs = Date.parse(value || '');
+  return Number.isFinite(startMs)
+    ? new Intl.DateTimeFormat('en-PH', { timeZone: 'Asia/Manila', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true }).format(startMs)
+    : '';
+};
 
 function SessionPayment({ session }) {
   const payment = paymentSummary(session);
@@ -113,7 +120,7 @@ function Monitor() {
 
   const {
     rooms, setRooms, sessions, loading, refreshError, lastUpdatedAt,
-    fetchRooms, fetchMonitorSessions,
+    fetchRooms, fetchMonitorSessions, applySessionChange,
     viewMode, changeViewMode,
     soundMuted, toggleSoundMuted,
   } = useRoomMonitorData('admin');
@@ -130,13 +137,13 @@ function Monitor() {
   const [sortBy, setSortBy] = useState('default');
   const [detailRoomId, setDetailRoomId] = useState(null);
   const [dueBookings, setDueBookings] = useState([]);
+  const [cancellingSessionId, setCancellingSessionId] = useState(null);
   async function fetchDueBookings() {
     if (!canStartFromBooking) return;
     try {
-      const today = businessDate();
       const data = await bookingsService.list({ status: 'Confirmed' });
       const list = Array.isArray(data) ? data : [];
-      setDueBookings(list.filter((b) => b.date <= today));
+      setDueBookings(list);
     } catch (err) {
       console.error(err);
     }
@@ -176,15 +183,19 @@ function Monitor() {
   }
 
   async function cancelSession(sessionId) {
-    if (refreshError || !guardPermission('room:operate')) return;
+    if (cancellingSessionId || refreshError || !guardPermission('room:operate')) return;
     if (!(await confirm('Cancel this accidental session and release the table? Its payment and session history will be kept. A linked reservation will be restored for a new start.', { confirmText: 'Cancel Session' }))) return;
+    setCancellingSessionId(sessionId);
     try {
-      await roomSessionsService.remove(sessionId);
-      await fetchMonitorSessions();
-      await fetchDueBookings();
+      const result = await roomSessionsService.remove(sessionId);
+      applySessionChange(result.session, result.room);
+      fetchMonitorSessions();
+      if (result.session.booking) fetchDueBookings();
     } catch (err) {
       console.error(err);
       alert(err.message || 'Could not cancel this session.');
+    } finally {
+      setCancellingSessionId(null);
     }
   }
 
@@ -209,7 +220,7 @@ function Monitor() {
     });
   }
 
-  async function handleModalSubmit({ roomId, roomTarget, totalHours, paymentMethod, paymentTiming, paidAmount, guestName, guestCount, hasCorkage, bookingId, applyVenueDiscount }) {
+  async function handleModalSubmit({ roomId, roomTarget, totalHours, paymentMethod, paymentTiming, paidAmount, guestName, guestCount, bookingId, applyVenueDiscount }) {
     if (refreshError) throw new Error('Wait for the table status to refresh before changing this session.');
     if (bookingId) {
       if (!canStartFromBooking) return;
@@ -217,7 +228,7 @@ function Monitor() {
       return;
     }
 
-    await roomSessionsService.create({ roomId, roomTarget: roomTarget || undefined, duration: totalHours, paymentMethod, paymentTiming, paidAmount, guestName, guestCount, hasCorkage, bookingId, applyVenueDiscount });
+    await roomSessionsService.create({ roomId, roomTarget: roomTarget || undefined, duration: totalHours, paymentMethod, paymentTiming, paidAmount, guestName, guestCount, bookingId, applyVenueDiscount });
 
     setModal(null);
     await fetchMonitorSessions();
@@ -295,13 +306,11 @@ function Monitor() {
 
   const detailRoom = detailRoomId ? rooms.find((r) => r._id === detailRoomId) || null : null;
   const detailView = detailRoom ? buildRoomView(detailRoom, sessions) : null;
-  const scheduleToday = businessDate();
-  const scheduledBookings = dueBookings
-    .filter((booking) => showOnRoomMonitor(booking))
-    .sort((a, b) => b.date.localeCompare(a.date) || String(a.timeIn || '').localeCompare(String(b.timeIn || '')));
-  const todayBookings = scheduledBookings.filter((booking) => booking.date === scheduleToday);
-  const earlierBookings = scheduledBookings.filter((booking) => booking.date < scheduleToday);
-  const displayedBookings = schedulePeriod === 'today' ? todayBookings : earlierBookings;
+  const scheduleNow = Date.now();
+  const scheduleToday = businessDate(scheduleNow);
+  const schedule = roomMonitorSchedule(dueBookings, scheduleNow);
+  const { bookings: scheduledBookings, today: todayBookings, upcoming: upcomingBookings, earlier: earlierBookings } = schedule;
+  const displayedBookings = schedule[schedulePeriod];
 
   const roomTableColumns = [
     {
@@ -377,9 +386,9 @@ function Monitor() {
             {occupancy ? (
               canOperate && !refreshError ? (
                 <>
-                  {canExtendSession(occupancy) && <button className="rm-btn" onClick={() => setExtendingSession(occupancy)}><i className="bi bi-clock-history"></i>Extend</button>}
-                  <button className="rm-btn rm-btn--success" onClick={() => endSession(occupancy)}><i className="bi bi-check2-circle"></i>Finish</button>
-                  <button className="rm-btn danger" onClick={() => cancelSession(occupancy._id, r._id)}><i className="bi bi-x-circle"></i>Cancel</button>
+                  {canExtendSession(occupancy) && <button className="rm-btn" disabled={!!cancellingSessionId} onClick={() => setExtendingSession(occupancy)}><i className="bi bi-clock-history"></i>Extend</button>}
+                  <button className="rm-btn rm-btn--success" disabled={!!cancellingSessionId} onClick={() => endSession(occupancy)}><i className="bi bi-check2-circle"></i>Finish</button>
+                  <button className="rm-btn danger" disabled={!!cancellingSessionId} onClick={() => cancelSession(occupancy._id)}><i className="bi bi-x-circle"></i>{cancellingSessionId === occupancy._id ? 'Cancelling…' : 'Cancel'}</button>
                 </>
               ) : (
                 <span className="rm-note">In use</span>
@@ -408,7 +417,7 @@ function Monitor() {
         </div>
         <div className="rm-toolbar-actions">
           {canStartFromBooking && (
-            <button type="button" className="rm-reservations-button" aria-haspopup="dialog" onClick={() => { setSchedulePeriod(todayBookings.length ? 'today' : 'earlier'); setScheduleOpen(true); }}>
+            <button type="button" className="rm-reservations-button" aria-haspopup="dialog" onClick={() => { setSchedulePeriod(schedule.defaultPeriod); setScheduleOpen(true); }}>
               <i className="bi bi-calendar-check" aria-hidden="true"></i>View reservations ({scheduledBookings.length})
             </button>
           )}
@@ -490,12 +499,13 @@ function Monitor() {
               <div className="rm-due-head">
                 <div className="rm-schedule-heading">
                   <span className="card-title">Reservation schedule</span>
-                  <span className="rm-schedule-today">Confirmed reservations waiting to start · {scheduleDate(scheduleToday)}</span>
+                  <span className="rm-schedule-today">Confirmed reservations waiting to start{schedulePeriod === 'today' ? ` · ${scheduleDate(scheduleToday)}` : ''}</span>
                 </div>
                 <button type="button" className="rm-btn rm-schedule-close" onClick={() => setScheduleOpen(false)} aria-label="Close reservation schedule">Close</button>
               </div>
               <div className="rm-schedule-tabs" aria-label="Reservation dates">
                 <button type="button" className={schedulePeriod === 'today' ? 'active' : ''} aria-pressed={schedulePeriod === 'today'} onClick={() => setSchedulePeriod('today')}>Today <span>{todayBookings.length}</span></button>
+                <button type="button" className={schedulePeriod === 'upcoming' ? 'active' : ''} aria-pressed={schedulePeriod === 'upcoming'} onClick={() => setSchedulePeriod('upcoming')}>Upcoming <span>{upcomingBookings.length}</span></button>
                 <button type="button" className={schedulePeriod === 'earlier' ? 'active' : ''} aria-pressed={schedulePeriod === 'earlier'} onClick={() => setSchedulePeriod('earlier')}>Earlier <span>{earlierBookings.length}</span></button>
               </div>
             </div>
@@ -520,7 +530,7 @@ function Monitor() {
                       : 'No matching active room';
                   return (
                     <Fragment key={b._id}>
-                      {schedulePeriod === 'earlier' && (index === 0 || displayedBookings[index - 1].date !== b.date) && (
+                      {schedulePeriod !== 'today' && (index === 0 || displayedBookings[index - 1].date !== b.date) && (
                         <h3 className="rm-schedule-date">{scheduleDate(b.date)}</h3>
                       )}
                       <div className={`rm-schedule-item rm-schedule-item--${isDue ? 'due' : 'upcoming'}`}>
@@ -563,7 +573,7 @@ function Monitor() {
                 })}
               </div>
             ) : (
-              <p className="rm-schedule-empty">{schedulePeriod === 'today' ? 'No reservations waiting to start today.' : 'No earlier reservations waiting to start.'}</p>
+              <p className="rm-schedule-empty">{schedulePeriod === 'today' ? 'No reservations waiting to start today.' : schedulePeriod === 'upcoming' ? 'No upcoming reservations waiting to start.' : 'No earlier reservations waiting to start.'}</p>
             )}
           </div>
         </Modal>
@@ -705,6 +715,7 @@ function Monitor() {
                         {canExtendSession(occupancy) && <button
                           type="button"
                           className="rm-btn"
+                          disabled={!!cancellingSessionId}
                           onClick={(e) => { e.stopPropagation(); setExtendingSession(occupancy); }}
                         >
                           <i className="bi bi-clock-history"></i>Extend
@@ -712,6 +723,7 @@ function Monitor() {
                         <button
                           type="button"
                           className="rm-btn rm-btn--success"
+                          disabled={!!cancellingSessionId}
                           onClick={(e) => { e.stopPropagation(); endSession(occupancy); }}
                         >
                           <i className="bi bi-check2-circle"></i>Finish
@@ -719,11 +731,12 @@ function Monitor() {
                         <button
                           type="button"
                           className="rm-btn danger rm-btn--icon"
-                          title="Cancel session (accidental start)"
-                          aria-label="Cancel session"
-                          onClick={(e) => { e.stopPropagation(); cancelSession(occupancy._id, r._id); }}
+                          disabled={!!cancellingSessionId}
+                          title={cancellingSessionId === occupancy._id ? 'Cancelling session…' : 'Cancel session (accidental start)'}
+                          aria-label={cancellingSessionId === occupancy._id ? 'Cancelling session…' : 'Cancel session'}
+                          onClick={(e) => { e.stopPropagation(); cancelSession(occupancy._id); }}
                         >
-                          <i className="bi bi-x-circle"></i>
+                          <i className={cancellingSessionId === occupancy._id ? 'bi bi-hourglass-split' : 'bi bi-x-circle'}></i>
                         </button>
                       </div>
                     )}
@@ -792,7 +805,7 @@ function Monitor() {
         }}
         onCancelSession={() => {
           setDetailRoomId(null);
-          cancelSession(detailView.occupancy._id, detailRoom._id);
+          cancelSession(detailView.occupancy._id);
         }}
         onEdit={() => {
           setDetailRoomId(null);
@@ -852,10 +865,13 @@ function ExtendSessionModal({ session, onClose, onSubmit }) {
 
   const availableOptions = EXTENSION_OPTIONS.filter((option) => Number(session.duration) + option.hours <= MAX_SESSION_HOURS);
   const balanceAfter = quote ? Math.max(0, Math.round((Number(quote.newBalance) - (collectNow ? Number(quote.addedCharge) : 0)) * 100) / 100) : 0;
+  const reservationTime = reservationNoticeTime(quote?.reservationStart);
+  const reservationStartMs = Date.parse(quote?.reservationStart || '');
+  const shorterExtensionFits = availableOptions.some((option) => option.hours < addedHours && sessionEnd(session).getTime() + option.hours * 60 * 60 * 1000 <= reservationStartMs);
 
   async function handleSubmit(event) {
     event.preventDefault();
-    if (!quote || Number(quote.addedHours) !== addedHours || saving) return;
+    if (!quote || quote.canExtend === false || Number(quote.addedHours) !== addedHours || saving) return;
     setSaving(true);
     setSaveError('');
     try {
@@ -881,7 +897,22 @@ function ExtendSessionModal({ session, onClose, onSubmit }) {
         <div className="session-extension-quote-slot" aria-live="polite">
           {quoteError && <div className="session-extension-retry"><p className="session-form-error" role="alert">{quoteError}</p>{availableOptions.length > 0 && <button type="button" className="rm-btn" onClick={() => setQuoteAttempt((value) => value + 1)}>Try again</button>}</div>}
           {!quote && !quoteError && <p className="mfield-note" role="status">Calculating the extension charge…</p>}
-          {quote && (
+          {quote?.canExtend === false && (
+            <div className="session-availability-notice session-availability-notice--conflict" role="status">
+              <TriangleAlert size={20} aria-hidden="true" />
+              <div>
+                <span className="session-availability-label">Upcoming reservation{reservationTime ? ` · ${reservationTime}` : ''}</span>
+                <strong>Keep one {session.roomName || session.facilityName} table free</strong>
+                <p>Adding {sessionLengthLabel(addedHours)} would keep this table busy when the reservation starts.</p>
+                <p className="session-availability-action">
+                  {shorterExtensionFits
+                    ? 'Pick a shorter extension, or keep the current end time.'
+                    : `Keep the current end time, or free up another ${session.roomName || session.facilityName} table.`}
+                </p>
+              </div>
+            </div>
+          )}
+          {quote && quote.canExtend !== false && (
             <>
               <div className="session-payment-ledger session-extension-summary" aria-label="Extension payment summary">
                 <div><span>Current balance</span><strong>{money(quote.currentBalance)}</strong></div>
@@ -911,7 +942,7 @@ function ExtendSessionModal({ session, onClose, onSubmit }) {
         {saveError && <p className="session-form-error" role="alert">{saveError}</p>}
         <div className="modal-actions">
           <button type="button" className="btn-cancel" disabled={saving} onClick={onClose}>Cancel</button>
-          <button type="submit" className="btn-confirm" disabled={!quote || Number(quote.addedHours) !== addedHours || saving}>{saving ? 'Saving…' : 'Confirm extension'}</button>
+          <button type="submit" className="btn-confirm" disabled={!quote || quote.canExtend === false || Number(quote.addedHours) !== addedHours || saving}>{saving ? 'Saving…' : 'Confirm extension'}</button>
         </div>
       </form>
     </Modal>
@@ -1265,10 +1296,12 @@ function SessionModal({ modal, onClose, onSubmit }) {
   const [collectionMode, setCollectionMode] = useState('later');
   const [guestName, setGuestName] = useState('');
   const [guestCount, setGuestCount] = useState('1');
-  const [hasCorkage, setHasCorkage] = useState(false);
   const [applyVenueDiscount, setApplyVenueDiscount] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
+  const [startQuote, setStartQuote] = useState(null);
+  const [startQuoteFailure, setStartQuoteFailure] = useState(null);
+  const [startQuoteAttempt, setStartQuoteAttempt] = useState(0);
 
   const fromBooking = !!modal?.bookingId;
   const bookingNotStarted = fromBooking && Date.now() < Number(modal?.scheduledStartMs);
@@ -1283,7 +1316,6 @@ function SessionModal({ modal, onClose, onSubmit }) {
       setCollectionMode((modal.downPaymentInfo?.balance || 0) > 0 ? 'later' : 'full');
       setGuestName(modal.initialGuestName || '');
       setGuestCount('1');
-      setHasCorkage(false);
       setApplyVenueDiscount(false);
     } else {
       setHours(1);
@@ -1291,17 +1323,34 @@ function SessionModal({ modal, onClose, onSubmit }) {
       setCollectionMode('later');
       setGuestName('');
       setGuestCount('1');
-      setHasCorkage(false);
       setApplyVenueDiscount(false);
     }
     setFormError('');
   }, [modal]);
 
   const duration = Math.max(1, Math.round(Number(hours) || 1));
+  const startQuoteKey = `${modal?.fixedRoom?._id}:${duration}`;
+  const checkedStartQuote = startQuote?.key === startQuoteKey ? startQuote : null;
+  const startQuoteError = startQuoteFailure?.key === startQuoteKey ? startQuoteFailure.message : '';
+  const reservationStartMs = Date.parse(checkedStartQuote?.reservationStart || '');
+  const reservationTime = reservationNoticeTime(checkedStartQuote?.reservationStart);
+  const oneHourFitsBeforeReservation = reservationStartMs - Date.now() >= 60 * 60 * 1000;
+
+  useEffect(() => {
+    if (!modal?.fixedRoom?._id || fromBooking) return;
+    let cancelled = false;
+    setStartQuote(null);
+    setStartQuoteFailure(null);
+    roomSessionsService.quoteStart(modal.fixedRoom._id, duration)
+      .then((result) => { if (!cancelled) setStartQuote({ ...result, key: startQuoteKey }); })
+      .catch((error) => { if (!cancelled) setStartQuoteFailure({ key: startQuoteKey, message: error.message || 'Could not check this session length.' }); });
+    return () => { cancelled = true; };
+  }, [modal?.fixedRoom?._id, fromBooking, duration, startQuoteAttempt]);
+
   const maxHours = MAX_SESSION_HOURS;
   const bookedLengthExceedsLimit = fromBooking && duration > maxHours;
   const walkInPricing = !fromBooking && modal?.fixedRoom
-    ? calculateBookingPrice({ variant: modal.fixedRoom, startHour: manilaHour(), duration, guestCount: Number(guestCount) || 1, hasCorkage })
+    ? calculateBookingPrice({ variant: modal.fixedRoom, startHour: manilaHour(), duration, guestCount: Number(guestCount) || 1 })
     : null;
   const originalCharge = fromBooking ? Number(modal?.downPaymentInfo?.total) || 0 : Number(walkInPricing?.amount) || 0;
   const previouslyCollected = fromBooking ? Number(modal?.downPaymentInfo?.collected) || 0 : 0;
@@ -1337,6 +1386,10 @@ function SessionModal({ modal, onClose, onSubmit }) {
       setFormError(`Choose no more than ${maxHours} whole hour${maxHours === 1 ? '' : 's'}.`);
       return;
     }
+    if (!fromBooking && checkedStartQuote?.canStart !== true) {
+      setFormError(checkedStartQuote?.notice || startQuoteError || 'Wait for the reservation check before starting.');
+      return;
+    }
     if (fromBooking && venueDiscount > 0 && !applyVenueDiscount) {
       setFormError('Settle the room discount with the guest before starting this reservation.');
       return;
@@ -1357,7 +1410,6 @@ function SessionModal({ modal, onClose, onSubmit }) {
         paidAmount,
         guestName,
         guestCount: Number(guestCount) || 1,
-        hasCorkage,
         bookingId: modal.bookingId,
         applyVenueDiscount: fromBooking && applyVenueDiscount,
       });
@@ -1396,12 +1448,29 @@ function SessionModal({ modal, onClose, onSubmit }) {
             ) : (
               <div className="session-hour-picker" role="group" aria-label="Session length">
                 {HOUR_PRESETS.filter((value) => value <= maxHours).map((value) => (
-                  <button key={value} type="button" className={`session-hour-option${duration === value ? ' active' : ''}`} aria-pressed={duration === value} onClick={() => setHours(value)}>{value}<small>hr</small></button>
+                  <button key={value} type="button" className={`session-hour-option${duration === value ? ' active' : ''}`} aria-pressed={duration === value} onClick={() => { setHours(value); setFormError(''); }}>{value}<small>hr</small></button>
                 ))}
               </div>
             )}
             {fromBooking && <p className="session-reservation-deadline">{bookingNotStarted ? 'Starts at' : 'Ends at'} {boardClock(new Date(bookingNotStarted ? modal.scheduledStartMs : modal.scheduledEndMs))}{!bookingNotStarted && !bookingEnded ? ` · ${Math.ceil((modal.scheduledEndMs - Date.now()) / 60000)} min left` : ''}</p>}
             {bookedLengthExceedsLimit && <p className="session-form-error" role="alert">This reservation exceeds the five-hour session limit. Update its reserved length before starting the session.</p>}
+            {!fromBooking && !checkedStartQuote && !startQuoteError && <p className="mfield-note" role="status">Checking upcoming reservations…</p>}
+            {!fromBooking && startQuoteError && <div className="session-extension-retry"><p className="session-form-error" role="alert">{startQuoteError}</p><button type="button" className="rm-btn" onClick={() => setStartQuoteAttempt((value) => value + 1)}>Try again</button></div>}
+            {!fromBooking && checkedStartQuote?.canStart === false && (
+              <div className="session-availability-notice session-availability-notice--conflict" role="alert">
+                <TriangleAlert size={20} aria-hidden="true" />
+                <div>
+                  <span className="session-availability-label">Upcoming reservation{reservationTime ? ` · ${reservationTime}` : ''}</span>
+                  <strong>Keep one {modal.fixedRoom.roomName} table free</strong>
+                  <p>A {duration}-hour session here would still be running when the reservation starts.</p>
+                  <p className="session-availability-action">
+                    {reservationTime && !oneHourFitsBeforeReservation
+                      ? `No session can end before then. Leave this table free, or free up another ${modal.fixedRoom.roomName} table.`
+                      : `Pick a session that ends before the reservation, or free up another ${modal.fixedRoom.roomName} table.`}
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="mfield">
@@ -1415,10 +1484,6 @@ function SessionModal({ modal, onClose, onSubmit }) {
                 <label>Number of Guests</label>
                 <input type="number" min="1" value={guestCount} onChange={(event) => setGuestCount(event.target.value)} />
               </div>
-              <label className="booking-addon-check">
-                <input type="checkbox" checked={hasCorkage} onChange={(event) => setHasCorkage(event.target.checked)} />
-                <span><strong>Outside food or drinks</strong><small>Add ₱{CORKAGE_FEE.toLocaleString()} corkage.</small></span>
-              </label>
             </>
           )}
 
@@ -1429,7 +1494,7 @@ function SessionModal({ modal, onClose, onSubmit }) {
               {venueDiscount > 0 && (
                 <label className="booking-addon-check">
                   <input type="checkbox" checked={applyVenueDiscount} onChange={(event) => setApplyVenueDiscount(event.target.checked)} />
-                  <span><strong>Apply {money(venueDiscount)} room discount at the venue</strong><small>{duration === 1 ? `Return ${money(venueDiscount)} to the guest. Corkage and extras stay due separately.` : originalBalance >= venueDiscount ? `Reduce the balance to ${money(originalBalance - venueDiscount)}.` : `Return ${money(venueDiscount - originalBalance)} to the guest before confirming.`}</small></span>
+                  <span><strong>Apply {money(venueDiscount)} room discount at the venue</strong><small>{duration === 1 ? `Return ${money(venueDiscount)} to the guest. Optional services stay due separately.` : originalBalance >= venueDiscount ? `Reduce the balance to ${money(originalBalance - venueDiscount)}.` : `Return ${money(venueDiscount - originalBalance)} to the guest before confirming.`}</small></span>
                 </label>
               )}
               <div className="session-payment-ledger">
@@ -1470,7 +1535,7 @@ function SessionModal({ modal, onClose, onSubmit }) {
 
           <div className="modal-actions">
             <button type="button" className="btn-cancel" onClick={onClose}>Cancel</button>
-            <button type="button" className="btn-confirm" disabled={submitting || maxHours < 1 || bookedLengthExceedsLimit || bookingNotStarted || bookingEnded} onClick={handleSubmit}>
+            <button type="button" className="btn-confirm" disabled={submitting || maxHours < 1 || bookedLengthExceedsLimit || bookingNotStarted || bookingEnded || (!fromBooking && checkedStartQuote?.canStart !== true)} onClick={handleSubmit}>
               {submitting ? 'Starting…' : 'Start session'}
             </button>
           </div>

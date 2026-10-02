@@ -31,7 +31,7 @@ const roomSessionSchema = new mongoose.Schema({
   duration: { type: Number, required: true, min: 1 / 3600, max: 24 },
   rate: { type: Number, default: 0, min: 0 },
   amount: { type: Number, default: 0, min: 0 },
-  corkageFee: { type: Number, default: 0, min: 0 },
+  roomCharge: { type: Number, default: 0, min: 0 },
   hourlyRates: [{ type: Number, min: 0 }],
   paidAmount: { type: Number, default: 0, min: 0 },
   refundedAmount: { type: Number, default: 0, min: 0 },

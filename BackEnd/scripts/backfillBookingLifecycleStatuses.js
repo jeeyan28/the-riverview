@@ -17,20 +17,21 @@ async function run() {
   const todayKey = new Intl.DateTimeFormat("en-CA", { timeZone: TIME_ZONE }).format(new Date(now));
   console.log(`\nToday (${TIME_ZONE}): ${todayKey}`);
 
-  const confirmed = await Booking.find({
+  const expirableStatuses = [Booking.BOOKING_STATUS.CONFIRMED, Booking.BOOKING_STATUS.OVERDUE];
+  const activeReservations = await Booking.find({
     date: { $lte: todayKey },
-    status: Booking.BOOKING_STATUS.CONFIRMED,
+    status: { $in: expirableStatuses },
     cancellationStatus: { $ne: "Requested" },
   }).select("_id reservationCode date timeIn duration status");
-  const noShows = confirmed.filter((booking) => bookingStartMs(booking.date, booking.timeIn) + Number(booking.duration) * 3600000 <= now);
-  console.log(`Found ${noShows.length} confirmed booking(s) whose reserved time has ended.`);
+  const noShows = activeReservations.filter((booking) => bookingStartMs(booking.date, booking.timeIn) + Number(booking.duration) * 3600000 <= now);
+  console.log(`Found ${noShows.length} confirmed or overdue booking(s) whose reserved time has ended.`);
 
   for (const b of noShows) {
     console.log(`  ${b.reservationCode || b._id} (${b.date} ${b.timeIn}): "${b.status}" -> "${Booking.BOOKING_STATUS.NO_SHOW}"`);
   }
 
   if (APPLY && noShows.length) {
-    await Booking.updateMany({ _id: { $in: noShows.map((b) => b._id) }, status: Booking.BOOKING_STATUS.CONFIRMED, cancellationStatus: { $ne: "Requested" } }, { status: Booking.BOOKING_STATUS.NO_SHOW, noShowAt: new Date(now) });
+    await Booking.updateMany({ _id: { $in: noShows.map((b) => b._id) }, status: { $in: expirableStatuses }, cancellationStatus: { $ne: "Requested" } }, { status: Booking.BOOKING_STATUS.NO_SHOW, noShowAt: new Date(now) });
     console.log(`\n${noShows.length} booking(s) updated.`);
   } else if (!APPLY) {
     console.log(`\nDry run only — re-run with --apply to write these changes.`);

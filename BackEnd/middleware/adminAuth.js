@@ -7,7 +7,13 @@ async function ensureAuthenticated(req, res, next) {
     return res.status(401).json({ message: "Not logged in." });
   }
   try {
-    const user = await User.findById(req.session.userId);
+    const user = await User.findOne({
+      _id: req.session.userId,
+      $or: [
+        { password: { $type: "string", $ne: "" } },
+        { googleId: { $type: "string", $ne: "" } },
+      ],
+    });
     if (!user || !user.isActive) {
       return res.status(401).json({ message: "Not logged in." });
     }

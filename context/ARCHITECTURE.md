@@ -54,7 +54,7 @@ scripts/      → one-off/cron-invoked maintenance jobs, not part of the request
 
 ## 3. Auth & Authorization
 
-- **Session-based**, not JWT: `express-session` + `connect-mongo`, rolling 365-day customer/guest sessions and 8-hour staff sessions, with an `httpOnly`/`secure`/`sameSite:lax` cookie.
+- **Session-based**, not JWT: `express-session` + `connect-mongo`, rolling 365-day customer sessions and 8-hour staff sessions for accounts with a password or linked Google account, with an `httpOnly`/`secure`/`sameSite:lax` cookie.
 - **CSRF protection**: custom origin-verification middleware (`middleware/csrf.js`) checks request origin against an explicit allow-list — not a token-based CSRF scheme.
 - **RBAC**: role hierarchy `user (0) → staff (1) → manager/"Supervisor" → super_admin/"Owner"`, defined in `utils/permissions.js`. Authorization is **permission-string based** (`booking:manage`, `reports:view`, etc.), not raw role checks — routes call `requirePermission(PERMISSIONS.X)`, so a role's access can change by editing the permission map, not the routes.
 - **Shared account entry point:** customers and staff use the same `/login` screen and `POST /api/auth/login` session flow. Customer registration remains available on that page. After sign-in, Staff lands on Live Monitor, Supervisor and Owner land on Dashboard, and customers return to their requested customer path; a safe requested admin path is preserved only for staff roles.
@@ -88,15 +88,16 @@ sequenceDiagram
 ```
 
 - The lock (20-minute TTL, auto-expiring via Mongo TTL index) prevents two customers from paying for the same slot simultaneously — this is what makes "zero double-booked slots" achievable.
+- Online payment intents and staff-entered reservations require separate guest phone and email fields. The booking form prefills them from the account when available; existing bookings with older combined or missing contact data remain readable.
 - If a webhook is missed/delayed, the `/intent/:id/attach` and `/status/:id` endpoints let the client actively confirm payment status as a fallback — the booking isn't left stuck on network flakiness alone.
 - If payment succeeds but the slot became unavailable in the meantime (race condition), the booking is flagged for manual review/refund rather than silently created — logged server-side, not surfaced as a generic error.
-- `utils/roomPricing.js` is the canonical calculator for flat rates, Court daytime/evening rates, per-guest hourly surcharges, and the fixed ₱200 corkage add-on. The API calculates the charge and downpayment; client totals are previews only. Bookings store the resulting hourly-rate and charge snapshot for finance/audit history.
+- `utils/roomPricing.js` is the canonical calculator for flat rates, Court daytime/evening rates, per-guest hourly surcharges, and configured optional services. The API calculates the charge and downpayment; client totals are previews only. Bookings store the resulting hourly-rate and charge snapshot for finance/audit history.
 
 ### 4.1 Canonical finance and cancellation lifecycle
 
 `utils/salesReport.js` loads bookings and room sessions for the requested Asia/Manila date range, then `utils/salesLedger.js` produces the single finance view consumed by the dashboard, analytics, reports, and forecast endpoints. A session linked to a booking is one transaction: the session charge supersedes the booking charge, while the booking's original deposit is carried into the session's paid amount exactly once. Collected revenue is explicit payments minus manual refunds; outstanding is charges minus paid, with closed statuses settled at zero. Records that only say `Paid` without an amount are flagged for review and excluded from totals. Source filters use `Booking.source`: online reservations remain separate from staff-entered walk-ins/manual bookings, while unlinked room sessions are walk-ins.
 
-Customer cancellation is a two-step flow (`cancellationStatus = Requested` then `Approved` or `Rejected`) and never triggers an automatic provider refund. Admin review stores the reason, reviewer, note, and manual refund amount. A confirmed booking that reaches its scheduled end without completion is marked `No Show`; its downpayment remains forfeited and the record stays in the ledger for auditability.
+Ordinary customer cancellation is a two-step flow (`cancellationStatus = Requested` then `Approved` or `Rejected`) with staff-recorded manual refunds. Venue closures are a separate full-refund exception: holiday creation transactionally flags affected unstarted bookings and queues personal bell/email notifications. Closure reschedules bypass the normal cutoff/allowance, and refunds return through the original PayMongo/Xendit payment where supported. An atomic persisted refund claim prevents repeated submissions; authenticated webhooks and durable jobs verify provider success before changing the ledger or queuing completion messages. Cash remainders stay manual. Pending closures are excluded from no-show and session-start/completion paths. See `BackEnd/docs/venue-closures.md` for serverless scheduler setup and recovery.
 
 **Path B — Staff/walk-in manual booking:**
 
@@ -119,9 +120,13 @@ sequenceDiagram
 - A local 1-second tick drives visual countdowns (e.g. time remaining) between polls without hitting the server every second.
 - `/lobby-monitor` uses URL-based W3C Presentation API page streaming for **View on TV**, with the existing fullscreen display as a labeled fallback. The authenticated lobby tab keeps polling and sends display fields plus filters/view/sort/theme over its presentation connection. The same route independently renders in a genuine receiving context without shared login/storage or protected API calls; a query flag alone does not bypass `room:view`. New sessions require Chrome's device picker; active connections are reused and Stop casting terminates them. The laptop and controlling tab must stay running. See [Chromecast setup](chromecast-setup.md).
 - An overdue-session alert (audible beep) re-fires at most every 30 seconds to avoid alert fatigue.
-- Staff starts a walk-in with `POST /api/room-sessions`, choosing 1–5 whole hours, guest/corkage details, and full payment before or after play. The API calculates the exact hourly charge from the chosen `MonitorRoom` pricing snapshot. Legacy tables with a zero rate use a uniquely matching facility catalog variant; sessions cannot start if the rate is still unknown.
+- Staff starts a walk-in with `POST /api/room-sessions`, choosing 1–5 whole hours, guest details, and full payment before or after play. The API calculates the exact hourly charge from the chosen `MonitorRoom` pricing snapshot. Legacy tables with a zero rate use a uniquely matching facility catalog variant; sessions cannot start if the rate is still unknown.
+- Before a walk-in starts, the API checks its selected length against incoming reservations and every matching table. The start dialog shows the same capacity warning, and the API checks again after claiming the table so a concurrent start cannot consume the last reserved space.
 - Starting a due reservation uses the same endpoint with `bookingId`. The API assigns an available physical unit, copies the reservation charge, preserves the verified deposit, derives `Paid`/`Partial`/`Unpaid`, and changes the booking to `Ongoing`.
+- The reservation schedule retains confirmed bookings across dates, with Today, Upcoming, and Earlier tabs based on Asia/Manila. Upcoming shows the nearest reservation first and opens when Today is empty, so next-hour midnight reservations stay visible before their booking date.
 - Extending, finishing, cancelling, and correcting sessions preserve the financial trail. Finishing a charged session requires full payment; older unpaid records retain their original amounts.
+- Extension quotes and submissions check reservations against active sessions and matching tables. An extension is blocked when no other table of that type can accommodate an overlapping reservation; the notice includes its start time. Sessions can extend in 30-minute increments within the five-hour limit.
+- Cancelling a session returns its released table status so the monitor updates immediately after success, without waiting for the next poll or a full refresh. Earlier polling responses cannot overwrite the cancellation result.
 - `GET /api/room-sessions/report?from=YYYY-MM-DD&to=YYYY-MM-DD` returns finished, fully paid sessions only. `/report/export` uses the same filter and rebuilds the venue's daily monitoring workbook: a `Summary` sheet (Facilities / Sales, `M-D-YYYY` title) followed by one sheet per current facility, each mirroring the familiar per-table Time In / Time out / Rate grid in 15-row bands. Only rooms still present in the room catalog are exported, so removed rooms never appear.
 - **This is the final approach, not a placeholder.** 2-second polling meets the "near-live" requirement without the added complexity of a WebSocket/SSE layer. Do not introduce a push-based layer without a documented reason — it's not a "todo."
 
@@ -170,5 +175,4 @@ flowchart LR
 
 - Both Frontend and Backend deploy to **Vercel**.
 - Backend is a single serverless function (`api/index.js` → `server.js`); `vercel.json` routes all paths to it.
-- **Vercel Cron** runs `GET /api/cron/purge-expired-guests` daily (18:00 UTC), protected by a bearer-token secret (`CRON_SECRET`) — not a public endpoint.
 - Environment-specific behavior (`trust proxy`, secure cookies) is gated on `NODE_ENV === "production"`.

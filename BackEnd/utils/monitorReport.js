@@ -55,7 +55,6 @@ function sessionRow(session) {
     rate: money(session.rate),
     rateLabel: rateLabel(session),
     hourlyRates: session.hourlyRates || [],
-    corkageFee: money(session.corkageFee),
     amount,
     paidAmount,
     refundedAmount,
