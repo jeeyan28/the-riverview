@@ -1,5 +1,6 @@
 const dns = require('node:dns');
-dns.setServers(['1.1.1.1', '8.8.8.8']);
+// Windows SRV lookup bug (nodejs/node#64428); Vercel's runtime refuses public resolvers.
+if (process.platform === 'win32') dns.setServers(['1.1.1.1', '8.8.8.8']);
 
 const express = require("express");
 const mongoose = require("mongoose");
