@@ -22,6 +22,7 @@ const {
   updatePaymentMethodSchema,
   createEmergencyContactSchema,
   updateEmergencyContactSchema,
+  updateTermsSchema,
 } = require("../validation/settingsSchemas");
 
 router.get("/", async (req, res) => {
@@ -40,6 +41,7 @@ router.get("/", async (req, res) => {
       paymentMethods: settings.paymentMethods
         .filter(pm => pm.isActive)
         .map(pm => ({ _id: pm._id, name: pm.name, qrImage: pm.qrImage })),
+      terms: settings.terms,
     });
   } catch (err) {
     console.error(err);
@@ -166,6 +168,23 @@ router.put("/operating-hours", requirePermission(PERMISSIONS.SETTINGS_MANAGE), v
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Server error." });
+  }
+});
+
+router.put("/terms", requirePermission(PERMISSIONS.SETTINGS_MANAGE), validate(updateTermsSchema), async (req, res) => {
+  try {
+    const { lastUpdated, en, fil } = req.body;
+    const settings = await Settings.getSingleton();
+    settings.terms = { lastUpdated: lastUpdated || "", en, fil };
+    settings.updatedBy = req.user._id;
+    settings.updatedAt = new Date();
+    await settings.save();
+
+    await logAudit({ category: "Settings", action: "updated", description: "updated terms of service", user: req.user });
+    res.json(settings.terms);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Could not save the terms of service." });
   }
 });
 

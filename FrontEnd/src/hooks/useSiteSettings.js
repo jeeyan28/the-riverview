@@ -6,6 +6,7 @@ const DEFAULT_SETTINGS = {
   holidays: [],
   announcements: [],
   paymentMethods: [],
+  terms: null,
 };
 
 const SiteSettingsContext = createContext(null);

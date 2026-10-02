@@ -1,6 +1,6 @@
 # Lobby TV availability board
 
-Scope: the guest-facing board entered with Display on TV at `/lobby-monitor`. Mode: Operate. Walk-in guests should identify a facility, a numbered unit, its availability, and its rate or remaining time without scrolling. Keep the existing setup filters and table view.
+Scope: the guest-facing board entered with View on TV or Fullscreen at `/lobby-monitor`. Mode: Operate. Walk-in guests should identify a facility, a numbered unit, its availability, and its rate or remaining time. Keep the existing setup filters and table view. Scrolling is expected when the inventory extends beyond the viewport; never shrink the grid to fit one screen.
 
 ## Direction contract
 
@@ -10,12 +10,12 @@ OWN-WORLD: inherit Riverview's Inter, navy surfaces, teal accents, light-theme s
 
 STORY: find the facility and room type, choose an available number, then ask staff to start. Remaining time includes units and does not promise immediate availability after expiry.
 
-FIRST VIEWPORT: compact title, guest instruction, availability total and clock above a screen-filling set of facility/type sections. Cards prioritize the unit number, status, then hourly rate or time remaining. Partial rows fill their category width. A quiet footer retains update health and exit.
+FIRST VIEWPORT: title and clock above the existing facility/type sections. Cards retain the preview layout, including unit number, status, active-session timer and hourly rate. Fullscreen hides setup controls and adds each facility's status counts; further facilities remain reachable by scrolling.
 
-FORM: preserve the established facility/type groups, navy/teal surfaces and status colors. Fullscreen and cast mode place Available, Occupied, Ending Soon and Overdue counts immediately above each facility. Slightly larger cards and type aid reading from a distance. Size cards from the complete inventory so facility filters simply hide the other facilities without stretching the remaining tiles. Room-type options follow the selected facility; changing facilities resets that secondary filter.
+FORM: preserve the established facility/type groups, navy/teal surfaces and status colors. Fullscreen and cast mode place Available, Occupied, Ending Soon and Overdue counts immediately above each facility. Preview, fullscreen and cast use the same card markup, typography, padding and grid rules. Grid columns respond normally to viewport width, while card height and text never scale with screen height or room count. Facility filters only hide other facilities. Room-type options follow the selected facility; changing facilities resets that secondary filter.
 
 FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance
 
 ## Scoped finish review — October 2, 2026
 
-Verdict: the requested refinement preserves the grouped design. The 21-space fixture fits at 1920×1080 and 1280×720 with no clipped card text. Facility filtering preserves card geometry; switching facilities clears the room-type filter. The 390px setup view has no horizontal overflow. Fullscreen and a simulated presentation receiver both expose the facility status rows. Casting hardware was not part of this local visual check. No new product image assets were introduced.
+The latest user direction replaces the previous one-screen fitting requirement: preserve the normal grid dimensions across display modes and allow scrolling. The isolated browser fixture passed with 60 rooms: preview, fullscreen and cast had identical card widths, heights, padding and font sizes at 1280×720. Increasing only screen height to 900 preserved that geometry. The scroll region reached the final Court section; Billiards filtering retained 44 Billiards units with the same widths and hid other facilities. Four status counts remain above each facility. Production build and 23 presentation tests passed. Verdict: scoped direction met. Casting hardware is outside the local fixture check. No new product image assets were introduced.

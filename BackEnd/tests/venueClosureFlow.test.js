@@ -125,7 +125,10 @@ before(async () => {
     if (failure === 'read-timeout') throw Object.assign(new Error('timeout'), { status: 504 });
     return { paymentId: 'pay_test', amount: booking.downPayment };
   });
-  stub(paymongo, 'listRefunds', async () => paidRefunds);
+  stub(paymongo, 'listRefunds', async () => {
+    if (failure === 'history-filter') throw Object.assign(new Error('data attribute is not allowed to be used as a filter'), { status: 400 });
+    return paidRefunds;
+  });
   stub(paymongo, 'createRefund', async args => {
     createdRefunds.push(args);
     if (failure === 'reject') throw Object.assign(new Error('insufficient balance'), { status: 400 });
@@ -219,6 +222,37 @@ test('manual refunds cannot be recorded while an online submission remains uncer
   await put(`/bookings/${booking._id}/closure-refund`);
   const response = await put(`/bookings/${booking._id}/cancellation-review`, { decision: 'approve', refundedAmount: 300 }, staffId);
   assert.equal(response.status, 409); assert.equal(booking.refundedAmount, 0);
+});
+
+test('an admin can recover a refund blocked before submission, retaining its request and preventing repeated refunds', async () => {
+  reset(); const booking = await closeBooking(); failure = 'history-filter';
+  await put(`/bookings/${booking._id}/closure-refund`);
+  const requestId = booking.closureRefund.requestId;
+  assert.equal(booking.closureRefund.status, 'manual_required'); assert.equal(createdRefunds.length, 0);
+  assert.equal(booking.refundedAmount, 0);
+  assert.equal((await put(`/bookings/${booking._id}/closure-refund/retry`, {}, ownerId)).status, 403);
+  failure = '';
+  const response = await put(`/bookings/${booking._id}/closure-refund/retry`, {}, staffId);
+  assert.equal(response.status, 200); assert.equal(booking.closureRefund.status, 'completed');
+  assert.equal(booking.closureRefund.requestId, requestId); assert.equal(booking.refundedAmount, 300);
+  assert.equal(createdRefunds.length, 1); assert.equal(createdRefunds[0].requestId, requestId);
+  assert.equal((await put(`/bookings/${booking._id}/closure-refund/retry`, {}, staffId)).status, 409);
+  assert.equal(createdRefunds.length, 1); assert.equal(notifications.filter(item => item.type === 'refund_completed').length, 1);
+});
+
+test('retry refuses ambiguous or rejected submissions and a preflight request partly returned manually', async () => {
+  for (const reason of ['timeout', 'reject', 'history-filter']) {
+    reset(); const booking = await closeBooking(); failure = reason;
+    await put(`/bookings/${booking._id}/closure-refund`);
+    const calls = createdRefunds.length;
+    if (reason === 'history-filter') {
+      const returned = await put(`/bookings/${booking._id}/cancellation-review`, { decision: 'approve', refundedAmount: 100, note: 'Partial cash return' }, staffId);
+      assert.equal(returned.status, 200);
+    }
+    failure = '';
+    assert.equal((await put(`/bookings/${booking._id}/closure-refund/retry`, {}, staffId)).status, 409);
+    assert.equal(createdRefunds.length, calls); assert.equal(booking.refundedAmount, reason === 'history-filter' ? 100 : 0);
+  }
 });
 
 test('mixed payments return only the original gateway amount automatically and notify again after the cash remainder is returned', async () => {

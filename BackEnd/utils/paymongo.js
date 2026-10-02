@@ -233,9 +233,10 @@ async function listRefunds(paymentId) {
   const results = [];
   let after;
   for (let page = 0; page < 5; page++) {
-    const query = new URLSearchParams({ "data.attributes.payment_id": paymentId, "data.attributes.limit": "100", ...(after ? { "data.attributes.after": after } : {}) });
+    const query = new URLSearchParams({ payment_id: paymentId, limit: "100", ...(after ? { after } : {}) });
     const json = await paymongoRequest(`/refunds?${query}`);
     if (!Array.isArray(json.data)) throw new Error("Invalid refund list.");
+    if (json.data.some(item => !item.id || item.attributes?.payment_id !== paymentId)) throw new Error("Refund history does not match the original payment.");
     results.push(...json.data);
     if (!json.has_more) return results;
     after = json.data.at(-1)?.id;

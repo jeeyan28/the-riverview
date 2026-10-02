@@ -51,6 +51,7 @@ export const bookingsService = {
   reschedule: (id, payload) => apiRequest(`${BASE}/${id}/reschedule`, { method: 'PUT', body: payload, fallbackMessage: 'Failed to reschedule your reservation.' }),
   requestClosureRefund: (id) => apiRequest(`${BASE}/${id}/closure-refund`, { method: 'PUT', body: {}, fallbackMessage: 'Could not request the closure refund. Check your reservation before trying again.' }),
   checkClosureRefund: (id) => apiRequest(`${BASE}/${id}/closure-refund/check`, { method: 'PUT', body: {}, fallbackMessage: 'Could not check the refund status.' }),
+  retryClosureRefund: (id) => apiRequest(`${BASE}/${id}/closure-refund/retry`, { method: 'PUT', body: {}, fallbackMessage: 'Could not retry the automatic refund. Check the current refund status.' }),
 
   requestCancellation: (id, payload) => apiRequest(`${BASE}/${id}/cancellation-request`, { method: 'PUT', body: payload, fallbackMessage: 'Failed to request cancellation.' }),
 

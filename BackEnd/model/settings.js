@@ -55,6 +55,28 @@ const emergencyContactSchema = new mongoose.Schema({
   details: { type: String, default: "", trim: true, maxlength: 180 },
 }, { timestamps: true });
 
+// Customer-facing Terms of Service text, editable from admin Settings >
+// Terms & Services. Shape mirrors `TERMS_CONTENT` in
+// FrontEnd/src/data/legalContent.js so the public /terms page and the
+// sign-up agreement modal can render it with no transformation. When `en`
+// has no sections the frontend falls back to the built-in default copy.
+const termsSectionSchema = new mongoose.Schema({
+  heading:    { type: String, required: true, trim: true },
+  paragraphs: { type: [String], default: [] },
+  list:       { type: [String], default: [] },
+}, { _id: false });
+
+const termsLanguageSchema = new mongoose.Schema({
+  intro:    { type: String, default: "" },
+  sections: { type: [termsSectionSchema], default: [] },
+}, { _id: false });
+
+const termsSchema = new mongoose.Schema({
+  lastUpdated: { type: String, default: "" },
+  en:  { type: termsLanguageSchema, default: () => ({}) },
+  fil: { type: termsLanguageSchema, default: () => ({}) },
+}, { _id: false });
+
 // The whole app only ever needs ONE settings document. We enforce that with
 // a fixed singleton id ("global") rather than a unique-index-on-nothing
 // trick, so `Settings.getSingleton()` can always findOrCreate deterministically.
@@ -65,6 +87,7 @@ const settingsSchema = new mongoose.Schema({
   announcements:  { type: [announcementSchema], default: [] },
   paymentMethods: { type: [paymentMethodSchema], default: [] },
   emergencyContacts: { type: [emergencyContactSchema], default: [] },
+  terms:         { type: termsSchema, default: () => ({}) },
   updatedBy:      { type: mongoose.Schema.Types.ObjectId, ref: "User" },
   updatedAt:      { type: Date, default: Date.now },
 });
