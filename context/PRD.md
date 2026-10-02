@@ -29,7 +29,6 @@ Admin and staff have no real system — booking, reporting, and status tracking 
 | Billiards | Solo Big Room | ₱250/hr |
 | Billiards | VIP (KTV + Pool, max 10 pax) | ₱400/hr (+₱50/head over base) |
 | KTV | Standard Room | ₱300/hr |
-| Add-on | Corkage fee (outside food/drinks) | ₱200 flat |
 
 Room/table/court **inventory (counts) is admin-configurable**, not hardcoded — admin can add, edit, or remove units and pricing as the business changes. Billiards, KTV, and Court remain the core presets, while an admin may create additional uniquely named hourly facilities that use the same booking, monitoring, and reporting flow.
 
@@ -38,8 +37,9 @@ Room/table/court **inventory (counts) is admin-configurable**, not hardcoded —
 - Customer must be logged into their own account to book online
 - **Required downpayment** via online payment to confirm a booking
 - Booking is **auto-confirmed the instant downpayment succeeds** — no staff approval step
-- **Reschedule**: allowed up to 2 times per booking, must be requested at least 3 hours before the booked start time
-- **Cancellation**: requires admin approval; admin manually decides and processes any refund (no automatic refund)
+- **Reschedule**: allowed up to 2 times per booking, must be requested at least 24 hours before the booked start time; venue closure changes bypass that cutoff and allowance
+- **Cancellation**: ordinary customer requests require admin review and manual refunds under the first-hour policy. Venue closures offer a full refund through the original online provider, with staff handling cash/manual remainders.
+- **Venue closures**: notify affected reservation owners in their bell and by email. They can reschedule without consuming their usual allowance or request a full refund; provider-confirmed completion sends another notification and email. Public announcements remain in the page banner.
 - **No-show** (no cancellation/reschedule, customer doesn't appear): downpayment is **automatically forfeited**, no admin action needed
 - **Walk-ins / FB-originated bookings**: staff can create a manual booking for a customer without an account; no downpayment enforced for these (they pay on-site)
 
@@ -53,7 +53,7 @@ Room/table/court **inventory (counts) is admin-configurable**, not hardcoded —
 
 ### 5.2 Revenue and Reporting Rules
 - **Charges**, **collected revenue**, **refunds**, and **outstanding balances** are separate values. Revenue means money actually collected, after recorded refunds.
-- The room charge is calculated per whole hour from the exact room/facility type used. Time-based court rates are calculated hour by hour; corkage stays a separate flat add-on.
+- The room charge is calculated per whole hour from the exact room/facility type used. Time-based court rates are calculated hour by hour; optional services use their configured fees.
 - A reservation linked to a played session appears once in finance totals. The played session supplies the final charge while the reservation supplies its previously verified deposit.
 - Reports has a dedicated Live Monitor session report for a day, month, or custom inclusive range. It shows only finished, fully paid sessions, with time in/out, hours, rate, charge, collected amount, source, payment timing/status, and totals by room type. Older unpaid sessions are hidden from this report and its Excel export, without changing their stored payment state.
 - The main sales report uses the same ledger and offers Today, Last 7 days, This month, and simple From/To service-date controls. Excel exports contain a concise Summary, activity/transactions, room totals, and daily totals where applicable.
@@ -61,7 +61,7 @@ Room/table/court **inventory (counts) is admin-configurable**, not hardcoded —
 ## 6. MVP Feature Set
 1. Customer accounts & self-service booking (date/time-range picker, service + room-type selection)
 2. Downpayment-based online payment, auto-confirmation
-3. Reschedule flow (2x limit, 3-hour cutoff)
+3. Reschedule flow (2x limit, 24-hour cutoff, with venue closure exceptions)
 4. Admin-gated cancellation + manual refund handling
 5. Automatic no-show forfeiture
 6. Staff-side manual/walk-in booking creation
@@ -80,7 +80,7 @@ Room/table/court **inventory (counts) is admin-configurable**, not hardcoded —
 - Any Riverview tenant business other than billiards, KTV, and court (e.g. the gaming hub)
 - In-system chat/messaging (customers are redirected to the business FB page/contact info for inquiries)
 - Multi-location/franchise support (single physical location only)
-- Automated online refunds (refunds are manual/admin-processed)
+- Automatic refunds for ordinary customer cancellations (automatic provider refunds are limited to venue-caused closures)
 - LLM-based forecasting (using statistical/trend model instead)
 
 ## 8. Technical Context (not hard requirements, current reality)

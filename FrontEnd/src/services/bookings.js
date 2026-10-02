@@ -6,6 +6,8 @@ const BASE = '/api/bookings';
 export const bookingsService = {
   listActive: () => apiRequest(`${BASE}?status=${BOOKING_STATUS.ONGOING}`, { fallbackMessage: 'Failed to load reservations for the room monitor.' }),
 
+  repeatCustomers: (name) => apiRequest(`${BASE}?${new URLSearchParams({ search: name })}`, { fallbackMessage: 'Could not load previous customers.' }),
+
   updateStatus: (id, status) => apiRequest(`${BASE}/${id}`, { method: 'PUT', body: { status }, fallbackMessage: 'Failed to end the session.' }),
 
   create: (payload) => apiRequest(BASE, { method: 'POST', body: payload, fallbackMessage: 'Failed to create the reservation.' }),
@@ -47,6 +49,8 @@ export const bookingsService = {
   mine: () => apiRequest(`${BASE}/mine`, { fallbackMessage: 'Failed to load your reservation history.' }),
 
   reschedule: (id, payload) => apiRequest(`${BASE}/${id}/reschedule`, { method: 'PUT', body: payload, fallbackMessage: 'Failed to reschedule your reservation.' }),
+  requestClosureRefund: (id) => apiRequest(`${BASE}/${id}/closure-refund`, { method: 'PUT', body: {}, fallbackMessage: 'Could not request the closure refund. Check your reservation before trying again.' }),
+  checkClosureRefund: (id) => apiRequest(`${BASE}/${id}/closure-refund/check`, { method: 'PUT', body: {}, fallbackMessage: 'Could not check the refund status.' }),
 
   requestCancellation: (id, payload) => apiRequest(`${BASE}/${id}/cancellation-request`, { method: 'PUT', body: payload, fallbackMessage: 'Failed to request cancellation.' }),
 

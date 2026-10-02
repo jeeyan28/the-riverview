@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import '../styles/style.css';
@@ -7,34 +7,32 @@ import '../styles/auth-ui.css';
 import '../styles/skeleton.css';
 import '../styles/login.css';
 import Navbar from '../components/Navbar';
+import AnnouncementBanner from '../components/AnnouncementBanner';
 import Footer from '../components/Footer';
 import ProfileModal from '../components/ProfileModal';
-import GuestBanner from '../components/GuestBanner';
-import ClaimAccountModal from '../components/ClaimAccountModal';
 import PageTransition from '../components/PageTransition';
 import { useTheme } from '../hooks/useTheme';
 import { useAuth } from '../context/AuthContext';
 import { useSiteSettings } from '../hooks/useSiteSettings';
-import { useAnnouncements } from '../hooks/useAnnouncements';
 import { CustomerAppNavigation } from '../components/MobileAppNavigation';
 import { buildLoginPath } from '../utils/auth';
+import { useNotifications } from '../hooks/useNotifications';
 
 function MainLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const { initializing, user } = useAuth();
+  const notifications = useNotifications(initializing ? null : user?._id);
   const reservationParams = new URLSearchParams(location.search);
   const reservationIntent = reservationParams.get('reservation')
     ? { code: reservationParams.get('reservation'), action: reservationParams.get('action') }
     : null;
   const { settings } = useSiteSettings();
-  const announcements = useAnnouncements(settings.announcements, initializing ? null : user?._id);
+  const [announcementHeight, setAnnouncementHeight] = useState(0);
   const [theme, toggleTheme] = useTheme();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
-  const [claimAccountOpen, setClaimAccountOpen] = useState(false);
-  const siteRef = useRef(null);
   const closeMobileNav = useCallback(() => setMobileNavOpen(false), []);
 
   useEffect(() => {
@@ -85,32 +83,10 @@ function MainLayout() {
     };
   }, [mobileNavOpen]);
 
-  useEffect(() => {
-    document.body.classList.toggle('has-guest-banner', !!user?.isGuest);
-    return () => document.body.classList.remove('has-guest-banner');
-  }, [user?.isGuest]);
-
-  useEffect(() => {
-    const site = siteRef.current;
-    if (!site) return;
-    const banner = site.querySelector('.guest-banner');
-    if (!banner) {
-      site.style.setProperty('--guest-banner-h', '0px');
-      return;
-    }
-    const updateBannerHeight = () => site.style.setProperty('--guest-banner-h', `${banner.getBoundingClientRect().height}px`);
-    updateBannerHeight();
-    const observer = new ResizeObserver(updateBannerHeight);
-    observer.observe(banner);
-    return () => observer.disconnect();
-  }, [initializing, user?.isGuest]);
-
   return (
-    <div className="public-site" ref={siteRef}>
-      <GuestBanner onSave={() => setClaimAccountOpen(true)} />
-
+    <div className="public-site" style={{ '--announcement-height': `${announcementHeight}px` }}>
+      <AnnouncementBanner announcements={settings.announcements} onHeightChange={setAnnouncementHeight} />
       <Navbar
-        announcements={announcements}
         mobileNavOpen={mobileNavOpen}
         onOpenMobileNav={() => setMobileNavOpen(true)}
         onCloseMobileNav={closeMobileNav}
@@ -118,6 +94,12 @@ function MainLayout() {
         onOpenProfile={() => setProfileOpen(true)}
         theme={theme}
         onToggleTheme={toggleTheme}
+        notifications={notifications}
+        onOpenNotification={(item) => {
+          closeMobileNav();
+          navigate(`/?${new URLSearchParams({ reservation: item.reservationCode, action: 'closure' })}`);
+          setProfileOpen(true);
+        }}
       />
 
       <main>
@@ -134,8 +116,6 @@ function MainLayout() {
       />
 
       <ProfileModal open={profileOpen} onClose={closeProfile} reservationIntent={reservationIntent} />
-
-      <ClaimAccountModal open={claimAccountOpen} onClose={() => setClaimAccountOpen(false)} />
 
       <div className="modal-portal-root" data-modal-portal />
     </div>

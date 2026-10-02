@@ -1,5 +1,7 @@
 import { cancellationAmounts } from './cancellationPolicy.js';
 import { getEmbeddedBrowserInfo } from './embeddedBrowser.js';
+import { reservationDisplayName } from './reservationName.js';
+import { AUTOMATIC_REFUND_STATUSES, isClosurePending, refundTiming } from './closureRefund.js';
 
 export function formatHour(h) {
   const hh = h % 24;
@@ -40,11 +42,11 @@ export function getBookingReceiptData(booking, overrides = {}) {
   const showRefundToArrange = Boolean(booking.cancellationSource || booking.cancellationRequestedAt);
   const venueDiscountReturned = Math.max(0, Number(booking.venueDiscountRefunded) || 0);
   const cancellationRefunded = Math.max(0, payment.refunded - venueDiscountReturned);
+  const automaticRefundPending = AUTOMATIC_REFUND_STATUSES.includes(booking.closureRefund?.status);
 
   const costRows = [
     ...(Number(booking.discountAmount) > 0 ? [{ label: booking.venueDiscountApplied ? 'Room discount at venue' : 'Pay-in-full discount', value: -Number(booking.discountAmount) }] : []),
     ...(booking.addOns || []).map((service) => ({ label: service.name, value: Number(service.fee) || 0 })),
-    ...(Number(booking.corkageFee) > 0 ? [{ label: 'Corkage', value: Number(booking.corkageFee) }] : []),
     { label: 'Total amount', value: amount },
     { label: 'Paid online', value: downPayment },
     ...(paidAtVenue > 0 ? [{ label: 'Paid later', value: paidAtVenue }] : []),
@@ -52,7 +54,7 @@ export function getBookingReceiptData(booking, overrides = {}) {
     ...(closed ? [
       ...(cancellationRefunded > 0 ? [{ label: 'Refunded', value: cancellationRefunded }] : []),
       { label: 'Paid', value: payment.retained },
-      ...(status === 'Cancelled' && showRefundToArrange && payment.refundRemaining > 0 ? [{ label: 'Refund to arrange', value: payment.refundRemaining }] : []),
+      ...(status === 'Cancelled' && showRefundToArrange && payment.refundRemaining > 0 ? [{ label: automaticRefundPending ? 'Refund processing' : 'Refund to arrange', value: payment.refundRemaining }] : []),
     ] : [{ label: 'Remaining balance', value: remaining }]),
   ];
   const notes = [];
@@ -67,7 +69,14 @@ export function getBookingReceiptData(booking, overrides = {}) {
       : `Staff: deduct ₱${Number(booking.eligibleDiscount).toLocaleString()} from the guest's remaining balance at the facility as the room discount.`);
   }
   if (status === 'No Show') notes.push('No refund is due for a no-show.');
-  if (status === 'Cancelled' && payment.customerCancelled) {
+  if (isClosurePending(booking)) {
+    notes.push(`Venue closed on ${booking.venueClosure.date}. Reschedule or request a full refund in your reservation account. No first-hour charge will be kept.`);
+  } else if (booking.closureRefund) {
+    notes.push('Venue closure: the full amount paid is refundable. No first-hour charge is retained.');
+    if (automaticRefundPending) notes.push(`Refund processing. You will receive a bell notification and email after provider confirmation. ${refundTiming(booking)}`);
+    else if (booking.closureRefund.status === 'completed' && Number(booking.closureRefund.processedAmount) > 0) notes.push(`The provider has processed the online refund. ${refundTiming(booking)}`);
+    else if (payment.refundRemaining > 0) notes.push('Staff will arrange the remaining manual refund and notify you after it is returned.');
+  } else if (status === 'Cancelled' && payment.customerCancelled) {
     notes.push(refundException ? 'A refund exception was approved.' : 'The first-hour charge is non-refundable for a customer cancellation.');
     if (payment.refundRemaining > 0) notes.push('Contact admin to arrange the remaining manual refund.');
   } else if (status === 'Cancelled' && showRefundToArrange && payment.refundRemaining > 0) {
@@ -81,8 +90,8 @@ export function getBookingReceiptData(booking, overrides = {}) {
     subtitle: closed ? 'Payment record for this reservation.' : 'Your reservation has been successfully created.',
     facility,
     info: [
-      [{ label: 'Reserved by', value: booking.guestName || '—' }, { label: 'Contact no.', value: guestPhoneDisplay(booking.guestContact) }],
-      [{ label: 'Email', value: booking.guestEmail || '—' }],
+      [{ label: 'Reserved by', value: reservationDisplayName(booking.guestName) }, { label: 'Contact no.', value: guestPhoneDisplay(booking.guestContact) }],
+      [{ label: 'Email', value: booking.guestEmail || (String(booking.guestContact || '').includes('@') ? booking.guestContact : '—') }],
       [{ label: 'Room', value: roomName }, { label: 'Guests', value: String(booking.guestCount || 1) }],
       [{ label: 'Reservation date', value: dateLabel }, { label: 'Time', value: timeLabel }],
       [{ label: 'Reserved on', value: bookedOnLabel }],

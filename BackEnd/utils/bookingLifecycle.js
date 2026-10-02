@@ -26,7 +26,7 @@ function venueDiscountSettlement(booking) {
   const previousRefund = money(booking.refundedAmount || 0);
   const previousBalance = money(Math.max(0, originalAmount - (previousPaid - previousRefund)));
   // A one-hour reservation has already paid its room charge online. Return its
-  // room discount at the venue even when corkage or other extras are still due.
+  // room discount at the venue even when optional services are still due.
   const cashReturned = money(Number(booking.duration) === 1 ? discount : Math.max(0, discount - previousBalance));
   return {
     discount,
@@ -44,6 +44,27 @@ function financialFields(amount, paidAmount, refundedAmount = 0) {
   const netPaid = money(paidAmount - refundedAmount);
   const paymentStatus = amount > 0 && netPaid >= amount ? "Paid" : netPaid > 0 ? "Partial" : "Unpaid";
   return { amount, paidAmount, refundedAmount, paymentStatus };
+}
+
+function manualReservationPaymentFields({ amount, hourlyRates, duration, paymentChoice, paidAmount }) {
+  const total = money(amount);
+  const firstHourPayment = money(hourlyRates?.[0] || 0);
+  const choice = Number(duration) === 1 ? 'deposit' : paymentChoice;
+  const expected = choice === 'full' ? total : firstHourPayment;
+  const received = paymentChoice ? expected : money(paidAmount || 0);
+  if (paymentChoice && paidAmount !== undefined && money(paidAmount) !== expected) {
+    throw new AppError(409, 'The reservation price changed. Review the payment choice and try again.');
+  }
+  if (received > total) throw new AppError(400, 'Amount received cannot exceed the reservation charge.');
+  return {
+    ...financialFields(total, received),
+    firstHourPayment,
+    ...(paymentChoice ? {
+      paymentChoice: choice,
+      downPayment: received,
+      downPaymentHours: choice === 'full' ? Number(duration) : 1,
+    } : {}),
+  };
 }
 
 function fullOrDeferredPaymentFields(amount, previousPaid, nextPaid, refundedAmount = 0) {
@@ -72,15 +93,16 @@ function bookingSessionEnd(booking, now = Date.now()) {
 }
 
 function completeReservationFields(booking, { now = Date.now(), hasMonitorSession = false } = {}) {
+  if (booking.venueClosure?.status === "pending") throw new AppError(409, "Resolve the venue closure by rescheduling or refunding this reservation.");
   if (hasMonitorSession) throw new AppError(409, "Finish the linked session in Room Monitoring instead.");
   if (booking.status === "No Show") return { status: "Done", noShowAt: null };
-  if (booking.status === "Confirmed") {
+  if (booking.status === "Confirmed" || booking.status === "Overdue") {
     if (booking.cancellationStatus === "Requested") throw new AppError(409, "Review the cancellation request before completing this reservation.");
     const start = bookingStartMs(booking.date, booking.timeIn);
     if (!Number.isFinite(start) || start > now) throw new AppError(409, "A reservation cannot be completed before its start time.");
     return { status: "Done", noShowAt: null };
   }
-  throw new AppError(409, "Only a confirmed or no-show reservation can be marked done.");
+  throw new AppError(409, "Only a confirmed, overdue, or no-show reservation can be marked done.");
 }
 
 function extendSessionFields(session, addedHours, nextAmount, { collectNow = false } = {}) {
@@ -157,4 +179,4 @@ function reviewCancellationFields(booking, { decision, refundedAmount = booking.
   };
 }
 
-module.exports = { money, bookingCollected, venueDiscountSettlement, financialFields, fullOrDeferredPaymentFields, bookingStartMs, bookingSessionEnd, completeReservationFields, extendSessionFields, endSessionFields, firstHourCharge, cancellationRefundLimit, reviewCancellationFields };
+module.exports = { money, bookingCollected, venueDiscountSettlement, financialFields, manualReservationPaymentFields, fullOrDeferredPaymentFields, bookingStartMs, bookingSessionEnd, completeReservationFields, extendSessionFields, endSessionFields, firstHourCharge, cancellationRefundLimit, reviewCancellationFields };

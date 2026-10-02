@@ -25,7 +25,7 @@ import {
   getDayAvailability,
   getTimePeriod,
 } from '../utils/rooms';
-import { CORKAGE_FEE, calculateBookingPrice, effectiveDiscountPercent, variantRateLabel } from '../utils/roomPricing';
+import { calculateBookingPrice, effectiveDiscountPercent, variantRateLabel } from '../utils/roomPricing';
 import { API_BASE_URL } from '../services/api';
 import { terminalPaymentFailure } from '../utils/paymongoStatus';
 import { ArrowLeft, X } from 'lucide-react';
@@ -102,7 +102,7 @@ function BookingStepper({ step, onStepClick, steps = STEPS }) {
 
 function BookingSummaryContents({
   room, selectedVariant, selectedDate, selectedHour, selectedDuration,
-  guestName, guestContact, guestCount, guestNote, hasCorkage,
+  guestName, guestContact, guestEmail, guestCount, guestNote,
   selectedMethod, subtotal, downPayment, remainingBalance,
   priceBreakdown, paymentChoice,
   step,
@@ -224,8 +224,12 @@ function BookingSummaryContents({
                   <span className="bk-summary-panel-row-value">{guestName || 'Not provided yet'}</span>
                 </div>
                 <div className="bk-summary-panel-row">
-                  <span className="bk-summary-panel-row-label"><i className="fa-solid fa-phone"></i> Contact</span>
+                  <span className="bk-summary-panel-row-label"><i className="fa-solid fa-phone"></i> Phone</span>
                   <span className="bk-summary-panel-row-value">{guestContact || 'Not provided yet'}</span>
+                </div>
+                <div className="bk-summary-panel-row">
+                  <span className="bk-summary-panel-row-label"><i className="fa-solid fa-envelope"></i> Email</span>
+                  <span className="bk-summary-panel-row-value">{guestEmail || 'Not provided yet'}</span>
                 </div>
                 <div className="bk-summary-panel-row">
                   <span className="bk-summary-panel-row-label"><i className="fa-solid fa-users"></i> Guests</span>
@@ -235,12 +239,6 @@ function BookingSummaryContents({
                   <div className="bk-summary-panel-row">
                     <span className="bk-summary-panel-row-label"><i className="fa-solid fa-note-sticky"></i> Special Request</span>
                     <span className="bk-summary-panel-row-value">{guestNote}</span>
-                  </div>
-                )}
-                {hasCorkage && (
-                  <div className="bk-summary-panel-row">
-                    <span className="bk-summary-panel-row-label"><i className="fa-solid fa-bag-shopping"></i> Add-on</span>
-                    <span className="bk-summary-panel-row-value">Outside food/drinks · ₱{CORKAGE_FEE}</span>
                   </div>
                 )}
               </div>
@@ -264,12 +262,6 @@ function BookingSummaryContents({
                   <span>{variantRateLabel(selectedVariant)}</span>
                 </div>
                 {timeLabel && <div className="bk-summary-panel-cost-row"><span>Room charge</span><span>₱{priceBreakdown.roomCharge.toLocaleString()}</span></div>}
-                {timeLabel && hasCorkage && (
-                  <div className="bk-summary-panel-cost-row">
-                    <span>Corkage</span>
-                    <span>₱{CORKAGE_FEE.toLocaleString()}</span>
-                  </div>
-                )}
                 {timeLabel && priceBreakdown.addOns.map((service) => (
                   <div className="bk-summary-panel-cost-row" key={service.name}>
                     <span>{service.name}</span>
@@ -441,14 +433,18 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
   const [claimDiscount, setClaimDiscount] = useState(false);
   const [selectedAddOns, setSelectedAddOns] = useState([]);
 
-  const [guestName, setGuestName] = useState('');
+  const [guestLastName, setGuestLastName] = useState('');
+  const [guestFirstName, setGuestFirstName] = useState('');
+  const guestName = [guestLastName.trim(), guestFirstName.trim()].filter(Boolean).join(', ');
   const [guestContact, setGuestContact] = useState('');
+  const [guestEmail, setGuestEmail] = useState('');
   const [guestCount, setGuestCount] = useState(1);
   const [guestNote, setGuestNote] = useState('');
-  const [hasCorkage, setHasCorkage] = useState(false);
   const [paxError, setPaxError] = useState('');
-  const [nameError, setNameError] = useState('');
+  const [lastNameError, setLastNameError] = useState('');
+  const [firstNameError, setFirstNameError] = useState('');
   const [contactError, setContactError] = useState('');
+  const [emailError, setEmailError] = useState('');
 
   const [payLoading, setPayLoading] = useState(false);
   const [payError, setPayError] = useState('');
@@ -521,14 +517,15 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
     setSelectedHour(null);
     setSelectedDuration(minDuration);
     setGuestNote('');
-    setHasCorkage(false);
     setClaimDiscount(false);
     setSelectedAddOns([]);
     setPaymentChoice('deposit');
     setGuestCount(1);
     setPaxError('');
-    setNameError('');
+    setLastNameError('');
+    setFirstNameError('');
     setContactError('');
+    setEmailError('');
     setPmIntent(null);
     externalCheckoutRef.current = false;
     setSelectedMethod(null);
@@ -542,8 +539,10 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
     setLockError('');
 
     const user = authUser;
-    setGuestName(user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : '');
-    setGuestContact(user ? user.phone || (user.isGuest ? '' : user.email) || '' : '');
+    setGuestLastName(user?.lastName || '');
+    setGuestFirstName(user?.firstName || '');
+    setGuestContact(user?.phone || '');
+    setGuestEmail(user?.email || '');
   }, [room, initialVariantLabel]);
 
   useEffect(() => {
@@ -732,8 +731,8 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
           body: JSON.stringify({
             guestName: guestName.trim(),
             guestContact: guestContact.trim(),
+            guestEmail: guestEmail.trim(),
             guestCount: guestCount || 1,
-            hasCorkage,
             specialRequests: guestNote.trim(),
             roomId: room._id,
             variantLabel: selectedVariant.label,
@@ -785,7 +784,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
     return () => {
       cancelled = true;
     };
-  }, [step, room, selectedVariant, selectedDate, selectedHour, selectedDuration, paymentChoice, claimDiscount, selectedAddOns, hasCorkage, paymentInitVersion]);
+  }, [step, room, selectedVariant, selectedDate, selectedHour, selectedDuration, paymentChoice, claimDiscount, selectedAddOns, paymentInitVersion]);
 
   function handleClose() {
     stopPolling();
@@ -914,19 +913,23 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
   }
 
   async function continueToPayment() {
-    const trimmedName = guestName.trim();
+    const trimmedLastName = guestLastName.trim();
+    const trimmedFirstName = guestFirstName.trim();
     const trimmedContact = guestContact.trim();
+    const trimmedEmail = guestEmail.trim();
 
-    const nErr = trimmedName ? '' : 'Please enter your full name.';
-    let cErr = '';
-    if (!trimmedContact) {
-      cErr = authUser?.isGuest ? '' : 'Please enter a phone number or email.';
-    } else if (authUser?.isGuest && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedContact)) {
-      cErr = 'Please enter a valid email address.';
-    }
-    setNameError(nErr);
+    const lastErr = !trimmedLastName ? 'Please enter your last name.'
+      : guestName.length > 120 ? 'Keep the full name within 120 characters.' : '';
+    const firstErr = trimmedFirstName ? '' : 'Please enter your first name.';
+    const cErr = !trimmedContact ? 'Please enter a phone number.'
+      : trimmedContact.length < 7 || trimmedContact.length > 40 || !/^\+?[0-9() .-]+$/.test(trimmedContact) || trimmedContact.replace(/\D/g, '').length < 7 ? 'Enter a valid phone number.' : '';
+    const eErr = !trimmedEmail ? 'Please enter an email address.'
+      : !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail) ? 'Enter a valid email address.' : '';
+    setLastNameError(lastErr);
+    setFirstNameError(firstErr);
     setContactError(cErr);
-    if (nErr || cErr || paxError) return;
+    setEmailError(eErr);
+    if (lastErr || firstErr || cErr || eErr || paxError) return;
 
     setConfirming(true);
     const user = await revalidate();
@@ -1338,12 +1341,11 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
         startHour: selectedHour ?? 0,
         duration: selectedDuration,
         guestCount,
-        hasCorkage,
         paymentChoice: selectedDuration === 1 ? 'deposit' : paymentChoice,
         claimDiscount,
         selectedAddOns,
       })
-    : { amount: 0, roomCharge: 0, corkageFee: 0, downPayment: 0, discountAmount: 0, eligibleDiscount: 0, addOns: [], addOnFee: 0, hourlyRates: [] };
+    : { amount: 0, roomCharge: 0, downPayment: 0, discountAmount: 0, eligibleDiscount: 0, addOns: [], addOnFee: 0, hourlyRates: [] };
   const subtotalAmount = priceBreakdown.amount;
   const downPaymentAmount = priceBreakdown.downPayment;
   const remainingBalanceAmount = Math.max(0, subtotalAmount - downPaymentAmount);
@@ -1353,8 +1355,8 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
       : `₱${remainingBalanceAmount.toLocaleString()} remains to pay at the facility. `
     : '';
   const downPaymentOptions = [
-    { choice: 'deposit', label: selectedDuration === 1 ? '1-hour reservation payment' : '1-hour down payment', amount: Math.min(priceBreakdown.roomCharge + priceBreakdown.corkageFee + priceBreakdown.addOnFee, priceBreakdown.hourlyRates[0] || 0) },
-    { choice: 'full', label: 'Pay in full', amount: Math.max(0, priceBreakdown.roomCharge - priceBreakdown.eligibleDiscount + priceBreakdown.corkageFee + priceBreakdown.addOnFee) },
+    { choice: 'deposit', label: selectedDuration === 1 ? '1-hour reservation payment' : '1-hour down payment', amount: Math.min(priceBreakdown.roomCharge + priceBreakdown.addOnFee, priceBreakdown.hourlyRates[0] || 0) },
+    { choice: 'full', label: 'Pay in full', amount: Math.max(0, priceBreakdown.roomCharge - priceBreakdown.eligibleDiscount + priceBreakdown.addOnFee) },
   ];
   const visiblePaymentOptions = selectedDuration === 1 ? downPaymentOptions.slice(0, 1) : downPaymentOptions;
   const availableDiscountPercent = selectedVariant ? effectiveDiscountPercent(room, selectedVariant) : 0;
@@ -1431,9 +1433,9 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
               selectedDuration={selectedDuration}
               guestName={guestName}
               guestContact={guestContact}
+              guestEmail={guestEmail}
               guestCount={guestCount}
               guestNote={guestNote}
-              hasCorkage={hasCorkage}
               selectedMethod={selectedMethod}
               subtotal={subtotalAmount}
               downPayment={downPaymentAmount}
@@ -1715,37 +1717,71 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
 
                 <div className="bk-guest-fields">
                   <div className="bk-field">
-                    <label className="bk-field-label" htmlFor="bkGuestName">Full Name</label>
+                    <label className="bk-field-label" htmlFor="bkGuestLastName">Last Name</label>
                     <input
                       type="text"
-                      id="bkGuestName"
-                      className={`bk-field-input${nameError ? ' bk-field-input--error' : ''}`}
-                      placeholder="Juan Dela Cruz"
-                      value={guestName}
-                      onChange={(e) => { setGuestName(e.target.value); if (nameError) setNameError(''); }}
+                      id="bkGuestLastName"
+                      className={`bk-field-input${lastNameError ? ' bk-field-input--error' : ''}`}
+                      placeholder="Dela Cruz"
+                      autoComplete="family-name"
+                      required
+                      value={guestLastName}
+                      onChange={(e) => { setGuestLastName(e.target.value); if (lastNameError) setLastNameError(''); }}
                     />
-                    {nameError && (
-                      <p className="bk-field-error"><i className="fa-solid fa-circle-exclamation"></i> {nameError}</p>
+                    {lastNameError && (
+                      <p className="bk-field-error"><i className="fa-solid fa-circle-exclamation"></i> {lastNameError}</p>
+                    )}
+                  </div>
+                  <div className="bk-field">
+                    <label className="bk-field-label" htmlFor="bkGuestFirstName">First Name</label>
+                    <input
+                      type="text"
+                      id="bkGuestFirstName"
+                      className={`bk-field-input${firstNameError ? ' bk-field-input--error' : ''}`}
+                      placeholder="Juan"
+                      autoComplete="given-name"
+                      required
+                      value={guestFirstName}
+                      onChange={(e) => { setGuestFirstName(e.target.value); if (firstNameError) setFirstNameError(''); }}
+                    />
+                    {firstNameError && (
+                      <p className="bk-field-error"><i className="fa-solid fa-circle-exclamation"></i> {firstNameError}</p>
                     )}
                   </div>
                   <div className="bk-field">
                     <label className="bk-field-label" htmlFor="bkGuestContact">
-                      {authUser?.isGuest ? 'Email Address' : 'Phone Number or Email'}
-                      {authUser?.isGuest && <span className="bk-field-optional">Optional</span>}
+                      Phone Number
                     </label>
                     <input
-                      type="text"
+                      type="tel"
                       id="bkGuestContact"
                       className={`bk-field-input${contactError ? ' bk-field-input--error' : ''}`}
-                      placeholder={authUser?.isGuest ? 'you@email.com' : '09xx xxx xxxx or you@email.com'}
+                      placeholder="0912 345 6789"
+                      autoComplete="tel"
+                      required
+                      maxLength={40}
                       value={guestContact}
                       onChange={(e) => { setGuestContact(e.target.value); if (contactError) setContactError(''); }}
                     />
                     {contactError && (
                       <p className="bk-field-error"><i className="fa-solid fa-circle-exclamation"></i> {contactError}</p>
                     )}
-                    {authUser?.isGuest && !contactError && !guestContact.trim() && (
-                      <p className="bk-field-warning"><i className="fa-solid fa-triangle-exclamation"></i> Without an email, you won't receive a reservation receipt.</p>
+                  </div>
+                  <div className="bk-field">
+                    <label className="bk-field-label" htmlFor="bkGuestEmail">Email Address</label>
+                    <input
+                      type="email"
+                      id="bkGuestEmail"
+                      className={`bk-field-input${emailError ? ' bk-field-input--error' : ''}`}
+                      placeholder="you@example.com"
+                      autoComplete="email"
+                      required
+                      maxLength={254}
+                      value={guestEmail}
+                      onChange={(e) => { setGuestEmail(e.target.value); if (emailError) setEmailError(''); }}
+                    />
+                    {emailError && (
+                      <p className="bk-field-error"><i className="fa-solid fa-circle-exclamation"></i> {emailError}</p>
                     )}
                   </div>
                   <div className="bk-field">
@@ -1788,18 +1824,6 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
                       onChange={(e) => setGuestNote(e.target.value)}
                     />
                   </div>
-                  <label className={`bk-addon-option${hasCorkage ? ' bk-addon-option--selected' : ''}`}>
-                    <input
-                      type="checkbox"
-                      checked={hasCorkage}
-                      onChange={(event) => setHasCorkage(event.target.checked)}
-                    />
-                    <span className="bk-addon-option-icon"><i className="fa-solid fa-bag-shopping" aria-hidden="true"></i></span>
-                    <span>
-                      <strong>Bringing outside food or drinks</strong>
-                      <small>Includes the required ₱{CORKAGE_FEE.toLocaleString()} corkage fee.</small>
-                    </span>
-                  </label>
                   {availableDiscountPercent > 0 && (
                     <label className={`bk-addon-option bk-discount-option${claimDiscount ? ' bk-addon-option--selected' : ''}`}>
                       <input type="checkbox" checked={claimDiscount} onChange={(event) => setClaimDiscount(event.target.checked)} />
@@ -2156,9 +2180,9 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
                 selectedDuration={selectedDuration}
                 guestName={guestName}
                 guestContact={guestContact}
+                guestEmail={guestEmail}
                 guestCount={guestCount}
                 guestNote={guestNote}
-                hasCorkage={hasCorkage}
                 selectedMethod={selectedMethod}
                 subtotal={subtotalAmount}
                 downPayment={downPaymentAmount}

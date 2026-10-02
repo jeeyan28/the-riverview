@@ -37,6 +37,29 @@ function lobbyStatus(r, sessions) {
 
 const STATUS_RANK = { expired: 0, 'ending-soon': 1, occupied: 2, available: 3, other: 4 };
 
+function LobbyStatusLegend({ rooms, sessions, facilityName }) {
+  const counts = { available: 0, occupied: 0, 'ending-soon': 0, expired: 0 };
+  rooms.forEach((room) => {
+    const key = lobbyStatus(room, sessions).key;
+    if (key in counts) counts[key] += 1;
+  });
+
+  return (
+    <div className={`lobby-legend${facilityName ? ' lobby-legend--facility' : ''}`} role="group" aria-label={`${facilityName || 'Selected rooms'} availability counts`}>
+      {STATUS_ORDER.map((key) => (
+        <div className={`lobby-legend-item lobby-legend-item--${key}`} key={key}>
+          <span className="lobby-legend-dot" aria-hidden="true"></span>
+          <span className="lobby-legend-val">{counts[key]}</span>
+          <span className="lobby-legend-text">
+            <span className="lobby-legend-label">{STATUS_META[key].label}</span>
+            {!facilityName && <span className="lobby-legend-hint">{STATUS_META[key].hint}</span>}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function LobbyMonitor() {
   return isLobbyPresentationReceiver() ? <LobbyReceiver /> : <LobbyController />;
 }
@@ -126,16 +149,14 @@ function LobbyMonitorView({ monitor, receiver }) {
   }, []);
 
   const facilities = useMemo(() => [...new Set(rooms.map((r) => r.facilityName))], [rooms]);
-  const roomTypes = useMemo(() => [...new Set(rooms.map((r) => r.roomName))], [rooms]);
+  const roomTypes = useMemo(() => [...new Set(rooms
+    .filter((room) => facilityFilter === 'All' || room.facilityName === facilityFilter)
+    .map((room) => room.roomName))], [rooms, facilityFilter]);
 
-  const statusCounts = useMemo(() => {
-    const counts = { available: 0, occupied: 0, 'ending-soon': 0, expired: 0 };
-    rooms.forEach((r) => {
-      const key = lobbyStatus(r, sessions).key;
-      if (key in counts) counts[key] += 1;
-    });
-    return counts;
-  }, [rooms, sessions]);
+  function selectFacility(name) {
+    setFacilityFilter(name);
+    setRoomTypeFilter('All');
+  }
 
   const visibleRooms = useMemo(() => {
     let list = rooms;
@@ -169,9 +190,9 @@ function LobbyMonitorView({ monitor, receiver }) {
     return list;
   }
 
-  const groups = useMemo(() => {
+  const inventoryGroups = useMemo(() => {
     const byFacility = new Map();
-    visibleRooms.forEach((r) => {
+    rooms.forEach((r) => {
       if (!byFacility.has(r.facilityName)) byFacility.set(r.facilityName, new Map());
       const byType = byFacility.get(r.facilityName);
       if (!byType.has(r.roomName)) byType.set(r.roomName, []);
@@ -181,23 +202,30 @@ function LobbyMonitorView({ monitor, receiver }) {
       facilityName,
       types: [...byType.entries()].map(([roomName, roomList]) => ({ roomName, rooms: sortRooms(roomList) })),
     }));
-  }, [visibleRooms, sortBy, sessions]);
+  }, [rooms, sortBy, sessions]);
 
-  const liveTight = (displaySize.height || 800) < 640;
+  const groups = useMemo(() => inventoryGroups
+    .filter((group) => facilityFilter === 'All' || group.facilityName === facilityFilter)
+    .map((group) => ({ ...group, types: group.types.filter((type) => roomTypeFilter === 'All' || type.roomName === roomTypeFilter) }))
+    .filter((group) => group.types.length > 0), [inventoryGroups, facilityFilter, roomTypeFilter]);
+
+  const liveTight = (displaySize.height || 800) < 700;
 
   const liveLayout = useMemo(() => {
     const width = displaySize.width || 1920;
     const height = displaySize.height || 800;
     const gap = liveTight ? 6 : 8;
-    const typeMin = height >= 860 ? 360 : height >= 700 ? 320 : 280;
-    const cardMin = height >= 860 ? 180 : height >= 700 ? 150 : 112;
+    const typeMin = height >= 860 ? 384 : height >= 700 ? 340 : 300;
+    const cardMin = height >= 860 ? 194 : height >= 700 ? 164 : 124;
     const typePadX = (liveTight ? 10 : 12) * 2 + 2;
-    const facilityBlock = liveTight ? 56 : 68;
-    const typeBlock = (liveTight ? 8 * 2 + 2 : 10 * 2 + 2) + (liveTight ? 24 : 28);
+    const facilityBlock = liveTight ? 78 : 104;
+    const typeBlock = liveTight ? 41 : 50;
     const perTypeRow = Math.max(1, Math.floor((width + gap) / (typeMin + gap)));
     let rows = 0;
     let overhead = 0;
-    groups.forEach(({ types }) => {
+    // Size against the complete inventory so a filter only removes facilities;
+    // it must not stretch the remaining cards to fill the screen.
+    inventoryGroups.forEach(({ types }) => {
       let facilityRows = 0;
       let chunks = 0;
       for (let i = 0; i < types.length; i += perTypeRow) {
@@ -211,11 +239,11 @@ function LobbyMonitorView({ monitor, receiver }) {
       overhead += facilityBlock + chunks * typeBlock + Math.max(0, facilityRows - 1) * gap;
     });
     return { width, height, gap, typeMin, cardMin, rows, overhead };
-  }, [groups, displaySize.width, displaySize.height, liveTight]);
+  }, [inventoryGroups, displaySize.width, displaySize.height, liveTight]);
 
   const liveCellH = useMemo(() => {
     const usable = liveLayout.height - liveLayout.overhead - 16;
-    return Math.round(Math.max(48, Math.min(260, (usable / Math.max(1, liveLayout.rows)) * 1.12)));
+    return Math.floor(Math.max(48, Math.min(176, (usable / Math.max(1, liveLayout.rows)) * 1.08)));
   }, [liveLayout]);
 
   const tableFont = Math.max(0.55, Math.min(0.84, (displaySize.height || 700) / Math.max(visibleRooms.length, 1) / 35));
@@ -278,9 +306,9 @@ function LobbyMonitorView({ monitor, receiver }) {
             <div className="lobby-filter-row">
               <span className="lobby-filter-label"><i className="bi bi-funnel"></i>Facilities</span>
               <div className="lobby-chip-row">
-                <button type="button" className={`lobby-chip${facilityFilter === 'All' ? ' active' : ''}`} onClick={() => setFacilityFilter('All')}>All</button>
+                <button type="button" className={`lobby-chip${facilityFilter === 'All' ? ' active' : ''}`} onClick={() => selectFacility('All')}>All</button>
                 {facilities.map((name) => (
-                  <button key={name} type="button" className={`lobby-chip${facilityFilter === name ? ' active' : ''}`} onClick={() => setFacilityFilter(name)}>{name}</button>
+                  <button key={name} type="button" className={`lobby-chip${facilityFilter === name ? ' active' : ''}`} onClick={() => selectFacility(name)}>{name}</button>
                 ))}
               </div>
             </div>
@@ -307,18 +335,7 @@ function LobbyMonitorView({ monitor, receiver }) {
         </>
       )}
 
-      <div className="lobby-legend">
-        {STATUS_ORDER.map((key) => (
-          <div className={`lobby-legend-item lobby-legend-item--${key}`} key={key}>
-            <span className="lobby-legend-dot"></span>
-            <span className="lobby-legend-val">{statusCounts[key]}</span>
-            <span className="lobby-legend-text">
-              <span className="lobby-legend-label">{STATUS_META[key].label}</span>
-              <span className="lobby-legend-hint">{STATUS_META[key].hint}</span>
-            </span>
-          </div>
-        ))}
-      </div>
+      {!isFullscreen && <LobbyStatusLegend rooms={visibleRooms} sessions={sessions} />}
 
       <div className="lobby-scroll" ref={scrollRef}>
         {loading ? (
@@ -338,7 +355,8 @@ function LobbyMonitorView({ monitor, receiver }) {
             }}
           >
             {groups.map(({ facilityName, types }) => (
-              <div className="lobby-facility" key={facilityName}>
+              <div className="lobby-facility" key={facilityName} data-facility={facilityName}>
+                <LobbyStatusLegend facilityName={facilityName} rooms={types.flatMap((type) => type.rooms)} sessions={sessions} />
                 <div className="lobby-facility-head">
                   <i className={`bi ${FACILITY_ICONS[facilityName] || FACILITY_ICON_DEFAULT}`}></i>
                   {facilityName}
@@ -359,7 +377,7 @@ function LobbyMonitorView({ monitor, receiver }) {
                               <div className="lobby-live-card-inner">
                                 <span className="lobby-live-card-num">{unit} {r.roomNumber}</span>
                                 <span className={`lobby-badge lobby-badge--${status.key}${status.critical ? ' lobby-card--critical' : ''}`}><span className="dot"></span>{status.label}</span>
-                                <div className="lobby-timer">{occupancy ? formatTimeRemaining(remaining, isPastEnd) : '—'}</div>
+                                {occupancy && <div className="lobby-timer">{formatTimeRemaining(remaining, isPastEnd)}</div>}
                               </div>
                             </div>
                           );
@@ -373,7 +391,7 @@ function LobbyMonitorView({ monitor, receiver }) {
           </div>
         ) : viewMode === 'grid' ? (
           groups.map(({ facilityName, types }) => (
-            <div className="lobby-facility" key={facilityName}>
+            <div className="lobby-facility" key={facilityName} data-facility={facilityName}>
               <div className="lobby-facility-head">
                 <i className={`bi ${FACILITY_ICONS[facilityName] || FACILITY_ICON_DEFAULT}`}></i>
                 {facilityName}
@@ -396,9 +414,7 @@ function LobbyMonitorView({ monitor, receiver }) {
                                 <span className="lobby-room-num">Table No.{r.roomNumber}</span>
                                 <span className={`lobby-badge lobby-badge--${status.key}${status.critical ? ' lobby-badge--critical' : ''}`}><span className="dot"></span>{status.label}</span>
                               </div>
-                              <div className="lobby-timer">
-                                {occupancy ? formatTimeRemaining(remaining, isPastEnd) : '—'}
-                              </div>
+                              {occupancy && <div className="lobby-timer">{formatTimeRemaining(remaining, isPastEnd)}</div>}
                               <div className="lobby-card-foot">
                                 <span className="lobby-price">₱{r.price}/hr</span>
                               </div>

@@ -20,7 +20,6 @@ button { cursor: pointer; border: none; font-family: 'Inter', sans-serif; }
     --warning: #e0a13a;
     --header-h: 68px;
     --holiday-h: 0px;
-    --guest-banner-h: 0px;
 
     
     --surface:            #101d33;
@@ -119,13 +118,9 @@ button { cursor: pointer; border: none; font-family: 'Inter', sans-serif; }
 #site-header .theme-toggle:hover { background: var(--nav-bg-scroll); }
 #site-header .theme-toggle-icon { color: var(--nav-muted); }
 
-body.has-guest-banner {
-    --guest-banner-h: 44px;
-}
-
 #site-header {
     position: fixed;
-    top: var(--guest-banner-h);
+    top: 0;
     left: 0; right: 0;
     z-index: 200;
     background: var(--nav-bg);

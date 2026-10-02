@@ -15,14 +15,15 @@ const { getPaymongoPaymentMethodLabel } = require("./paymongo");
 async function voidExpiredBookings() {
   const now = Date.now();
   const todayKey = new Intl.DateTimeFormat("en-CA", { timeZone: TIME_ZONE }).format(new Date(now));
-  const confirmed = await Booking.find({ status: Booking.BOOKING_STATUS.CONFIRMED, cancellationStatus: { $ne: "Requested" }, date: { $lte: todayKey } }).select("date timeIn duration");
-  const expiredIds = confirmed
+  const expirableStatuses = [Booking.BOOKING_STATUS.CONFIRMED, Booking.BOOKING_STATUS.OVERDUE];
+  const activeReservations = await Booking.find({ status: { $in: expirableStatuses }, cancellationStatus: { $ne: "Requested" }, "venueClosure.status": { $ne: "pending" }, date: { $lte: todayKey } }).select("date timeIn duration");
+  const expiredIds = activeReservations
     .filter((b) => {
       return bookingStartMs(b.date, b.timeIn) + Number(b.duration) * 3600000 <= now;
     })
     .map((b) => b._id);
   if (expiredIds.length) {
-    await Booking.updateMany({ _id: { $in: expiredIds }, status: Booking.BOOKING_STATUS.CONFIRMED, cancellationStatus: { $ne: "Requested" } }, { status: Booking.BOOKING_STATUS.NO_SHOW, noShowAt: new Date(now) });
+    await Booking.updateMany({ _id: { $in: expiredIds }, status: { $in: expirableStatuses }, cancellationStatus: { $ne: "Requested" }, "venueClosure.status": { $ne: "pending" } }, { status: Booking.BOOKING_STATUS.NO_SHOW, noShowAt: new Date(now) });
   }
 }
 
@@ -47,7 +48,7 @@ async function runInTransaction(fn) {
   }
 }
 
-async function validateAndPriceBooking({ roomId, variantLabel, date, timeIn, duration, isAdminBooking, guestCount, hasCorkage = false, excludeLockUserId, excludeBookingId, session }) {
+async function validateAndPriceBooking({ roomId, variantLabel, date, timeIn, duration, isAdminBooking, guestCount, excludeLockUserId, excludeBookingId, session }) {
   if (!roomId || !date || !timeIn || !duration) {
     throw new AppError(400, "roomId, date, timeIn and duration are required.");
   }
@@ -55,8 +56,8 @@ async function validateAndPriceBooking({ roomId, variantLabel, date, timeIn, dur
     throw new AppError(400, "Reservations must be 1–5 hours in whole-hour increments.");
   }
   if (!Number.isFinite(bookingStartMs(date, timeIn)) || !/:00$/.test(timeIn)) throw new AppError(400, "Choose a valid date and an hourly start time.");
-  
-  const settings = isAdminBooking ? null : await Settings.getSingleton();
+
+  const settings = isAdminBooking ? null : await Settings.getSingleton({ session });
 
   if (!isAdminBooking) {
     const minDuration = Number(settings?.operatingHours?.minOnlineDurationHours) || 1;
@@ -135,7 +136,6 @@ async function validateAndPriceBooking({ roomId, variantLabel, date, timeIn, dur
     timeIn,
     duration,
     guestCount,
-    hasCorkage,
   });
   if (!isAdminBooking) {
     const oh = settings.operatingHours || {};
@@ -229,7 +229,6 @@ async function finalizeBookingFromPayment({ paymentIntentId, metadata, paidPayme
           duration: Number(duration),
           isAdminBooking: false,
           guestCount: Number(guestCount),
-          hasCorkage: metadata.hasCorkage === "true",
           excludeLockUserId: metadata.bookedBy || undefined,
           session,
         });
@@ -270,7 +269,6 @@ async function finalizeBookingFromPayment({ paymentIntentId, metadata, paidPayme
         paymentChoice: metadata.paymentChoice === "full" ? "full" : "deposit",
         hourlyRates: paidHourlyRates,
         firstHourPayment: computeDownPayment(paidHourlyRates, 1),
-        corkageFee: Number(metadata.corkageFee) || 0,
         paymentMethod: provider === "xendit"
           ? ({ GCASH: "GCash", PAYMAYA: "Maya" }[paymentMethodType] || "Xendit online payment")
           : getPaymongoPaymentMethodLabel(paymentMethodType),

@@ -17,6 +17,7 @@ export const settingsService = {
 
   /** @param {{name:string, date:string, fullDay:boolean}} payload */
   addHoliday: (payload) => apiRequest(`${BASE}/holidays`, { method: 'POST', body: payload, fallbackMessage: 'Failed to add holiday.' }),
+  closureImpact: (date) => apiRequest(`${BASE}/holidays/impact?${new URLSearchParams({ date })}`, { fallbackMessage: 'Could not check affected reservations.' }),
 
   removeHoliday: (id) => apiRequest(`${BASE}/holidays/${id}`, { method: 'DELETE', fallbackMessage: 'Failed to remove holiday.' }),
 

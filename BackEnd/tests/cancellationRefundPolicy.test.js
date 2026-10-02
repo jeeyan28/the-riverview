@@ -9,7 +9,7 @@ function reservation(paidAmount, overrides = {}) {
     cancellationStatus: 'Requested', cancellationSource: 'customer',
     cancellationRequestedAt: new Date('2026-09-22T00:00:00Z'),
     date: '2026-10-01', timeIn: '16:00', duration: 3, amount: 1300,
-    roomLabel: 'Court', hourlyRates: [300, 400, 400], roomCharge: 1100, corkageFee: 200,
+    roomLabel: 'Court', hourlyRates: [300, 400, 400], roomCharge: 1100, addOnFee: 200, addOns: [{ name: 'Outside food service', fee: 200 } ],
     firstHourPayment: 300, downPayment: paidAmount, paidAmount, refundedAmount: 0,
     downPaymentHours: paidAmount === 1300 ? 3 : 1,
     ...overrides,

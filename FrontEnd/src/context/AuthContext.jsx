@@ -20,9 +20,6 @@ function parseStoredUser(storage) {
 }
 
 function readStoredUser() {
-  // A tab-scoped login is the newest explicit choice for this tab. Older
-  // versions could leave a guest in localStorage and an account in
-  // sessionStorage, so reading localStorage first incorrectly restored Guest.
   return parseStoredUser(sessionStorage) || parseStoredUser(localStorage);
 }
 
@@ -120,24 +117,6 @@ export function AuthProvider({ children }) {
     return data.user;
   }, []);
 
-  const continueAsGuest = useCallback(async ({ firstName, lastName }) => {
-    const res = await fetch(`${API_BASE_URL}/api/auth/guest`, {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ firstName, lastName }),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      const err = new Error(data.message || 'Could not start a guest session.');
-      err.status = res.status;
-      throw err;
-    }
-    setUser(data.user);
-    writeStoredUser(data.user);
-    return data.user;
-  }, []);
-
   const register = useCallback(async (formData) => {
     const res = await fetch(`${API_BASE_URL}/api/auth/register`, {
       method: 'POST',
@@ -218,73 +197,6 @@ export function AuthProvider({ children }) {
     return data;
   }, []);
 
-  const claimGuestByEmailStart = useCallback(async (email, password) => {
-    const res = await fetch(`${API_BASE_URL}/api/auth/guest/claim/email/start`, {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      const err = new Error(data.message || 'Could not send a verification code.');
-      err.status = res.status;
-      err.field = data.field;
-      throw err;
-    }
-    return data;
-  }, []);
-
-  const claimGuestByEmailResendOtp = useCallback(async () => {
-    const res = await fetch(`${API_BASE_URL}/api/auth/guest/claim/email/resend-otp`, {
-      method: 'POST',
-      credentials: 'include',
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      const err = new Error(data.message || 'Could not resend the code.');
-      err.status = res.status;
-      throw err;
-    }
-    return data;
-  }, []);
-
-  const claimGuestByEmailVerifyOtp = useCallback(async (otp) => {
-    const res = await fetch(`${API_BASE_URL}/api/auth/guest/claim/email/verify-otp`, {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ otp }),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      const err = new Error(data.message || 'Verification failed.');
-      err.status = res.status;
-      throw err;
-    }
-    setUser(data.user);
-    writeStoredUser(data.user);
-    return data.user;
-  }, []);
-
-  const claimGuestByGoogle = useCallback(async (code) => {
-    const res = await fetch(`${API_BASE_URL}/api/auth/guest/claim/google`, {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code }),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      const err = new Error(data.message || 'Google sign-in failed.');
-      err.status = res.status;
-      throw err;
-    }
-    setUser(data.user);
-    writeStoredUser(data.user);
-    return data.user;
-  }, []);
-
   const logout = useCallback(async () => {
     try {
       await fetch(`${API_BASE_URL}/api/auth/logout`, { method: 'POST', credentials: 'include' });
@@ -330,16 +242,11 @@ export function AuthProvider({ children }) {
       guardPermission,
       login,
       loginWithGoogle,
-      continueAsGuest,
       register,
       verifyRegistrationOtp,
       resendRegistrationOtp,
       resendAccountVerification,
       verifyAccountOtp,
-      claimGuestByEmailStart,
-      claimGuestByEmailResendOtp,
-      claimGuestByEmailVerifyOtp,
-      claimGuestByGoogle,
       logout,
       updateUser,
       revalidate,
@@ -352,16 +259,11 @@ export function AuthProvider({ children }) {
       guardPermission,
       login,
       loginWithGoogle,
-      continueAsGuest,
       register,
       verifyRegistrationOtp,
       resendRegistrationOtp,
       resendAccountVerification,
       verifyAccountOtp,
-      claimGuestByEmailStart,
-      claimGuestByEmailResendOtp,
-      claimGuestByEmailVerifyOtp,
-      claimGuestByGoogle,
       logout,
       updateUser,
       revalidate,

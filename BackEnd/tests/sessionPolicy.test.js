@@ -2,10 +2,9 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { STAFF_SESSION_MS, CUSTOMER_SESSION_MS, setAuthenticatedSession, refreshSessionLifetime } = require('../utils/sessionPolicy');
 
-test('customer and guest sign-ins persist across visits while staff keeps the shorter session', () => {
+test('customer sign-ins persist across visits while staff keeps the shorter session', () => {
   for (const user of [
-    { _id: 'customer-id', role: 'user', isGuest: false },
-    { _id: 'guest-id', role: 'user', isGuest: true },
+    { _id: 'customer-id', role: 'user' },
   ]) {
     const req = { session: { cookie: {} } };
     setAuthenticatedSession(req, user);

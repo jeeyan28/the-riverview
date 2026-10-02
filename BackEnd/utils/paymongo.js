@@ -216,6 +216,47 @@ async function retrievePaymentIntent(paymentIntentId) {
   return paymongoRequest(`/payment_intents/${paymentIntentId}`);
 }
 
+async function getRefundPayment(booking) {
+  const intent = await retrievePaymentIntent(booking.paymongoPaymentIntentId);
+  if (intent?.data?.id !== booking.paymongoPaymentIntentId) throw new Error("Payment intent mismatch.");
+  const paid = intent.data.attributes.payments?.find(p => p?.attributes?.status === "paid" && (!booking.paymongoPaymentId || p.id === booking.paymongoPaymentId));
+  if (!paid?.id) throw new Error("No verified payment found for this reservation.");
+  const payment = await paymongoRequest(`/payments/${encodeURIComponent(paid.id)}`);
+  const attrs = payment?.data?.attributes;
+  if (payment?.data?.id !== paid.id || attrs?.currency !== "PHP" || attrs?.status !== "paid" || Math.round(Number(attrs.amount)) !== Math.round(Number(booking.downPayment) * 100)) {
+    throw new Error("Original payment does not match this reservation.");
+  }
+  return { paymentId: paid.id, amount: Number(attrs.amount) / 100 };
+}
+
+async function listRefunds(paymentId) {
+  const results = [];
+  let after;
+  for (let page = 0; page < 5; page++) {
+    const query = new URLSearchParams({ "data.attributes.payment_id": paymentId, "data.attributes.limit": "100", ...(after ? { "data.attributes.after": after } : {}) });
+    const json = await paymongoRequest(`/refunds?${query}`);
+    if (!Array.isArray(json.data)) throw new Error("Invalid refund list.");
+    results.push(...json.data);
+    if (!json.has_more) return results;
+    after = json.data.at(-1)?.id;
+    if (!after) break;
+  }
+  throw new Error("Refund history requires staff reconciliation.");
+}
+
+async function createRefund({ paymentId, amount, requestId }) {
+  // Retrying an ambiguous POST can return the same money twice. Reconcile
+  // through the persisted request metadata and provider reads instead.
+  return paymongoRequest("/refunds", { method: "POST", retries: 0, body: { data: { attributes: {
+    payment_id: paymentId, amount: Math.round(amount * 100), reason: "others",
+    notes: `Riverview venue closure ${requestId}`, metadata: { riverview_refund_request: requestId },
+  } } } });
+}
+
+async function retrieveRefund(id) {
+  return paymongoRequest(`/refunds/${encodeURIComponent(id)}`);
+}
+
 async function createWalletPaymentMethod({ type, billing }) {
   if (!["gcash", "paymaya", "qrph"].includes(type)) {
     throw new Error(`createWalletPaymentMethod does not support type "${type}".`);
@@ -289,6 +330,10 @@ module.exports = {
   getPublicKey,
   createPaymentIntent,
   retrievePaymentIntent,
+  getRefundPayment,
+  listRefunds,
+  createRefund,
+  retrieveRefund,
   createWalletPaymentMethod,
   attachPaymentIntent,
   verifyWebhookSignature,

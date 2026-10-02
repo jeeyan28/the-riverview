@@ -8,7 +8,6 @@ import LogoutConfirmDialog from './LogoutConfirmDialog';
 import { buildLoginPath } from '../utils/auth';
 
 function Navbar({
-  announcements,
   mobileNavOpen,
   onOpenMobileNav,
   onCloseMobileNav,
@@ -16,6 +15,8 @@ function Navbar({
   onOpenProfile,
   theme,
   onToggleTheme,
+  notifications,
+  onOpenNotification,
 }) {
   const [chipMenuOpen, setChipMenuOpen] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
@@ -39,9 +40,10 @@ function Navbar({
         frame = 0;
         const sections = document.querySelectorAll('section[id]');
         if (!sections.length) return;
+        const headerBottom = document.getElementById('site-header')?.getBoundingClientRect().bottom || 120;
         let current = '';
         sections.forEach((s) => {
-          if (window.scrollY >= s.offsetTop - 120) current = s.id;
+          if (window.scrollY >= s.offsetTop - headerBottom - 16) current = s.id;
         });
         setActiveSection(current);
       });
@@ -93,7 +95,7 @@ function Navbar({
   useEffect(() => {
     if (!mobileNavOpen) return;
     const menu = menuRef.current;
-    const background = [...document.querySelectorAll('.public-site > #site-header, .public-site > .guest-banner, .public-site > main, .public-site > footer')];
+    const background = [...document.querySelectorAll('.public-site > .announcement-banner, .public-site > #site-header, .public-site > main, .public-site > footer')];
     const previousInert = background.map((element) => element.inert);
     background.forEach((element) => { element.inert = true; });
     menu?.querySelector('button')?.focus();
@@ -151,7 +153,7 @@ function Navbar({
         </nav>
 
         <div className="nav-buttons">
-          <AnnouncementsBell variant="desktop" {...announcements} />
+          {loggedIn && <AnnouncementsBell variant="desktop" {...notifications} onOpenReservation={onOpenNotification} />}
 
           <ThemeToggle id="nav-theme-toggle" theme={theme} onToggle={onToggleTheme} />
 
@@ -229,7 +231,7 @@ function Navbar({
         </div>
 
         <div className="mobile-header-actions">
-          <AnnouncementsBell variant="mobile" {...announcements} />
+          {loggedIn && <AnnouncementsBell variant="mobile" {...notifications} onOpenReservation={onOpenNotification} />}
 
           <button
             type="button"
@@ -294,7 +296,6 @@ function Navbar({
 
       <LogoutConfirmDialog
         open={showLogoutConfirm}
-        isGuest={!!user?.isGuest}
         onConfirm={confirmLogout}
         onCancel={() => setShowLogoutConfirm(false)}
       />

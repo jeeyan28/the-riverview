@@ -165,6 +165,14 @@ export function useRoomMonitorData(namespace = 'admin') {
     return refreshMonitor();
   }
 
+  function applySessionChange(nextSession, nextRoom) {
+    generationRef.current += 1;
+    pendingRefreshRef.current = null;
+    setSessions((previous) => previous.map((session) => session._id === nextSession._id ? { ...session, ...nextSession } : session));
+    if (nextRoom) setRooms((previous) => previous.map((room) => String(room._id) === String(nextRoom._id) ? { ...room, status: nextRoom.status } : room));
+    setLastUpdatedAt(Date.now());
+  }
+
   useEffect(() => {
     soundMutedRef.current = soundMuted;
   }, [soundMuted]);
@@ -224,6 +232,7 @@ export function useRoomMonitorData(namespace = 'admin') {
     lastUpdatedAt,
     fetchRooms: refreshAfterChange,
     fetchMonitorSessions: refreshAfterChange,
+    applySessionChange,
     viewMode,
     changeViewMode,
     soundMuted,

@@ -7,6 +7,7 @@ import { formatHour } from '../utils/receipt';
 import { businessDate } from '../utils/businessDate';
 import { relativeBookingHour, slotBookingFields, slotStartMs } from '../utils/bookingHours';
 import ModalPortal from './ModalPortal';
+import { canResolveClosure, isClosurePending } from '../utils/closureRefund';
 import {
   dateKey,
   fetchReservedHours,
@@ -28,6 +29,7 @@ const MONTHS = [
 export const RESCHEDULE_MAX_USES = 2;
 
 export function canRescheduleBooking(booking) {
+  if (canResolveClosure(booking)) return true;
   if (!booking || booking.status !== 'Confirmed') return false;
   if (booking.cancellationStatus === 'Requested') return false;
   if ((booking.rescheduleCount || 0) >= RESCHEDULE_MAX_USES) return false;
@@ -82,6 +84,7 @@ function RescheduleModal({ booking, onClose, onRescheduled }) {
   const variantLabel = booking.variantLabel;
   const duration = Number(booking.duration) || 1;
   const usesLeft = RESCHEDULE_MAX_USES - (booking.rescheduleCount || 0);
+  const closureChange = isClosurePending(booking);
 
   useEffect(() => {
     let cancelled = false;
@@ -274,7 +277,7 @@ function RescheduleModal({ booking, onClose, onRescheduled }) {
         {step !== 'success' && (
           <div className="bk-lock-banner">
             <i className="fa-solid fa-circle-info"></i>
-            Reschedule at least 24 hours before your reservation starts. Your room, option, and {duration}-hour duration stay the same — only the date and time change. You have {usesLeft} reschedule{usesLeft === 1 ? '' : 's'} left for this reservation.
+            {closureChange ? `Choose an open date for your ${duration}-hour reservation. This venue closure change does not use your normal reschedule allowance, and the 24-hour cutoff does not apply.` : `Reschedule at least 24 hours before your reservation starts. Your room, option, and ${duration}-hour duration stay the same — only the date and time change. You have ${usesLeft} reschedule${usesLeft === 1 ? '' : 's'} left for this reservation.`}
           </div>
         )}
 
@@ -456,7 +459,7 @@ function RescheduleModal({ booking, onClose, onRescheduled }) {
 
                 <p className="bk-info-bar">
                   <i className="fa-solid fa-circle-info"></i>
-                  Your room, option, and amount paid stay the same. This will use {usesLeft === 1 ? 'your last' : 'one of your'} remaining reschedule{usesLeft === 1 ? '' : 's'}.
+                  Your room, option, and amount paid stay the same. {closureChange ? 'This venue closure change does not use your normal reschedule allowance.' : `This will use ${usesLeft === 1 ? 'your last' : 'one of your'} remaining reschedule${usesLeft === 1 ? '' : 's'}.`}
                 </p>
 
                 {error && (

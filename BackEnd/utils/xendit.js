@@ -21,7 +21,7 @@ function isPaymongoUnavailable(error) {
   return [500, 502, 503, 504].includes(error?.status) || error?.isTimeout === true || error?.name === "TypeError";
 }
 
-async function request(path, { method = "GET", body } = {}) {
+async function request(path, { method = "GET", body, headers } = {}) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 15000);
   try {
@@ -30,6 +30,7 @@ async function request(path, { method = "GET", body } = {}) {
       headers: {
         Authorization: `Basic ${Buffer.from(`${process.env.XENDIT_SECRET_KEY}:`).toString("base64")}`,
         "Content-Type": "application/json",
+        ...headers,
       },
       body: body ? JSON.stringify(body) : undefined,
       signal: controller.signal,
@@ -38,6 +39,7 @@ async function request(path, { method = "GET", body } = {}) {
     if (!response.ok) {
       const error = new Error(data.message || `Xendit returned ${response.status}.`);
       error.status = response.status;
+      error.code = data.error_code;
       throw error;
     }
     return data;
@@ -112,4 +114,32 @@ async function getVerifiedPayment(attempt) {
   return { status: "succeeded", paymentId: payment.payment_id, paymentMethodType: payment.channel_code };
 }
 
-module.exports = { createSession, getVerifiedPayment, isConfigured, isPaymongoUnavailable, verifyWebhookToken };
+async function getRefundPayment(booking) {
+  if (!booking.xenditPaymentId) throw new Error("Original payment ID is missing.");
+  const payment = await request(`/v3/payments/${encodeURIComponent(booking.xenditPaymentId)}`);
+  const session = await request(`/sessions/${encodeURIComponent(booking.xenditPaymentSessionId)}`);
+  if (payment.payment_id !== booking.xenditPaymentId || payment.payment_id !== session.payment_id || payment.payment_request_id !== session.payment_request_id || session.payment_session_id !== booking.xenditPaymentSessionId || payment.currency !== "PHP" || payment.type !== "PAY" || payment.status !== "SUCCEEDED" || Math.round(Number(payment.request_amount) * 100) !== Math.round(Number(booking.downPayment) * 100)) {
+    throw new Error("Original payment does not match this reservation.");
+  }
+  return { paymentId: payment.payment_id, paymentRequestId: payment.payment_request_id, amount: Number(payment.request_amount) };
+}
+
+async function createRefund({ paymentRequestId, amount, requestId }) {
+  return request("/refunds", { method: "POST", headers: { "idempotency-key": requestId }, body: {
+    reference_id: requestId, payment_request_id: paymentRequestId,
+    currency: "PHP", amount, reason: "CANCELLATION",
+  } });
+}
+
+async function retrieveRefund(id) {
+  return request(`/refunds/${encodeURIComponent(id)}`);
+}
+
+async function listRefunds(paymentRequestId) {
+  const query = new URLSearchParams({ payment_request_id: paymentRequestId, limit: "100" });
+  const result = await request(`/refunds?${query}`);
+  if (!Array.isArray(result.data) || result.has_more) throw new Error("Refund history requires staff reconciliation.");
+  return result.data;
+}
+
+module.exports = { createSession, getVerifiedPayment, isConfigured, isPaymongoUnavailable, verifyWebhookToken, getRefundPayment, createRefund, retrieveRefund, listRefunds };

@@ -45,11 +45,11 @@
   box-shadow: var(--shadow-depth);
 }
 
-:is(.login-page, .claim-modal-scope) .field.has-error input:not(.otp-input) {
+.login-page .field.has-error input:not(.otp-input) {
   border-color: #ff6b6b;
   background: rgba(255, 107, 107, .08);
 }
-:is(.login-page, .claim-modal-scope) .field.has-error input:not(.otp-input):focus {
+.login-page .field.has-error input:not(.otp-input):focus {
   border-color: #ff6b6b;
   box-shadow: 0 0 0 4px rgba(255, 107, 107, .14);
 }
@@ -103,13 +103,13 @@
 /* Authentication always uses the dark reservation theme. */
 .auth-content { color-scheme: dark; }
 
-:is(.login-page, .claim-modal-scope) .btn-social:hover,
-:is(.login-page, .claim-modal-scope) .btn-social:hover :is(.btn-social-label, .btn-social-arrow) {
+.login-page .btn-social:hover,
+.login-page .btn-social:hover :is(.btn-social-label, .btn-social-arrow) {
   color: #101418;
 }
 
 /* Auth dialogs share the same compact, centered chrome on every viewport. */
-:is(.login-page, .claim-modal-scope) .modal-bg {
+.login-page .modal-bg {
   position: fixed;
   inset: 0;
   z-index: 850;
@@ -121,7 +121,7 @@
   backdrop-filter: blur(10px);
 }
 
-:is(.login-page, .claim-modal-scope) .modal-box {
+.login-page .modal-box {
   width: min(440px, 100%);
   max-height: calc(100dvh - 32px);
   overflow-y: auto;
@@ -134,7 +134,7 @@
   overscroll-behavior: contain;
 }
 
-:is(.login-page, .claim-modal-scope) .modal-heading {
+.login-page .modal-heading {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -142,7 +142,7 @@
   margin-bottom: 18px;
 }
 
-:is(.login-page, .claim-modal-scope) .modal-title {
+.login-page .modal-title {
   margin: 0;
   color: var(--text);
   font-size: 1.15rem;
@@ -151,7 +151,7 @@
   line-height: 1.3;
 }
 
-:is(.login-page, .claim-modal-scope) .modal-close {
+.login-page .modal-close {
   display: grid;
   width: 40px;
   height: 40px;
@@ -167,14 +167,14 @@
   transition: background-color 160ms ease, color 160ms ease, transform 160ms ease;
 }
 
-:is(.login-page, .claim-modal-scope) .modal-close:hover {
+.login-page .modal-close:hover {
   background: var(--ovl-08);
   color: var(--text);
 }
 
-:is(.login-page, .claim-modal-scope) .modal-close:active { transform: scale(.94); }
+.login-page .modal-close:active { transform: scale(.94); }
 
-:is(.login-page, .claim-modal-scope) .modal-actions {
+.login-page .modal-actions {
   display: grid;
   grid-template-columns: minmax(0, .72fr) minmax(0, 1.28fr);
   gap: 9px;
@@ -183,20 +183,20 @@
   border-top: 1px solid var(--border);
 }
 
-:is(.login-page, .claim-modal-scope) .modal-actions > button {
+.login-page .modal-actions > button {
   min-width: 0;
   min-height: 44px;
   justify-content: center;
 }
 
 @media (max-width: 480px) {
-  :is(.login-page, .claim-modal-scope) .modal-box {
+  .login-page .modal-box {
     max-height: calc(100dvh - 24px);
     padding: 18px;
     border-radius: 16px;
   }
 
-  :is(.login-page, .claim-modal-scope) .modal-actions { margin-top: 16px; padding-top: 14px; }
+  .login-page .modal-actions { margin-top: 16px; padding-top: 14px; }
 }
 
 /* A light admin workspace reads as light from the sidebar through the content area. */
@@ -513,7 +513,7 @@
 }
 
 /* Show browser handoff help only after an embedded browser user requests Google sign-in. */
-:is(.login-page, .claim-modal-scope) .google-browser-handoff {
+.login-page .google-browser-handoff {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   gap: 10px;
@@ -524,10 +524,10 @@
   color: var(--text);
 }
 
-:is(.login-page, .claim-modal-scope) .google-browser-handoff > svg { margin-top: 2px; color: var(--teal); }
-:is(.login-page, .claim-modal-scope) .google-browser-handoff strong { display: block; font-size: .8rem; line-height: 1.35; }
-:is(.login-page, .claim-modal-scope) .google-browser-handoff p { margin: 3px 0 8px; color: var(--muted); font-size: .72rem; line-height: 1.45; }
-:is(.login-page, .claim-modal-scope) .google-browser-handoff :is(button, a) {
+.login-page .google-browser-handoff > svg { margin-top: 2px; color: var(--teal); }
+.login-page .google-browser-handoff strong { display: block; font-size: .8rem; line-height: 1.35; }
+.login-page .google-browser-handoff p { margin: 3px 0 8px; color: var(--muted); font-size: .72rem; line-height: 1.45; }
+.login-page .google-browser-handoff :is(button, a) {
   display: inline-flex;
   min-height: 34px;
   align-items: center;
@@ -541,7 +541,7 @@
   font-weight: 700;
   text-decoration: none;
 }
-:is(.login-page, .claim-modal-scope) .google-browser-handoff a { margin-right: 8px; }
+.login-page .google-browser-handoff a { margin-right: 8px; }
 
 /* Admin links give immediate directional feedback on pointer devices. */
 @media (hover: hover) and (pointer: fine) {

@@ -49,7 +49,6 @@
 }
 .bk-customer-info{display:flex;flex-direction:column;gap:1px;min-width:0;}
 .bk-customer-name{font-size:.82rem;font-weight:600;color:var(--text);}
-.bk-customer-phone{font-size:.72rem;color:var(--muted);}
 
 .bk-facility{display:flex;flex-direction:column;gap:1px;}
 .bk-facility-room{font-size:.72rem;color:var(--muted);}
@@ -69,24 +68,43 @@ button.bk-payment-pill{cursor:pointer;}
 #app .walkin-form-section{padding-top:18px;border-top:1px solid var(--border);}
 #app .walkin-section-title{font-size:.85rem;font-weight:700;color:var(--text);margin:0 0 14px;}
 #app .walkin-optional{font-weight:400;color:var(--muted);}
-#app .booking-form-grid.walkin-guest-grid{grid-template-columns:minmax(0,1.4fr) minmax(0,1.4fr) minmax(92px,.6fr);gap:14px;}
+#app .booking-form-grid.walkin-guest-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;}
+#app .manual-customer-field{grid-column:1/-1;min-width:0;}
+#app .manual-customer-suggestions{max-height:280px;overflow:auto;margin-top:6px;border:1px solid var(--border);border-radius:10px;background:var(--navy2);box-shadow:0 10px 22px rgba(0,0,0,.12);}
+#app .manual-customer-suggestion{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:3px 10px;width:100%;padding:10px 12px;border:0;border-bottom:1px solid var(--border-soft);background:transparent;color:var(--text);font:inherit;text-align:left;cursor:pointer;}
+#app .manual-customer-suggestion:last-child{border-bottom:0;}
+#app .manual-customer-suggestion:hover,#app .manual-customer-suggestion:focus-visible{background:var(--teal-soft);outline:none;}
+#app .manual-customer-suggestion-name{display:flex;flex-direction:column;gap:2px;min-width:0;font-size:.8rem;font-weight:700;overflow-wrap:anywhere;}
+#app .manual-customer-suggestion-name small,#app .manual-customer-suggestion-detail,#app .manual-customer-suggestion-usual{font-size:.69rem;font-weight:400;color:var(--muted);}
+#app .manual-customer-suggestion-detail{align-self:start;text-align:right;overflow-wrap:anywhere;}
+#app .manual-customer-suggestion-usual{grid-column:1/-1;color:var(--teal-text);}
+#app .manual-customer-suggestion-message{margin:0;padding:12px;color:var(--muted);font-size:.75rem;line-height:1.4;}
+#app .manual-customer-prefill-notice{margin:6px 0 0;color:var(--teal-text);font-size:.72rem;line-height:1.4;}
 #app .booking-form-grid.walkin-facility-grid{gap:14px;}
 #app .booking-form-grid.walkin-time-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:14px;}
 #app .booking-form-grid.walkin-payment-grid{gap:14px;align-items:start;}
 #app .walkin-payment-grid .booking-charge-preview{min-height:72px;align-self:start;}
 #app .walkin-payment-grid .booking-form-help{margin-top:5px;}
 #app .walkin-actions{margin-top:0;padding-top:16px;border-top:1px solid var(--border);}
-#app .manual-payment-layout{display:grid;grid-template-columns:minmax(0,1.2fr) repeat(2,minmax(0,1fr));gap:14px;align-items:start;}
+#app .manual-payment-layout{display:grid;grid-template-columns:minmax(0,.8fr) minmax(0,1.5fr);gap:14px;align-items:start;}
 #app .manual-payment-layout .mfield{min-width:0;margin:0;}
-#app .manual-payment-layout :is(input,select){width:100%;min-height:44px;}
+#app .manual-payment-layout select{width:100%;min-height:44px;}
 #app .manual-charge{display:flex;flex-direction:column;gap:5px;min-height:90px;padding:13px 16px;border:1px solid var(--border);border-radius:10px;background:var(--navy3);}
 #app .manual-charge span{font-size:.75rem;color:var(--muted);}
 #app .manual-charge strong{font-size:1.2rem;line-height:1.2;color:var(--text);font-variant-numeric:tabular-nums;}
 #app .manual-charge small{font-size:.71rem;line-height:1.4;color:var(--muted);}
-#app .manual-corkage{gap:12px;}
-#app .manual-corkage span{flex:1;min-width:0;}
-#app .manual-corkage b{flex:0 0 auto;font-size:.84rem;color:var(--text);font-variant-numeric:tabular-nums;}
-#app .manual-corkage:has(input:checked){border-color:var(--teal);background:var(--teal-soft);}
+#app .manual-payment-options{min-width:0;margin:0;padding:0;border:0;}
+#app .manual-payment-options legend{margin-bottom:7px;font-size:.8rem;font-weight:600;color:var(--text);}
+#app .manual-payment-choice-list{display:grid;gap:8px;}
+#app .manual-payment-option{display:flex;align-items:center;gap:10px;min-width:0;padding:12px 14px;border:1px solid var(--border);border-radius:10px;background:var(--navy3);color:var(--text);cursor:pointer;}
+#app .manual-payment-option.is-selected{border-color:var(--teal);background:var(--teal-soft);}
+#app .manual-payment-option input{width:16px;min-width:16px;height:16px;margin:0;accent-color:var(--teal);}
+#app .manual-payment-option span{display:flex;flex:1;flex-direction:column;gap:3px;min-width:0;}
+#app .manual-payment-option b{font-size:.8rem;line-height:1.3;}
+#app .manual-payment-option small{font-size:.7rem;line-height:1.35;color:var(--muted);}
+#app .manual-payment-option strong{font-size:.84rem;font-variant-numeric:tabular-nums;white-space:nowrap;}
+#app .manual-payment-options:disabled .manual-payment-option{opacity:.65;cursor:not-allowed;}
+#app .manual-payment-method{grid-column:1/-1;max-width:320px;}
 #app .manual-notes{margin:14px 0 0;}
 #app .manual-notes textarea{display:block;width:100%;min-height:80px;padding:11px 12px;border:1px solid var(--border);border-radius:9px;background:var(--navy3);color:var(--text);font:inherit;resize:vertical;}
 
@@ -209,8 +227,8 @@ button.bk-payment-pill{cursor:pointer;}
 
 @media (max-width:900px){
   .bk-search-wrap{max-width:none;width:100%;}
-  #app .manual-payment-layout{grid-template-columns:repeat(2,minmax(0,1fr));}
-  #app .manual-charge{grid-column:1/-1;}
+  #app .manual-payment-layout{grid-template-columns:minmax(0,1fr);}
+  #app .manual-payment-method{grid-column:auto;}
   #app .bd-spec-grid{grid-template-columns:repeat(2,minmax(0,1fr));}
 }
 @media (max-width:640px){
@@ -226,8 +244,6 @@ button.bk-payment-pill{cursor:pointer;}
   #app .walkin-payment-grid .booking-charge-preview{min-height:56px;}
   #app .manual-payment-layout{grid-template-columns:minmax(0,1fr);gap:12px;}
   #app .manual-charge{grid-column:auto;min-height:0;}
-  #app .manual-corkage{padding:12px;}
-  #app .manual-corkage b{font-size:.78rem;}
   #app .admin-slot-heading{align-items:flex-start;flex-direction:column;}
   #app .admin-slot-grid{grid-template-columns:repeat(2,minmax(0,1fr));}
   #app .bd-row,#app .bd-spec-grid{grid-template-columns:minmax(0,1fr);}

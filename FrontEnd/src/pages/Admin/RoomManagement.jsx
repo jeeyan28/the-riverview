@@ -740,7 +740,7 @@ function RoomManagement() {
                   <div className="fm-section-title"><Tags size={16} aria-hidden="true" /> Room discount</div>
                   <div className="ffield">
                     <label className="flabel" htmlFor="facility-discount">Facility discount (%)</label>
-                    <span className="flabel-hint">Guests choose this in reservation details. Full payment applies it online; a down payment settles it at the facility. Corkage and services are excluded. Rooms can use their own percentage.</span>
+                    <span className="flabel-hint">Guests choose this in reservation details. Full payment applies it online; a down payment settles it at the facility. Optional services are excluded. Rooms can use their own percentage.</span>
                     <input id="facility-discount" type="number" min="0" max="99" step="0.01" value={form.discountPercent} onChange={(event) => setForm((current) => ({ ...current, discountPercent: event.target.value }))} />
                   </div>
                 </div>

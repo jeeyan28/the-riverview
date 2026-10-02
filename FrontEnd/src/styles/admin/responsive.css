@@ -110,7 +110,6 @@
 @media (pointer:coarse),(max-width:1200px){
   #app :is(button,select){min-height:44px;}
   #app :is(.notif-btn,.fm-close-btn,.holiday-del,.fac-icon-btn,.announcement-btn.danger,.chip-add-btn,.bkcal-nav-btn){min-width:44px;}
-  #app :is(.tbl-action-btn,.rm-btn,.set-tab,.fac-chip,.um-tab){padding-block:10px;}
   #app .theme-toggle{height:44px;}
   #app .theme-toggle-thumb{top:10px;}
   #app .chip button{width:32px;min-height:32px;height:32px;}
@@ -151,8 +150,6 @@
   #app .rep-daterange-row > *{flex:1 1 140px;min-width:0;}
   #app .rep-search{min-width:0;}
   #app .rep-log-table-wrap{padding:0 12px 12px;}
-  #app .um-tabs{flex-wrap:wrap;}
-  #app .um-tab{flex:1;justify-content:center;}
   #app .fac-chips{width:100%;gap:6px;}
   #app .fac-chip{flex:1 1 auto;justify-content:center;}
   #app .view-toggle{width:100%;}

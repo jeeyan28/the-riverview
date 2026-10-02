@@ -48,7 +48,6 @@ const bookingSchema = new mongoose.Schema({
   addOnFee: { type: Number, default: 0, min: 0 },
   paymentChoice: { type: String, enum: ["deposit", "full"], default: "deposit" },
   hourlyRates:   [{ type: Number, min: 0 }],
-  corkageFee:    { type: Number, default: 0, min: 0 },
   status:        {
     type: String,
     enum: Object.values(BOOKING_STATUS),
@@ -72,6 +71,41 @@ const bookingSchema = new mongoose.Schema({
   cancellationRefundNote: { type: String, default: "", maxlength: 500 },
   cancellationSource: { type: String, enum: ["customer", "admin"] },
   cancellationRefundException: { type: Boolean, default: false },
+  venueClosure: {
+    type: new mongoose.Schema({
+      holidayId: mongoose.Schema.Types.ObjectId,
+      date: String,
+      name: String,
+      note: String,
+      customerUserId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+      status: { type: String, enum: ["pending", "rescheduled", "refund_requested", "reopened"] },
+      notifiedAt: Date,
+      resolvedAt: Date,
+    }, { _id: false }),
+    default: undefined,
+  },
+  closureRefund: {
+    type: new mongoose.Schema({
+      requestId: { type: String, required: true },
+      provider: { type: String, enum: ["manual", "paymongo", "xendit"], required: true },
+      status: { type: String, enum: ["queued", "submitting", "processing", "review_required", "failed", "manual_required", "completed"], required: true },
+      amount: { type: Number, min: 0, required: true },
+      baseRefundedAmount: { type: Number, min: 0, required: true },
+      gatewayAmount: { type: Number, min: 0, default: 0 },
+      processedAmount: { type: Number, min: 0, default: 0 },
+      attempts: { type: Number, min: 0, default: 0 },
+      paymentId: String,
+      paymentRequestId: String,
+      providerRefundId: String,
+      requestedAt: Date,
+      submittedAt: Date,
+      checkedAt: Date,
+      nextCheckAt: Date,
+      completedAt: Date,
+      lastError: String,
+    }, { _id: false }),
+    default: undefined,
+  },
   noShowAt: { type: Date },
   downPaymentHours:  { type: Number, default: 1, min: 1 },
   firstHourPayment:  { type: Number, min: 0 },
@@ -92,6 +126,8 @@ const bookingSchema = new mongoose.Schema({
 });
 
 bookingSchema.index({ room: 1, date: 1 });
+bookingSchema.index({ "closureRefund.status": 1, "closureRefund.nextCheckAt": 1 });
+bookingSchema.index({ "closureRefund.providerRefundId": 1 }, { sparse: true });
 
 module.exports = mongoose.model("Booking", bookingSchema);
 module.exports.MIN_DURATION_HOURS = MIN_DURATION_HOURS;

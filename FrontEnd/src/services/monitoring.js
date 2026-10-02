@@ -44,6 +44,7 @@ export const roomSessionsService = {
   },
 
   create: (payload) => apiRequest(SESSIONS_BASE, { method: 'POST', body: payload, fallbackMessage: 'Failed to start the session.' }),
+  quoteStart: (roomId, duration) => apiRequest(`${SESSIONS_BASE}/start-availability?${new URLSearchParams({ roomId, duration })}`, { fallbackMessage: 'Could not check this session length.' }),
 
   quoteExtension: (id, addedHours) => apiRequest(`${SESSIONS_BASE}/${id}/extend?addedHours=${addedHours}`, { fallbackMessage: 'Could not calculate the extension charge.' }),
 

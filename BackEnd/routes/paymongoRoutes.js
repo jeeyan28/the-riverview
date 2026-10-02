@@ -20,7 +20,7 @@ const {
   verifyWebhookSignature,
 } = require("../utils/paymongo");
 const { isAdminRole } = require("../utils/permissions");
-const { GUEST_EMAIL_DOMAIN, EMAIL_RE } = require("../utils/constants");
+const { EMAIL_RE } = require("../utils/constants");
 const { validate } = require("../middleware/validate");
 const { paymentIntentIdParamsSchema, createIntentSchema, attachIntentSchema } = require("../validation/paymentSchemas");
 const { paymentIntentLimiter, paymentAttachLimiter } = require("../middleware/rateLimiter");
@@ -38,13 +38,6 @@ function isPaidPaymentIntent(intentAttrs) {
   if (!intentAttrs) return false;
   if (intentAttrs.status === "succeeded") return true;
   return Array.isArray(intentAttrs.payments) && intentAttrs.payments.some(p => p?.attributes?.status === "paid");
-}
-
-function resolveGuestEmail({ guestEmail, guestContact, accountEmail, isGuest }) {
-  if (guestEmail && EMAIL_RE.test(guestEmail)) return guestEmail;
-  if (guestContact && EMAIL_RE.test(guestContact)) return guestContact;
-  if (isGuest) return "";
-  return accountEmail || "";
 }
 
 function toBookingMetadata(fields) {
@@ -66,17 +59,10 @@ router.get("/config", (req, res) => {
 
 router.post("/intent", ensureAuthenticated, paymentIntentLimiter, validate(createIntentSchema), async (req, res) => {
   try {
-    const { guestName, guestContact, guestEmail, guestCount: guestCountRaw, hasCorkage, specialRequests, roomId, variantLabel, date, timeIn, duration, paymentChoice: requestedPaymentChoice, downPaymentHours: legacyPaymentHours, claimDiscount, selectedAddOns = [] } = req.body;
+    const { guestName, guestContact, guestEmail, guestCount: guestCountRaw, specialRequests, roomId, variantLabel, date, timeIn, duration, paymentChoice: requestedPaymentChoice, downPaymentHours: legacyPaymentHours, claimDiscount, selectedAddOns = [] } = req.body;
     const guestCount = guestCountRaw || 1;
     const paymentChoice = Number(duration) === 1 ? "deposit" : (requestedPaymentChoice || (legacyPaymentHours === duration ? "full" : "deposit"));
     const downPaymentHours = paymentChoice === "full" ? duration : 1;
-
-    if (req.user.isGuest) {
-      const candidateEmail = (guestEmail || guestContact || "").trim().toLowerCase();
-      if (candidateEmail && (!EMAIL_RE.test(candidateEmail) || candidateEmail.endsWith(`@${GUEST_EMAIL_DOMAIN}`))) {
-        return res.status(400).json({ message: "Please provide a valid email address, or leave it blank.", field: "guestEmail" });
-      }
-    }
 
     const activeLock = await BookingLock.findOne({
       room: roomId,
@@ -91,15 +77,15 @@ router.post("/intent", ensureAuthenticated, paymentIntentLimiter, validate(creat
       return res.status(409).json({ message: "Your hold on this time slot has expired. Please select a time again." });
     }
 
-    let room, selectedVariant, roomCharge, corkageFee, hourlyRates;
+    let room, selectedVariant, roomCharge, hourlyRates;
     try {
-      ({ room, selectedVariant, roomCharge, corkageFee, hourlyRates } = await validateAndPriceBooking({ roomId, variantLabel, date, timeIn, duration, isAdminBooking: false, guestCount, hasCorkage, excludeLockUserId: req.user._id }));
+      ({ room, selectedVariant, roomCharge, hourlyRates } = await validateAndPriceBooking({ roomId, variantLabel, date, timeIn, duration, isAdminBooking: false, guestCount, excludeLockUserId: req.user._id }));
     } catch (e) {
       return res.status(e.status || 500).json({ message: e.message || "Server error." });
     }
     let quote;
     try {
-      quote = quoteOnlineBooking({ room, variant: selectedVariant, basePrice: { roomCharge, corkageFee, hourlyRates }, paymentChoice, claimDiscount, selectedAddOns });
+      quote = quoteOnlineBooking({ room, variant: selectedVariant, basePrice: { roomCharge, hourlyRates }, paymentChoice, claimDiscount, selectedAddOns });
     } catch (e) {
       return res.status(e.status || 400).json({ message: e.message });
     }
@@ -108,9 +94,8 @@ router.post("/intent", ensureAuthenticated, paymentIntentLimiter, validate(creat
     const metadata = toBookingMetadata({
       guestName: guestName.trim(),
       guestContact: (guestContact || "").trim(),
-      guestEmail: resolveGuestEmail({ guestEmail, guestContact, accountEmail: req.user.email, isGuest: req.user.isGuest }),
+      guestEmail,
       guestCount,
-      hasCorkage,
       specialRequests: (specialRequests || "").trim(),
       roomId: room._id,
       variantLabel: variantLabel || "",
@@ -119,7 +104,6 @@ router.post("/intent", ensureAuthenticated, paymentIntentLimiter, validate(creat
       duration,
       amount,
       roomCharge,
-      corkageFee,
       discountPercent,
       discountAmount,
       eligibleDiscount,
@@ -205,7 +189,7 @@ router.post("/intent/:paymentIntentId/attach", ensureAuthenticated, paymentAttac
 
     let methodId = paymentMethodId;
     if (!methodId) {
-      const billingEmail = metadata.guestEmail || (req.user.isGuest ? "" : req.user.email);
+      const billingEmail = metadata.guestEmail || req.user.email;
       if (!billingEmail || !EMAIL_RE.test(billingEmail)) {
         return res.status(400).json({
           message: "A valid email address is required for wallet payments. Please go back and enter your email in the guest details.",
@@ -352,6 +336,18 @@ async function webhookHandler(req, res) {
   } catch (err) {
     console.error("PayMongo webhook signature check failed:", err.message);
     return res.status(400).json({ message: "Invalid signature." });
+  }
+
+  const refundEventType = event?.data?.attributes?.type;
+  if (["payment.refunded", "payment.refund.updated", "refund.succeeded", "refund.failed"].includes(refundEventType)) {
+    try {
+      await require("../utils/closureRefunds").handleRefundWebhook("paymongo", event?.data?.attributes?.data);
+      await require("../utils/reservationNotifications").deliverNotificationEmails({ limit: 5 });
+      return res.status(200).json({ received: true });
+    } catch (error) {
+      console.error("PayMongo refund webhook failed:", error.name);
+      return res.status(500).json({ message: "Refund verification will be retried." });
+    }
   }
 
   res.status(200).json({ received: true });

@@ -34,14 +34,6 @@ const userSchema = new mongoose.Schema({
   isActive:  { type: Boolean, default: true },
   lastLoginAt: { type: Date },
 
-  isGuest: { type: Boolean, default: false },
-  guestDeletedAt: { type: Date, default: null },
-  guestRecoveryEmailHash: { type: String, select: false },
-  guestRecoveryPasswordHash: { type: String, select: false },
-  guestRecoveryExpiresAt: { type: Date, select: false },
-  pendingClaimEmail: { type: String, select: false },
-  pendingClaimPasswordHash: { type: String, select: false },
-
   readAnnouncementIds: { type: [mongoose.Schema.Types.ObjectId], default: [], select: false },
 
   createdAt: { type: Date, default: Date.now }

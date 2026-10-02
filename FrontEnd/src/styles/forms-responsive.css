@@ -3,7 +3,7 @@
 .bk-overlay,
 .pf-overlay,
 .uimodal-overlay,
-:is(.login-page, .claim-modal-scope) .forgot-modal-backdrop {
+.login-page .forgot-modal-backdrop {
   padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
   overscroll-behavior: contain;
 }
@@ -50,7 +50,7 @@
 .bk-pax-btn,
 .drp-nav-btn,
 .drp-close,
-:is(.login-page, .claim-modal-scope) .forgot-modal-close {
+.login-page .forgot-modal-close {
   width: 44px;
   height: 44px;
   flex-shrink: 0;
@@ -72,7 +72,7 @@
 .uimodal-btn,
 .drp-trigger,
 .drp-preset-btn,
-:is(.login-page, .claim-modal-scope) .forgot-modal-actions button {
+.login-page .forgot-modal-actions button {
   min-height: 44px;
   touch-action: manipulation;
 }
@@ -163,27 +163,27 @@
   filter: brightness(1.06);
 }
 
-:is(.login-page, .claim-modal-scope) .forgot-modal.login-card {
+.login-page .forgot-modal.login-card {
   max-height: calc(100dvh - 48px);
   overscroll-behavior: contain;
 }
 
-:is(.login-page, .claim-modal-scope) .forgot-modal .login-card-header {
+.login-page .forgot-modal .login-card-header {
   padding-right: 36px;
 }
 
-:is(.login-page, .claim-modal-scope) .forgot-modal-close {
+.login-page .forgot-modal-close {
   top: 12px;
   right: 12px;
 }
 
-:is(.login-page, .claim-modal-scope) .forgot-modal .otp-input-group {
+.login-page .forgot-modal .otp-input-group {
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: clamp(4px, 1.5vw, 10px);
 }
 
-:is(.login-page, .claim-modal-scope) .forgot-modal .otp-input-group .otp-input {
+.login-page .forgot-modal .otp-input-group .otp-input {
   width: 100%;
   min-width: 0;
   height: 48px;
@@ -191,20 +191,9 @@
   border-radius: 10px;
 }
 
-:is(.login-page, .claim-modal-scope) .forgot-modal .signup-row {
+.login-page .forgot-modal .signup-row {
   flex-wrap: wrap;
   line-height: 1.6;
-}
-
-.claim-modal-scope .profile-tabs {
-  display: grid;
-  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
-}
-
-.claim-modal-scope .profile-tab {
-  min-width: 0;
-  min-height: 44px;
-  padding-inline: 8px;
 }
 
 .drp-root {
@@ -297,7 +286,7 @@
   .pf-modal input,
   .pf-modal select,
   .pf-modal textarea,
-  :is(.login-page, .claim-modal-scope) .forgot-modal .field input {
+  .login-page .forgot-modal .field input {
     font-size: 16px;
   }
 
@@ -644,19 +633,19 @@
     max-width: 100%;
   }
 
-  :is(.login-page, .claim-modal-scope) .forgot-modal.login-card {
+  .login-page .forgot-modal.login-card {
     padding: 28px 20px;
     border-radius: 20px;
     min-width: 0;
   }
 
-  :is(.login-page, .claim-modal-scope) .forgot-modal-actions {
+  .login-page .forgot-modal-actions {
     display: flex;
     flex-direction: column;
     gap: 10px;
   }
 
-  :is(.login-page, .claim-modal-scope) .forgot-modal-actions button {
+  .login-page .forgot-modal-actions button {
     width: 100%;
     margin: 0;
     white-space: normal;

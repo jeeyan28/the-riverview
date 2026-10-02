@@ -7,9 +7,13 @@ const { PERMISSIONS } = require("../utils/permissions");
 const { paymentMethodQrUpload } = require("../middleware/upload");
 const { logAudit } = require("../utils/auditLog");
 const { validate } = require("../middleware/validate");
+const { affectedReservations, createHolidayWithClosure, removeHolidayWithClosure } = require("../utils/venueClosures");
+const { deliverNotificationEmails } = require("../utils/reservationNotifications");
+const { validDateKey } = require("../utils/businessDate");
 const {
   settingsItemIdParamsSchema,
   emptyBodySchema,
+  closureImpactQuerySchema,
   operatingHoursSchema,
   createHolidaySchema,
   createAnnouncementSchema,
@@ -165,39 +169,34 @@ router.put("/operating-hours", requirePermission(PERMISSIONS.SETTINGS_MANAGE), v
   }
 });
 
+router.get("/holidays/impact", requirePermission(PERMISSIONS.SETTINGS_MANAGE), validate(closureImpactQuerySchema, "query"), async (req, res) => {
+  if (!validDateKey(req.query.date)) return res.status(400).json({ message: "Choose a valid date." });
+  const settings = await Settings.getSingleton();
+  const bookings = await affectedReservations(req.query.date, settings);
+  res.json({ count: bookings.length, reservations: bookings.map(b => ({ _id: b._id, reservationCode: b.reservationCode, guestName: b.guestName, roomLabel: b.roomLabel, date: b.date, timeIn: b.timeIn })) });
+});
+
 router.post("/holidays", requirePermission(PERMISSIONS.SETTINGS_MANAGE), validate(createHolidaySchema), async (req, res) => {
   try {
-    const { name, date, fullDay, note } = req.body;
-    const settings = await Settings.getSingleton();
-    settings.holidays.push({ name, date, fullDay: fullDay !== false, note: note || "" });
-    settings.updatedBy = req.user._id;
-    settings.updatedAt = new Date();
-    await settings.save();
-    const created = settings.holidays[settings.holidays.length - 1];
-    await logAudit({ category: "Settings", action: "created", description: `added holiday "${created.name}" (${created.date})`, user: req.user });
+    const created = await createHolidayWithClosure(req.body, req.user._id);
+    await logAudit({ category: "Settings", action: "created", description: `added holiday "${created.name}" (${created.date}); ${created.affectedReservationCount} affected reservations notified`, user: req.user });
+    await deliverNotificationEmails({ limit: 5 });
     res.status(201).json(created);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ message: "Server error." });
+    res.status(err.status || 500).json({ message: err.status ? err.message : "Could not close this date." });
   }
 });
 
 router.delete("/holidays/:id", requirePermission(PERMISSIONS.SETTINGS_MANAGE), validate(settingsItemIdParamsSchema, "params"), validate(emptyBodySchema), async (req, res) => {
   try {
-    const settings = await Settings.getSingleton();
-    const target = settings.holidays.find(h => String(h._id) === req.params.id);
-    if (!target) {
-      return res.status(404).json({ message: "Holiday not found." });
-    }
-    settings.holidays = settings.holidays.filter(h => String(h._id) !== req.params.id);
-    settings.updatedBy = req.user._id;
-    settings.updatedAt = new Date();
-    await settings.save();
+    const target = await removeHolidayWithClosure(req.params.id, req.user._id);
     await logAudit({ category: "Settings", action: "deleted", description: `removed holiday "${target.name}" (${target.date})`, user: req.user });
+    await deliverNotificationEmails({ limit: 5 });
     res.json({ message: "Holiday removed." });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ message: "Server error." });
+    res.status(err.status || 500).json({ message: err.status ? err.message : "Could not remove this holiday." });
   }
 });
 

@@ -45,9 +45,13 @@ const sessionCreateSchema = Joi.object({
   paymentTiming,
   guestName: Joi.string().trim().allow("").max(120),
   guestCount: Joi.number().integer().min(1).max(100),
-  hasCorkage: Joi.boolean().default(false),
   applyVenueDiscount: Joi.boolean().default(false),
 }).or("roomId", "bookingId");
+
+const sessionStartQuoteSchema = Joi.object({
+  roomId: objectId.required(),
+  duration: duration.required(),
+});
 
 const sessionExtendSchema = Joi.object({
   addedHours: Joi.number().valid(0.5, 1, 1.5, 2).required(),
@@ -82,6 +86,7 @@ module.exports = {
   monitorRoomCreateSchema,
   monitorRoomUpdateSchema,
   sessionCreateSchema,
+  sessionStartQuoteSchema,
   sessionExtendSchema,
   sessionExtendQuoteSchema,
   sessionEndSchema,

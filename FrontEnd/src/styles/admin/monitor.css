@@ -365,6 +365,14 @@
 .rmd-actions-row .rm-btn{flex:1;justify-content:center;}
 
 #app .modal-box.extend-session-modal{width:min(520px,100%);max-width:520px;}
+.session-availability-notice{display:flex;align-items:flex-start;gap:var(--space-3);padding:var(--space-4);border:1px solid var(--warning-text);border-radius:var(--radius-md);background:var(--warning-bg);color:var(--warning-text);}
+.session-availability-notice>svg{flex-shrink:0;}
+.session-availability-notice strong{display:block;font-size:.9rem;}
+.session-availability-notice p{margin:var(--space-2) 0 0;font-size:.85rem;line-height:1.5;}
+.session-availability-notice--conflict{border-left-width:4px;}
+.session-availability-notice--conflict .session-availability-label{display:block;font-size:.7rem;font-weight:700;letter-spacing:.04em;line-height:1.4;}
+.session-availability-notice--conflict strong{margin-top:var(--space-1);font-size:.96rem;line-height:1.35;}
+.session-availability-notice--conflict .session-availability-action{font-weight:600;}
 .session-extension{display:flex;flex-direction:column;min-height:420px;}
 .session-extension-options{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:10px 0 16px;}
 .session-extension-option{min-height:48px;padding:8px;border:1px solid var(--border);border-radius:10px;background:var(--navy3);color:var(--text);font-weight:700;}

@@ -21,19 +21,6 @@ const STATUS_PILL_CLASS = {
   'No Show': 'pill-overdue',
 };
 
-const ROOM_STATUS_PILL_CLASS = {
-  Available: 'pill-vacant',
-  Occupied: 'pill-active',
-  'Under Maintenance': 'pill-overdue',
-  Inactive: 'pill-vacant',
-};
-const ROOM_STATUS_DOT_CLASS = {
-  Available: 'dash-dot-vacant',
-  Occupied: 'dash-dot-active',
-  'Under Maintenance': 'dash-dot-overdue',
-  Inactive: 'dash-dot-vacant',
-};
-
 const DASHBOARD_POLL_MS = 15000;
 
 function initialsOf(name) {
@@ -181,12 +168,8 @@ function Dashboard() {
 
   const roomViews = rooms
     .map((r) => ({ room: r, view: buildRoomView(r, sessions) }))
-    .sort((a, b) => {
-      if (a.view.occupancy && b.view.occupancy) return a.view.remaining - b.view.remaining;
-      if (a.view.occupancy) return -1;
-      if (b.view.occupancy) return 1;
-      return 0;
-    })
+    .filter(({ view }) => view.occupancy)
+    .sort((a, b) => a.view.remaining - b.view.remaining)
     .slice(0, 10);
 
   return (
@@ -250,19 +233,17 @@ function Dashboard() {
               <div className="dash-empty-state">Loading…</div>
             ) : roomsError ? (
               <div className="dash-empty-state">Could not load rooms.</div>
-            ) : rooms.length === 0 ? (
-              <div className="dash-empty-state">No rooms yet.</div>
+            ) : roomViews.length === 0 ? (
+              <div className="dash-empty-state">No ongoing or overdue sessions.</div>
             ) : (
               roomViews.map(({ room: r, view }) => (
                 <div className="dash-room-row" key={r._id}>
-                  <span className={`dash-room-dot ${ROOM_STATUS_DOT_CLASS[r.status] || 'dash-dot-vacant'}`}></span>
+                  <span className={`dash-room-dot ${view.isPastEnd ? 'dash-dot-overdue' : 'dash-dot-active'}`}></span>
                   <span className="dash-room-identity"><strong>{r.roomName || 'Room'} · Table No. {r.roomNumber}</strong><small>{r.facilityName}</small></span>
-                  {view.occupancy && (
-                    <span className={`dash-room-time${view.isCritical || view.isPastEnd ? ' critical' : view.isWarning ? ' warning' : ''}`}>
-                      {view.isPastEnd ? `Overdue ${formatTimeRemaining(view.remaining, true)}` : formatTimeRemaining(view.remaining, false)}
-                    </span>
-                  )}
-                  <span className={`pill ${ROOM_STATUS_PILL_CLASS[r.status] || 'pill-vacant'}`}>{r.status}</span>
+                  <span className={`dash-room-time${view.isCritical || view.isPastEnd ? ' critical' : view.isWarning ? ' warning' : ''}`}>
+                    {view.isPastEnd ? `Overdue ${formatTimeRemaining(view.remaining, true)}` : formatTimeRemaining(view.remaining, false)}
+                  </span>
+                  <span className={`pill ${view.isPastEnd ? 'pill-overdue' : 'pill-active'}`}>{view.isPastEnd ? 'Overdue' : 'Ongoing'}</span>
                 </div>
               ))
             )}

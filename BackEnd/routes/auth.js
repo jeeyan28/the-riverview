@@ -6,7 +6,7 @@ const router = express.Router();
 const User = require("../model/user");
 const LoginHistory = require("../model/loginHistory");
 const PendingRegistration = require("../model/pendingRegistration");
-const { loginLimiter, forgotPasswordLimiter, verifyResetOtpLimiter, resetPasswordLimiter, registerOtpLimiter, guestCreationLimiter, guestRecoveryLoginLimiter } = require("../middleware/rateLimiter");
+const { loginLimiter, forgotPasswordLimiter, verifyResetOtpLimiter, resetPasswordLimiter, registerOtpLimiter } = require("../middleware/rateLimiter");
 const { ensureAuthenticated } = require("../middleware/adminAuth");
 const { sendOtpEmail } = require("../utils/mailer");
 const {
@@ -23,16 +23,12 @@ const { normalizeName, validateName } = require("../utils/nameValidation");
 const { isAdminRole, getEffectivePermissions, roleLabel } = require("../utils/permissions");
 const { setAuthenticatedSession } = require("../utils/sessionPolicy");
 const { isPasswordStrongEnough, PASSWORD_POLICY_MESSAGE } = require("../utils/passwordPolicy");
-const { GUEST_EMAIL_DOMAIN, EMAIL_RE } = require("../utils/constants");
+const { EMAIL_RE } = require("../utils/constants");
 const { validate } = require("../middleware/validate");
 const {
   registerSchema,
   emailSchema,
   emailOtpSchema,
-  otpSchema,
-  guestSchema,
-  guestRecoveryLoginSchema,
-  claimEmailStartSchema,
   googleCodeSchema,
   loginSchema,
   resetPasswordSchema,
@@ -52,7 +48,6 @@ function sanitizeUser(user) {
     roleLabel: roleLabel(user.role),
     permissions: isAdminRole(user.role) ? getEffectivePermissions(user) : undefined,
     isGoogleAccount: !!user.googleId,
-    isGuest: !!user.isGuest,
     profilePicture: user.googleId ? user.googleProfilePicture || "" : "",
   };
 }
@@ -411,303 +406,6 @@ router.post("/verify-account-otp", registerOtpLimiter, validate(emailOtpSchema),
   }
 });
 
-router.post("/guest", guestCreationLimiter, validate(guestSchema), async (req, res) => {
-  try {
-    const firstNameError = validateName(req.body.firstName, "First name");
-    const lastNameError = validateName(req.body.lastName, "Last name");
-    if (firstNameError || lastNameError) {
-      return res.status(400).json({ message: firstNameError || lastNameError, field: firstNameError ? "firstName" : "lastName" });
-    }
-
-    const user = await User.create({
-      firstName: normalizeName(req.body.firstName),
-      lastName: normalizeName(req.body.lastName),
-      phone: "",
-      email: `guest_${crypto.randomUUID()}@${GUEST_EMAIL_DOMAIN}`,
-      role: "user",
-      isGuest: true,
-      isVerified: true,
-      isActive: true,
-    });
-
-    await logLoginAttempt(req, { user, status: "success", method: "guest" });
-
-    await regenerateSession(req);
-
-    setAuthenticatedSession(req, user);
-    await saveSession(req);
-
-    res.status(201).json({ message: "Guest session started.", user: sanitizeUser(user) });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Server error." });
-  }
-});
-
-// GUEST_ACCOUNT_PLAN.md Section 2: the customer-facing counterpart to
-// POST /api/users/:id/recover (routes/userRoutes.js). Verifies the one-time
-// temp email/password an admin relayed to the customer. This is the only
-// place a soft-deleted guest is considered restored — issuing the temp
-// credentials (the admin side) does not clear guestDeletedAt on its own.
-router.post("/guest-recovery-login", guestRecoveryLoginLimiter, validate(guestRecoveryLoginSchema), async (req, res) => {
-  try {
-    const { tempEmail, tempPassword } = req.body;
-    if (!tempEmail || !tempPassword) {
-      return res.status(400).json({ message: "Temporary email and password are required." });
-    }
-
-    const invalid = { message: "Invalid or expired recovery credentials." };
-
-    const user = await User.findOne({
-      guestRecoveryEmailHash: hashOtp(String(tempEmail).trim()),
-      isGuest: true,
-    }).select("+guestRecoveryPasswordHash +guestRecoveryExpiresAt");
-
-    if (!user || !user.guestRecoveryExpiresAt || user.guestRecoveryExpiresAt.getTime() < Date.now()) {
-      await logLoginAttempt(req, { email: tempEmail, status: "failed", reason: "Invalid or expired guest recovery credentials", method: "guest-recovery" });
-      return res.status(400).json(invalid);
-    }
-
-    if (!hashesMatch(hashOtp(String(tempPassword)), user.guestRecoveryPasswordHash)) {
-      await logLoginAttempt(req, { user, status: "failed", reason: "Wrong recovery password", method: "guest-recovery" });
-      return res.status(400).json(invalid);
-    }
-
-    user.guestDeletedAt = null;
-    user.isActive = true;
-    user.guestRecoveryEmailHash = undefined;
-    user.guestRecoveryPasswordHash = undefined;
-    user.guestRecoveryExpiresAt = undefined;
-    await user.save();
-
-    await logLoginAttempt(req, { user, status: "success", method: "guest-recovery" });
-
-    await regenerateSession(req);
-
-    setAuthenticatedSession(req, user);
-    await saveSession(req);
-
-    res.json({ message: "Welcome back! Your account has been restored.", user: sanitizeUser(user) });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Server error." });
-  }
-});
-
-function requireGuest(req, res, next) {
-  if (!req.user.isGuest) {
-    return res.status(403).json({ message: "Only guest accounts can be claimed." });
-  }
-  next();
-}
-
-router.post("/guest/claim/email/start", registerOtpLimiter, ensureAuthenticated, requireGuest, validate(claimEmailStartSchema), async (req, res) => {
-  try {
-    const { password } = req.body;
-    const emailRaw = String(req.body.email || "").trim();
-    const emailLower = emailRaw.toLowerCase();
-
-    if (!emailRaw) {
-      return res.status(400).json({ message: "Email is required.", field: "email" });
-    }
-    if (!EMAIL_RE.test(emailRaw)) {
-      return res.status(400).json({ message: "Enter a valid email address.", field: "email" });
-    }
-    if (!password) {
-      return res.status(400).json({ message: "Password is required.", field: "password" });
-    }
-    if (!isPasswordStrongEnough(password)) {
-      return res.status(400).json({ message: PASSWORD_POLICY_MESSAGE, field: "password" });
-    }
-
-    const existingUser = await User.findOne({ email: emailLower, _id: { $ne: req.user._id } });
-    if (existingUser) {
-      return res.status(409).json({ message: "An account with this email already exists.", field: "email" });
-    }
-
-    const passwordHash = await bcrypt.hash(password, User.SALT_ROUNDS);
-
-    const user = await User.findById(req.user._id).select(
-      "+verifyOtpHash +verifyOtpExpires +verifyOtpAttempts +otpWindowStart +otpResendCount"
-    );
-
-    const windowCheck = checkAndBumpOtpRequestWindow(user);
-    if (!windowCheck.allowed) {
-      return res.status(429).json({
-        message: "Too many verification codes requested. Please try again later.",
-        retryAfterSeconds: windowCheck.retryAfterSeconds,
-      });
-    }
-
-    const otp = generateOtp();
-    user.pendingClaimEmail = emailLower;
-    user.pendingClaimPasswordHash = passwordHash;
-    user.verifyOtpHash = hashOtp(otp);
-    user.verifyOtpExpires = new Date(Date.now() + OTP_TTL_MS);
-    user.verifyOtpAttempts = 0;
-    await user.save();
-
-    try {
-      await sendOtpEmail({ email: emailLower, firstName: user.firstName, lastName: user.lastName }, otp, "verify");
-    } catch (err) {
-      console.error("Failed to send claim OTP email:", err);
-    }
-
-    res.json({ message: "Verification code sent.", email: emailLower });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Server error." });
-  }
-});
-
-router.post("/guest/claim/email/resend-otp", registerOtpLimiter, ensureAuthenticated, requireGuest, validate(emptyBodySchema), async (req, res) => {
-  try {
-    const user = await User.findById(req.user._id).select(
-      "+pendingClaimEmail +verifyOtpExpires +otpWindowStart +otpResendCount"
-    );
-
-    if (!user.pendingClaimEmail) {
-      return res.status(400).json({ message: "No pending claim request. Start again." });
-    }
-
-    if (user.verifyOtpExpires) {
-      const lastIssuedAt = user.verifyOtpExpires.getTime() - OTP_TTL_MS;
-      const msSinceIssued = Date.now() - lastIssuedAt;
-      if (msSinceIssued < RESEND_COOLDOWN_MS) {
-        return res.status(429).json({
-          message: "Please wait before requesting another code.",
-          retryAfterSeconds: Math.ceil((RESEND_COOLDOWN_MS - msSinceIssued) / 1000),
-        });
-      }
-    }
-
-    const windowCheck = checkAndBumpOtpRequestWindow(user);
-    if (!windowCheck.allowed) {
-      return res.status(429).json({
-        message: "Too many verification codes requested. Please try again later.",
-        retryAfterSeconds: windowCheck.retryAfterSeconds,
-      });
-    }
-
-    const otp = generateOtp();
-    user.verifyOtpHash = hashOtp(otp);
-    user.verifyOtpExpires = new Date(Date.now() + OTP_TTL_MS);
-    user.verifyOtpAttempts = 0;
-    await user.save();
-
-    try {
-      await sendOtpEmail({ email: user.pendingClaimEmail, firstName: user.firstName, lastName: user.lastName }, otp, "verify");
-    } catch (err) {
-      console.error("Failed to send claim OTP email:", err);
-    }
-
-    res.json({ message: "A new verification code has been sent." });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Server error." });
-  }
-});
-
-router.post("/guest/claim/email/verify-otp", registerOtpLimiter, ensureAuthenticated, requireGuest, validate(otpSchema), async (req, res) => {
-  try {
-    const { otp } = req.body;
-    if (!otp) {
-      return res.status(400).json({ message: "Code is required." });
-    }
-
-    const user = await User.findById(req.user._id).select(
-      "+pendingClaimEmail +pendingClaimPasswordHash +verifyOtpHash +verifyOtpExpires +verifyOtpAttempts"
-    );
-
-    const incorrect = { message: "Incorrect verification code." };
-    const expired = { message: "That code has expired. Request a new one." };
-    const tooManyAttempts = { message: "Too many incorrect attempts. Please request a new code." };
-
-    if (!user.pendingClaimEmail || !user.verifyOtpHash || !user.verifyOtpExpires) {
-      return res.status(400).json(incorrect);
-    }
-    if (user.verifyOtpExpires.getTime() < Date.now()) {
-      return res.status(400).json(expired);
-    }
-    if (user.verifyOtpAttempts >= MAX_OTP_VERIFY_ATTEMPTS) {
-      return res.status(429).json(tooManyAttempts);
-    }
-
-    const candidateHash = hashOtp(otp);
-    if (!hashesMatch(candidateHash, user.verifyOtpHash)) {
-      user.verifyOtpAttempts += 1;
-      await user.save();
-      if (user.verifyOtpAttempts >= MAX_OTP_VERIFY_ATTEMPTS) {
-        return res.status(429).json(tooManyAttempts);
-      }
-      return res.status(400).json(incorrect);
-    }
-
-    const existingUser = await User.findOne({ email: user.pendingClaimEmail, _id: { $ne: user._id } });
-    if (existingUser) {
-      user.pendingClaimEmail = undefined;
-      user.pendingClaimPasswordHash = undefined;
-      user.verifyOtpHash = undefined;
-      user.verifyOtpExpires = undefined;
-      user.verifyOtpAttempts = 0;
-      await user.save();
-      return res.status(409).json({ message: "An account with this email already exists." });
-    }
-
-    user.email = user.pendingClaimEmail;
-    user.setPasswordHash(user.pendingClaimPasswordHash);
-    user.isGuest = false;
-    user.pendingClaimEmail = undefined;
-    user.pendingClaimPasswordHash = undefined;
-    user.verifyOtpHash = undefined;
-    user.verifyOtpExpires = undefined;
-    user.verifyOtpAttempts = 0;
-    await user.save();
-
-    res.json({ message: "Your account has been saved.", user: sanitizeUser(user) });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Server error." });
-  }
-});
-
-router.post("/guest/claim/google", ensureAuthenticated, requireGuest, validate(googleCodeSchema), async (req, res) => {
-  try {
-    const { code } = req.body;
-    if (!code) return res.status(400).json({ message: "Missing Google credential." });
-
-    const redirectUri = getRequestOrigin(req);
-    if (!redirectUri) return res.status(400).json({ message: "Missing Google sign-in origin." });
-
-    const profile = await exchangeGoogleAuthCode(code, redirectUri);
-    if (!profile.email || !profile.emailVerified) {
-      return res.status(401).json({ message: "Google account email is not verified." });
-    }
-
-    const existingUser = await User.findOne({
-      $or: [{ googleId: profile.googleId }, { email: profile.email }],
-      _id: { $ne: req.user._id },
-    });
-    if (existingUser) {
-      return res.status(409).json({ message: "That Google account is already linked to another user." });
-    }
-
-    const user = await User.findById(req.user._id);
-    user.email = profile.email;
-    user.googleId = profile.googleId;
-    user.googleProfilePicture = profile.picture || "";
-    if (profile.firstname) user.firstName = profile.firstname;
-    if (profile.lastname) user.lastName = profile.lastname;
-    user.isGuest = false;
-    user.isVerified = true;
-    await user.save();
-
-    res.json({ message: "Your account has been saved.", user: sanitizeUser(user) });
-  } catch (err) {
-    return handleGoogleAuthError(err, res);
-  }
-});
-
 async function handlePasswordLogin(req, res) {
   try {
     const { email, password } = req.body;
@@ -946,19 +644,7 @@ router.post("/reset-password", resetPasswordLimiter, validate(resetPasswordSchem
 router.get("/me", ensureAuthenticated, async (req, res) => {
   res.json({ user: sanitizeUser(req.user) });
 });
-router.post("/logout", validate(emptyBodySchema), async (req, res) => {
-  try {
-    if (req.session && req.session.userId) {
-      const user = await User.findById(req.session.userId);
-      if (user && user.isGuest) {
-        user.isActive = false;
-        user.guestDeletedAt = new Date();
-        await user.save();
-      }
-    }
-  } catch (err) {
-    console.error(err);
-  }
+router.post("/logout", validate(emptyBodySchema), (req, res) => {
   req.session.destroy(() => {
     res.clearCookie("connect.sid");
     res.json({ message: "Logged out." });

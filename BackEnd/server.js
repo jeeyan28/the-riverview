@@ -43,21 +43,6 @@ app.post("/api/payments/paymongo/webhook", express.raw({ type: "application/json
 const { webhookHandler: xenditWebhookHandler } = require("./routes/xenditRoutes");
 app.post("/api/payments/xendit/webhook", express.json({ limit: "100kb" }), xenditWebhookHandler);
 
-app.get("/api/cron/purge-expired-guests", async (req, res) => {
-  if (req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`) {
-    return res.status(401).json({ message: "Unauthorized." });
-  }
-  try {
-    await connectDB();
-    const { purgeExpiredGuests } = require("./scripts/purgeExpiredGuests");
-    const result = await purgeExpiredGuests({ dryRun: false });
-    res.json({ deletedCount: result.deletedCount });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Cleanup failed." });
-  }
-});
-
 app.use(express.json({ limit: "100kb" }));
 
 const allowedOrigins = (process.env.APP_BASE_URL || "http://localhost:5500")
@@ -118,6 +103,8 @@ app.use("/api/bookings", require("./routes/bookingRoutes"));
 app.use("/api/users", require("./routes/userRoutes"));
 app.use("/api/login-history", require("./routes/loginHistoryRoutes"));
 app.use("/api/settings", require("./routes/settingsRoutes"));
+app.use("/api/notifications", require("./routes/notificationRoutes"));
+app.use("/api/jobs/reservations", require("./routes/reservationJobsRoutes").router);
 app.use("/api/audit-logs", require("./routes/auditLogRoutes"));
 app.use("/api/forecast", require("./routes/forecastRoutes"));
 app.use("/api/dashboard", require("./routes/dashboardRoutes"));
@@ -139,6 +126,7 @@ function startBookingLifecycleScheduler() {
   const INTERVAL_MS = 60 * 1000;
   async function tick() {
     try { await voidExpiredBookings(); } catch (e) { console.error("scheduler: voidExpiredBookings failed:", e.message); }
+    try { await require("./routes/reservationJobsRoutes").runReservationJobs(); } catch (e) { console.error("scheduler: reservation jobs failed:", e.message); }
   }
   setInterval(tick, INTERVAL_MS);
   tick();
