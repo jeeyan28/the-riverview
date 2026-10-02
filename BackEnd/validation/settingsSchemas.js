@@ -64,6 +64,23 @@ const createEmergencyContactSchema = Joi.object({
 });
 const updateEmergencyContactSchema = Joi.object(emergencyContactFields).min(1);
 
+const termsSectionSchema = Joi.object({
+  heading: Joi.string().trim().min(1).max(200).required(),
+  paragraphs: Joi.array().items(Joi.string().allow("").max(6000)).max(60).default([]),
+  list: Joi.array().items(Joi.string().allow("").max(6000)).max(80).default([]),
+});
+
+const termsLanguageSchema = Joi.object({
+  intro: Joi.string().allow("").max(20000).default(""),
+  sections: Joi.array().items(termsSectionSchema).min(1).max(40),
+});
+
+const updateTermsSchema = Joi.object({
+  lastUpdated: Joi.string().allow("").max(60).default(""),
+  en: termsLanguageSchema.required(),
+  fil: termsLanguageSchema.required(),
+});
+
 module.exports = {
   settingsItemIdParamsSchema,
   emptyBodySchema,
@@ -76,4 +93,5 @@ module.exports = {
   updatePaymentMethodSchema,
   createEmergencyContactSchema,
   updateEmergencyContactSchema,
+  updateTermsSchema,
 };

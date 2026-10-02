@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import '../../styles/admin/lobby-monitor.css';
 import { useTheme } from '../../hooks/useTheme';
 import { useCountdownClock } from '../../hooks/useCountdownClock';
@@ -21,7 +21,7 @@ const STATUS_META = {
   'ending-soon': { label: 'Ending Soon', hint: 'Wrapping up' },
   expired: { label: 'Overdue', hint: 'Past reserved time' },
 };
-const STATUS_ORDER = ['available', 'occupied', 'ending-soon', 'expired'];
+const STATUS_ORDER = ['occupied', 'ending-soon', 'expired', 'available'];
 
 function lobbyStatus(r, sessions) {
   const { occupancy, isPastEnd, isCritical, isWarning } = buildRoomView(r, sessions);
@@ -35,7 +35,7 @@ function lobbyStatus(r, sessions) {
   return { key: 'other', label: r.status, critical: false };
 }
 
-const STATUS_RANK = { expired: 0, 'ending-soon': 1, occupied: 2, available: 3, other: 4 };
+const STATUS_RANK = { occupied: 0, 'ending-soon': 1, expired: 2, available: 3, other: 4 };
 
 function LobbyStatusLegend({ rooms, sessions, facilityName }) {
   const counts = { available: 0, occupied: 0, 'ending-soon': 0, expired: 0 };
@@ -101,7 +101,6 @@ function LobbyMonitorView({ monitor, receiver }) {
   const [fullscreen, setIsFullscreen] = useState(false);
   const isFullscreen = fullscreen || Boolean(receiver);
   const [fullscreenError, setFullscreenError] = useState('');
-  const [displaySize, setDisplaySize] = useState({ width: 0, height: 0 });
   const snapshot = useMemo(() => lobbySnapshot({
     rooms, sessions, loading, refreshError: dataWarning, lastUpdatedAt: monitor.lastUpdatedAt,
     selection: { facilityFilter, roomTypeFilter, sortBy, viewMode, theme },
@@ -110,8 +109,6 @@ function LobbyMonitorView({ monitor, receiver }) {
   const castBusy = ['selecting', 'connecting', 'stopping'].includes(casting.phase);
   const castLabel = { connected: 'Casting to TV', disconnected: 'Reconnect to TV', selecting: 'Choose a TV…', connecting: 'Connecting…', stopping: 'Stopping…' }[casting.phase] || 'View on TV';
   const showCastStatus = !casting.supported || (casting.phase !== 'idle' && casting.phase !== 'terminated');
-
-  const scrollRef = useRef(null);
 
   useEffect(() => {
     function onFullscreenChange() {
@@ -130,23 +127,6 @@ function LobbyMonitorView({ monitor, receiver }) {
       setFullscreenError('Fullscreen is unavailable here. Use Chrome’s fullscreen control or press F11.');
     }
   }
-
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return undefined;
-    const updateSize = () => {
-      const { width, height } = el.getBoundingClientRect();
-      setDisplaySize((current) => current.width === width && current.height === height ? current : { width, height });
-    };
-    updateSize();
-    window.addEventListener('resize', updateSize);
-    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(updateSize);
-    observer?.observe(el);
-    return () => {
-      window.removeEventListener('resize', updateSize);
-      observer?.disconnect();
-    };
-  }, []);
 
   const facilities = useMemo(() => [...new Set(rooms.map((r) => r.facilityName))], [rooms]);
   const roomTypes = useMemo(() => [...new Set(rooms
@@ -181,13 +161,11 @@ function LobbyMonitorView({ monitor, receiver }) {
         return remA - remB;
       });
     }
-    if (sortBy === 'status') {
-      return [...list].sort((a, b) => STATUS_RANK[lobbyStatus(a, sessions).key] - STATUS_RANK[lobbyStatus(b, sessions).key]);
-    }
     if (sortBy === 'price') {
       return [...list].sort((a, b) => (a.price || 0) - (b.price || 0));
     }
-    return list;
+    // in-use units first, available last
+    return [...list].sort((a, b) => STATUS_RANK[lobbyStatus(a, sessions).key] - STATUS_RANK[lobbyStatus(b, sessions).key]);
   }
 
   const inventoryGroups = useMemo(() => {
@@ -208,46 +186,6 @@ function LobbyMonitorView({ monitor, receiver }) {
     .filter((group) => facilityFilter === 'All' || group.facilityName === facilityFilter)
     .map((group) => ({ ...group, types: group.types.filter((type) => roomTypeFilter === 'All' || type.roomName === roomTypeFilter) }))
     .filter((group) => group.types.length > 0), [inventoryGroups, facilityFilter, roomTypeFilter]);
-
-  const liveTight = (displaySize.height || 800) < 700;
-
-  const liveLayout = useMemo(() => {
-    const width = displaySize.width || 1920;
-    const height = displaySize.height || 800;
-    const gap = liveTight ? 6 : 8;
-    const typeMin = height >= 860 ? 384 : height >= 700 ? 340 : 300;
-    const cardMin = height >= 860 ? 194 : height >= 700 ? 164 : 124;
-    const typePadX = (liveTight ? 10 : 12) * 2 + 2;
-    const facilityBlock = liveTight ? 78 : 104;
-    const typeBlock = liveTight ? 41 : 50;
-    const perTypeRow = Math.max(1, Math.floor((width + gap) / (typeMin + gap)));
-    let rows = 0;
-    let overhead = 0;
-    // Size against the complete inventory so a filter only removes facilities;
-    // it must not stretch the remaining cards to fill the screen.
-    inventoryGroups.forEach(({ types }) => {
-      let facilityRows = 0;
-      let chunks = 0;
-      for (let i = 0; i < types.length; i += perTypeRow) {
-        const chunk = types.slice(i, i + perTypeRow);
-        const typeWidth = (width - (chunk.length - 1) * gap) / chunk.length;
-        const cols = Math.max(1, Math.floor((typeWidth - typePadX + gap) / (cardMin + gap)));
-        facilityRows += Math.max(...chunk.map((t) => Math.ceil(t.rooms.length / cols)));
-        chunks += 1;
-      }
-      rows += facilityRows;
-      overhead += facilityBlock + chunks * typeBlock + Math.max(0, facilityRows - 1) * gap;
-    });
-    return { width, height, gap, typeMin, cardMin, rows, overhead };
-  }, [inventoryGroups, displaySize.width, displaySize.height, liveTight]);
-
-  const liveCellH = useMemo(() => {
-    const usable = liveLayout.height - liveLayout.overhead - 16;
-    return Math.floor(Math.max(48, Math.min(176, (usable / Math.max(1, liveLayout.rows)) * 1.08)));
-  }, [liveLayout]);
-
-  const tableFont = Math.max(0.55, Math.min(0.84, (displaySize.height || 700) / Math.max(visibleRooms.length, 1) / 35));
-  const tablePad = Math.max(1, Math.min(8, Math.floor(((displaySize.height || 700) / Math.max(visibleRooms.length, 1) - tableFont * 16 * 1.3) / 2)));
 
   return (
     <div className={`lobby-display${isFullscreen ? ' lobby-display--live' : ''}`} data-theme={theme}>
@@ -337,65 +275,21 @@ function LobbyMonitorView({ monitor, receiver }) {
 
       {!isFullscreen && <LobbyStatusLegend rooms={visibleRooms} sessions={sessions} />}
 
-      <div className="lobby-scroll" ref={scrollRef}>
+      <div className="lobby-scroll" role="region" aria-label="Facility availability" tabIndex={0}>
         {loading ? (
           <div className="lobby-empty" role="status">{receiver?.message || 'Loading rooms…'}</div>
         ) : rooms.length === 0 ? (
           <div className="lobby-empty">No rooms configured yet.</div>
         ) : visibleRooms.length === 0 ? (
           <div className="lobby-empty">No rooms match the current filters.</div>
-        ) : isFullscreen ? (
-          <div
-            className="lobby-live-boards"
-            data-tight={liveTight ? '' : undefined}
-            style={{
-              '--lobby-cell-h': `${liveCellH}px`,
-              '--lobby-type-min': `${liveLayout.typeMin}px`,
-              '--lobby-card-min': `${liveLayout.cardMin}px`,
-            }}
-          >
-            {groups.map(({ facilityName, types }) => (
-              <div className="lobby-facility" key={facilityName} data-facility={facilityName}>
-                <LobbyStatusLegend facilityName={facilityName} rooms={types.flatMap((type) => type.rooms)} sessions={sessions} />
-                <div className="lobby-facility-head">
-                  <i className={`bi ${FACILITY_ICONS[facilityName] || FACILITY_ICON_DEFAULT}`}></i>
-                  {facilityName}
-                </div>
-                <div className="lobby-types-row">
-                  {types.map(({ roomName, rooms: typeRooms }) => (
-                    <div className="lobby-type" key={`${facilityName}::${roomName}`}>
-                      <div className="lobby-type-head">
-                        {roomName} <span className="lobby-type-count">· {typeRooms.length}</span>
-                      </div>
-                      <div className="lobby-card-grid">
-                        {typeRooms.map((r) => {
-                          const { occupancy, remaining, isPastEnd } = buildRoomView(r, sessions);
-                          const status = lobbyStatus(r, sessions);
-                          const unit = r.facilityName === 'Billiards' ? 'Table' : r.facilityName === 'Court' ? 'Court' : 'Room';
-                          return (
-                            <div className={`lobby-card lobby-card--${status.key}${status.critical ? ' lobby-card--critical' : ''}`} key={r._id}>
-                              <div className="lobby-live-card-inner">
-                                <span className="lobby-live-card-num">{unit} {r.roomNumber}</span>
-                                <span className={`lobby-badge lobby-badge--${status.key}${status.critical ? ' lobby-card--critical' : ''}`}><span className="dot"></span>{status.label}</span>
-                                {occupancy && <div className="lobby-timer">{formatTimeRemaining(remaining, isPastEnd)}</div>}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : viewMode === 'grid' ? (
+        ) : isFullscreen || viewMode === 'grid' ? (
           groups.map(({ facilityName, types }) => (
             <div className="lobby-facility" key={facilityName} data-facility={facilityName}>
               <div className="lobby-facility-head">
                 <i className={`bi ${FACILITY_ICONS[facilityName] || FACILITY_ICON_DEFAULT}`}></i>
                 {facilityName}
               </div>
+              {isFullscreen && <LobbyStatusLegend facilityName={facilityName} rooms={types.flatMap((type) => type.rooms)} sessions={sessions} />}
               <div className="lobby-types-row">
                 {types.map(({ roomName, rooms: typeRooms }) => {
                   const key = `${facilityName}::${roomName}`;
@@ -411,7 +305,7 @@ function LobbyMonitorView({ monitor, receiver }) {
                           return (
                             <div className={`lobby-card lobby-card--${status.key}${status.critical ? ' lobby-card--critical' : ''}`} key={r._id}>
                               <div className="lobby-card-top">
-                                <span className="lobby-room-num">Table No.{r.roomNumber}</span>
+                                <span className="lobby-room-num">{r.facilityName === 'Billiards' ? 'Table' : r.facilityName === 'Court' ? 'Court' : 'Room'} No.{r.roomNumber}</span>
                                 <span className={`lobby-badge lobby-badge--${status.key}${status.critical ? ' lobby-badge--critical' : ''}`}><span className="dot"></span>{status.label}</span>
                               </div>
                               {occupancy && <div className="lobby-timer">{formatTimeRemaining(remaining, isPastEnd)}</div>}
@@ -429,8 +323,8 @@ function LobbyMonitorView({ monitor, receiver }) {
             </div>
           ))
         ) : (
-          <div className="lobby-table-wrap" tabIndex={isFullscreen ? undefined : 0} role="region" aria-label="Room availability table" style={{ '--lobby-table-font': `${tableFont}rem`, '--lobby-table-row-pad': `${tablePad}px` }}>
-            <table className="lobby-table lobby-board-table" data-compact={visibleRooms.length > 16}>
+          <div className="lobby-table-wrap" tabIndex={0} role="region" aria-label="Room availability table">
+            <table className="lobby-table lobby-board-table">
               <thead>
                 <tr>
                   <th>Rate</th>

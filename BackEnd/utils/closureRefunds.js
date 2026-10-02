@@ -3,7 +3,7 @@ const Booking = require("../model/booking");
 const AppError = require("./appError");
 const { runInTransaction } = require("./bookingHelper");
 const { financialFields, bookingCollected, money, reviewCancellationFields } = require("./bookingLifecycle");
-const { CLOSABLE_STATUSES, AUTOMATIC_REFUND_STATUSES, isClosurePending, outstandingClosureRefund } = require("./closurePolicy");
+const { CLOSABLE_STATUSES, AUTOMATIC_REFUND_STATUSES, isClosurePending, outstandingClosureRefund, canRetryUnsubmittedRefund } = require("./closurePolicy");
 const { notifyReservation } = require("./reservationNotifications");
 const providers = { paymongo: require("./paymongo"), xendit: require("./xendit") };
 
@@ -173,6 +173,19 @@ async function completeManualClosureRefund(booking, session) {
   await notifyReservation(booking, "refund_completed", { session });
 }
 
+async function retryUnsubmittedClosureRefund(id) {
+  await runInTransaction(async session => {
+    const booking = await Booking.findById(id).session(session);
+    if (!booking) throw new AppError(404, "Reservation not found.");
+    if (!canRetryUnsubmittedRefund(booking)) throw new AppError(409, "This refund cannot be safely resubmitted. Check the provider status before returning any additional payment.");
+    booking.closureRefund.status = "queued";
+    booking.closureRefund.lastError = "";
+    booking.closureRefund.nextCheckAt = new Date();
+    await booking.save({ session });
+  });
+  return processClosureRefund(id);
+}
+
 async function processPendingClosureRefunds({ limit = 5 } = {}) {
   const due = await Booking.find({ "closureRefund.status": { $in: AUTOMATIC_REFUND_STATUSES }, "closureRefund.nextCheckAt": { $lte: new Date() } }).select("_id").limit(limit);
   await Promise.all(due.map(booking => processClosureRefund(booking._id)));
@@ -194,4 +207,4 @@ async function handleRefundWebhook(provider, resource) {
   await processClosureRefund(booking._id, { force: true, ...(isRefund ? { refundId: resource.id } : {}) });
 }
 
-module.exports = { queueClosureRefund, normalizeRefund, applyVerifiedRefund, processClosureRefund, processPendingClosureRefunds, completeManualClosureRefund, handleRefundWebhook };
+module.exports = { queueClosureRefund, normalizeRefund, applyVerifiedRefund, processClosureRefund, retryUnsubmittedClosureRefund, processPendingClosureRefunds, completeManualClosureRefund, handleRefundWebhook };

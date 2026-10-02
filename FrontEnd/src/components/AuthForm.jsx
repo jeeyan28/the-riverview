@@ -11,6 +11,7 @@ import { useGoogleAuth } from '../hooks/useGoogleAuth';
 import { getExternalBrowserUrl } from '../utils/embeddedBrowser';
 import { useCountdownClock } from '../hooks/useCountdownClock';
 import { useAuth } from '../context/AuthContext';
+import { useSiteSettings } from '../hooks/useSiteSettings';
 import { OTP_LENGTH, OTP_EXPIRY_SECONDS, RESEND_COOLDOWN_SECONDS, formatCountdown } from '../utils/otp';
 import { isPasswordStrongEnough } from '../utils/password';
 import { validateName, normalizeName } from '../utils/name';
@@ -34,6 +35,11 @@ function AuthForm({ mode, resetLogin, onSwitchMode, onForgotPassword, onAuthSucc
     resendRegistrationOtp,
   } = useAuth();
   const { toast, showToast } = useToast();
+  const { settings } = useSiteSettings();
+  const termsContent = settings?.terms?.en?.sections?.length
+    ? { en: settings.terms.en, fil: settings.terms.fil?.sections?.length ? settings.terms.fil : settings.terms.en }
+    : TERMS_CONTENT;
+  const termsLastUpdated = settings?.terms?.lastUpdated || TERMS_LAST_UPDATED;
   async function handleGoogleCredential(response) {
     if (!response.code) {
       if (response.error && response.error !== 'access_denied') {
@@ -815,8 +821,8 @@ function AuthForm({ mode, resetLogin, onSwitchMode, onForgotPassword, onAuthSucc
         className="legal-review-modal"
       >
         <LegalDocument
-          content={legalDoc === 'terms' ? TERMS_CONTENT : PRIVACY_CONTENT}
-          lastUpdated={legalDoc === 'terms' ? TERMS_LAST_UPDATED : LAST_UPDATED}
+          content={legalDoc === 'terms' ? termsContent : PRIVACY_CONTENT}
+          lastUpdated={legalDoc === 'terms' ? termsLastUpdated : LAST_UPDATED}
           embedded
           onClose={() => setLegalDoc(null)}
         />

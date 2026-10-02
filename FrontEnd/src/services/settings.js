@@ -41,4 +41,8 @@ export const settingsService = {
 
   removePaymentMethod: (id) =>
     apiRequest(`${BASE}/payment-methods/${id}`, { method: 'DELETE', fallbackMessage: 'Failed to remove payment method.' }),
+
+  /** @param {{lastUpdated:string, en:{intro:string, sections:Array}, fil:{intro:string, sections:Array}}} payload */
+  updateTerms: (payload) =>
+    apiRequest(`${BASE}/terms`, { method: 'PUT', body: payload, fallbackMessage: 'Failed to save the terms of service.' }),
 };

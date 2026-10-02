@@ -6,19 +6,21 @@ import ConfirmDialog from '../../components/ConfirmDialog';
 import PasswordInput from '../../components/PasswordInput';
 import PasswordRequirementsList from '../../components/PasswordRequirementsList';
 import LoginHistory from './LoginHistory';
+import TermsTab from './TermsSettings';
 import { useAuth } from '../../context/AuthContext';
 import { settingsService } from '../../services/settings';
 import { usersService } from '../../services/users';
 import { useSiteSettings } from '../../hooks/useSiteSettings';
 import { useConfirm } from '../../hooks/useConfirm';
 import { PASSWORD_REQUIREMENTS } from '../../utils/password';
-import { BellRing, History, Settings2, UserRound } from 'lucide-react';
+import { BellRing, FileText, History, Settings2, UserRound } from 'lucide-react';
 import { businessDate } from '../../utils/businessDate';
 import '../../styles/reservation-notifications.css';
 
 
 const SETTINGS_TABS = [
   { key: 'announcements', label: 'Venue & notices', description: 'Schedule, closures, announcements', icon: BellRing },
+  { key: 'terms', label: 'Terms & Services', description: 'Public terms of service text', icon: FileText },
   { key: 'profile', label: 'Admin account', description: 'Profile and password', icon: UserRound },
   { key: 'login', label: 'Login history', description: 'Account access', icon: History },
 ];
@@ -45,7 +47,7 @@ function Settings() {
 
   return (
     <div className="panel active" id="panel-settings">
-      <div className="settings-intro"><div><h2>System settings</h2><p>Manage the customer-facing schedule, venue notices, and your administrative account.</p></div><Settings2 size={23} aria-hidden="true" /></div>
+      <div className="settings-intro"><div><h2>System settings</h2><p>Manage the customer-facing schedule, venue notices, terms of service, and your administrative account.</p></div><Settings2 size={23} aria-hidden="true" /></div>
       <div className="set-layout">
         <div className="set-tabs" role="tablist" aria-label="Settings sections">
           {SETTINGS_TABS.map((tab) => (
@@ -78,6 +80,10 @@ function Settings() {
 
           <div className={`set-subpanel${activeTab === 'login' ? ' active' : ''}`} id="set-login-history">
             {activeTab === 'login' && <LoginHistory />}
+          </div>
+
+          <div className={`set-subpanel${activeTab === 'terms' ? ' active' : ''}`} id="set-terms">
+            {activeTab === 'terms' && <TermsTab />}
           </div>
         </div>
       </div>

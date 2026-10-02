@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const paymongo = require('../utils/paymongo');
 const xendit = require('../utils/xendit');
 const { buildNotificationEmail } = require('../utils/mailer');
+const { notificationCopy } = require('../utils/reservationNotifications');
 
 test('PayMongo refund sends centavos, original payment ID and a persistent request marker', async () => {
   const original = global.fetch;
@@ -53,6 +54,50 @@ test('PayMongo refund preflight verifies the saved intent, captured payment and 
     await assert.rejects(paymongo.getRefundPayment(booking), /does not match/);
     await assert.rejects(paymongo.getRefundPayment({ ...booking, paymongoPaymentId: 'pay_another' }), /No verified payment/);
   } finally { global.fetch = original; if (originalKey === undefined) delete process.env.PAYMONGO_SECRET_KEY; else process.env.PAYMONGO_SECRET_KEY = originalKey; }
+});
+
+test('PayMongo refund history uses supported filters and follows pagination for the original payment only', async () => {
+  const original = global.fetch;
+  const originalKey = process.env.PAYMONGO_SECRET_KEY;
+  process.env.PAYMONGO_SECRET_KEY = 'sk_test_fixture';
+  const requests = [];
+  global.fetch = async (url, options) => {
+    const query = new URL(url).searchParams;
+    requests.push({ query, method: options.method });
+    assert.equal(query.get('payment_id'), 'pay_original');
+    assert.equal(query.get('limit'), '100');
+    assert.equal([...query.keys()].some(key => key.startsWith('data')), false);
+    const second = query.has('after');
+    return { ok: true, text: async () => JSON.stringify({
+      data: [{ id: second ? 'ref_second' : 'ref_first', attributes: { payment_id: 'pay_original', status: 'succeeded', amount: 10000 } }], has_more: !second,
+    }) };
+  };
+  try {
+    const refunds = await paymongo.listRefunds('pay_original');
+    assert.deepEqual(refunds.map(item => item.id), ['ref_first', 'ref_second']);
+    assert.equal(requests.length, 2); assert.equal(requests[1].query.get('after'), 'ref_first');
+    assert.equal(requests.every(request => request.method === 'GET'), true);
+    global.fetch = async () => ({ ok: true, text: async () => JSON.stringify({ data: [{ id: 'ref_foreign', attributes: { payment_id: 'pay_another' } }] }) });
+    await assert.rejects(paymongo.listRefunds('pay_original'), /does not match the original payment/);
+  } finally { global.fetch = original; if (originalKey === undefined) delete process.env.PAYMONGO_SECRET_KEY; else process.env.PAYMONGO_SECRET_KEY = originalKey; }
+});
+
+test('online refund confirmations distinguish the processing estimate from wallet posting time and omit cash instructions', () => {
+  const booking = { reservationCode: 'BIL-TEST', paymentProvider: 'paymongo', paymentMethod: 'GCash', closureRefund: { provider: 'paymongo', amount: 150 } };
+  const copy = notificationCopy(booking, 'refund_processing');
+  const email = buildNotificationEmail({ type: 'refund_processing', ...copy, reservationCode: booking.reservationCode, details: { refundAmount: 150, paymentMethod: 'GCash' } });
+  assert.match(email.text, /30–60 minutes/); assert.match(email.text, /estimate; payment provider checks may take longer/);
+  assert.match(email.text, /within 24 hours after the provider processes/);
+  assert.match(email.text, /separate from the processing estimate/); assert.match(email.text, /original GCash/);
+  assert.doesNotMatch(copy.message, /cash|manual|staff|assistance/);
+  assert.match(email.html, /₱150.00/); assert.match(email.html, /cid:riverview-notification-logo/);
+  const mixed = notificationCopy({ ...booking, downPayment: 150, closureRefund: { provider: 'paymongo', amount: 300, baseRefundedAmount: 0 } }, 'refund_processing');
+  assert.match(mixed.message, /₱150.00 will be returned through your original GCash/);
+  assert.match(mixed.message, /remaining ₱150.00 paid separately/); assert.match(mixed.message, /applies to the online portion/);
+  const manual = notificationCopy({ ...booking, closureRefund: { provider: 'manual', amount: 150 } }, 'refund_processing');
+  assert.match(manual.message, /confirm the timing with you/); assert.doesNotMatch(manual.message, /30–60|24 hours|original GCash/);
+  const unpaid = notificationCopy({ ...booking, closureRefund: { amount: 0 } }, 'refund_processing');
+  assert.equal(unpaid.title, 'Reservation cancelled'); assert.doesNotMatch(unpaid.message, /30–60|24 hours/);
 });
 
 test('Xendit refund sends pesos, original payment request and the stable idempotency key', async () => {

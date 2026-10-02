@@ -26,7 +26,7 @@ const {
 const { logAudit } = require("../utils/auditLog");
 const { bookingActionLimiter } = require("../middleware/rateLimiter");
 const { CLOSABLE_STATUSES, AUTOMATIC_REFUND_STATUSES, isClosurePending, isBookingCustomer } = require("../utils/closurePolicy");
-const { queueClosureRefund, processClosureRefund, completeManualClosureRefund } = require("../utils/closureRefunds");
+const { queueClosureRefund, processClosureRefund, retryUnsubmittedClosureRefund, completeManualClosureRefund } = require("../utils/closureRefunds");
 const { notifyReservation, deliverNotificationEmails } = require("../utils/reservationNotifications");
 const { validDateKey } = require("../utils/businessDate");
 const AppError = require("../utils/appError");
@@ -389,6 +389,17 @@ router.put("/:id/closure-refund/check", requirePermission(PERMISSIONS.BOOKING_MA
   await processClosureRefund(booking._id, { force: true });
   await deliverNotificationEmails({ limit: 5 });
   res.json(await Booking.findById(booking._id));
+});
+
+router.put("/:id/closure-refund/retry", requirePermission(PERMISSIONS.BOOKING_MANAGE), bookingActionLimiter, validate(bookingIdParamsSchema, "params"), validate(emptyBodySchema), async (req, res) => {
+  try {
+    const booking = await retryUnsubmittedClosureRefund(req.params.id);
+    await logAudit({ category: "Booking", action: "updated", description: `Retried an unsubmitted closure refund for ${booking.reservationCode}`, user: req.user });
+    await deliverNotificationEmails({ limit: 5 });
+    res.json(booking);
+  } catch (error) {
+    res.status(error.status || 500).json({ message: error.status ? error.message : "Could not retry the refund. Check the current refund status before trying again." });
+  }
 });
 
 router.put("/:id/cancellation-request", ensureAuthenticated, bookingActionLimiter, validate(bookingIdParamsSchema, "params"), validate(cancellationRequestSchema), async (req, res) => {

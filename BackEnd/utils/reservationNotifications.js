@@ -3,7 +3,7 @@ const Booking = require("../model/booking");
 const User = require("../model/user");
 const { EMAIL_RE } = require("./constants");
 const { sendNotificationEmail } = require("./mailer");
-const { refundTiming, outstandingClosureRefund } = require("./closurePolicy");
+const { refundTiming, outstandingClosureRefund, REFUND_PROCESSING_ESTIMATE } = require("./closurePolicy");
 
 async function customerForBooking(booking, session) {
   const candidateId = booking.venueClosure?.customerUserId || (booking.source === "walk-in" ? null : booking.bookedBy);
@@ -33,6 +33,15 @@ function notificationCopy(booking, type) {
     : refundTiming(booking.paymentMethod);
   const amount = Number(booking.closureRefund?.amount || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 });
   const processed = Number(booking.closureRefund?.processedAmount || 0);
+  const gatewayAmount = Math.min(Number(booking.closureRefund?.amount || 0), Math.max(0, Number(booking.downPayment ?? booking.closureRefund?.amount ?? 0) - Number(booking.closureRefund?.baseRefundedAmount || 0)));
+  const manualRemainder = Number(booking.closureRefund?.amount || 0) - gatewayAmount;
+  const online = ["paymongo", "xendit"].includes(booking.closureRefund?.provider || booking.paymentProvider) && gatewayAmount > 0;
+  const returnRoute = manualRemainder > 0
+    ? `₱${gatewayAmount.toLocaleString("en-PH", { minimumFractionDigits: 2 })} will be returned through your original ${booking.paymentMethod || "online payment"} method. The venue will arrange the remaining ₱${manualRemainder.toLocaleString("en-PH", { minimumFractionDigits: 2 })} paid separately and confirm its return timing with you.`
+    : `Your online payment will be returned to your original ${booking.paymentMethod || "payment"} method.`;
+  const requestedMessage = online
+    ? `We received your request for a full ₱${amount} refund. ${returnRoute}\n\n${REFUND_PROCESSING_ESTIMATE}${manualRemainder > 0 ? " This applies to the online portion." : ""} We’ll notify you again by email and in your notification bell when the full refund is processed.\n\n${timing} This is separate from the processing estimate above.`
+    : `We received your request for a full ₱${amount} refund. The venue will arrange the return of your cash or manually recorded payment and confirm the timing with you. You do not need to submit another request. We’ll notify you by email and in your notification bell after the payment is returned.`;
   const completedMessage = processed > 0
     ? processed < Number(booking.closureRefund?.amount) ? `₱${processed.toLocaleString("en-PH")} was sent through your original online payment method; staff recorded the remaining payment as returned. ${timing}` : `The payment was sent back through your original payment method. ${timing}`
     : "Staff has recorded the payment as returned.";
@@ -43,7 +52,7 @@ function notificationCopy(booking, type) {
     },
     rescheduled: { title: "Reservation rescheduled", message: `${code} is now booked for ${booking.date} at ${booking.timeIn}. This venue closure change did not use your usual reschedule allowance.` },
     reopened: { title: "Venue date reopened", message: `The closure affecting ${code} has been removed. Your original reservation on ${booking.date} at ${booking.timeIn} remains confirmed.` },
-    refund_processing: { title: Number(booking.closureRefund?.amount) > 0 ? "Refund requested" : "Reservation cancelled", message: `Your closure-affected reservation ${code} has been cancelled.${Number(booking.closureRefund?.amount) > 0 ? ` We are processing your full ₱${amount} refund. Online payments return to the original payment method; cash and manual payments are returned by staff. We'll notify you again after processing. ${timing}` : " There is no payment to refund."}` },
+    refund_processing: { title: Number(booking.closureRefund?.amount) > 0 ? "Refund requested" : "Reservation cancelled", message: `Your reservation ${code} has been cancelled because of the venue closure.${Number(booking.closureRefund?.amount) > 0 ? `\n\n${requestedMessage}` : " There is no payment to refund."}` },
     refund_completed: { title: "Refund processed", message: `The full ₱${amount} refund for ${code} has been processed. ${completedMessage}` },
     refund_attention: { title: "Refund needs staff assistance", message: `Your reservation ${code} is cancelled and remains eligible for a full refund. ${Number(booking.closureRefund?.processedAmount) > 0 ? `₱${Number(booking.closureRefund.processedAmount).toLocaleString("en-PH")} has been processed online. ` : ""}Staff needs to arrange or verify the remaining refund. You do not need to submit another refund request.` },
   };

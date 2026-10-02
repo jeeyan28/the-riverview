@@ -118,25 +118,22 @@ function isFullPayment(b) {
   return Number(b?.amount || 0) > 0 && netCollected(b) >= Number(b.amount);
 }
 
-function paymentPlanLabel(b) {
+function paymentStage(b) {
   const paid = netCollected(b);
-  const refunded = Number(b?.refundedAmount) || 0;
-  const cancellation = cancellationAmounts(b);
-  if (reservationPresentation(b).status === 'No Show') return paid > 0
-    ? `${formatPeso(paid)} paid${Number(b?.venueDiscountRefunded) > 0 ? ` · ${formatPeso(b.venueDiscountRefunded)} room discount settled` : ''}`
-    : 'No payment';
-  if (b?.status === 'Cancelled' && b?.cancellationStatus === 'Approved' && cancellation.customerCancelled && cancellation.refundRemaining > 0) {
-    return `${isFullPayment(b) ? 'Paid ' : ''}${formatPeso(paid)} retained · ${formatPeso(cancellation.refundRemaining)} refund to arrange`;
-  }
-  if (refunded > 0) return `${formatPeso(refunded)} refunded · ${isFullPayment(b) ? 'Paid ' : ''}${formatPeso(paid)} retained`;
-  if (['Cancelled', 'Rejected'].includes(reservationPresentation(b).status)) return paid > 0 ? `${isFullPayment(b) ? 'Paid ' : ''}${formatPeso(paid)} retained` : 'No payment retained';
-  if (isFullPayment(b)) return b?.paymentChoice === 'deposit' && Number(b?.duration) === 1 ? `1-hour payment ${formatPeso(paid)}` : `Paid ${formatPeso(paid)}`;
-  if (paid > 0) return `${formatPeso(paid)} paid`;
-  return 'No payment';
+  if (paid <= 0) return 'Unpaid';
+  return isFullPayment(b) ? 'Full' : 'Partially';
 }
 
-function paymentPlanPillClass(b) {
-  return isFullPayment(b) ? 'pill-active' : 'pill-pending';
+function reservationSourceLabel(b) {
+  if (b?.source === 'walk-in') return 'Walk-in / Manual';
+  if (b?.source === 'online') return 'Online';
+  return 'Not recorded';
+}
+
+function reservationSourceNote(b) {
+  if (b?.source === 'walk-in') return 'Entered by staff';
+  if (b?.source === 'online') return 'Booked online';
+  return '';
 }
 
 function initials(name) {
@@ -455,6 +452,18 @@ function Bookings() {
       ),
     },
     {
+      key: 'source',
+      label: 'Reservation Type',
+      sortable: true,
+      sortValue: (b) => reservationSourceLabel(b),
+      render: (b) => (
+        <div className="bk-facility">
+          <span>{reservationSourceLabel(b)}</span>
+          {reservationSourceNote(b) && <span className="bk-facility-room">{reservationSourceNote(b)}</span>}
+        </div>
+      ),
+    },
+    {
       key: 'date',
       label: 'Schedule',
       sortable: true,
@@ -467,26 +476,32 @@ function Bookings() {
     },
     {
       key: 'paymentStatus',
-      label: 'Payment',
+      label: 'Amount Paid',
       sortable: true,
-      sortValue: (b) => recordedPayment(b),
-      render: (b) =>
-        b.paymentScreenshot ? (
+      sortValue: (b) => netCollected(b),
+      render: (b) => {
+        const cell = (
+          <span className="bk-paid">
+            <span className="bk-paid-amount">{formatPeso(netCollected(b))}</span>
+            <span className="bk-paid-stage">{paymentStage(b)}</span>
+          </span>
+        );
+        if (!b.paymentScreenshot) return cell;
+        return (
           <button
             type="button"
-            className={`pill bk-payment-pill ${paymentPlanPillClass(b)}`}
+            className="bk-paid-btn"
             title="Click to view screenshot"
             onClick={() => setProofId(b._id)}
           >
-            {paymentPlanLabel(b)}
+            {cell}
           </button>
-        ) : (
-          <span className={`pill bk-payment-pill ${paymentPlanPillClass(b)}`}>{paymentPlanLabel(b)}</span>
-        ),
+        );
+      },
     },
     {
       key: 'balance',
-      label: 'Balance',
+      label: 'Remaining',
       sortable: true,
       sortValue: (b) => outstandingBalance(b),
       render: (b) => <span className="bk-balance">{formatPeso(outstandingBalance(b))}</span>,
@@ -701,8 +716,8 @@ function Bookings() {
                     {detailBooking.paymentChoice === 'deposit' && !detailBooking.venueDiscountApplied && Number(detailBooking.eligibleDiscount) > 0 && <div className="bd-field"><label>{Number(detailBooking.duration) === 1 ? 'Discount to return at venue' : 'Discount to deduct at venue'}</label><p>{formatPeso(detailBooking.eligibleDiscount)}</p></div>}
                     {Number(detailBooking.venueDiscountRefunded) > 0 && <div className="bd-field"><label>Room discount returned to guest</label><p>{formatPeso(detailBooking.venueDiscountRefunded)}</p></div>}
                     <div className="bd-field bd-field--total"><label>Total charge</label><p>{formatPeso(detailBooking.amount)}</p></div>
-                    <div className="bd-field"><label>Payment received</label><p>{formatPeso(netCollected(detailBooking))}</p></div>
-                    <div className="bd-field"><label>Balance remaining</label><p>{formatPeso(outstandingBalance(detailBooking))}</p></div>
+                    <div className="bd-field"><label>Amount paid</label><p>{formatPeso(netCollected(detailBooking))}</p></div>
+                    <div className="bd-field"><label>Remaining</label><p>{formatPeso(outstandingBalance(detailBooking))}</p></div>
                   </div>
                 </div>
               </div>
