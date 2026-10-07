@@ -27,7 +27,7 @@
     "mongoose": "^9.7.3",
     "multer": "^2.4.0",
     "nodemailer": "^10.0.14",
-    "simple-statistics": "^7.9.3"
+    "simple-statistics": "^7.12.1"
   },
   "overrides": {
     "exceljs": {
