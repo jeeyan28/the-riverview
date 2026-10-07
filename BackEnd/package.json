@@ -24,7 +24,7 @@
     "google-auth-library": "^10.9.0",
     "helmet": "^8.2.0",
     "joi": "^18.2.9",
-    "mongoose": "^9.7.3",
+    "mongoose": "^9.10.4",
     "multer": "^2.4.0",
     "nodemailer": "^10.0.14",
     "simple-statistics": "^7.9.3"
