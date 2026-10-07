@@ -1,7 +1,7 @@
 version: 2
 updates:
   - package-ecosystem: "npm"
-    directory: "/BackEnd"
+    directory: "/backend"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 10
@@ -12,7 +12,7 @@ updates:
       interval: "weekly"
 
   - package-ecosystem: "npm"
-    directory: "/FrontEnd"
+    directory: "/frontend"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 10

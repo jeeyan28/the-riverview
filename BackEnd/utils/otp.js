@@ -1,10 +1,6 @@
 const crypto = require("crypto");
 
-// ── Centralized OTP configuration, shared by Forgot Password, Registration,
-// and the Part 8 unverified-login flow. Change a value here and it applies
-// everywhere (backend). Frontend/src/utils/otp.js mirrors the display-facing
-// subset of these and must be kept in sync manually — there's no shared
-// package to import across BackEnd/Frontend.
+// OTP constants mirror frontend/src/utils/otp.js.
 const OTP_LENGTH = 6;
 const OTP_TTL_MS = 5 * 60 * 1000;              // how long a generated OTP stays valid
 const RESEND_COOLDOWN_MS = 60 * 1000;           // "Resend Code" cooldown

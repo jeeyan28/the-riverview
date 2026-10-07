@@ -1,10 +1,4 @@
-// Shared password policy for every password-entry flow (Registration,
-// Forgot/Reset Password). Single source of truth so client-side validation
-// and the requirements checklist UI can never drift out of sync with each
-// other. Must match the password validation in BackEnd/routes/auth.js.
-//
-// Each rule is checked independently and its `label` is shown as-is
-// whenever `test` fails, so multiple messages can be visible at once.
+// Password rules mirror backend/routes/auth.js.
 export const PASSWORD_REQUIREMENTS = [
   { key: 'length', label: 'Password must be at least 8 characters.', test: (p) => p.length >= 8 },
   { key: 'upper', label: 'Password must contain at least one uppercase letter.', test: (p) => /[A-Z]/.test(p) },

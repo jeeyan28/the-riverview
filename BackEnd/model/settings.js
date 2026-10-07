@@ -55,11 +55,7 @@ const emergencyContactSchema = new mongoose.Schema({
   details: { type: String, default: "", trim: true, maxlength: 180 },
 }, { timestamps: true });
 
-// Customer-facing Terms of Service text, editable from admin Settings >
-// Terms & Services. Shape mirrors `TERMS_CONTENT` in
-// FrontEnd/src/data/legalContent.js so the public /terms page and the
-// sign-up agreement modal can render it with no transformation. When `en`
-// has no sections the frontend falls back to the built-in default copy.
+// Editable terms match frontend/src/data/legalContent.js.
 const termsSectionSchema = new mongoose.Schema({
   heading:    { type: String, required: true, trim: true },
   paragraphs: { type: [String], default: [] },

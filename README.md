@@ -6,8 +6,8 @@ A reservation and venue management system for The Riverview's KTV rooms, billiar
 
 | Directory | Purpose |
 | --- | --- |
-| `FrontEnd/` | React 18, React Router, and Vite; customer pages and the admin interface |
-| `BackEnd/` | Express 5 API, Mongoose models, authentication, payment integrations, and reservation jobs |
+| `frontend/` | React 18, React Router, and Vite; customer pages and the admin interface |
+| `backend/` | Express 5 API, Mongoose models, authentication, payment integrations, and reservation jobs |
 | `.github/` | Continuous integration and Dependabot for both packages and GitHub Actions |
 
 The API uses MongoDB for application data and sessions, Cloudinary for uploaded images, Gmail SMTP for email, PayMongo for primary online payments, and Xendit as an optional fallback. Reports export to Excel through ExcelJS. Booking dates and schedules use the Asia/Manila business timezone.
@@ -16,13 +16,13 @@ The API uses MongoDB for application data and sessions, Cloudinary for uploaded 
 
 | Module | Responsibility |
 | --- | --- |
-| `FrontEnd/src/services/api.js` | Shared JSON requests, typed errors, cancellation, and file downloads; requests default to 30 seconds and downloads to 60 seconds |
-| `FrontEnd/src/services/auth.js` | Authentication and password-recovery endpoints and required response fields |
-| `FrontEnd/src/context/AuthContext.jsx` | Cached identity, session refresh, login/logout, and protection against outdated responses; the API remains the authority for access |
-| `BackEnd/utils/http.js` | Shared payment-provider JSON transport, with a 15-second deadline covering headers and the response body |
-| `BackEnd/utils/reservationJobs.js` | Reservation job ordering, independent failure handling, and shared execution for concurrent calls within a process |
-| `BackEnd/utils/reservationScheduler.js` | Minute scheduling and stopping active work; the authenticated HTTP trigger stays in `routes/reservationJobsRoutes.js` |
-| `BackEnd/scripts/checkSyntax.js` | Active maintenance command used locally and by CI to check all backend JavaScript without starting the API |
+| `frontend/src/services/api.js` | Shared JSON requests, typed errors, cancellation, and file downloads; requests default to 30 seconds and downloads to 60 seconds |
+| `frontend/src/services/auth.js` | Authentication and password-recovery endpoints and required response fields |
+| `frontend/src/context/AuthContext.jsx` | Cached identity, session refresh, login/logout, and protection against outdated responses; the API remains the authority for access |
+| `backend/utils/http.js` | Shared payment-provider JSON transport, with a 15-second deadline covering headers and the response body |
+| `backend/utils/reservationJobs.js` | Reservation job ordering, independent failure handling, and shared execution for concurrent calls within a process |
+| `backend/utils/reservationScheduler.js` | Minute scheduling and stopping active work; the authenticated HTTP trigger stays in `routes/reservationJobsRoutes.js` |
+| `backend/scripts/checkSyntax.js` | Active maintenance command used locally and by CI to check all backend JavaScript without starting the API |
 
 Add application requests through the shared service layer so credentials, deadlines, validation errors, and cancellation behave consistently. Payment-provider writes are not automatically retried after ambiguous failures; safe PayMongo reads can retry once. Verify payment status before repeating a payment action.
 
@@ -33,18 +33,18 @@ You need Node.js **22.12 or newer**, npm, and MongoDB configured as a **replica 
 From the repository root:
 
 ```powershell
-npm ci --prefix BackEnd
-npm ci --prefix FrontEnd
+npm ci --prefix backend
+npm ci --prefix frontend
 ```
 
 For a new checkout, copy the environment templates. Keep any existing `.env` files instead of replacing them:
 
 ```powershell
-if (!(Test-Path BackEnd/.env)) { Copy-Item BackEnd/.env.example BackEnd/.env }
-if (!(Test-Path FrontEnd/.env)) { Copy-Item FrontEnd/.env.example FrontEnd/.env }
+if (!(Test-Path backend/.env)) { Copy-Item backend/.env.example backend/.env }
+if (!(Test-Path frontend/.env)) { Copy-Item frontend/.env.example frontend/.env }
 ```
 
-Edit `BackEnd/.env`, setting `MONGO_URI` and `SESSION_SECRET`. Generate a session secret with:
+Edit `backend/.env`, setting `MONGO_URI` and `SESSION_SECRET`. Generate a session secret with:
 
 ```powershell
 node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"
@@ -55,11 +55,11 @@ Configure Gmail before using email registration or password recovery. Configure 
 Start the API and frontend in separate terminals:
 
 ```powershell
-npm start --prefix BackEnd
+npm start --prefix backend
 ```
 
 ```powershell
-npm run dev --prefix FrontEnd
+npm run dev --prefix frontend
 ```
 
 Open [http://localhost:5501](http://localhost:5501). The frontend proxies `/api` requests to port `3000`. [http://localhost:3000](http://localhost:3000) returns the API and database status.
@@ -67,11 +67,11 @@ Open [http://localhost:5501](http://localhost:5501). The frontend proxies `/api`
 To preview a production frontend build, keep the backend running, stop the frontend dev server, and run:
 
 ```powershell
-npm run build --prefix FrontEnd
-npm run preview --prefix FrontEnd
+npm run build --prefix frontend
+npm run preview --prefix frontend
 ```
 
-Preview also uses port `5501` and the local API proxy. If you change the backend port, update both proxy targets in `FrontEnd/vite.config.js`.
+Preview also uses port `5501` and the local API proxy. If you change the backend port, update both proxy targets in `frontend/vite.config.js`.
 
 ## Environment configuration
 
@@ -138,12 +138,14 @@ The repository includes configuration for **two Vercel projects**:
 
 | Project | Root directory | Configuration |
 | --- | --- | --- |
-| API | `BackEnd` | `BackEnd/vercel.json` builds and routes requests to `server.js` |
-| Frontend | `FrontEnd` | Vite build, `dist` output, API rewrite, and SPA fallback |
+| API | `backend` | `backend/vercel.json` builds and routes requests to `server.js` |
+| Frontend | `frontend` | Vite build, `dist` output, API rewrite, and SPA fallback |
+
+For existing Vercel projects, update their Root Directory settings to `backend` and `frontend` before deploying the renamed folders.
 
 Set backend environment variables on the API project and public frontend variables on the frontend project. Set `NODE_ENV=production`, HTTPS frontend origins, and explicit payment return URLs. Use a MongoDB account limited to this application's database and configure network access for the deployment.
 
-`FrontEnd/vercel.json` currently rewrites `/api` to `https://the-riverview-ejap.vercel.app`. Change that destination if your backend hostname differs. Keep the API rewrite above the SPA fallback.
+`frontend/vercel.json` currently rewrites `/api` to `https://the-riverview-ejap.vercel.app`. Change that destination if your backend hostname differs. Keep the API rewrite above the SPA fallback.
 
 Keep browser API requests on the frontend origin through this rewrite. The session cookie is HTTP-only, uses `SameSite=Lax`, and is secure in production; calling an unrelated backend domain directly can prevent cookies from working.
 
@@ -177,10 +179,10 @@ Before accepting live bookings, verify registration and recovery email, image up
 ## Maintenance and validation
 
 ```powershell
-npm run check --prefix BackEnd
-npm run build --prefix FrontEnd
-npm audit --prefix BackEnd
-npm audit --prefix FrontEnd
+npm run check --prefix backend
+npm run build --prefix frontend
+npm audit --prefix backend
+npm audit --prefix frontend
 ```
 
 The GitHub workflow runs clean dependency installs, backend syntax checks, the production frontend build, and dependency audits on Node 22 and 24 for pushes and pull requests. Audit gates reject moderate or higher advisories. It uses a read-only repository token and requires no application secrets. The same build, syntax, and audit commands passed locally; remote workflow runs will occur after these changes are pushed.

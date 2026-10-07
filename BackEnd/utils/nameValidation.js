@@ -1,6 +1,4 @@
-// Shared name policy, reused for both First Name and Last Name (identical
-// rules for each — see FEATURE_REQUESTS.md). Mirrors
-// Frontend/src/utils/name.js — keep both in sync.
+// Keep name rules aligned with frontend/src/utils/name.js.
 
 const NAME_PATTERN = /^[A-Za-z\s'.-]+$/;
 const HAS_LETTER = /[A-Za-z]/;

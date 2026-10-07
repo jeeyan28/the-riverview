@@ -1,6 +1,4 @@
-// Shared name policy, reused for both First Name and Last Name (identical
-// rules for each — see FEATURE_REQUESTS.md). Mirrors
-// BackEnd/utils/nameValidation.js — keep both in sync.
+// Keep name rules aligned with backend/utils/nameValidation.js.
 
 const NAME_PATTERN = /^[A-Za-z\s'.-]+$/;
 const HAS_LETTER = /[A-Za-z]/;
@@ -24,4 +22,4 @@ export function validateName(name, label = 'Name') {
   }
   if (!HAS_LETTER.test(normalized)) return `${label} must contain at least one letter.`;
   return '';
-} 
+}

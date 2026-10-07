@@ -30,17 +30,17 @@ jobs:
           node-version: ${{ matrix.node }}
           cache: npm
           cache-dependency-path: |
-            BackEnd/package-lock.json
-            FrontEnd/package-lock.json
+            backend/package-lock.json
+            frontend/package-lock.json
       - name: Install backend dependencies
-        run: npm ci --prefix BackEnd
+        run: npm ci --prefix backend
       - name: Install frontend dependencies
-        run: npm ci --prefix FrontEnd
+        run: npm ci --prefix frontend
       - name: Check backend syntax
-        run: npm run check --prefix BackEnd
+        run: npm run check --prefix backend
       - name: Build frontend
-        run: npm run build --prefix FrontEnd
+        run: npm run build --prefix frontend
       - name: Audit dependencies
         run: |
-          npm audit --prefix BackEnd --audit-level=moderate
-          npm audit --prefix FrontEnd --audit-level=moderate
+          npm audit --prefix backend --audit-level=moderate
+          npm audit --prefix frontend --audit-level=moderate
