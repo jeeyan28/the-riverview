@@ -5,6 +5,8 @@ import { useAuth } from '../context/AuthContext';
 import ThemeToggle from './ThemeToggle';
 import AnnouncementsBell from './AnnouncementsBell';
 import LogoutConfirmDialog from './LogoutConfirmDialog';
+import Toast from './Toast';
+import { useToast } from '../hooks/useToast';
 import { buildLoginPath } from '../utils/auth';
 
 function Navbar({
@@ -20,6 +22,9 @@ function Navbar({
 }) {
   const [chipMenuOpen, setChipMenuOpen] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [logoutPending, setLogoutPending] = useState(false);
+  const logoutInFlight = useRef(false);
+  const { toast, showToast } = useToast();
   const chipRef = useRef(null);
   const menuRef = useRef(null);
   const menuButtonRef = useRef(null);
@@ -76,9 +81,19 @@ function Navbar({
   }
 
   async function confirmLogout() {
-    setShowLogoutConfirm(false);
-    await logout();
-    navigate('/');
+    if (logoutInFlight.current) return;
+    logoutInFlight.current = true;
+    setLogoutPending(true);
+    try {
+      await logout();
+      setShowLogoutConfirm(false);
+      navigate('/');
+    } catch (error) {
+      showToast(error.message, 'error');
+    } finally {
+      logoutInFlight.current = false;
+      setLogoutPending(false);
+    }
   }
 
   useEffect(() => {
@@ -296,9 +311,11 @@ function Navbar({
 
       <LogoutConfirmDialog
         open={showLogoutConfirm}
+        pending={logoutPending}
         onConfirm={confirmLogout}
-        onCancel={() => setShowLogoutConfirm(false)}
+        onCancel={() => { if (!logoutInFlight.current) setShowLogoutConfirm(false); }}
       />
+      <Toast {...toast} />
     </>
   );
 }

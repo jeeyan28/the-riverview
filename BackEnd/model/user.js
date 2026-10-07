@@ -1,5 +1,6 @@
 ﻿const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
+const { randomBytes } = require("node:crypto");
 const { LOGIN_LOCKOUT_MAX_ATTEMPTS, LOGIN_LOCKOUT_DURATION_MS } = require("../utils/constants");
 
 const ROLES = ["user", "staff", "manager", "super_admin"];
@@ -10,6 +11,7 @@ const userSchema = new mongoose.Schema({
   phone:     { type: String, default: "" },
   email:     { type: String, required: true, unique: true, lowercase: true },
   password: { type: String, select: false },
+  sessionVersion: { type: String, default: "" },
   role:      { type: String, enum: ROLES, default: "user" },
 
   googleId:  { type: String, index: true, sparse: true },
@@ -44,8 +46,14 @@ userSchema.virtual("isLocked").get(function () {
 });
 
 userSchema.pre("save", async function () {
+  if (["password", "role", "isActive"].some(field => this.isModified(field))) {
+    this.sessionVersion = randomBytes(16).toString("hex");
+  }
   if (!this.isModified("password") || !this.password) return;
-  if (this.$locals.skipPasswordHash) return;
+  if (this.$locals.skipPasswordHash) {
+    delete this.$locals.skipPasswordHash;
+    return;
+  }
   this.password = await bcrypt.hash(this.password, SALT_ROUNDS);
 });
 

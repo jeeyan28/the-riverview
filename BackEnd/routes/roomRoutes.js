@@ -42,7 +42,7 @@ function parseRoomBody(req, res, next) {
     };
     next();
   } catch (err) {
-    res.status(err.status || 400).json({ message: err.message || "Invalid room data." });
+    res.status(err.status || 400).json({ message: AppError.publicMessage(err, "Invalid room data.") });
   }
 }
 
@@ -124,7 +124,7 @@ router.post("/", requirePermission(PERMISSIONS.ROOM_MANAGE), roomUploads, parseR
     res.status(201).json(room);
   } catch (err) {
     console.error(err);
-    res.status(err.status || 500).json({ message: err.message || "Server error." });
+    res.status(err.status || 500).json({ message: AppError.publicMessage(err, "Server error.") });
   }
 });
 
@@ -144,7 +144,7 @@ router.put("/:id", requirePermission(PERMISSIONS.ROOM_MANAGE), roomUploads, pars
     res.json(room);
   } catch (err) {
     console.error(err);
-    res.status(err.status || 500).json({ message: err.message || "Server error." });
+    res.status(err.status || 500).json({ message: AppError.publicMessage(err, "Server error.") });
   }
 });
 

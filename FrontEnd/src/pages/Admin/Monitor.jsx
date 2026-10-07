@@ -1082,7 +1082,7 @@ function loadPresets(key, seed = []) {
 }
 
 function savePresets(key, options) {
-  localStorage.setItem(key, JSON.stringify(options));
+  try { localStorage.setItem(key, JSON.stringify(options)); } catch {}
 }
 
 function PresetDropdown({ label, value, options, onSelect, onAdd, onDelete, placeholder }) {

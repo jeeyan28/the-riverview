@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { facilityImage } from '../utils/facilityImage';
 import RoomOptionCard from './RoomOptionCard';
 import { bookingsService } from '../services/bookings';
+import { paymentsService } from '../services/payments';
 import { useCountdownClock } from '../hooks/useCountdownClock';
 import { useToast } from '../hooks/useToast';
 import { formatHour, openBookingReceipt } from '../utils/receipt';
@@ -26,7 +27,6 @@ import {
   getTimePeriod,
 } from '../utils/rooms';
 import { calculateBookingPrice, effectiveDiscountPercent, variantRateLabel } from '../utils/roomPricing';
-import { API_BASE_URL } from '../services/api';
 import { terminalPaymentFailure } from '../utils/paymongoStatus';
 import { ArrowLeft, X } from 'lucide-react';
 import ModalPortal from './ModalPortal';
@@ -34,8 +34,6 @@ import Toast from './Toast';
 import { buildLoginPath, buildRoomReservationPath } from '../utils/auth';
 import { businessDate } from '../utils/businessDate';
 import { slotBookingFields, slotStartMs } from '../utils/bookingHours';
-
-const PAYMONGO_API_BASE = import.meta.env.VITE_PAYMONGO_API_BASE || 'https://api.paymongo.com/v1';
 
 const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -408,7 +406,7 @@ function BookingSuccess({ booking, room, selectedVariant, onDone }) {
 
 function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, closeHour, settings, initialVariantLabel = '' }) {
   const open = !!room || !!returnInfo;
-  const { user: authUser, revalidate, logout } = useAuth();
+  const { user: authUser, revalidate, invalidateSession } = useAuth();
   const { toast, showToast } = useToast();
 
   const [monthBookings, setMonthBookings] = useState({});
@@ -459,6 +457,9 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
   const [cardExpiry, setCardExpiry] = useState('');
   const [cardCvc, setCardCvc] = useState('');
   const pollRef = useRef(null);
+  const pollRequestRef = useRef(null);
+  const paymentInitRef = useRef(null);
+  const paymentActionRef = useRef(null);
   const externalCheckoutRef = useRef(false);
 
   const [pmReturn, setPmReturn] = useState({ phase: 'loading', booking: null });
@@ -534,7 +535,9 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
     setCardCvc('');
     setPayError('');
     setPayErrorKind(null);
+    setPayLoading(false);
     stopPolling();
+    stopPaymentAction();
     releaseCurrentLock();
     setLockError('');
 
@@ -563,6 +566,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
   useEffect(() => {
     if (!returnInfo) return;
     let cancelled = false;
+    const controller = new AbortController();
     setStep('paymongoReturn');
     setPmReturn({ phase: 'loading', booking: null });
 
@@ -584,24 +588,18 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
       for (let attempt = 0; attempt < maxAttempts; attempt++) {
         if (cancelled) return;
         try {
-          const res = await fetch(
-            returnInfo.provider === 'xendit'
-              ? `${API_BASE_URL}/api/payments/xendit/status/${encodeURIComponent(returnInfo.referenceId)}`
-              : `${API_BASE_URL}/api/payments/paymongo/status/${encodeURIComponent(returnInfo.paymentIntentId)}`,
-            { credentials: 'include' }
+          const { data, httpStatus } = await paymentsService.status(
+            returnInfo.provider === 'xendit' ? returnInfo.referenceId : returnInfo.paymentIntentId,
+            { provider: returnInfo.provider, signal: controller.signal },
           );
-          const data = await res.json().catch(() => ({}));
-          if (res.status === 401 || res.status === 403) {
-            if (!cancelled) setPmReturn({ phase: 'needLogin', booking: null });
-            return;
-          }
+          if (cancelled) return;
           awaitingMethodChecks = data.status === 'awaiting_payment_method' ? awaitingMethodChecks + 1 : 0;
-          const paymentFailure = terminalPaymentFailure(data, { httpStatus: res.status, awaitingMethodChecks });
+          const paymentFailure = terminalPaymentFailure(data, { httpStatus, awaitingMethodChecks });
           if (paymentFailure) {
             if (!cancelled) setPmReturn({ ...paymentFailure, booking: null });
             return;
           }
-          if (res.status === 409 && data.status === 'paid_slot_unavailable') {
+          if (httpStatus === 409 && data.status === 'paid_slot_unavailable') {
             if (!cancelled) {
               setPmReturn({
                 phase: 'paidSlotUnavailable',
@@ -611,12 +609,18 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
             }
             return;
           }
-          if (res.ok && ['Paid', 'Partial'].includes(data.paymentStatus) && data.bookingId) {
-            const booking = await fetchPaidBooking(data.bookingId);
+          if (httpStatus === 200 && ['Paid', 'Partial'].includes(data.paymentStatus) && data.bookingId) {
+            const booking = await fetchPaidBooking(data.bookingId, { signal: controller.signal });
             if (!cancelled) setPmReturn({ phase: 'confirmed', booking });
             return;
           }
         } catch (err) {
+          if (cancelled) return;
+          if ([401, 403].includes(err.status)) {
+            if (err.status === 401) invalidateSession();
+            setPmReturn({ phase: 'needLogin', booking: null });
+            return;
+          }
           console.error(err);
         }
         await new Promise((r) => setTimeout(r, 2000));
@@ -627,8 +631,9 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
     resolve();
     return () => {
       cancelled = true;
+      controller.abort();
     };
-  }, [returnInfo]);
+  }, [returnInfo, invalidateSession]);
 
   useEffect(() => {
     document.body.style.overflow = open ? 'hidden' : '';
@@ -705,6 +710,9 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
   useEffect(() => {
     if (step !== 'payment' || !room || !selectedVariant || !selectedDate || selectedHour === null) return;
     let cancelled = false;
+    const controller = new AbortController();
+    paymentInitRef.current = controller;
+    const isCurrent = () => !cancelled && !controller.signal.aborted && paymentInitRef.current === controller;
 
     async function init() {
       setPmIntent(null);
@@ -714,46 +722,38 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
       setPayLoading(true);
       try {
         if (!paymongoPublicKey) {
-          const cfgRes = await fetch(`${API_BASE_URL}/api/payments/paymongo/config`, { credentials: 'include' });
-          const cfg = await cfgRes.json().catch(() => ({}));
-          if (cfgRes.ok && cfg.publicKey && !cancelled) setPaymongoPublicKey(cfg.publicKey);
-          if (cfgRes.ok && Array.isArray(cfg.paymentMethods) && !cancelled) setAllowedPaymentMethodKeys(cfg.paymentMethods);
+          try {
+            const cfg = await paymentsService.config({ signal: controller.signal });
+            if (!isCurrent()) return;
+            if (cfg.publicKey) setPaymongoPublicKey(cfg.publicKey);
+            if (Array.isArray(cfg.paymentMethods)) setAllowedPaymentMethodKeys(cfg.paymentMethods);
+          } catch (err) {
+            if (!isCurrent()) return;
+            console.error(err);
+          }
         }
+        if (!isCurrent()) return;
 
         const { y, m, d } = selectedDate;
         const serviceDate = dateKey(y, m, d);
         const { date: dateStr, timeIn: timeStr } = slotBookingFields(serviceDate, selectedHour);
 
-        const res = await fetch(`${API_BASE_URL}/api/payments/paymongo/intent`, {
-          method: 'POST',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            guestName: guestName.trim(),
-            guestContact: guestContact.trim(),
-            guestEmail: guestEmail.trim(),
-            guestCount: guestCount || 1,
-            specialRequests: guestNote.trim(),
-            roomId: room._id,
-            variantLabel: selectedVariant.label,
-            date: dateStr,
-            timeIn: timeStr,
-            duration: selectedDuration,
-            paymentChoice: selectedDuration === 1 ? 'deposit' : paymentChoice,
-            claimDiscount,
-            selectedAddOns,
-          }),
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) {
-          if (res.status === 401) {
-            await logout();
-            alert('Your session has expired. Please log in again to complete your reservation.');
-            window.location.href = '/login';
-            return;
-          }
-          throw new Error(data.message || 'Could not start online payment.');
-        }
+        const data = await paymentsService.createIntent({
+          guestName: guestName.trim(),
+          guestContact: guestContact.trim(),
+          guestEmail: guestEmail.trim(),
+          guestCount: guestCount || 1,
+          specialRequests: guestNote.trim(),
+          roomId: room._id,
+          variantLabel: selectedVariant.label,
+          date: dateStr,
+          timeIn: timeStr,
+          duration: selectedDuration,
+          paymentChoice: selectedDuration === 1 ? 'deposit' : paymentChoice,
+          claimDiscount,
+          selectedAddOns,
+        }, { signal: controller.signal });
+        if (!isCurrent()) return;
 
         clearReservedHours(room._id, serviceDate);
         clearMonthAvailability(room._id, y, m + 1);
@@ -762,32 +762,41 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
           clearMonthAvailability(room._id, bookingYear, bookingMonth);
         }
 
-        if (!cancelled && data.gateway === 'xendit') {
+        if (data.gateway === 'xendit') {
           externalCheckoutRef.current = true;
           setPmIntent({ gateway: 'xendit', amount: data.amount });
           window.location.assign(data.redirectUrl);
           return;
         }
-        if (!cancelled) setPmIntent({ paymentIntentId: data.paymentIntentId, clientKey: data.clientKey, amount: data.amount });
+        setPmIntent({ paymentIntentId: data.paymentIntentId, clientKey: data.clientKey, amount: data.amount });
       } catch (err) {
-        console.error(err);
-        if (!cancelled) {
+        if (isCurrent()) {
+          if (err.status === 401) {
+            invalidateSession();
+            alert('Your session has expired. Please log in again to complete your reservation.');
+            window.location.href = '/login';
+            return;
+          }
+          console.error(err);
           setPayErrorKind('connectivity');
           setPayError(err.message || "We couldn't reach the payment provider. Please try again.");
         }
       } finally {
-        if (!cancelled) setPayLoading(false);
+        if (isCurrent()) setPayLoading(false);
       }
     }
 
     init();
     return () => {
       cancelled = true;
+      controller.abort();
+      if (paymentInitRef.current === controller) paymentInitRef.current = null;
     };
-  }, [step, room, selectedVariant, selectedDate, selectedHour, selectedDuration, paymentChoice, claimDiscount, selectedAddOns, paymentInitVersion]);
+  }, [step, room, selectedVariant, selectedDate, selectedHour, selectedDuration, paymentChoice, claimDiscount, selectedAddOns, paymentInitVersion, invalidateSession]);
 
   function handleClose() {
     stopPolling();
+    stopPaymentAction();
     releaseCurrentLock();
     onClose();
   }
@@ -944,6 +953,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
   }
 
   function handleBack() {
+    if (paymentActionRef.current) return;
     if (step === 'payment') {
       setStep('details');
       return;
@@ -963,20 +973,35 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
   }
 
   function stopPolling() {
+    pollRequestRef.current?.abort();
+    pollRequestRef.current = null;
     if (pollRef.current) {
       clearTimeout(pollRef.current);
       pollRef.current = null;
     }
   }
 
-  useEffect(() => stopPolling, []);
+  function stopPaymentAction() {
+    paymentInitRef.current?.abort();
+    paymentInitRef.current = null;
+    paymentActionRef.current?.abort();
+    paymentActionRef.current = null;
+  }
 
-  async function fetchPaidBooking(bookingId) {
+  function beginPaymentAction() {
+    if (paymentActionRef.current) return null;
+    const controller = new AbortController();
+    paymentActionRef.current = controller;
+    return controller;
+  }
+
+  useEffect(() => () => { stopPolling(); stopPaymentAction(); }, []);
+
+  async function fetchPaidBooking(bookingId, options) {
     try {
-      const res = await fetch(`${API_BASE_URL}/api/bookings/${encodeURIComponent(bookingId)}`, { credentials: 'include' });
-      if (res.ok) return await res.json();
+      return await bookingsService.get(bookingId, options);
     } catch (err) {
-      console.error(err);
+      if (err.name !== 'AbortError') console.error(err);
     }
     return null;
   }
@@ -994,7 +1019,11 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
     let awaitingMethodChecks = 0;
     let statusFailures = 0;
     stopPolling();
+    const controller = new AbortController();
+    pollRequestRef.current = controller;
+    const isCurrent = () => !controller.signal.aborted && pollRequestRef.current === controller;
     const checkStatus = async () => {
+      if (!isCurrent()) return;
       attempts += 1;
       let paid = false;
       let paidBookingId = null;
@@ -1004,23 +1033,23 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
       let statusChecked = false;
       let authRequired = false;
       try {
-        const res = await fetch(`${API_BASE_URL}/api/payments/paymongo/status/${encodeURIComponent(paymentIntentId)}`, {
-          credentials: 'include',
-        });
-        const data = await res.json().catch(() => ({}));
-        statusChecked = res.ok || [402, 409, 410].includes(res.status);
-        statusFailures = statusChecked ? 0 : statusFailures + 1;
-        authRequired = res.status === 401 || res.status === 403;
+        const { data, httpStatus } = await paymentsService.status(paymentIntentId, { signal: controller.signal });
+        if (!isCurrent()) return;
+        statusChecked = true;
+        statusFailures = 0;
         remoteStatus = data.status || '';
         awaitingMethodChecks = remoteStatus === 'awaiting_payment_method' ? awaitingMethodChecks + 1 : 0;
-        if (res.status === 409 && data.status === 'paid_slot_unavailable') {
+        if (httpStatus === 409 && data.status === 'paid_slot_unavailable') {
           slotUnavailableMsg = data.message || "Your payment succeeded, but this slot was just taken. Please contact support so we can help resolve it.";
         } else {
-          paymentFailure = terminalPaymentFailure(data, { httpStatus: res.status, awaitingMethodChecks });
-          paid = res.ok && ['Paid', 'Partial'].includes(data.paymentStatus);
+          paymentFailure = terminalPaymentFailure(data, { httpStatus, awaitingMethodChecks });
+          paid = httpStatus === 200 && ['Paid', 'Partial'].includes(data.paymentStatus);
           paidBookingId = data.bookingId || null;
         }
       } catch (err) {
+        if (!isCurrent()) return;
+        authRequired = [401, 403].includes(err.status);
+        if (err.status === 401) invalidateSession();
         console.error(err);
         statusFailures += 1;
       }
@@ -1063,10 +1092,11 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
       }
 
       if (paid) {
+        const booking = paidBookingId ? await fetchPaidBooking(paidBookingId, { signal: controller.signal }) : null;
+        if (!isCurrent()) return;
         stopPolling();
         if (popup && !popup.closed) popup.close();
         window.focus();
-        const booking = paidBookingId ? await fetchPaidBooking(paidBookingId) : null;
         setPmReturn({ phase: 'confirmed', booking });
         return;
       }
@@ -1117,39 +1147,18 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
     pollPaymentStatus(paymentIntentId, null);
   }
 
-  async function attachAndHandle(body) {
+  async function attachAndHandle(body, controller = beginPaymentAction()) {
+    if (!controller || controller.signal.aborted) return;
     setPayError('');
     setPayErrorKind(null);
     setPayLoading(true);
     try {
-      const res = await fetch(
-        `${API_BASE_URL}/api/payments/paymongo/intent/${encodeURIComponent(pmIntent.paymentIntentId)}/attach`,
-        {
-          method: 'POST',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body),
-        }
-      );
-      const data = await res.json().catch(() => ({}));
-
-      if (!res.ok && res.status !== 402 && res.status !== 409) {
-        if (res.status === 401) {
-          await logout();
-          alert('Your session has expired. Please log in again to complete your reservation.');
-          window.location.href = '/login';
-          return;
-        }
-        if (res.status === 400 && data.field === 'guestEmail') {
-          setPayErrorKind('declined');
-          setPayError(data.message || 'A valid email is required for wallet payments. Please go back and enter your email.');
-          return;
-        }
-        throw new Error(data.message || 'Payment could not be processed. Please try again.');
-      }
+      const { data, httpStatus } = await paymentsService.attach(pmIntent.paymentIntentId, body, { signal: controller.signal });
+      if (controller.signal.aborted) return;
 
       if (data.status === 'succeeded') {
-        const booking = await fetchPaidBooking(data.bookingId);
+        const booking = await fetchPaidBooking(data.bookingId, { signal: controller.signal });
+        if (controller.signal.aborted) return;
         setStep('paymongoReturn');
         setPmReturn({ phase: 'confirmed', booking });
         return;
@@ -1167,7 +1176,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
         setPayError(data.message || 'Your payment succeeded, but this slot was just taken. Please contact support.');
         return;
       }
-      const paymentFailure = terminalPaymentFailure(data);
+      const paymentFailure = terminalPaymentFailure(data, { httpStatus });
       if (paymentFailure) {
         setPayErrorKind(paymentFailure.phase === 'failed' ? 'declined' : paymentFailure.phase);
         setPayError(paymentFailure.message);
@@ -1176,11 +1185,24 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
       setPayErrorKind('declined');
       setPayError(data.message || 'That payment method was declined. Please try another.');
     } catch (err) {
+      if (controller.signal.aborted) return;
+      if (err.status === 401) {
+        invalidateSession();
+        alert('Your session has expired. Please log in again to complete your reservation.');
+        window.location.href = '/login';
+        return;
+      }
+      if (err.status === 400 && err.field === 'guestEmail') {
+        setPayErrorKind('declined');
+        setPayError(err.message || 'A valid email is required for wallet payments. Please go back and enter your email.');
+        return;
+      }
       console.error(err);
       setPayErrorKind('connectivity');
       setPayError(err.message || "We couldn't reach the payment provider. Please try again.");
     } finally {
-      setPayLoading(false);
+      if (paymentActionRef.current === controller) paymentActionRef.current = null;
+      if (!controller.signal.aborted) setPayLoading(false);
     }
   }
 
@@ -1213,38 +1235,26 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
       setPayError('Payment is still initializing — please wait a moment and try again.');
       return;
     }
+    const controller = beginPaymentAction();
+    if (!controller) return;
 
     setPayError('');
     setPayErrorKind(null);
     setPayLoading(true);
     try {
-      const res = await fetch(`${PAYMONGO_API_BASE}/payment_methods`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Basic ${btoa(`${paymongoPublicKey}:`)}`,
-        },
-        body: JSON.stringify({
-          data: {
-            attributes: {
-              type: 'card',
-              details: { card_number: digits, exp_month: Number(mm), exp_year: Number(yy), cvc: cardCvc },
-              billing: guestName ? { name: guestName.trim() } : undefined,
-            },
-          },
-        }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setPayErrorKind('declined');
-        throw new Error(data?.errors?.[0]?.detail || 'Card could not be verified. Please check the details and try again.');
-      }
-      await attachAndHandle({ paymentMethodId: data.data.id, paymentMethodType: 'card' });
+      const paymentMethodId = await paymentsService.createCardMethod(paymongoPublicKey, {
+        card_number: digits, exp_month: Number(mm), exp_year: Number(yy), cvc: cardCvc,
+      }, guestName, { signal: controller.signal });
+      if (controller.signal.aborted) return;
+      await attachAndHandle({ paymentMethodId, paymentMethodType: 'card' }, controller);
     } catch (err) {
+      if (controller.signal.aborted) return;
       console.error(err);
-      if (!payErrorKind) setPayErrorKind('connectivity');
+      setPayErrorKind(err.status >= 400 && err.status < 500 ? 'declined' : 'connectivity');
       setPayError(err.message || 'Card could not be verified. Please check the details and try again.');
-      setPayLoading(false);
+    } finally {
+      if (paymentActionRef.current === controller) paymentActionRef.current = null;
+      if (!controller.signal.aborted) setPayLoading(false);
     }
   }
 
@@ -1267,6 +1277,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
 
   function handleDone() {
     stopPolling();
+    stopPaymentAction();
     releaseCurrentLock();
     onClose();
   }
@@ -1377,7 +1388,7 @@ function BookingModal({ room, returnInfo, onClose, onViewBooking, openHour, clos
       <div className={`bk-overlay${open ? ' open' : ''}`} id="booking-modal" role="dialog" aria-modal="true" aria-labelledby="booking-modal-title">
         <div className={'bk-modal' + (showSummaryPanel ? '' : ' bk-modal--compact') + (isPaymentReturn ? ' bk-modal--payment-return' : '') + (isConfirmedReturn ? ' bk-modal--payment-confirmed' : '') + (isPaymentReturn && pmReturn.phase === 'loading' ? ' bk-modal--payment-loading' : '')}>
           <div className={`bk-header${isConfirmedReturn ? ' bk-header--success' : ''}`}>
-          {!isConfirmedReturn && <button type="button" className="bk-modal-back" aria-label="Go back" onClick={handleBack}>
+          {!isConfirmedReturn && <button type="button" className="bk-modal-back" aria-label="Go back" onClick={handleBack} disabled={payLoading && Boolean(paymentActionRef.current)}>
             <ArrowLeft size={18} aria-hidden="true" />
             <span>Back</span>
           </button>}

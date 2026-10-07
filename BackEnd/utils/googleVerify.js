@@ -16,14 +16,6 @@ function mapGoogleProfile(payload) {
   };
 }
 
-async function verifyGoogleIdToken(idToken) {
-  const ticket = await client.verifyIdToken({
-    idToken,
-    audience: process.env.GOOGLE_CLIENT_ID,
-  });
-  return mapGoogleProfile(ticket.getPayload());
-}
-
 async function exchangeGoogleAuthCode(code, redirectUri) {
   if (!redirectUri) {
     throw new Error("Google sign-in origin is missing.");
@@ -43,4 +35,4 @@ async function exchangeGoogleAuthCode(code, redirectUri) {
   return mapGoogleProfile(ticket.getPayload());
 }
 
-module.exports = { verifyGoogleIdToken, exchangeGoogleAuthCode };
+module.exports = { exchangeGoogleAuthCode };

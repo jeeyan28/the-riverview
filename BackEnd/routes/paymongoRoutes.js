@@ -1,4 +1,5 @@
 const express = require("express");
+const AppError = require("../utils/appError");
 const { randomUUID } = require("node:crypto");
 const router = express.Router();
 const Booking = require("../model/booking");
@@ -81,13 +82,13 @@ router.post("/intent", ensureAuthenticated, paymentIntentLimiter, validate(creat
     try {
       ({ room, selectedVariant, roomCharge, hourlyRates } = await validateAndPriceBooking({ roomId, variantLabel, date, timeIn, duration, isAdminBooking: false, guestCount, excludeLockUserId: req.user._id }));
     } catch (e) {
-      return res.status(e.status || 500).json({ message: e.message || "Server error." });
+      return res.status(e.status || 500).json({ message: AppError.publicMessage(e, "Server error.") });
     }
     let quote;
     try {
       quote = quoteOnlineBooking({ room, variant: selectedVariant, basePrice: { roomCharge, hourlyRates }, paymentChoice, claimDiscount, selectedAddOns });
     } catch (e) {
-      return res.status(e.status || 400).json({ message: e.message });
+      return res.status(e.status || 400).json({ message: AppError.publicMessage(e) });
     }
     const { amount, downPayment, discountPercent, discountAmount, eligibleDiscount, addOns, addOnFee } = quote;
 
@@ -180,7 +181,7 @@ router.post("/intent/:paymentIntentId/attach", ensureAuthenticated, paymentAttac
     try {
       intent = await retrievePaymentIntent(paymentIntentId);
     } catch (e) {
-      return res.status(e.status || 502).json({ message: e.message || "Could not find this payment. Please try again." });
+      return res.status(e.status || 502).json({ message: AppError.publicMessage(e, "Could not find this payment. Please try again.") });
     }
     const metadata = intent?.data?.attributes?.metadata || {};
     if (String(metadata.bookedBy) !== String(req.user._id)) {
@@ -204,7 +205,7 @@ router.post("/intent/:paymentIntentId/attach", ensureAuthenticated, paymentAttac
           billing: { name: metadata.guestName, email: billingEmail },
         });
       } catch (e) {
-        return res.status(e.status || 502).json({ message: e.message || "Could not start that payment method. Please try again." });
+        return res.status(e.status || 502).json({ message: AppError.publicMessage(e, "Could not start that payment method. Please try again.") });
       }
       methodId = walletMethod.data.id;
     }
@@ -223,7 +224,7 @@ router.post("/intent/:paymentIntentId/attach", ensureAuthenticated, paymentAttac
       if (failure) {
         return res.status(failure.status === "expired" ? 410 : 402).json({ ...failure, paymentStatus: "Unpaid" });
       }
-      return res.status(e.status || 502).json({ message: e.message || "Payment could not be processed. Please try again." });
+      return res.status(e.status || 502).json({ message: AppError.publicMessage(e, "Payment could not be processed. Please try again.") });
     }
 
     const attrs = attachResult.data.attributes;
@@ -245,7 +246,7 @@ router.post("/intent/:paymentIntentId/attach", ensureAuthenticated, paymentAttac
       } catch (e) {
         if (e.slotUnavailable) {
           console.error(`PayMongo payment ${paymentIntentId} succeeded but the slot is no longer available — needs manual review/refund.`);
-          return res.status(409).json({ status: "paid_slot_unavailable", message: e.message });
+          return res.status(409).json({ status: "paid_slot_unavailable", message: AppError.publicMessage(e) });
         }
         throw e;
       }
@@ -291,7 +292,7 @@ router.get("/status/:paymentIntentId", ensureAuthenticated, validate(paymentInte
       if (failure) {
         return res.status(failure.status === "expired" ? 410 : 402).json({ ...failure, paymentStatus: "Unpaid" });
       }
-      return res.status(e.status || 502).json({ message: e.message || "Could not check payment status." });
+      return res.status(e.status || 502).json({ message: AppError.publicMessage(e, "Could not check payment status.") });
     }
     const attrs = intent?.data?.attributes;
     const metadata = attrs?.metadata || {};
@@ -318,7 +319,7 @@ router.get("/status/:paymentIntentId", ensureAuthenticated, validate(paymentInte
       return res.json({ status: created.status, paymentStatus: created.paymentStatus, bookingId: created._id, reservationCode: created.reservationCode });
     } catch (e) {
       if (e.slotUnavailable) {
-        return res.status(409).json({ status: "paid_slot_unavailable", paymentStatus: "Paid", message: e.message });
+        return res.status(409).json({ status: "paid_slot_unavailable", paymentStatus: "Paid", message: AppError.publicMessage(e) });
       }
       throw e;
     }
@@ -350,8 +351,6 @@ async function webhookHandler(req, res) {
     }
   }
 
-  res.status(200).json({ received: true });
-
   try {
     const eventType = event?.data?.attributes?.type;
     const resource = event?.data?.attributes?.data;
@@ -360,11 +359,11 @@ async function webhookHandler(req, res) {
       const paymentIntentId = eventType === "payment_intent.succeeded"
         ? resource?.id
         : resource?.attributes?.payment_intent_id;
-      if (!paymentIntentId) return;
+      if (!paymentIntentId) return res.status(200).json({ received: true });
 
       const intent = await retrievePaymentIntent(paymentIntentId);
       const attrs = intent?.data?.attributes;
-      if (!isPaidPaymentIntent(attrs)) return;
+      if (!isPaidPaymentIntent(attrs)) return res.status(200).json({ received: true });
 
       const paidPayment = attrs.payments?.find(p => p?.attributes?.status === "paid");
       await finalizeBookingFromPayment({
@@ -380,8 +379,10 @@ async function webhookHandler(req, res) {
         throw e;
       });
     }
+    return res.status(200).json({ received: true });
   } catch (err) {
     console.error("Error processing PayMongo webhook:", err);
+    return res.status(500).json({ message: "Payment verification will be retried." });
   }
 }
 

@@ -13,7 +13,11 @@ function validate(schema, source = "body") {
         errors: error.details.map((d) => d.message),
       });
     }
-    req[source] = value;
+    if (source === "query") {
+      Object.defineProperty(req, source, { value, writable: true, configurable: true, enumerable: true });
+    } else {
+      req[source] = value;
+    }
     next();
   };
 }

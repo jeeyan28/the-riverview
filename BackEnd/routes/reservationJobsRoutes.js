@@ -1,14 +1,7 @@
 const express = require("express");
 const { timingSafeEqual } = require("node:crypto");
-const { processPendingClosureRefunds } = require("../utils/closureRefunds");
-const { deliverNotificationEmails } = require("../utils/reservationNotifications");
+const { runReservationJobs } = require("../utils/reservationJobs");
 const router = express.Router();
-
-async function runReservationJobs() {
-  const refunds = await processPendingClosureRefunds();
-  const emails = await deliverNotificationEmails();
-  return { refunds, emails };
-}
 
 router.get("/", async (req, res) => {
   const expected = process.env.CRON_SECRET ? `Bearer ${process.env.CRON_SECRET}` : "";

@@ -1,6 +1,5 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { API_BASE_URL } from '../services/api';
-
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { authService } from '../services/auth';
 
 const STORAGE_KEY = 'riverview_user';
 
@@ -10,9 +9,9 @@ const ADMIN_ROLES = ['staff', 'manager', 'super_admin'];
 const SESSION_CHECK_TIMEOUT_MS = 8000;
 
 function parseStoredUser(storage) {
-  const raw = storage.getItem(STORAGE_KEY);
-  if (!raw) return null;
   try {
+    const raw = storage.getItem(STORAGE_KEY);
+    if (!raw) return null;
     return JSON.parse(raw);
   } catch {
     return null;
@@ -20,7 +19,11 @@ function parseStoredUser(storage) {
 }
 
 function readStoredUser() {
-  return parseStoredUser(sessionStorage) || parseStoredUser(localStorage);
+  try {
+    return parseStoredUser(sessionStorage) || parseStoredUser(localStorage);
+  } catch {
+    return null;
+  }
 }
 
 function replaceStoredUser(user, storage) {
@@ -29,12 +32,16 @@ function replaceStoredUser(user, storage) {
 }
 
 function writeStoredUser(user) {
-  replaceStoredUser(user, localStorage);
+  try {
+    replaceStoredUser(user, localStorage);
+  } catch {
+    // Authentication still works when browser storage is unavailable.
+  }
 }
 
 function clearStoredUser() {
-  localStorage.removeItem(STORAGE_KEY);
-  sessionStorage.removeItem(STORAGE_KEY);
+  try { localStorage.removeItem(STORAGE_KEY); } catch {}
+  try { sessionStorage.removeItem(STORAGE_KEY); } catch {}
 }
 
 const AuthContext = createContext(null);
@@ -43,177 +50,100 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(() => readStoredUser());
   const [initializing, setInitializing] = useState(true);
 
+  const mountedRef = useRef(true);
+  const revisionRef = useRef(0);
+  const sessionRequestRef = useRef(null);
+
+  const commitUser = useCallback(freshUser => {
+    setUser(freshUser);
+    if (freshUser) writeStoredUser(freshUser);
+    else clearStoredUser();
+  }, []);
+
+  const beginSessionChange = useCallback(() => {
+    sessionRequestRef.current?.abort();
+    sessionRequestRef.current = null;
+    return ++revisionRef.current;
+  }, []);
+
   const revalidate = useCallback(async () => {
+    const revision = beginSessionChange();
     const controller = new AbortController();
-    const timeoutId = window.setTimeout(() => controller.abort(), SESSION_CHECK_TIMEOUT_MS);
+    sessionRequestRef.current = controller;
+    const isCurrent = () => mountedRef.current && revision === revisionRef.current;
     try {
-      const res = await fetch(`${API_BASE_URL}/api/auth/me`, {
-        credentials: 'include',
-        signal: controller.signal,
-      });
-      if (res.status === 401 || res.status === 403) {
-        setUser(null);
-        clearStoredUser();
-        return null;
-      }
-      if (!res.ok) throw new Error('session check unavailable');
-      const { user: freshUser } = await res.json();
-      setUser(freshUser);
-      writeStoredUser(freshUser);
+      const freshUser = await authService.me({ signal: controller.signal, timeoutMs: SESSION_CHECK_TIMEOUT_MS });
+      if (!isCurrent()) return null;
+      commitUser(freshUser);
       return freshUser;
-    } catch {
-      const cachedUser = readStoredUser();
-      setUser(cachedUser);
+    } catch (error) {
+      if (!isCurrent() || controller.signal.aborted) return null;
+      const cachedUser = [401, 403].includes(error.status) ? null : readStoredUser();
+      commitUser(cachedUser);
       return cachedUser;
     } finally {
-      window.clearTimeout(timeoutId);
-      setInitializing(false);
+      if (sessionRequestRef.current === controller) sessionRequestRef.current = null;
+      if (isCurrent()) setInitializing(false);
     }
-  }, []);
+  }, [beginSessionChange, commitUser]);
 
   useEffect(() => {
+    mountedRef.current = true;
     revalidate();
-
     function handlePageShow(event) {
-      if (event.persisted) {
-        revalidate();
-      }
+      if (event.persisted) revalidate();
     }
     window.addEventListener('pageshow', handlePageShow);
-    return () => window.removeEventListener('pageshow', handlePageShow);
-  }, [revalidate]);
+    return () => {
+      mountedRef.current = false;
+      beginSessionChange();
+      window.removeEventListener('pageshow', handlePageShow);
+    };
+  }, [revalidate, beginSessionChange]);
 
-  const login = useCallback(async (email, password) => {
-    const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      const err = new Error(data.message || 'Login failed.');
-      err.status = res.status;
-      err.unverified = !!data.unverified;
-      err.field = data.field;
-      throw err;
+  const signIn = useCallback(async request => {
+    const revision = beginSessionChange();
+    try {
+      const freshUser = await request();
+      if (mountedRef.current && revision === revisionRef.current) commitUser(freshUser);
+      return freshUser;
+    } finally {
+      if (mountedRef.current && revision === revisionRef.current) setInitializing(false);
     }
-    setUser(data.user);
-    writeStoredUser(data.user);
-    return data.user;
-  }, []);
+  }, [beginSessionChange, commitUser]);
 
-  const loginWithGoogle = useCallback(async (code) => {
-    const res = await fetch(`${API_BASE_URL}/api/auth/google`, {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code }),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.message || 'Google sign-in failed.');
-    setUser(data.user);
-    writeStoredUser(data.user);
-    return data.user;
-  }, []);
+  const login = useCallback((email, password) => signIn(() => authService.login(email, password)), [signIn]);
+  const loginWithGoogle = useCallback(code => signIn(() => authService.loginWithGoogle(code)), [signIn]);
+  const register = useCallback(authService.register, []);
+  const verifyRegistrationOtp = useCallback(authService.verifyRegistrationOtp, []);
+  const resendRegistrationOtp = useCallback(authService.resendRegistrationOtp, []);
+  const resendAccountVerification = useCallback(authService.resendAccountVerification, []);
+  const verifyAccountOtp = useCallback(authService.verifyAccountOtp, []);
 
-  const register = useCallback(async (formData) => {
-    const res = await fetch(`${API_BASE_URL}/api/auth/register`, {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(formData),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      const err = new Error(data.message || 'Registration failed.');
-      err.status = res.status;
-      throw err;
-    }
-    return data;
-  }, []);
-
-  const verifyRegistrationOtp = useCallback(async (email, otp) => {
-    const res = await fetch(`${API_BASE_URL}/api/auth/register/verify-otp`, {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, otp }),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      const err = new Error(data.message || 'Verification failed.');
-      err.status = res.status;
-      throw err;
-    }
-    return data;
-  }, []);
-
-  const resendRegistrationOtp = useCallback(async (email) => {
-    const res = await fetch(`${API_BASE_URL}/api/auth/register/resend-otp`, {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email }),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      const err = new Error(data.message || 'Could not resend the code.');
-      err.status = res.status;
-      throw err;
-    }
-    return data;
-  }, []);
-
-  const resendAccountVerification = useCallback(async (email) => {
-    const res = await fetch(`${API_BASE_URL}/api/auth/resend-verification`, {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email }),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      const err = new Error(data.message || 'Could not resend the code.');
-      err.status = res.status;
-      throw err;
-    }
-    return data;
-  }, []);
-
-  const verifyAccountOtp = useCallback(async (email, otp) => {
-    const res = await fetch(`${API_BASE_URL}/api/auth/verify-account-otp`, {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, otp }),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      const err = new Error(data.message || 'Verification failed.');
-      err.status = res.status;
-      throw err;
-    }
-    return data;
-  }, []);
+  const invalidateSession = useCallback(() => {
+    beginSessionChange();
+    commitUser(null);
+    setInitializing(false);
+  }, [beginSessionChange, commitUser]);
 
   const logout = useCallback(async () => {
-    try {
-      await fetch(`${API_BASE_URL}/api/auth/logout`, { method: 'POST', credentials: 'include' });
-    } finally {
-      clearStoredUser();
-      setUser(null);
+    const revision = beginSessionChange();
+    await authService.logout();
+    if (mountedRef.current && revision === revisionRef.current) {
+      commitUser(null);
+      setInitializing(false);
     }
-  }, []);
+  }, [beginSessionChange, commitUser]);
 
   const updateUser = useCallback((patch) => {
+    beginSessionChange();
     setUser((prev) => {
       if (!prev) return prev;
       const next = { ...prev, ...patch };
       writeStoredUser(next);
       return next;
     });
-  }, []);
+  }, [beginSessionChange]);
 
   const isAdmin = !!user && ADMIN_ROLES.includes(user.role);
 
@@ -248,6 +178,7 @@ export function AuthProvider({ children }) {
       resendAccountVerification,
       verifyAccountOtp,
       logout,
+      invalidateSession,
       updateUser,
       revalidate,
     }),
@@ -265,6 +196,7 @@ export function AuthProvider({ children }) {
       resendAccountVerification,
       verifyAccountOtp,
       logout,
+      invalidateSession,
       updateUser,
       revalidate,
     ]

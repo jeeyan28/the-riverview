@@ -11,22 +11,36 @@ const session = require("express-session");
 const { STAFF_SESSION_MS, CUSTOMER_SESSION_MS } = require("./utils/sessionPolicy");
 const { MongoStore } = require("connect-mongo");
 require("dotenv").config({ path: path.join(__dirname, ".env") });
+const { startReservationScheduler } = require('./utils/reservationScheduler');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+for (const name of ["MONGO_URI", "SESSION_SECRET"]) {
+  if (!process.env[name]) throw new Error(`Missing required environment variable: ${name}`);
+}
+if (process.env.NODE_ENV === "production" && (!process.env.APP_BASE_URL || process.env.SESSION_SECRET.length < 32)) {
+  throw new Error("Production requires APP_BASE_URL and a SESSION_SECRET of at least 32 characters.");
+}
 
 if (process.env.NODE_ENV === "production") {
   app.set("trust proxy", 1);
 }
 
 app.use(helmet());
+app.use((req, res, next) => {
+  res.set("Cache-Control", "no-store");
+  next();
+});
 
-let isConnected = false;
+let connectionPromise;
 async function connectDB() {
-  if (isConnected) return;
-  await mongoose.connect(process.env.MONGO_URI);
-  isConnected = true;
-  console.log("✅ Connected to MongoDB");
+  if (mongoose.connection.readyState === 1) return;
+  if (!connectionPromise) {
+    connectionPromise = mongoose.connect(process.env.MONGO_URI)
+      .then(() => console.log("Connected to MongoDB"))
+      .finally(() => { connectionPromise = null; });
+  }
+  await connectionPromise;
 }
 
 app.use(async (req, res, next) => {
@@ -46,7 +60,7 @@ app.post("/api/payments/xendit/webhook", express.json({ limit: "100kb" }), xendi
 
 app.use(express.json({ limit: "100kb" }));
 
-const allowedOrigins = (process.env.APP_BASE_URL || "http://localhost:5500")
+const allowedOrigins = (process.env.APP_BASE_URL || "http://localhost:5501")
   .split(",")
   .map((o) => o.trim())
   .filter(Boolean);
@@ -54,7 +68,7 @@ const allowedOrigins = (process.env.APP_BASE_URL || "http://localhost:5500")
 app.use(cors({
   origin(origin, callback) {
     if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
-    return callback(new Error("Not allowed by CORS"));
+    return callback(Object.assign(new Error("Request origin not allowed."), { status: 403 }));
   },
   credentials: true,
 }));
@@ -69,6 +83,15 @@ app.get("/", (req, res) => {
   });
 });
 
+const sessionStore = MongoStore.create({
+  mongoUrl: process.env.MONGO_URI,
+  collectionName: "sessions",
+  ttl: CUSTOMER_SESSION_MS / 1000,
+  autoRemove: "native",
+}).on("error", (err) => {
+  console.error("Session store error:", err);
+});
+
 app.use(session({
   secret: process.env.SESSION_SECRET,
   resave: false,
@@ -76,14 +99,7 @@ app.use(session({
   rolling: true,
   name: "connect.sid",
 
-  store: MongoStore.create({
-    mongoUrl: process.env.MONGO_URI,
-    collectionName: "sessions",
-    ttl: CUSTOMER_SESSION_MS / 1000,
-    autoRemove: "native",
-  }).on("error", (err) => {
-    console.error("Session store error:", err);
-  }),
+  store: sessionStore,
 
   cookie: {
     httpOnly: true,
@@ -114,32 +130,48 @@ app.use("/api/payments/paymongo", require("./routes/paymongoRoutes").router);
 app.use("/api/payments/xendit", require("./routes/xenditRoutes").router);
 
 app.use((err, req, res, next) => {
-  if (err) {
-    console.error(err);
-    const status = err.status || 500;
-    return res.status(status).json({ message: err.message || "Something went wrong." });
-  }
-  next();
+  if (res.headersSent) return next(err);
+  console.error(err);
+  const uploadError = typeof err.code === "string" && err.code.startsWith("LIMIT_");
+  let status = Number.isInteger(err.status) && err.status >= 400 && err.status < 600 ? err.status : 500;
+  if (err.code === "LIMIT_FILE_SIZE") status = 413;
+  else if (uploadError) status = 400;
+  const message = status >= 500 ? "Something went wrong." : status === 413 ? "The uploaded file or request is too large." : err.message || "Invalid request.";
+  return res.status(status).json({ message });
 });
-
-function startBookingLifecycleScheduler() {
-  const { voidExpiredBookings } = require("./utils/bookingHelper");
-  const INTERVAL_MS = 60 * 1000;
-  async function tick() {
-    try { await voidExpiredBookings(); } catch (e) { console.error("scheduler: voidExpiredBookings failed:", e.message); }
-    try { await require("./routes/reservationJobsRoutes").runReservationJobs(); } catch (e) { console.error("scheduler: reservation jobs failed:", e.message); }
-  }
-  setInterval(tick, INTERVAL_MS);
-  tick();
-}
 
 if (require.main === module) {
   connectDB()
     .then(() => {
-      startBookingLifecycleScheduler();
-      app.listen(PORT, () => {
+      const stopScheduler = startReservationScheduler();
+      const server = app.listen(PORT, () => {
         console.log(`Server running on port ${PORT}`);
       });
+      let closing = false;
+      async function shutdown(signal) {
+        if (closing) return;
+        closing = true;
+        console.log(`Received ${signal}; finishing active work.`);
+        const deadline = setTimeout(() => {
+          server.closeAllConnections();
+          process.exit(1);
+        }, 30000);
+        deadline.unref();
+        try {
+          await Promise.all([
+            stopScheduler(),
+            new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve())),
+          ]);
+          await sessionStore.close();
+          await mongoose.disconnect();
+          clearTimeout(deadline);
+        } catch (error) {
+          console.error('Shutdown failed:', error.message);
+          process.exit(1);
+        }
+      }
+      process.once('SIGINT', () => shutdown('SIGINT'));
+      process.once('SIGTERM', () => shutdown('SIGTERM'));
     })
     .catch((err) => {
       console.error("MongoDB connection failed:", err.message);

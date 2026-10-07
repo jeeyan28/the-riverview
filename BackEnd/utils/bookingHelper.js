@@ -11,6 +11,7 @@ const { bookingStartMs, financialFields } = require("./bookingLifecycle");
 const { HOUR_MS, nearbyDates, operatingWindowForStart, occupiedCountAt } = require("./bookingSchedule");
 const { calculateBookingPrice, computeDownPayment, parsePaxCapacity } = require("./roomPricing");
 const { getPaymongoPaymentMethodLabel } = require("./paymongo");
+const { validDateKey } = require("./businessDate");
 
 async function voidExpiredBookings() {
   const now = Date.now();
@@ -55,7 +56,7 @@ async function validateAndPriceBooking({ roomId, variantLabel, date, timeIn, dur
   if (!Number.isInteger(duration) || duration < 1 || duration > 5) {
     throw new AppError(400, "Reservations must be 1–5 hours in whole-hour increments.");
   }
-  if (!Number.isFinite(bookingStartMs(date, timeIn)) || !/:00$/.test(timeIn)) throw new AppError(400, "Choose a valid date and an hourly start time.");
+  if (!validDateKey(date) || !Number.isFinite(bookingStartMs(date, timeIn)) || !/^(?:[01]\d|2[0-3]):00$/.test(timeIn)) throw new AppError(400, "Choose a valid date and an hourly start time.");
 
   const settings = isAdminBooking ? null : await Settings.getSingleton({ session });
 
@@ -234,6 +235,7 @@ async function finalizeBookingFromPayment({ paymentIntentId, metadata, paidPayme
         });
         room = pricing.room;
       } catch (e) {
+        if (![400, 404, 409].includes(e.status)) throw e;
         const slotError = new AppError(e.status || 409, e.message || "This time slot is no longer available.");
         slotError.slotUnavailable = true;
         throw slotError;
@@ -297,7 +299,7 @@ async function finalizeBookingFromPayment({ paymentIntentId, metadata, paidPayme
     throw err;
   }
 
-  sendReceiptEmail(booking).catch((err) => {
+  await sendReceiptEmail(booking).catch((err) => {
     console.error(`Failed to send receipt email for booking ${booking.reservationCode}:`, err.message);
   });
 

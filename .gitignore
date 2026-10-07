@@ -3,7 +3,8 @@ node_modules/
 
 # Environment
 .env
-.env .example
+.env.*
+!.env.example
 
 # Build output
 dist/
@@ -17,7 +18,3 @@ build/
 *.log
 .prd-backups/
 .payment-method-backups/
-
-# Local-only project docs (not tracked in repo)
-.md
-

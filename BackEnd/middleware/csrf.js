@@ -21,12 +21,13 @@ function verifyOrigin(allowedOrigins) {
           return null;
         }
       })();
-      if (refererOrigin && !allowedOrigins.includes(refererOrigin)) {
+      if (!refererOrigin || !allowedOrigins.includes(refererOrigin)) {
         return res.status(403).json({ message: "Request origin not allowed." });
       }
+      return next();
     }
 
-    next();
+    return res.status(403).json({ message: "Request origin not allowed." });
   };
 }
 

@@ -1,4 +1,5 @@
 const crypto = require("node:crypto");
+const { fetchJson } = require('./http');
 
 const API_BASE = "https://api.xendit.co";
 const CHANNELS = ["GCASH", "PAYMAYA"];
@@ -22,30 +23,22 @@ function isPaymongoUnavailable(error) {
 }
 
 async function request(path, { method = "GET", body, headers } = {}) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 15000);
-  try {
-    const response = await fetch(`${API_BASE}${path}`, {
-      method,
-      headers: {
-        Authorization: `Basic ${Buffer.from(`${process.env.XENDIT_SECRET_KEY}:`).toString("base64")}`,
-        "Content-Type": "application/json",
-        ...headers,
-      },
-      body: body ? JSON.stringify(body) : undefined,
-      signal: controller.signal,
-    });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      const error = new Error(data.message || `Xendit returned ${response.status}.`);
-      error.status = response.status;
-      error.code = data.error_code;
-      throw error;
-    }
-    return data;
-  } finally {
-    clearTimeout(timer);
+  const { response, data } = await fetchJson(`${API_BASE}${path}`, {
+    method,
+    headers: {
+      Authorization: `Basic ${Buffer.from(`${process.env.XENDIT_SECRET_KEY}:`).toString("base64")}`,
+      "Content-Type": "application/json",
+      ...headers,
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (!response.ok) {
+    const error = new Error(data.message || `Xendit returned ${response.status}.`);
+    error.status = response.status;
+    error.code = data.error_code;
+    throw error;
   }
+  return data;
 }
 
 function safeCheckoutUrl(value) {

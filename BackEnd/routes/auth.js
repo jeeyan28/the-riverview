@@ -6,7 +6,7 @@ const router = express.Router();
 const User = require("../model/user");
 const LoginHistory = require("../model/loginHistory");
 const PendingRegistration = require("../model/pendingRegistration");
-const { loginLimiter, forgotPasswordLimiter, verifyResetOtpLimiter, resetPasswordLimiter, registerOtpLimiter } = require("../middleware/rateLimiter");
+const { loginLimiter, authActionLimiter, forgotPasswordLimiter, verifyResetOtpLimiter, resetPasswordLimiter, registerOtpLimiter } = require("../middleware/rateLimiter");
 const { ensureAuthenticated } = require("../middleware/adminAuth");
 const { sendOtpEmail } = require("../utils/mailer");
 const {
@@ -469,7 +469,7 @@ async function handlePasswordLogin(req, res) {
 
 router.post("/login", loginLimiter, validate(loginSchema), (req, res) => handlePasswordLogin(req, res));
 
-router.post("/google", validate(googleCodeSchema), async (req, res) => {
+router.post("/google", authActionLimiter, validate(googleCodeSchema), async (req, res) => {
   try {
     const { code } = req.body;
     if (!code) return res.status(400).json({ message: "Missing Google credential." });
@@ -521,7 +521,7 @@ router.post("/google", validate(googleCodeSchema), async (req, res) => {
   }
 });
 
-router.post("/forgot-password", forgotPasswordLimiter, validate(emailSchema), async (req, res) => {
+router.post("/forgot-password", authActionLimiter, forgotPasswordLimiter, validate(emailSchema), async (req, res) => {
   try {
     const { email } = req.body;
     if (!email) return res.status(400).json({ message: "Email is required." });
@@ -551,7 +551,7 @@ router.post("/forgot-password", forgotPasswordLimiter, validate(emailSchema), as
   }
 });
 
-router.post("/verify-otp", verifyResetOtpLimiter, validate(emailOtpSchema), async (req, res) => {
+router.post("/verify-otp", authActionLimiter, verifyResetOtpLimiter, validate(emailOtpSchema), async (req, res) => {
   try {
     const { email, otp } = req.body;
     if (!email || !otp) {
@@ -602,7 +602,7 @@ router.post("/verify-otp", verifyResetOtpLimiter, validate(emailOtpSchema), asyn
   }
 });
 
-router.post("/reset-password", resetPasswordLimiter, validate(resetPasswordSchema), async (req, res) => {
+router.post("/reset-password", authActionLimiter, resetPasswordLimiter, validate(resetPasswordSchema), async (req, res) => {
   try {
     const { resetSessionToken, password } = req.body;
 

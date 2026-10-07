@@ -1,8 +1,9 @@
 const { Joi } = require("../middleware/validate");
 const Booking = require("../model/booking");
+const { validDateKey } = require("../utils/businessDate");
 
 const objectId = Joi.string().hex().length(24);
-const dateStr = Joi.string().pattern(/^\d{4}-\d{2}-\d{2}$/);
+const dateStr = Joi.string().custom((value, helpers) => validDateKey(value) ? value : helpers.message('Choose a valid date in YYYY-MM-DD format.'));
 const timeStr = Joi.string().pattern(/^(?:[01]\d|2[0-3]):00$/);
 const duration = Joi.number().integer().min(1).max(5);
 const guestPhone = Joi.string().trim().min(7).max(40).pattern(/^\+?[0-9() .-]+$/)
@@ -10,6 +11,18 @@ const guestPhone = Joi.string().trim().min(7).max(40).pattern(/^\+?[0-9() .-]+$/
 const guestEmail = Joi.string().trim().lowercase().email({ tlds: { allow: false } }).max(254);
 const bookingIdParamsSchema = Joi.object({ id: objectId.required() });
 const emptyBodySchema = Joi.object({}).default({});
+
+const availabilityQuerySchema = Joi.object({
+  roomId: objectId.required(),
+  date: dateStr.required(),
+  variantLabel: Joi.string().trim().allow("").max(120),
+});
+const monthAvailabilityQuerySchema = Joi.object({
+  roomId: objectId.required(),
+  year: Joi.number().integer().min(1000).max(9999).required(),
+  month: Joi.number().integer().min(1).max(12).required(),
+  variantLabel: Joi.string().trim().allow("").max(120),
+});
 
 const lockSchema = Joi.object({
   roomId: objectId.required(),
@@ -69,6 +82,8 @@ const cancellationReviewSchema = Joi.object({
 
 module.exports = {
   bookingIdParamsSchema,
+  availabilityQuerySchema,
+  monthAvailabilityQuerySchema,
   emptyBodySchema,
   lockSchema,
   createBookingSchema,

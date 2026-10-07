@@ -8,45 +8,15 @@ import PasswordInput from './PasswordInput';
 import PasswordRequirementsList from './PasswordRequirementsList';
 import { OTP_LENGTH, OTP_EXPIRY_SECONDS, RESEND_COOLDOWN_SECONDS, formatCountdown } from '../utils/otp';
 import { isPasswordStrongEnough } from '../utils/password';
-import { API_BASE_URL } from '../services/api';
+import { authService } from '../services/auth';
 import ModalPortal from './ModalPortal';
 
 const DEFAULT_SENT_COPY =
   `If an account exists for that email, a verification code has been sent. It'll expire in ${Math.round(OTP_EXPIRY_SECONDS / 60)} minutes.`;
 
 async function requestReset(email) {
-  const res = await fetch(`${API_BASE_URL}/api/auth/forgot-password`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email }),
-  });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    const error = new Error(data.message || 'Could not send a verification code. Please try again.');
-    error.status = res.status;
-    throw error;
-  }
+  const data = await authService.requestReset(email);
   return data.message || DEFAULT_SENT_COPY;
-}
-
-async function verifyOtp(email, otp) {
-  const res = await fetch(`${API_BASE_URL}/api/auth/verify-otp`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, otp }),
-  });
-  const data = await res.json().catch(() => ({}));
-  return { ok: res.ok, message: data.message, resetSessionToken: data.resetSessionToken };
-}
-
-async function submitNewPassword(resetSessionToken, password) {
-  const res = await fetch(`${API_BASE_URL}/api/auth/reset-password`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ resetSessionToken, password }),
-  });
-  const data = await res.json().catch(() => ({}));
-  return { ok: res.ok, message: data.message };
 }
 
 function ForgotPasswordModal({ open, onClose, onReturnToLogin }) {
@@ -161,7 +131,7 @@ function ForgotPasswordModal({ open, onClose, onReturnToLogin }) {
       setOtpExpiresAt(Date.now() + OTP_EXPIRY_SECONDS * 1000);
     } catch (err) {
       if (err.status) setEmailError(err.message);
-      else showToast('Could not reach the server. Is it running?', 'error');
+      else showToast(err.message, 'error');
     } finally {
       setLoading(false);
     }
@@ -179,7 +149,7 @@ function ForgotPasswordModal({ open, onClose, onReturnToLogin }) {
       setOtpBoxKey((k) => k + 1);
       showToast(message, 'success');
     } catch (err) {
-      setOtpError(err.status ? err.message : 'Could not reach the server. Is it running?');
+      setOtpError(err.message);
     } finally {
       setResending(false);
     }
@@ -201,15 +171,11 @@ function ForgotPasswordModal({ open, onClose, onReturnToLogin }) {
 
     setVerifying(true);
     try {
-      const { ok, message, resetSessionToken } = await verifyOtp(sentEmail, code);
-      if (!ok) {
-        setOtpError(message || 'Incorrect verification code.');
-        return;
-      }
+      const { resetSessionToken } = await authService.verifyResetOtp(sentEmail, code);
       setVerified(true);
       setResetSessionToken(resetSessionToken);
     } catch (err) {
-      showToast('Could not reach the server. Is it running?', 'error');
+      setOtpError(err.message);
     } finally {
       setVerifying(false);
     }
@@ -240,14 +206,10 @@ function ForgotPasswordModal({ open, onClose, onReturnToLogin }) {
     setConfirmError('');
     setResetting(true);
     try {
-      const { ok, message } = await submitNewPassword(resetSessionToken, newPassword);
-      if (!ok) {
-        setPasswordError(message || 'Could not reset password.');
-        return;
-      }
+      await authService.resetPassword(resetSessionToken, newPassword);
       setResetDone(true);
     } catch (err) {
-      showToast('Could not reach the server. Is it running?', 'error');
+      setPasswordError(err.message);
     } finally {
       setResetting(false);
     }

@@ -1,4 +1,5 @@
 const express = require("express");
+const AppError = require("../utils/appError");
 const router = express.Router();
 const Settings = require("../model/settings");
 const User = require("../model/user");
@@ -203,7 +204,7 @@ router.post("/holidays", requirePermission(PERMISSIONS.SETTINGS_MANAGE), validat
     res.status(201).json(created);
   } catch (err) {
     console.error(err);
-    res.status(err.status || 500).json({ message: err.status ? err.message : "Could not close this date." });
+    res.status(err.status || 500).json({ message: AppError.publicMessage(err, "Could not close this date.") });
   }
 });
 
@@ -215,7 +216,7 @@ router.delete("/holidays/:id", requirePermission(PERMISSIONS.SETTINGS_MANAGE), v
     res.json({ message: "Holiday removed." });
   } catch (err) {
     console.error(err);
-    res.status(err.status || 500).json({ message: err.status ? err.message : "Could not remove this holiday." });
+    res.status(err.status || 500).json({ message: AppError.publicMessage(err, "Could not remove this holiday.") });
   }
 });
 

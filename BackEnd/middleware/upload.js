@@ -2,6 +2,7 @@
 const multer = require("multer");
 const { v2: cloudinary } = require("cloudinary");
 const { Readable } = require("stream");
+const AppError = require("../utils/appError");
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -11,7 +12,7 @@ cloudinary.config({
 
 function imageFileFilter(req, file, cb) {
   const ok = ["image/jpeg", "image/png", "image/webp"].includes(file.mimetype);
-  cb(ok ? null : new Error("Only JPG, PNG, or WEBP images are allowed."), ok);
+  cb(ok ? null : new AppError(400, "Only JPG, PNG, or WEBP images are allowed."), ok);
 }
 
 function uploadBufferToCloudinary(buffer, cloudinaryParams) {
@@ -32,7 +33,7 @@ function uploadBufferToCloudinary(buffer, cloudinaryParams) {
 function makeCloudinaryUploader(cloudinaryParams) {
   const memoryUpload = multer({
     storage: multer.memoryStorage(),
-    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+    limits: { fileSize: 5 * 1024 * 1024, fieldSize: 100 * 1024, files: 21, fields: 30, parts: 51 },
     fileFilter: imageFileFilter,
   });
 

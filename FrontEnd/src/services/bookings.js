@@ -4,6 +4,8 @@ import { BOOKING_STATUS } from '../utils/bookingStatus';
 const BASE = '/api/bookings';
 
 export const bookingsService = {
+  get: (id, options = {}) => apiRequest(`${BASE}/${encodeURIComponent(id)}`, { ...options, fallbackMessage: 'Could not load this reservation.' }),
+
   listActive: () => apiRequest(`${BASE}?status=${BOOKING_STATUS.ONGOING}`, { fallbackMessage: 'Failed to load reservations for the room monitor.' }),
 
   repeatCustomers: (name) => apiRequest(`${BASE}?${new URLSearchParams({ search: name })}`, { fallbackMessage: 'Could not load previous customers.' }),

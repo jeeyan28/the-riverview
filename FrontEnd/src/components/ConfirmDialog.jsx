@@ -27,6 +27,7 @@ function ConfirmDialog({
   confirmText,
   cancelText,
   confirmDisabled = false,
+  cancelDisabled = false,
   onConfirm,
   onCancel,
 }) {
@@ -40,15 +41,14 @@ function ConfirmDialog({
     confirmBtnRef.current?.focus();
 
     function onKey(e) {
-      if (e.key === 'Escape') onCancel();
-      if (e.key === 'Enter' && !confirmDisabled) onConfirm();
+      if (e.key === 'Escape' && !cancelDisabled) onCancel();
     }
     document.addEventListener('keydown', onKey);
     return () => {
       document.removeEventListener('keydown', onKey);
       document.body.style.overflow = previousOverflow;
     };
-  }, [open, onConfirm, onCancel, confirmDisabled]);
+  }, [open, onConfirm, onCancel, confirmDisabled, cancelDisabled]);
 
   if (!open) return null;
 
@@ -64,7 +64,7 @@ function ConfirmDialog({
           <div className="uimodal-title" id="confirmation-dialog-title">{resolvedTitle}</div>
           <p className="uimodal-message">{message}</p>
           <div className="uimodal-actions">
-            <button className="uimodal-btn" onClick={onCancel}>
+            <button className="uimodal-btn" onClick={onCancel} disabled={cancelDisabled}>
               {cancelText || 'Cancel'}
             </button>
             <button

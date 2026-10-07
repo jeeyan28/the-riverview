@@ -11,7 +11,7 @@ function reservationActionUrl(booking, action) {
   const origins = (process.env.APP_BASE_URL || '').split(',').map((origin) => origin.trim());
   const configured = process.env.APP_PUBLIC_URL || origins.find((origin) => /^https:\/\//i.test(origin)) || origins[0];
   try {
-    const url = new URL(configured || 'http://localhost:5500');
+    const url = new URL(configured || 'http://localhost:5501');
     if (!['http:', 'https:'].includes(url.protocol)) return '';
     url.pathname = '/';
     url.search = new URLSearchParams({ reservation: String(booking.reservationCode || booking._id || ''), action }).toString();
