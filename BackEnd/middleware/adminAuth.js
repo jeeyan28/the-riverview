@@ -14,7 +14,8 @@ async function ensureAuthenticated(req, res, next) {
         { googleId: { $type: "string", $ne: "" } },
       ],
     });
-    if (!user || !user.isActive) {
+    if (!user || !user.isActive || user.isVerified === false || (req.session.sessionVersion || "") !== (user.sessionVersion || "")) {
+      req.session.destroy?.(() => {});
       return res.status(401).json({ message: "Not logged in." });
     }
     req.user = user;

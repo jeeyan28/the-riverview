@@ -1,4 +1,4 @@
-import { API_BASE_URL, apiRequest } from './api';
+import { apiDownload, apiRequest } from './api';
 
 const ROOMS_BASE = '/api/monitor-rooms';
 const SESSIONS_BASE = '/api/room-sessions';
@@ -23,24 +23,13 @@ export const roomSessionsService = {
     return apiRequest(`${SESSIONS_BASE}/report?${query}`, { fallbackMessage: 'Failed to load the room monitoring report.' });
   },
 
-  async exportReport(from, to) {
+  exportReport(from, to) {
     const query = new URLSearchParams({ from, to });
-    const response = await fetch(`${API_BASE_URL}${SESSIONS_BASE}/report/export?${query}`, { credentials: 'include' });
-    if (!response.ok) {
-      const body = await response.json().catch(() => ({}));
-      throw new Error(body.message || 'Failed to generate the room monitoring report.');
-    }
-    const blob = await response.blob();
-    const disposition = response.headers.get('Content-Disposition') || '';
-    const match = disposition.match(/filename="([^"]+)"/);
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = match?.[1] || `Riverview_Monitor_Daily_${from}${from === to ? '' : `_to_${to}`}.xlsx`;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
+    return apiDownload(`${SESSIONS_BASE}/report/export?${query}`, {
+      filename: `Riverview_Monitor_Daily_${from}${from === to ? '' : `_to_${to}`}.xlsx`,
+      contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      fallbackMessage: 'Failed to generate the room monitoring report.',
+    });
   },
 
   create: (payload) => apiRequest(SESSIONS_BASE, { method: 'POST', body: payload, fallbackMessage: 'Failed to start the session.' }),

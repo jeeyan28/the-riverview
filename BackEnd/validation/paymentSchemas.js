@@ -1,8 +1,9 @@
 const { Joi } = require("../middleware/validate");
 const { PAYMONGO_ALLOWED_METHODS } = require("../utils/paymongo");
+const { validDateKey } = require("../utils/businessDate");
 
 const objectId = Joi.string().hex().length(24);
-const dateStr = Joi.string().pattern(/^\d{4}-\d{2}-\d{2}$/);
+const dateStr = Joi.string().custom((value, helpers) => validDateKey(value) ? value : helpers.message('Choose a valid date in YYYY-MM-DD format.'));
 const timeStr = Joi.string().pattern(/^(?:[01]\d|2[0-3]):00$/);
 const guestPhone = Joi.string().trim().min(7).max(40).pattern(/^\+?[0-9() .-]+$/)
   .custom((value, helpers) => value.replace(/\D/g, '').length >= 7 ? value : helpers.message('Phone number must contain at least 7 digits.'));

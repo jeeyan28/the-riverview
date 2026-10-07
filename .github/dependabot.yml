@@ -1,13 +1,18 @@
 version: 2
 updates:
   - package-ecosystem: "npm"
-    directory: "/Backend"
+    directory: "/BackEnd"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 10
 
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+
   - package-ecosystem: "npm"
-    directory: "/Frontend"
+    directory: "/FrontEnd"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 10

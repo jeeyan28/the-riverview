@@ -2,16 +2,13 @@
   "name": "riverview-backend",
   "version": "1.0.0",
   "main": "server.js",
+  "private": true,
+  "engines": {
+    "node": ">=22.12.0"
+  },
   "scripts": {
     "start": "node server.js",
-    "align:prd": "node scripts/alignCatalogWithPrd.js",
-    "align:prd:apply": "node scripts/alignCatalogWithPrd.js --apply",
-    "align:catalog": "npm run align:prd",
-    "align:catalog:apply": "npm run align:prd:apply",
-    "restore:prd": "node scripts/restorePrdBackup.js",
-    "restore:prd:apply": "node scripts/restorePrdBackup.js --apply",
-    "backfill:payment-methods": "node scripts/backfillPaymentMethods.js",
-    "backfill:payment-methods:apply": "node scripts/backfillPaymentMethods.js --apply",
+    "check": "node scripts/checkSyntax.js",
     "audit": "npm audit --omit=dev"
   },
   "dependencies": {
@@ -26,10 +23,15 @@
     "express-session": "^1.19.0",
     "google-auth-library": "^10.9.0",
     "helmet": "^8.2.0",
-    "joi": "^18.2.3",
+    "joi": "^18.2.9",
     "mongoose": "^9.7.3",
-    "multer": "^2.2.0",
-    "nodemailer": "^9.0.3",
+    "multer": "^2.4.0",
+    "nodemailer": "^10.0.14",
     "simple-statistics": "^7.9.3"
+  },
+  "overrides": {
+    "exceljs": {
+      "uuid": "^11.1.1"
+    }
   }
 }

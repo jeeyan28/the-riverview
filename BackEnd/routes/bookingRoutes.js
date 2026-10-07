@@ -15,6 +15,8 @@ const { shiftDate, nearbyDates, availabilityRows } = require("../utils/bookingSc
 const { validate } = require("../middleware/validate");
 const {
   bookingIdParamsSchema,
+  availabilityQuerySchema,
+  monthAvailabilityQuerySchema,
   emptyBodySchema,
   lockSchema,
   createBookingSchema,
@@ -72,13 +74,9 @@ router.get("/", requirePermission(PERMISSIONS.BOOKING_VIEW), async (req, res) =>
   }
 });
 
-router.get("/availability", async (req, res) => {
+router.get("/availability", validate(availabilityQuerySchema, "query"), async (req, res) => {
   try {
     const { roomId, date, variantLabel } = req.query;
-    if (!roomId || !DATE_KEY_PATTERN.test(String(date))) {
-      return res.status(400).json({ message: "roomId and date are required." });
-    }
-
     const filter = {
       room: roomId,
       date: { $in: nearbyDates(date) },
@@ -101,18 +99,11 @@ router.get("/availability", async (req, res) => {
 });
 
 
-router.get("/availability-month", async (req, res) => {
+router.get("/availability-month", validate(monthAvailabilityQuerySchema, "query"), async (req, res) => {
   try {
     const { roomId, year, month, variantLabel } = req.query;
-    if (!roomId || !year || !month) {
-      return res.status(400).json({ message: "roomId, year and month are required." });
-    }
-
-    const y = Number(year);
-    const m = Number(month);
-    if (!Number.isInteger(y) || !Number.isInteger(m) || m < 1 || m > 12) {
-      return res.status(400).json({ message: "Invalid year or month." });
-    }
+    const y = year;
+    const m = month;
 
     const lastDay = new Date(y, m, 0).getDate();
     const startStr = `${y}-${String(m).padStart(2, "0")}-01`;
@@ -183,7 +174,7 @@ router.post("/lock", ensureAuthenticated, bookingActionLimiter, validate(lockSch
         return created;
       });
     } catch (e) {
-      return res.status(e.status || 500).json({ message: e.message || "Server error." });
+      return res.status(e.status || 500).json({ message: AppError.publicMessage(e, "Server error.") });
     }
 
     res.status(201).json({ id: lock._id, expiresAt: lock.expiresAt });
@@ -248,7 +239,7 @@ router.post("/", requirePermission(PERMISSIONS.BOOKING_MANAGE), paymentProofUplo
         return b;
       });
     } catch (e) {
-      return res.status(e.status || 500).json({ message: e.message || "Server error." });
+      return res.status(e.status || 500).json({ message: AppError.publicMessage(e, "Server error.") });
     }
 
     await logAudit({ category: "Booking", action: "created", description: `created manual reservation ${booking.reservationCode} for ${booking.guestName}`, user: req.user });
@@ -350,7 +341,7 @@ router.put("/:id/reschedule", ensureAuthenticated, bookingActionLimiter, validat
         return updated;
       });
     } catch (e) {
-      return res.status(e.status || 500).json({ message: e.message || "Server error." });
+      return res.status(e.status || 500).json({ message: AppError.publicMessage(e, "Server error.") });
     }
 
     if (booking.venueClosure?.status === "rescheduled") await deliverNotificationEmails({ limit: 5 });
@@ -379,7 +370,7 @@ router.put("/:id/closure-refund", ensureAuthenticated, bookingActionLimiter, val
     res.json(await Booking.findById(booking._id));
   } catch (err) {
     console.error(err);
-    res.status(err.status || 500).json({ message: err.status ? err.message : "Could not request the refund. Check your reservation before trying again." });
+    res.status(err.status || 500).json({ message: AppError.publicMessage(err, "Could not request the refund. Check your reservation before trying again.") });
   }
 });
 
@@ -398,7 +389,7 @@ router.put("/:id/closure-refund/retry", requirePermission(PERMISSIONS.BOOKING_MA
     await deliverNotificationEmails({ limit: 5 });
     res.json(booking);
   } catch (error) {
-    res.status(error.status || 500).json({ message: error.status ? error.message : "Could not retry the refund. Check the current refund status before trying again." });
+    res.status(error.status || 500).json({ message: AppError.publicMessage(error, "Could not retry the refund. Check the current refund status before trying again.") });
   }
 });
 
@@ -418,7 +409,7 @@ router.put("/:id/cancellation-request", ensureAuthenticated, bookingActionLimite
     res.json(updated);
   } catch (err) {
     console.error(err);
-    res.status(err.status || 500).json({ message: err.message || "Could not request cancellation." });
+    res.status(err.status || 500).json({ message: AppError.publicMessage(err, "Could not request cancellation.") });
   }
 });
 
@@ -452,7 +443,7 @@ router.put("/:id/cancellation-review", requirePermission(PERMISSIONS.BOOKING_MAN
     res.json(booking);
   } catch (err) {
     console.error(err);
-    res.status(err.status || 500).json({ message: err.message || "Could not review cancellation." });
+    res.status(err.status || 500).json({ message: AppError.publicMessage(err, "Could not review cancellation.") });
   }
 });
 
@@ -501,7 +492,7 @@ router.put("/:id/mark-done", requirePermission(PERMISSIONS.BOOKING_MANAGE), vali
     res.json(booking);
   } catch (err) {
     console.error(err);
-    res.status(err.status || 500).json({ message: err.message || "Could not mark this reservation done." });
+    res.status(err.status || 500).json({ message: AppError.publicMessage(err, "Could not mark this reservation done.") });
   }
 });
 
@@ -625,7 +616,7 @@ router.put("/:id", requirePermission(PERMISSIONS.BOOKING_MANAGE), validate(booki
         return updated;
       });
     } catch (e) {
-      return res.status(e.status || 500).json({ message: e.message || "Server error." });
+      return res.status(e.status || 500).json({ message: AppError.publicMessage(e, "Server error.") });
     }
 
     await logAudit({ category: "Booking", action: "updated", description: `${auditChanges.length ? auditChanges.join(' and ') : 'updated'} booking ${booking.reservationCode} for ${booking.guestName}`, user: req.user });
@@ -650,7 +641,7 @@ router.delete("/:id", requirePermission(PERMISSIONS.BOOKING_MANAGE), validate(bo
     res.json({ message: "Reservation deleted." });
   } catch (err) {
     console.error(err);
-    res.status(err.status || 500).json({ message: err.message || "Server error." });
+    res.status(err.status || 500).json({ message: AppError.publicMessage(err, "Server error.") });
   }
 });
 

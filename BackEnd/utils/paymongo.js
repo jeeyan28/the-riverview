@@ -1,4 +1,5 @@
 const crypto = require("crypto");
+const { fetchJson } = require('./http');
 const PAYMONGO_API_BASE = process.env.PAYMONGO_API_BASE || "https://api.paymongo.com/v1";
 const PAYMONGO_ALLOWED_METHODS = ["card", "gcash", "paymaya", "qrph"];
 const PAYMONGO_PAYMENT_METHOD_LABELS = Object.freeze({
@@ -124,41 +125,11 @@ function authHeader() {
 const GATEWAY_ERROR_STATUSES = [502, 503, 504];
 
 async function paymongoRequestOnce(path, { method, body, timeoutMs }) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-
-  let res;
-  try {
-    res = await fetch(`${PAYMONGO_API_BASE}${path}`, {
-      method,
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: authHeader(),
-      },
-      body: body ? JSON.stringify(body) : undefined,
-      signal: controller.signal,
-    });
-  } catch (err) {
-    if (err.name === "AbortError") {
-      const timeoutErr = new Error(`PayMongo API error: request timed out after ${timeoutMs}ms`);
-      timeoutErr.status = 504;
-      timeoutErr.isTimeout = true;
-      throw timeoutErr;
-    }
-    throw err;
-  } finally {
-    clearTimeout(timer);
-  }
-
-  const rawText = await res.text();
-  let json = {};
-  try {
-    json = rawText ? JSON.parse(rawText) : {};
-  } catch {
-    if (!res.ok) {
-      console.error(`PayMongo request to ${path} got a non-JSON ${res.status} response:`, rawText.slice(0, 500));
-    }
-  }
+  const { response: res, data: json, rawText } = await fetchJson(`${PAYMONGO_API_BASE}${path}`, {
+    method, timeoutMs,
+    headers: { "Content-Type": "application/json", Authorization: authHeader() },
+    body: body ? JSON.stringify(body) : undefined,
+  });
 
   if (!res.ok) {
     const detail = json?.errors?.[0]?.detail || res.statusText;
@@ -171,7 +142,7 @@ async function paymongoRequestOnce(path, { method, body, timeoutMs }) {
   return json;
 }
 
-async function paymongoRequest(path, { method = "GET", body, timeoutMs = 15000, retries = 1 } = {}) {
+async function paymongoRequest(path, { method = "GET", body, timeoutMs = 15000, retries = ["GET", "HEAD"].includes(method) ? 1 : 0 } = {}) {
   let attempt = 0;
   for (;;) {
     try {

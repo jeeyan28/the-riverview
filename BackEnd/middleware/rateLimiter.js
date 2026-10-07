@@ -53,6 +53,23 @@ function userOrIpKey(req) {
   return req.user?._id ? String(req.user._id) : ipKeyGenerator(req.ip);
 }
 
+const authActionLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: "Too many authentication requests from this network. Please try again later." },
+});
+
+const passwordChangeLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: userOrIpKey,
+  message: { message: "Too many password change attempts. Please try again later." },
+});
+
 const bookingActionLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 30,
@@ -82,6 +99,8 @@ const paymentAttachLimiter = rateLimit({
 
 module.exports = {
   loginLimiter,
+  authActionLimiter,
+  passwordChangeLimiter,
   forgotPasswordLimiter,
   verifyResetOtpLimiter,
   resetPasswordLimiter,

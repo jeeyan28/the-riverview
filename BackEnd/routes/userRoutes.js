@@ -17,6 +17,8 @@ const { normalizeName, validateName } = require("../utils/nameValidation");
 const { isPasswordStrongEnough, PASSWORD_POLICY_MESSAGE } = require("../utils/passwordPolicy");
 const { logAudit } = require("../utils/auditLog");
 const { validate } = require("../middleware/validate");
+const { setAuthenticatedSession } = require("../utils/sessionPolicy");
+const { passwordChangeLimiter } = require("../middleware/rateLimiter");
 const {
   userIdParamsSchema,
   createUserSchema,
@@ -107,6 +109,7 @@ router.post("/", requirePermission(PERMISSIONS.ADMIN_MANAGE), validate(createUse
       phone: phone || "",
       email: String(email).toLowerCase(),
       role,
+      isVerified: isAdminRole(role),
     });
     await user.setPassword(password);
     await user.save();
@@ -211,7 +214,7 @@ router.put("/:id", ensureAuthenticated, validate(userIdParamsSchema, "params"), 
   }
 });
 
-router.put("/:id/password", ensureAuthenticated, validate(userIdParamsSchema, "params"), validate(changePasswordSchema), async (req, res) => {
+router.put("/:id/password", ensureAuthenticated, passwordChangeLimiter, validate(userIdParamsSchema, "params"), validate(changePasswordSchema), async (req, res) => {
   try {
     const user = await User.findById(req.params.id).select("+password");
     if (!user) return res.status(404).json({ message: "User not found." });
@@ -238,6 +241,12 @@ router.put("/:id/password", ensureAuthenticated, validate(userIdParamsSchema, "p
 
     await user.setPassword(newPassword);
     await user.save();
+
+    if (isSelf) {
+      await new Promise((resolve, reject) => req.session.regenerate(err => err ? reject(err) : resolve()));
+      setAuthenticatedSession(req, user);
+      await new Promise((resolve, reject) => req.session.save(err => err ? reject(err) : resolve()));
+    }
 
     res.json({ message: "Password updated." });
   } catch (err) {

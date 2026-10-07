@@ -163,7 +163,7 @@ roomsRouter.post("/", requirePermission(PERMISSIONS.ROOM_MANAGE), validate(monit
     res.status(201).json(room);
   } catch (err) {
     console.error(err);
-    res.status(err.status || 500).json({ message: err.message || "Server error." });
+    res.status(err.status || 500).json({ message: AppError.publicMessage(err, "Server error.") });
   }
 });
 
@@ -187,7 +187,7 @@ roomsRouter.put("/:id", requireAnyPermission(PERMISSIONS.ROOM_MANAGE, PERMISSION
     res.json(room);
   } catch (err) {
     console.error(err);
-    res.status(err.status || 500).json({ message: err.message || "Server error." });
+    res.status(err.status || 500).json({ message: AppError.publicMessage(err, "Server error.") });
   }
 });
 
@@ -251,7 +251,7 @@ sessionsRouter.get("/start-availability", requirePermission(PERMISSIONS.ROOM_OPE
     res.json(await getSessionStartAvailability(room, Number(req.query.duration)));
   } catch (err) {
     console.error(err);
-    res.status(err.status || 500).json({ message: err.message || "Server error." });
+    res.status(err.status || 500).json({ message: AppError.publicMessage(err, "Server error.") });
   }
 });
 
@@ -481,7 +481,7 @@ sessionsRouter.post("/", requireAnyPermission(PERMISSIONS.ROOM_OPERATE, PERMISSI
     res.status(201).json(session);
   } catch (err) {
     console.error(err);
-    res.status(err.status || 500).json({ message: err.message || "Server error." });
+    res.status(err.status || 500).json({ message: AppError.publicMessage(err, "Server error.") });
   }
 });
 
@@ -501,7 +501,7 @@ sessionsRouter.get("/:id/extend", requirePermission(PERMISSIONS.ROOM_OPERATE), v
     });
   } catch (err) {
     console.error(err);
-    res.status(err.status || 500).json({ message: err.message || "Server error." });
+    res.status(err.status || 500).json({ message: AppError.publicMessage(err, "Server error.") });
   }
 });
 
@@ -534,7 +534,7 @@ sessionsRouter.put("/:id/extend", requirePermission(PERMISSIONS.ROOM_OPERATE), v
     res.json(session);
   } catch (err) {
     console.error(err);
-    res.status(err.status || 500).json({ message: err.message || "Server error." });
+    res.status(err.status || 500).json({ message: AppError.publicMessage(err, "Server error.") });
   }
 });
 
@@ -570,7 +570,7 @@ sessionsRouter.put("/:id/end", requirePermission(PERMISSIONS.ROOM_OPERATE), vali
     res.json({ ...session.toObject(), roomDeleted });
   } catch (err) {
     console.error(err);
-    res.status(err.status || 500).json({ message: err.message || "Server error." });
+    res.status(err.status || 500).json({ message: AppError.publicMessage(err, "Server error.") });
   }
 });
 
@@ -612,7 +612,7 @@ sessionsRouter.put("/:id", requirePermission(PERMISSIONS.ROOM_OPERATE), validate
     res.json(session);
   } catch (err) {
     console.error(err);
-    res.status(err.status || 500).json({ message: err.message || "Server error." });
+    res.status(err.status || 500).json({ message: AppError.publicMessage(err, "Server error.") });
   }
 });
 

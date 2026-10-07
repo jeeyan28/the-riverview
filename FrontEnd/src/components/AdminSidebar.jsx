@@ -19,6 +19,8 @@ import {
   X,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import Toast from './Toast';
+import { useToast } from '../hooks/useToast';
 import logo from '../assets/logo/logoo.png';
 
 const SIDEBAR_COLLAPSED_KEY = 'rv_admin_sidebar_collapsed';
@@ -111,6 +113,9 @@ function AdminSidebar({ compact = false, mobileOpen = false, onClose, triggerRef
   const navRef = useRef(null);
   const sidebarRef = useRef(null);
   const closeButtonRef = useRef(null);
+  const logoutInFlight = useRef(false);
+  const [logoutPending, setLogoutPending] = useState(false);
+  const { toast, showToast } = useToast();
 
   const [collapsed, setCollapsed] = useState(() => {
     try {
@@ -170,8 +175,18 @@ function AdminSidebar({ compact = false, mobileOpen = false, onClose, triggerRef
   }, [compact, mobileOpen, onClose, triggerRef]);
 
   async function handleLogout() {
-    await logout();
-    navigate('/login', { replace: true });
+    if (logoutInFlight.current) return;
+    logoutInFlight.current = true;
+    setLogoutPending(true);
+    try {
+      await logout();
+      navigate('/login', { replace: true });
+    } catch (error) {
+      showToast(error.message, 'error');
+    } finally {
+      logoutInFlight.current = false;
+      setLogoutPending(false);
+    }
   }
 
   return (
@@ -265,13 +280,15 @@ function AdminSidebar({ compact = false, mobileOpen = false, onClose, triggerRef
             className="sb-logout-button"
             id="admin-logout-btn"
             onClick={handleLogout}
+            disabled={logoutPending}
             title="Logout"
-            aria-label="Log out"
+            aria-label={logoutPending ? 'Logging out' : 'Log out'}
           >
             <LogOut size={18} aria-hidden="true" />
           </button>
         </div>
       </div>
+      <Toast {...toast} />
     </aside>
   );
 }

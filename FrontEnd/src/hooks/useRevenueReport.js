@@ -27,14 +27,15 @@ export function useRevenueReport(from, to, source) {
     setLoading(true);
     setError('');
     setData(null);
-    reportsService.getRange(from, to, source).then((result) => {
+    const controller = new AbortController();
+    reportsService.getRange(from, to, source, { signal: controller.signal }).then((result) => {
       if (!cancelled) setData(result);
     }).catch((err) => {
       if (!cancelled) setError(err.message);
     }).finally(() => {
       if (!cancelled) setLoading(false);
     });
-    return () => { cancelled = true; };
+    return () => { cancelled = true; controller.abort(); };
   }, [from, to, source, revision]);
 
   return { data, loading, error, reload: () => setRevision((value) => value + 1) };

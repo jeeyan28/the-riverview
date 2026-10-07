@@ -1,4 +1,4 @@
-import { API_BASE_URL, apiRequest } from './api';
+import { apiDownload, apiRequest } from './api';
 
 const BASE = '/api/reports';
 
@@ -6,34 +6,17 @@ export const reportsService = {
   getConfirmedBookingTrend(interval) {
     return apiRequest(`${BASE}/confirmed-booking-trend?interval=${encodeURIComponent(interval)}`, { fallbackMessage: 'Could not load confirmed reservations.' });
   },
-  getRange(from, to, source = 'all') {
+  getRange(from, to, source = 'all', options = {}) {
     const qs = new URLSearchParams({ from, to, source });
-    return apiRequest(`${BASE}?${qs}`, { fallbackMessage: 'Could not load sales for this date range.' });
+    return apiRequest(`${BASE}?${qs}`, { ...options, fallbackMessage: 'Could not load sales for this date range.' });
   },
 
-  async exportRange(from, to, source = 'all') {
+  exportRange(from, to, source = 'all') {
     const qs = new URLSearchParams({ from, to, source });
-    const res = await fetch(`${API_BASE_URL}${BASE}/export?${qs.toString()}`, { credentials: 'include' });
-
-    if (!res.ok) {
-      const body = await res.json().catch(() => ({}));
-      const err = new Error(body.message || 'Failed to generate report.');
-      err.status = res.status;
-      throw err;
-    }
-
-    const blob = await res.blob();
-    const disposition = res.headers.get('Content-Disposition') || '';
-    const match = disposition.match(/filename="([^"]+)"/);
-    const filename = match ? match[1] : `Riverview-Report_${from}_to_${to}.xlsx`;
-
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
+    return apiDownload(`${BASE}/export?${qs}`, {
+      filename: `Riverview-Report_${from}_to_${to}.xlsx`,
+      contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      fallbackMessage: 'Failed to generate report.',
+    });
   },
 };
