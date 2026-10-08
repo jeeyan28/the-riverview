@@ -2,26 +2,21 @@ const express = require("express");
 const router = express.Router();
 const Booking = require("../model/booking");
 const XenditPaymentAttempt = require("../model/xenditPaymentAttempt");
+const PaymentAttempt = require('../model/paymentAttempt');
 const { ensureAuthenticated } = require("../middleware/adminAuth");
-const { finalizeBookingFromPayment } = require("../utils/bookingHelper");
+const { finalizeVerifiedAttempt, fingerprint } = require('../utils/paymentAttempts');
 const { getVerifiedPayment, verifyWebhookToken } = require("../utils/xendit");
 const { isAdminRole } = require("../utils/permissions");
 
 async function checkAttempt(attempt) {
-  const existing = await Booking.findOne({ xenditPaymentSessionId: attempt.sessionId });
+  const sessionId = attempt.providerId || attempt.sessionId;
+  const existing = await Booking.findOne({ xenditPaymentSessionId: sessionId });
   if (existing) return { status: existing.status, paymentStatus: existing.paymentStatus, bookingId: existing._id, reservationCode: existing.reservationCode };
 
-  const verified = await getVerifiedPayment(attempt);
+  const verified = await getVerifiedPayment({ referenceId: attempt.referenceId || attempt._id, sessionId, amount: attempt.expectedMinor ? attempt.expectedMinor / 100 : attempt.amount });
   if (verified.status !== "succeeded") return { status: verified.status, paymentStatus: "Unpaid" };
   try {
-    const booking = await finalizeBookingFromPayment({
-      provider: "xendit",
-      paymentIntentId: attempt.sessionId,
-      metadata: attempt.metadata,
-      paidPaymentId: verified.paymentId,
-      paymentMethodType: verified.paymentMethodType,
-    });
-    return { status: booking.status, paymentStatus: booking.paymentStatus, bookingId: booking._id, reservationCode: booking.reservationCode };
+    return await finalizeVerifiedAttempt(attempt, { paymentId: verified.paymentId, paymentMethodType: verified.paymentMethodType });
   } catch (error) {
     if (error.slotUnavailable) {
       console.error(`Xendit payment ${attempt.sessionId} succeeded but the slot is unavailable — manual review/refund required.`);
@@ -35,7 +30,7 @@ router.get("/status/:referenceId", ensureAuthenticated, async (req, res) => {
   try {
     const { referenceId } = req.params;
     if (!/^rv-[0-9a-f-]{36}$/.test(referenceId)) return res.status(400).json({ message: "Invalid payment reference." });
-    const attempt = await XenditPaymentAttempt.findOne({ referenceId });
+    const attempt = await findAttempt(referenceId);
     if (!attempt) return res.status(404).json({ message: "Payment session not found." });
     if (String(attempt.bookedBy) !== String(req.user._id) && !isAdminRole(req.user.role)) {
       return res.status(403).json({ message: "Not allowed." });
@@ -64,9 +59,18 @@ async function webhookHandler(req, res) {
     }
   }
   if (event?.event !== "payment_session.completed") return res.status(200).json({ received: true });
-  const attempt = await XenditPaymentAttempt.findOne({ sessionId: event?.data?.payment_session_id });
-  if (!attempt) return res.status(404).json({ message: "Unknown payment session." });
   try {
+    const sessionId = event?.data?.payment_session_id;
+    let attempt = await PaymentAttempt.findOne({ provider: 'xendit', providerId: sessionId }).select('+metadata');
+    if (!attempt && event?.data?.reference_id) {
+      attempt = await findAttempt(event.data.reference_id);
+      if (attempt && !attempt.providerId) {
+        await getVerifiedPayment({ referenceId: attempt._id, sessionId, amount: attempt.expectedMinor / 100 });
+        await PaymentAttempt.updateOne({ _id: attempt._id, providerId: null }, { $set: { providerId: sessionId } });
+        attempt.providerId = sessionId;
+      }
+    }
+    if (!attempt) return res.status(404).json({ message: 'Unknown payment session.' });
     await checkAttempt(attempt);
     return res.status(200).json({ received: true });
   } catch (error) {
@@ -75,4 +79,16 @@ async function webhookHandler(req, res) {
   }
 }
 
-module.exports = { router, webhookHandler, checkAttempt };
+async function findAttempt(referenceId) {
+  const current = await PaymentAttempt.findOne({ _id: referenceId, provider: 'xendit' }).select('+metadata');
+  if (current) return current;
+  const legacy = await XenditPaymentAttempt.findOne({ referenceId });
+  if (!legacy) return null;
+  return PaymentAttempt.findOneAndUpdate({ _id: referenceId }, { $setOnInsert: {
+    provider: 'xendit', providerId: legacy.sessionId, bookedBy: legacy.bookedBy, room: legacy.metadata.roomId,
+    flowKey: `legacy:${legacy._id}`, clientKey: `legacy:${legacy._id}`, metadata: legacy.metadata,
+    expectedMinor: Math.round(legacy.amount * 100), fingerprint: fingerprint(legacy.metadata), state: 'pending',
+    events: [{ action: 'legacy_attempt_imported' }],
+  } }, { upsert: true, returnDocument: 'after', runValidators: true }).select('+metadata');
+}
+module.exports = { router, webhookHandler, checkAttempt, findAttempt };

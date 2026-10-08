@@ -6,11 +6,16 @@ function roundMoney(value) {
 
 function parsePaxCapacity(value) {
   if (!value) return null;
-  const text = String(value);
-  const paxMatches = [...text.matchAll(/(\d+)\s*(?:pax|guests?|people)/gi)].map((match) => Number(match[1]));
-  const matches = paxMatches.length ? paxMatches : (text.match(/\d+/g) || []).map(Number);
-  const capacity = matches.length ? Math.max(...matches) : 0;
-  return capacity > 0 ? capacity : null;
+  const text = String(value).trim();
+  if (/(?:^|\s)-\d|\d+\.\d/.test(text)) return null;
+  const range = text.match(/(\d+)\s*[-–]\s*(\d+)\s*(?:pax|guests?|people)?$/i);
+  if (range && (Number(range[1]) > Number(range[2]) || Number(range[1]) < 1 || Number(range[2]) > 100)) return null;
+  const explicit = [...text.matchAll(/(?:^|[^\d.])(\d+)\s*(?:pax|guests?|people)\b/gi)].map(match => Number(match[1]));
+  const numeric = /^\d+(?:\s*[-–]\s*\d+)?$/.test(text) ? (text.match(/\d+/g) || []).map(Number) : [];
+  const values = explicit.length ? explicit : numeric;
+  if (!values.length || values.some(number => number < 1 || number > 100)) return null;
+  if (numeric.length === 2 && numeric[0] > numeric[1]) return null;
+  return Math.max(...values);
 }
 
 function parseHour(value, fallback = 0) {

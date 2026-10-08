@@ -13,6 +13,7 @@ const paymentIntentIdParamsSchema = Joi.object({
 });
 
 const createIntentSchema = Joi.object({
+  attemptKey: Joi.string().guid({ version: ['uuidv4'] }),
   guestName: Joi.string().trim().min(1).max(120).required(),
   guestContact: guestPhone.required(),
   guestEmail: guestEmail.required(),

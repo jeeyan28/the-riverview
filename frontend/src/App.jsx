@@ -1,8 +1,7 @@
-import { lazy, Suspense } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { lazy, Suspense, useEffect } from 'react';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import MainLayout from './layouts/MainLayout';
 import AuthLayout from './layouts/AuthLayout';
-import AdminLayout from './layouts/AdminLayout';
 import { useAuth } from './context/AuthContext';
 import Login from './pages/Login';
 import { isAdminReturnPath } from './utils/auth';
@@ -10,6 +9,7 @@ import PageSkeleton from './components/PageSkeleton';
 import { isLobbyPresentationReceiver } from './utils/lobbyPresentation';
 
 const Home = lazy(() => import('./pages/Home'));
+const AdminLayout = lazy(() => import('./layouts/AdminLayout'));
 const Rooms = lazy(() => import('./pages/Rooms'));
 const FacilityDetails = lazy(() => import('./pages/FacilityDetails'));
 const Contact = lazy(() => import('./pages/Contact'));
@@ -57,7 +57,30 @@ function LegacyAdminLoginRedirect() {
   return <Navigate to={isAdminReturnPath(returnTo) ? returnTo : '/admin'} replace />;
 }
 
+function PaymentPopupReturn() {
+  function returnToReservation() {
+    try { window.opener?.focus(); } catch {}
+    window.close();
+  }
+
+  useEffect(returnToReservation, []);
+
+  return <main className="route-fallback payment-popup-return">
+    <section>
+      <h1>Returning to your reservation</h1>
+      <p role="status">Payment status is being checked in your original tab. You can close this window.</p>
+      <button type="button" onClick={returnToReservation}>Return to reservation</button>
+    </section>
+  </main>;
+}
+
 function App() {
+  const { pathname, search } = useLocation();
+  const params = new URLSearchParams(search);
+  if (pathname === '/' && params.get('paymongo') && params.get('paymentIntentId') && window.opener && !window.opener.closed) {
+    return <PaymentPopupReturn />;
+  }
+
   return (
     <Suspense fallback={<PageSkeleton />}>
       <Routes>

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -12,6 +12,9 @@ import {
   UsersRound,
 } from 'lucide-react';
 import BookingModal from '../components/BookingModal';
+import { readCheckoutAttempt } from '../hooks/useCheckoutAttempt';
+import GuestAvailability from '../components/GuestAvailability';
+import { loadReservationDraft, saveReservationDraft } from '../utils/reservationDraft';
 import { useSiteSettings } from '../hooks/useSiteSettings';
 import { roomsService } from '../services/rooms';
 import { getPaxCapacity, priceOptionsFor } from '../utils/rooms';
@@ -41,15 +44,7 @@ function sectionId(label, index) {
   return `room-${slug || index + 1}`;
 }
 
-function ReservationAction({ user, roomId, variantLabel = '', className, disabled = false, onStart, children }) {
-  if (!user && !disabled) {
-    return (
-      <Link className={className} to={buildLoginPath(buildRoomReservationPath(roomId, variantLabel))}>
-        {children}
-      </Link>
-    );
-  }
-
+function ReservationAction({ variantLabel = '', className, disabled = false, onStart, children }) {
   return (
     <button type="button" className={className} onClick={() => onStart(variantLabel)} disabled={disabled}>
       {children}
@@ -61,13 +56,16 @@ function FacilityDetails() {
   const { roomId } = useParams();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { user } = useAuth();
+  const { user, initializing, sessionVerified } = useAuth();
   const { settings, openHour, closeHour } = useSiteSettings();
   const [room, setRoom] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [bookingRoom, setBookingRoom] = useState(null);
   const [initialVariantLabel, setInitialVariantLabel] = useState('');
+  const [draft, setDraft] = useState(() => loadReservationDraft(roomId));
+  const [notice, setNotice] = useState('');
+  const intentRef = useRef('');
   const reserveIntent = searchParams.get('reserve') === '1';
   const reserveVariant = searchParams.get('variant') || '';
 
@@ -100,38 +98,47 @@ function FacilityDetails() {
   }, [room?.name]);
 
   const variants = useMemo(() => room ? priceOptionsFor(room) : [], [room]);
+  useEffect(() => {
+    if (room && user && sessionVerified && readCheckoutAttempt()?.roomId === room._id) setBookingRoom(room);
+  }, [room, user, sessionVerified]);
   const summary = useMemo(() => {
     const prices = variants.flatMap(availablePrices);
-    const capacities = variants.map((variant) => getPaxCapacity(variant.pax)).filter(Number.isFinite);
+    const capacities = variants.map((variant) => getPaxCapacity(variant.pax) || Number(room?.capacity) || null).filter(Number.isFinite);
     return {
       startingPrice: prices.length ? Math.min(...prices) : 0,
       units: variants.reduce((total, variant) => total + (Number(variant.roomCount) || 1), 0),
       maxGuests: capacities.length ? Math.max(...capacities) : null,
     };
-  }, [variants]);
+  }, [variants, room?.capacity]);
 
   useEffect(() => {
-    if (!room || !reserveIntent) return;
+    if (!room || initializing || !reserveIntent) return;
     const returnPath = buildRoomReservationPath(room._id, reserveVariant);
     if (!user) {
-      navigate(buildLoginPath(returnPath), { replace: true });
+      if (loadReservationDraft(room._id)) navigate(buildLoginPath(returnPath), { replace: true });
+      else { setInitialVariantLabel(reserveVariant); document.getElementById('availability')?.scrollIntoView({ block: 'start' }); }
       return;
     }
-    setInitialVariantLabel(reserveVariant);
-    setBookingRoom(room);
-    const nextParams = new URLSearchParams(searchParams);
-    nextParams.delete('reserve');
-    nextParams.delete('variant');
-    setSearchParams(nextParams, { replace: true });
-  }, [room, reserveIntent, reserveVariant, user, navigate, searchParams, setSearchParams]);
+    if (!sessionVerified || intentRef.current === returnPath) return;
+    intentRef.current = returnPath;
+    const saved = loadReservationDraft(room._id);
+    setInitialVariantLabel(saved?.variantLabel || reserveVariant); setDraft(saved);
+    if (saved) setBookingRoom(room);
+    else document.getElementById('availability')?.scrollIntoView({ block: 'start' });
+    const nextParams = new URLSearchParams(searchParams); nextParams.delete('reserve'); nextParams.delete('variant'); setSearchParams(nextParams, { replace: true });
+  }, [room, reserveIntent, reserveVariant, user, initializing, sessionVerified, navigate, searchParams, setSearchParams]);
 
   function startBooking(variantLabel = '') {
-    if (!user) {
-      navigate(buildLoginPath(buildRoomReservationPath(room._id, variantLabel)));
-      return;
-    }
     setInitialVariantLabel(variantLabel);
-    setBookingRoom(room);
+    document.getElementById('availability')?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth', block: 'start' });
+  }
+  function continueDraft(selection) {
+    const saved = saveReservationDraft(selection);
+    if (!saved) { setNotice('Choose a valid future slot before continuing.'); return; }
+    setDraft(saved);
+    if (!user) { navigate(buildLoginPath(buildRoomReservationPath(room._id, saved.variantLabel))); return; }
+    if (!sessionVerified) { setNotice('Retry your session check before reserving. Your selections are saved.'); return; }
+    setInitialVariantLabel(saved.variantLabel); setBookingRoom(room);
   }
 
   if (loading) {
@@ -171,7 +178,7 @@ function FacilityDetails() {
               <p>{room.description || 'Explore every managed room type, hourly rate, capacity, and amenity before choosing your schedule.'}</p>
               <div className="fd-hero-actions">
                 <ReservationAction user={user} roomId={room._id} className="fd-primary-button" onStart={startBooking}>
-                  <CalendarCheck size={18} aria-hidden="true" /> Start reservation
+                  <CalendarCheck size={18} aria-hidden="true" /> Check availability
                 </ReservationAction>
                 <a href="#room-types" className="fd-secondary-link">Compare rooms <ArrowRight size={17} aria-hidden="true" /></a>
               </div>
@@ -187,6 +194,8 @@ function FacilityDetails() {
       </header>
 
       <div className="fd-content">
+        {notice && <p className="service-feedback" role="status">{notice}</p>}
+        <GuestAvailability key={room._id} room={room} initialVariantLabel={initialVariantLabel} initialDraft={draft} onContinue={continueDraft} />
         <aside className="fd-booking-guide" aria-labelledby="fd-guide-title">
           <div>
             <Layers3 size={20} aria-hidden="true" />
@@ -235,7 +244,7 @@ function FacilityDetails() {
                       <div><dt><DoorOpen size={15} aria-hidden="true" /> Units</dt><dd>{roomCount} {roomCount === 1 ? 'room' : 'rooms'}</dd></div>
                       <div><dt><Clock3 size={15} aria-hidden="true" /> Billing</dt><dd>Whole hour</dd></div>
                       {Number(variant.extraGuestFee) > 0 && (
-                        <div><dt><UsersRound size={15} aria-hidden="true" /> Extra guests</dt><dd>{money(variant.extraGuestFee)}/guest/hr after {Number(variant.includedGuests) || 0}</dd></div>
+                        <div><dt><UsersRound size={15} aria-hidden="true" /> Extra guests</dt><dd>{Number(variant.includedGuests) > 0 ? money(variant.extraGuestFee) + '/guest/hr above ' + variant.includedGuests + ' included guests' : money(variant.extraGuestFee) + '/guest/hr for every guest, plus room rate'}</dd></div>
                       )}
                     </dl>
 
@@ -269,6 +278,8 @@ function FacilityDetails() {
       <BookingModal
         room={bookingRoom}
         initialVariantLabel={initialVariantLabel}
+        initialDraft={draft}
+       
         onClose={() => {
           setBookingRoom(null);
           setInitialVariantLabel('');

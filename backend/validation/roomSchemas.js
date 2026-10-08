@@ -1,4 +1,5 @@
 const { Joi } = require("../middleware/validate");
+const { parsePaxCapacity } = require('../utils/roomPricing');
 
 const hourlyTime = Joi.string().pattern(/^(?:[01]\d|2[0-3]):00$/);
 const roomIdParamsSchema = Joi.object({
@@ -9,7 +10,7 @@ const emptyBodySchema = Joi.object({}).default({});
 const roomVariantSchema = Joi.object({
   label: Joi.string().trim().min(1).max(100).required(),
   price: Joi.number().min(0).precision(2).required(),
-  pax: Joi.string().trim().allow("").max(80),
+  pax: Joi.string().trim().allow("").max(80).custom((value, helpers) => /\d/.test(value) && !parsePaxCapacity(value) ? helpers.message('Guest capacity must be 1–100 guests, or blank when unknown.') : value),
   startingRoomNumber: Joi.number().integer().valid(1).default(1),
   roomCount: Joi.number().integer().min(1).max(100).default(1),
   status: Joi.string().valid("Available", "Maintenance", "Unavailable").default("Available"),

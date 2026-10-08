@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { getPaxCapacity } from '../utils/rooms';
 import { facilityImage } from '../utils/facilityImage';
 import { effectiveDiscountPercent, variantRateLabel } from '../utils/roomPricing';
 
@@ -56,7 +57,7 @@ function RoomOptionCard({ option, room, selected = false, disabled = false, onSe
     >
       <div className="bk-room-option-collapsed">
         <div className="bk-room-option-img">
-          {cardImage ? <img src={cardImage} alt={option.label || 'Room'} /> : <span className="facility-name-placeholder">{option.label || 'Untitled Room'}</span>}
+          {cardImage ? <img src={cardImage} alt={option.label || 'Room'} width="240" height="160" loading="lazy" decoding="async" /> : <span className="facility-name-placeholder">{option.label || 'Untitled Room'}</span>}
         </div>
         <div className="bk-room-option-body">
           <div className="bk-room-option-top">
@@ -70,9 +71,7 @@ function RoomOptionCard({ option, room, selected = false, disabled = false, onSe
               </span>
             )}
           </div>
-          {option.pax && (
-            <p className="bk-room-option-pax"><i className="fa-solid fa-users"></i> {option.pax}</p>
-          )}
+          <p className="bk-room-option-pax"><i className="fa-solid fa-users" aria-hidden="true"></i> {getPaxCapacity(option.pax) || Number(room?.capacity) > 0 ? `Up to ${getPaxCapacity(option.pax) || Number(room.capacity)} guests` : 'Contact us to confirm group capacity'}</p>
           {features && features.length > 0 && (
             <ul className="bk-room-option-amenities-row">
               {features.map((f, fi) => (
@@ -106,7 +105,7 @@ function RoomOptionCard({ option, room, selected = false, disabled = false, onSe
           <div className="bk-room-option-detail-facts">
             <span><strong>{totalRooms}</strong> unit{totalRooms === 1 ? '' : 's'}</span>
             {showAvailability && <span><strong>{availableCount}</strong> available for this time</span>}
-            {Number(option.extraGuestFee) > 0 && <span><strong>₱{Number(option.extraGuestFee).toLocaleString()}</strong> per extra guest/hour after {Number(option.includedGuests) || 0}</span>}
+            {Number(option.extraGuestFee) > 0 && <span><strong>₱{Number(option.extraGuestFee).toLocaleString()}</strong> per guest/hour {Number(option.includedGuests) > 0 ? `above ${Number(option.includedGuests)} included guests` : 'for every guest, plus the room rate'}</span>}
           </div>
         </div>
       )}

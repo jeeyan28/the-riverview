@@ -4,6 +4,7 @@ import { BOOKING_STATUS } from '../utils/bookingStatus';
 const BASE = '/api/bookings';
 
 export const bookingsService = {
+  slots: (selection, options = {}) => apiRequest(`${BASE}/slots?${new URLSearchParams(Object.entries(selection).filter(([, value]) => value !== undefined && value !== null))}`, { ...options, fallbackMessage: 'We could not load availability. Please try again.' }),
   get: (id, options = {}) => apiRequest(`${BASE}/${encodeURIComponent(id)}`, { ...options, fallbackMessage: 'Could not load this reservation.' }),
 
   listActive: () => apiRequest(`${BASE}?status=${BOOKING_STATUS.ONGOING}`, { fallbackMessage: 'Failed to load reservations for the room monitor.' }),
@@ -14,10 +15,10 @@ export const bookingsService = {
 
   create: (payload) => apiRequest(BASE, { method: 'POST', body: payload, fallbackMessage: 'Failed to create the reservation.' }),
 
-  availability: ({ roomId, date, variantLabel }) => {
+  availability: ({ roomId, date, variantLabel }, options = {}) => {
     const params = new URLSearchParams({ roomId, date });
     if (variantLabel) params.set('variantLabel', variantLabel);
-    return apiRequest(`${BASE}/availability?${params}`, { fallbackMessage: 'Could not check reservation availability.' });
+    return apiRequest(`${BASE}/availability?${params}`, { ...options, fallbackMessage: 'Could not check reservation availability.' });
   },
 
   list: (params = {}) => {

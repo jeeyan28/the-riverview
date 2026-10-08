@@ -1,6 +1,7 @@
-import { useEffect, useRef } from 'react';
+import { useRef } from 'react';
 import '../styles/confirm-dialog.css';
 import ModalPortal from './ModalPortal';
+import { useDialogFocus } from '../hooks/useDialogFocus';
 
 const ICONS = {
   question: (
@@ -33,22 +34,8 @@ function ConfirmDialog({
 }) {
   const confirmBtnRef = useRef(null);
 
-  useEffect(() => {
-    if (!open) return;
-
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    confirmBtnRef.current?.focus();
-
-    function onKey(e) {
-      if (e.key === 'Escape' && !cancelDisabled) onCancel();
-    }
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('keydown', onKey);
-      document.body.style.overflow = previousOverflow;
-    };
-  }, [open, onConfirm, onCancel, confirmDisabled, cancelDisabled]);
+  const dialogRef = useRef(null);
+  useDialogFocus(open, dialogRef, () => { if (!cancelDisabled) onCancel(); });
 
   if (!open) return null;
 
@@ -56,7 +43,7 @@ function ConfirmDialog({
 
   return (
     <ModalPortal>
-      <div className="uimodal-overlay uimodal-show" role="dialog" aria-modal="true" aria-labelledby="confirmation-dialog-title">
+      <div className="uimodal-overlay uimodal-show" ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="confirmation-dialog-title">
         <div className="uimodal-box">
           <div className={`uimodal-icon${danger ? ' uimodal-danger' : ''}`}>
             {danger ? ICONS.danger : ICONS.question}

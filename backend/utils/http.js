@@ -1,6 +1,11 @@
 const AppError = require('./appError');
+const { remainingJobMs } = require('./jobDeadline');
 
 async function fetchJson(url, { timeoutMs = 15000, ...options } = {}) {
+  if (process.env.APP_MODE === 'demo') throw new AppError(403, 'External provider requests are disabled in the synthetic demo.');
+  const remaining = remainingJobMs();
+  if (remaining < 1000) throw new AppError(503, 'This processing run reached its deadline. The recorded operation will be checked on the next run.');
+  timeoutMs = Math.min(timeoutMs, Math.max(1, remaining - 500));
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {

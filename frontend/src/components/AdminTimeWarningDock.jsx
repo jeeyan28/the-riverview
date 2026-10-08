@@ -8,7 +8,6 @@ const AUTO_DISMISS_MS = 3000;
 function AdminTimeWarningDock() {
   const { sessions, bookings } = useAdminTimeWarnings();
   const [dismissed, setDismissed] = useState(() => new Set());
-  const [, forceUpdate] = useState(0);
 
   const warnings = buildTimeWarnings(sessions, bookings).filter((item) => !dismissed.has(item.key));
   const visible = warnings.slice(0, MAX_VISIBLE);

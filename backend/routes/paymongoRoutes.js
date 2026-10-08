@@ -1,12 +1,12 @@
 const express = require("express");
 const AppError = require("../utils/appError");
-const { randomUUID } = require("node:crypto");
 const router = express.Router();
 const Booking = require("../model/booking");
 const BookingLock = require("../model/bookingLock");
-const XenditPaymentAttempt = require("../model/xenditPaymentAttempt");
+const PaymentAttempt = require("../model/paymentAttempt");
+const { prepareAttempt, markUncertain, verifyPaymongoIntent, finalizeVerifiedAttempt } = require("../utils/paymentAttempts");
 const { ensureAuthenticated } = require("../middleware/adminAuth");
-const { validateAndPriceBooking, finalizeBookingFromPayment } = require("../utils/bookingHelper");
+const { validateAndPriceBooking } = require("../utils/bookingHelper");
 const { quoteOnlineBooking } = require("../utils/roomPricing");
 const {
   getPublicKey,
@@ -22,10 +22,10 @@ const {
 } = require("../utils/paymongo");
 const { isAdminRole } = require("../utils/permissions");
 const { EMAIL_RE } = require("../utils/constants");
-const { validate } = require("../middleware/validate");
+const { validate, Joi } = require("../middleware/validate");
 const { paymentIntentIdParamsSchema, createIntentSchema, attachIntentSchema } = require("../validation/paymentSchemas");
 const { paymentIntentLimiter, paymentAttachLimiter } = require("../middleware/rateLimiter");
-const { createSession: createXenditSession, isConfigured: isXenditConfigured, isPaymongoUnavailable } = require("../utils/xendit");
+const { createSession: createXenditSession, isConfigured: isXenditConfigured } = require("../utils/xendit");
 
 function getReturnBaseUrl() {
   return (
@@ -49,13 +49,37 @@ function toBookingMetadata(fields) {
   return out;
 }
 
+const checkoutAttemptIdParams = Joi.object({ id: Joi.string().pattern(/^rv-[0-9a-f-]{36}$/).required() });
+const checkoutAttemptKeyParams = Joi.object({ key: Joi.string().guid({ version: 'uuidv4' }).required() });
+async function customerCheckoutStatus(req, res) {
+  const identity = req.params.id ? { _id: req.params.id } : { clientKey: req.params.key };
+  const attempt = await PaymentAttempt.findOne({ ...identity, bookedBy: req.user._id }).select('state issue booking providerId');
+  if (!attempt) throw new AppError(404, 'The original checkout has not been recorded. Retry using the same checkout identity.');
+  if (['pending', 'uncertain'].includes(attempt.state) && attempt.providerId) {
+    return res.json(await require('../utils/paymentReconciliation').recheckAttempt(attempt._id, { actor: req.user, includeCheckout: true }));
+  }
+  res.json({ status: attempt.issue === 'paid_unbooked' ? 'paid_slot_unavailable' : attempt.booking ? 'succeeded' : attempt.state === 'uncertain' ? 'checking' : attempt.state,
+    attemptId: attempt._id, bookingId: attempt.booking,
+    message: attempt.state === 'uncertain' ? 'We are checking your payment. Please do not start another payment.' : undefined });
+}
+router.get('/attempts/client/:key', ensureAuthenticated, validate(checkoutAttemptKeyParams, 'params'), customerCheckoutStatus);
+router.get('/attempts/:id', ensureAuthenticated, validate(checkoutAttemptIdParams, 'params'), customerCheckoutStatus);
+
 router.get("/config", (req, res) => {
+  if (process.env.APP_MODE === 'demo') return res.json({ gateway: 'demo', publicKey: '', paymentMethods: [] });
   try {
     res.json({ publicKey: getPublicKey(), paymentMethods: PAYMONGO_ALLOWED_METHODS });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Server error." });
   }
+});
+
+router.post('/demo/:id/confirm', ensureAuthenticated, async (req, res) => {
+  if (process.env.APP_MODE !== 'demo') return res.status(404).json({ message: 'Not found.' });
+  const attempt = await PaymentAttempt.findOne({ _id: req.params.id, provider: 'demo', bookedBy: req.user._id }).select('+metadata');
+  if (!attempt) throw new AppError(404, 'Synthetic checkout not found.');
+  res.json(await finalizeVerifiedAttempt(attempt, { paymentId: 'pay_demo_' + attempt._id, paymentMethodType: 'demo' }));
 });
 
 router.post("/intent", ensureAuthenticated, paymentIntentLimiter, validate(createIntentSchema), async (req, res) => {
@@ -117,47 +141,42 @@ router.post("/intent", ensureAuthenticated, paymentIntentLimiter, validate(creat
       bookedBy: req.session.userId,
     });
     const description = `${paymentChoice === "full" ? "Full payment" : "One-hour down payment"} — ${room.name} (${date} ${new Date(`${date}T${timeIn}:00+08:00`).toLocaleTimeString('en-US', { timeZone: 'Asia/Manila', hour: 'numeric', minute: '2-digit', hour12: true })})`;
-    let intent;
-    try {
-      intent = await createPaymentIntent({
-        amountPesos: downPayment,
-        description,
-        statementDescriptor: room.name,
-        metadata,
-      });
-    } catch (paymongoErr) {
-      console.error("PayMongo payment intent creation failed:", paymongoErr);
-      if (isPaymongoUnavailable(paymongoErr) && isXenditConfigured()) {
-        try {
-          const referenceId = `rv-${randomUUID()}`;
-          const session = await createXenditSession({
-            referenceId,
-            amount: downPayment,
-            expiresAt: activeLock.expiresAt,
-            description,
-          });
-          await XenditPaymentAttempt.create({
-            referenceId,
-            sessionId: session.sessionId,
-            bookedBy: req.user._id,
-            amount: downPayment,
-            metadata,
-          });
-          return res.status(201).json({ gateway: "xendit", referenceId, redirectUrl: session.redirectUrl, amount: downPayment });
-        } catch (backupError) {
-          console.error("Xendit backup checkout failed:", backupError);
-          return res.status(502).json({ message: "Both online payment gateways are unavailable. Please try again shortly." });
-        }
-      }
-      return res.status(502).json({ message: paymongoErr.message || "Could not start online payment. Please try again." });
+    const provider = process.env.APP_MODE === 'demo' ? 'demo' : !process.env.PAYMONGO_SECRET_KEY && isXenditConfigured() ? 'xendit' : 'paymongo';
+    const attempt = await prepareAttempt({ provider, hold: activeLock, user: req.user, metadata, clientKey: req.body.attemptKey });
+    const pendingResponse = () => res.status(202).json({ gateway: attempt.provider, attemptId: attempt._id, status: 'checking', message: 'We are checking your payment. Please do not start another payment.' });
+    if (provider === 'demo') {
+      if (attempt.state === 'unpaid') await PaymentAttempt.updateOne({ _id: attempt._id, state: 'unpaid' }, { $set: { state: 'pending', providerId: `pi_demo_${attempt._id}`, nextCheckAt: null }, $push: { events: { action: 'synthetic_checkout_created', note: 'No provider was contacted.' } } });
+      return res.json({ gateway: 'demo', attemptId: attempt._id, amount: downPayment, status: 'pending' });
     }
-
-    res.status(201).json({
-      gateway: "paymongo",
-      paymentIntentId: intent.data.id,
-      clientKey: intent.data.attributes.client_key,
-      amount: downPayment,
-    });
+    if (attempt.state !== 'unpaid') {
+      if (attempt.providerId && attempt.state === 'pending') {
+        if (attempt.provider === 'xendit') return res.json({ gateway: 'xendit', attemptId: attempt._id, referenceId: attempt._id, redirectUrl: attempt.redirectUrl, amount: downPayment });
+        const current = await retrievePaymentIntent(attempt.providerId);
+        await verifyPaymongoIntent(current, { userId: req.user._id });
+        return res.json({ gateway: 'paymongo', attemptId: attempt._id, paymentIntentId: attempt.providerId, clientKey: current.data.attributes.client_key, amount: downPayment });
+      }
+      return pendingResponse();
+    }
+    if ((provider === 'paymongo' && !process.env.PAYMONGO_SECRET_KEY) || (provider === 'xendit' && !isXenditConfigured())) {
+      return res.status(503).json({ message: 'Online payments are not available right now. Please contact the venue.', code: 'PAYMENT_UNAVAILABLE', attemptId: attempt._id });
+    }
+    const claimed = await PaymentAttempt.findOneAndUpdate({ _id: attempt._id, state: 'unpaid' }, { $set: { state: 'uncertain', issue: 'provider_uncertain', nextCheckAt: new Date(Date.now() + 60000) }, $push: { events: { action: 'provider_creation_started' } } }, { returnDocument: 'after' });
+    if (!claimed) return pendingResponse();
+    try {
+      if (provider === 'xendit') {
+        const checkout = await createXenditSession({ referenceId: attempt._id, amount: downPayment, expiresAt: activeLock.expiresAt, description });
+        await PaymentAttempt.updateOne({ _id: attempt._id, state: 'uncertain', providerId: null }, { $set: { providerId: checkout.sessionId, redirectUrl: checkout.redirectUrl, state: 'pending', issue: '' }, $push: { events: { action: 'provider_session_created' } } });
+        return res.status(201).json({ gateway: 'xendit', attemptId: attempt._id, referenceId: attempt._id, redirectUrl: checkout.redirectUrl, amount: downPayment });
+      }
+      const intent = await createPaymentIntent({ amountPesos: downPayment, description, statementDescriptor: room.name, metadata: { ...metadata, attemptId: attempt._id } });
+      if (!intent?.data?.id || !intent?.data?.attributes?.client_key) throw new Error('Invalid provider creation response');
+      await PaymentAttempt.updateOne({ _id: attempt._id, state: 'uncertain', providerId: null }, { $set: { providerId: intent.data.id, state: 'pending', issue: '' }, $push: { events: { action: 'provider_intent_created' } } });
+      return res.status(201).json({ gateway: 'paymongo', attemptId: attempt._id, paymentIntentId: intent.data.id, clientKey: intent.data.attributes.client_key, amount: downPayment });
+    } catch (error) {
+      await markUncertain(attempt, error.isTimeout ? 'timeout' : 'provider_creation');
+      console.error('Payment creation requires reconciliation:', { requestId: req.id, attemptId: attempt._id, category: error.name });
+      return pendingResponse();
+    }
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Server error." });
@@ -183,7 +202,7 @@ router.post("/intent/:paymentIntentId/attach", ensureAuthenticated, paymentAttac
     } catch (e) {
       return res.status(e.status || 502).json({ message: AppError.publicMessage(e, "Could not find this payment. Please try again.") });
     }
-    const metadata = intent?.data?.attributes?.metadata || {};
+    const { attempt, metadata } = await verifyPaymongoIntent(intent, { userId: req.user._id });
     if (String(metadata.bookedBy) !== String(req.user._id)) {
       return res.status(403).json({ message: "Not allowed." });
     }
@@ -220,6 +239,7 @@ router.post("/intent/:paymentIntentId/attach", ensureAuthenticated, paymentAttac
         returnUrl: `${base.replace(/\/$/, "")}/?paymongo=success&paymentIntentId=${paymentIntentId}`,
       });
     } catch (e) {
+      await markUncertain(attempt, e.isTimeout ? 'attach_timeout' : 'attach_outcome');
       const failure = classifyPaymongoPaymentFailure(e.paymongoErrors || e.message);
       if (failure) {
         return res.status(failure.status === "expired" ? 410 : 402).json({ ...failure, paymentStatus: "Unpaid" });
@@ -236,13 +256,9 @@ router.post("/intent/:paymentIntentId/attach", ensureAuthenticated, paymentAttac
         paymentMethodType || (paymentMethodId ? "card" : "")
       );
       try {
-        const booking = await finalizeBookingFromPayment({
-          paymentIntentId,
-          metadata: attrs.metadata || metadata,
-          paidPaymentId: paidPayment?.id || "",
-          paymentMethodType: resolvedPaymentMethodType,
-        });
-        return res.json({ status: "succeeded", bookingId: booking._id, reservationCode: booking.reservationCode });
+        const verified = await verifyPaymongoIntent(attachResult, { userId: req.user._id });
+        const result = await finalizeVerifiedAttempt(verified.attempt, { paymentId: verified.paidPayment.id, paymentMethodType: resolvedPaymentMethodType });
+        return res.status(result.status === 'paid_slot_unavailable' ? 409 : 200).json({ ...result, status: result.bookingId ? 'succeeded' : result.status });
       } catch (e) {
         if (e.slotUnavailable) {
           console.error(`PayMongo payment ${paymentIntentId} succeeded but the slot is no longer available — needs manual review/refund.`);
@@ -295,7 +311,7 @@ router.get("/status/:paymentIntentId", ensureAuthenticated, validate(paymentInte
       return res.status(e.status || 502).json({ message: AppError.publicMessage(e, "Could not check payment status.") });
     }
     const attrs = intent?.data?.attributes;
-    const metadata = attrs?.metadata || {};
+    const { attempt, metadata } = await verifyPaymongoIntent(intent, { userId: req.user._id });
     if (String(metadata.bookedBy) !== String(req.user._id) && !isAdminRole(req.user.role)) {
       return res.status(403).json({ message: "Not allowed." });
     }
@@ -310,13 +326,8 @@ router.get("/status/:paymentIntentId", ensureAuthenticated, validate(paymentInte
 
     try {
       const paidPayment = attrs.payments?.find(p => p?.attributes?.status === "paid");
-      const created = await finalizeBookingFromPayment({
-        paymentIntentId,
-        metadata,
-        paidPaymentId: paidPayment?.id || "",
-        paymentMethodType: resolvePaymongoPaymentMethodType(paidPayment),
-      });
-      return res.json({ status: created.status, paymentStatus: created.paymentStatus, bookingId: created._id, reservationCode: created.reservationCode });
+      const result = await finalizeVerifiedAttempt(attempt, { paymentId: paidPayment.id, paymentMethodType: resolvePaymongoPaymentMethodType(paidPayment) });
+      return res.status(result.status === 'paid_slot_unavailable' ? 409 : 200).json(result);
     } catch (e) {
       if (e.slotUnavailable) {
         return res.status(409).json({ status: "paid_slot_unavailable", paymentStatus: "Paid", message: AppError.publicMessage(e) });
@@ -366,18 +377,8 @@ async function webhookHandler(req, res) {
       if (!isPaidPaymentIntent(attrs)) return res.status(200).json({ received: true });
 
       const paidPayment = attrs.payments?.find(p => p?.attributes?.status === "paid");
-      await finalizeBookingFromPayment({
-        paymentIntentId,
-        metadata: attrs.metadata || {},
-        paidPaymentId: paidPayment?.id || (eventType === "payment.paid" ? resource?.id : ""),
-        paymentMethodType: resolvePaymongoPaymentMethodType(paidPayment || resource),
-      }).catch((e) => {
-        if (e.slotUnavailable) {
-          console.error(`PayMongo webhook: payment ${paymentIntentId} succeeded but the slot is no longer available — needs manual review/refund.`);
-          return;
-        }
-        throw e;
-      });
+      const verified = await verifyPaymongoIntent(intent);
+      await finalizeVerifiedAttempt(verified.attempt, { paymentId: verified.paidPayment.id, paymentMethodType: resolvePaymongoPaymentMethodType(paidPayment || resource) });
     }
     return res.status(200).json({ received: true });
   } catch (err) {

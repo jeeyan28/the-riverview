@@ -22,7 +22,7 @@ function reservationActionUrl(booking, action) {
   }
 }
 
-const transporter = nodemailer.createTransport({
+const transporter = nodemailer.createTransport(process.env.APP_MODE === 'demo' ? { jsonTransport: true } : {
   service: "gmail",
   connectionTimeout: 8000,
   greetingTimeout: 8000,
@@ -71,6 +71,7 @@ const COPY = {
 };
 
 async function sendOtpEmail(user, otp, purpose = "reset") {
+  if (process.env.APP_MODE === 'demo') return { simulated: true };
   const copy = COPY[purpose] || COPY.reset;
   const fullName = escapeHtml(`${user.firstName} ${user.lastName}`.trim());
 
@@ -260,18 +261,20 @@ function buildReceiptEmail(booking) {
   return { html, text: venueDiscountNote ? `${text}\n\n${venueDiscountNote}` : text };
 }
 
-async function sendReceiptEmail(booking) {
+async function sendReceiptEmail(booking, { messageId, recipient } = {}) {
+  if (process.env.APP_MODE === 'demo') return { simulated: true };
   const { html, text } = buildReceiptEmail(booking);
 
   const recipients = new Set();
-  if (booking.guestEmail && EMAIL_RE.test(booking.guestEmail)) recipients.add(booking.guestEmail);
-  if (process.env.GMAIL_USER) recipients.add(process.env.GMAIL_USER);
+  if (recipient && EMAIL_RE.test(recipient)) recipients.add(recipient);
+  else if (booking.guestEmail && EMAIL_RE.test(booking.guestEmail)) recipients.add(booking.guestEmail);
   if (recipients.size === 0) return;
 
   await transporter.sendMail({
     from: `"The Riverview" <${process.env.GMAIL_USER}>`,
     to: Array.from(recipients).join(", "),
     subject: `Your Riverview Receipt — ${booking.reservationCode || ""}`,
+    ...(messageId ? { messageId } : {}),
     text,
     html,
   });
@@ -331,12 +334,13 @@ ${options}
 }
 
 async function sendNotificationEmail(notification) {
+  if (process.env.APP_MODE === 'demo') return { simulated: true };
   if (notification.type === "refund_attention") return;
   if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) throw new Error("SMTP_NOT_CONFIGURED");
   if (!EMAIL_RE.test(notification.email || "")) throw new Error("INVALID_RECIPIENT");
   await transporter.sendMail({
     from: `"The Riverview" <${process.env.GMAIL_USER}>`, to: notification.email,
-    subject: `${notification.title} — ${notification.reservationCode}`, ...buildNotificationEmail(notification),
+    subject: `${notification.title}${notification.reservationCode ? ` — ${notification.reservationCode}` : ''}`, messageId: `<riverview-notification-${notification._id}@riverview.invalid>`, ...buildNotificationEmail(notification),
   });
 }
 

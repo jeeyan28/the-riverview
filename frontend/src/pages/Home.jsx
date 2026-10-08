@@ -19,11 +19,11 @@ import { API_BASE_URL } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { buildLoginPath } from '../utils/auth';
 import { resolveImageUrl } from '../utils/resolveImageUrl';
-import heroBgImg from '../assets/images/main.png';
-import venueHero from '../assets/pictures/RiverView_8.jpg';
-import billiardsHero from '../assets/pictures/Billiard.jpg';
-import ktvHero from '../assets/pictures/KTV.jpg';
-import courtHero from '../assets/pictures/basketball.jpg';
+import heroBgImg from '../assets/images/hero.webp';
+import venueHero from '../assets/pictures/RiverView_8.webp';
+import billiardsHero from '../assets/pictures/Billiard.webp';
+import ktvHero from '../assets/pictures/KTV.webp';
+import courtHero from '../assets/pictures/basketball.webp';
 import '../styles/home-refinement.css';
 import '../styles/our-spaces.css';
 
@@ -169,7 +169,7 @@ function HeroCarousel({ slides }) {
               onClick={() => goTo(i)}
             >
               <span className="hero-carousel-frame">
-                {slide.src ? <img src={slide.src} alt={slide.alt} /> : <span className="facility-name-placeholder">{slide.alt}</span>}
+                {slide.src ? <img src={slide.src} alt={slide.alt} width="1280" height={slide.key === 'ktv' ? 854 : slide.key === 'court' ? 1707 : 960} loading={isActive ? 'eager' : 'lazy'} fetchpriority={isActive ? 'high' : 'auto'} decoding="async" /> : <span className="facility-name-placeholder">{slide.alt}</span>}
               </span>
             </button>
           );
@@ -213,15 +213,6 @@ function Home() {
   const spaceDetailImage = spaceDetailVariant ? resolveImageUrl(spaceDetailVariant.image) : '';
   const previousSpace = SPACE_ITEMS[(activeSpaceIndex - 1 + SPACE_ITEMS.length) % SPACE_ITEMS.length];
   const nextSpace = SPACE_ITEMS[(activeSpaceIndex + 1) % SPACE_ITEMS.length];
-
-  if (typeof window !== 'undefined' && window.opener && !window.opener.closed) {
-    const result = searchParams.get('paymongo');
-    const paymentIntentId = searchParams.get('paymentIntentId');
-    if (result && paymentIntentId) {
-      window.opener.focus();
-      window.close();
-    }
-  }
 
   function showSpace(direction) {
     setActiveSpaceIndex((current) => (current + direction + SPACE_ITEMS.length) % SPACE_ITEMS.length);

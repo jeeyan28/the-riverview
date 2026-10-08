@@ -3,7 +3,7 @@ import '../../styles/skeleton.css';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Area, CartesianGrid, ComposedChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { formatPeso } from '../../utils/currency';
-import { API_BASE_URL } from '../../services/api';
+import { reportsService } from '../../services/reports';
 
 const DEFAULT_RANGES = [
   { value: 'daily', label: 'Daily', forecastLabel: 'next 14 days' },
@@ -23,6 +23,7 @@ const INSIGHT_ICON = {
 
 function ForecastLineChart({ data, kind }) {
   const isRevenue = kind === 'revenue';
+  const rangeLabel = data.rangeLabel || 'Heuristic variability range';
   const chartData = useMemo(() => {
     const actualKey = isRevenue ? 'revenue' : 'bookingCount';
     const averageKey = isRevenue ? 'smaRevenue' : 'smaBookings';
@@ -39,20 +40,96 @@ function ForecastLineChart({ data, kind }) {
   const projectedColor = isRevenue ? '#EF9F27' : '#D4537E';
   const valueLabel = (value) => isRevenue ? formatPeso(value) : Number(value).toLocaleString();
   return <>
-    <div className="fc-chart-legend" aria-hidden="true"><span><i style={{ background: actualColor }} />Actual</span><span><i className="fc-legend-average" />Moving average</span><span><i className="fc-legend-projected" style={{ background: projectedColor }} />Projected</span><span><i className="fc-legend-band" />80% range</span></div>
-    <div className="chart-wrap" role="img" aria-label={`${isRevenue ? 'Revenue' : 'Reservation'} history, moving average, projection and 80 percent forecast range`}>
+    <div className="fc-chart-legend" aria-hidden="true"><span><i style={{ background: actualColor }} />Actual</span><span><i className="fc-legend-average" />Moving average</span><span><i className="fc-legend-projected" style={{ background: projectedColor }} />Projected</span><span><i className="fc-legend-band" />{rangeLabel}</span></div>
+    <div className="chart-wrap" role="img" aria-label={`${isRevenue ? 'Revenue' : 'Reservation'} history, moving average, projection and heuristic variability range`}>
       <ResponsiveContainer width="100%" height="100%"><ComposedChart data={chartData} margin={{ top: 10, right: 16, bottom: 2, left: isRevenue ? 0 : -20 }} accessibilityLayer>
         <CartesianGrid vertical={false} stroke="#304056" strokeDasharray="3 4" />
         <XAxis dataKey="label" tick={{ fill: '#a8b3c4', fontSize: 11 }} axisLine={false} tickLine={false} minTickGap={20} />
         <YAxis tick={{ fill: '#a8b3c4', fontSize: 11 }} axisLine={false} tickLine={false} allowDecimals={isRevenue} tickFormatter={(value) => isRevenue && value >= 1000 ? `₱${(value / 1000).toFixed(1)}k` : isRevenue ? `₱${value}` : value} />
-        <Tooltip contentStyle={{ background: '#1b2a3f', border: '1px solid #35445c', borderRadius: 10, color: '#f5f8fc', fontSize: 12 }} formatter={(value, name) => name === '80% range' ? `${valueLabel(value[0])} – ${valueLabel(value[1])}` : valueLabel(value)} />
-        <Area type="monotone" dataKey="band" name="80% range" fill="rgba(239,159,39,.15)" stroke="none" connectNulls={false} />
+        <Tooltip contentStyle={{ background: '#1b2a3f', border: '1px solid #35445c', borderRadius: 10, color: '#f5f8fc', fontSize: 12 }} formatter={(value, name) => name === rangeLabel ? `${valueLabel(value[0])} – ${valueLabel(value[1])}` : valueLabel(value)} />
+        <Area type="monotone" dataKey="band" name={rangeLabel} fill="rgba(239,159,39,.15)" stroke="none" connectNulls={false} />
         <Line type="monotone" dataKey="actual" name="Actual" stroke={actualColor} strokeWidth={2.5} dot={false} activeDot={{ r: 4 }} connectNulls={false} />
         <Line type="monotone" dataKey="average" name="Moving average" stroke="#94A3B8" strokeWidth={1.5} strokeDasharray="3 4" dot={false} activeDot={false} connectNulls={false} />
         <Line type="monotone" dataKey="projected" name="Projected" stroke={projectedColor} strokeWidth={2.5} strokeDasharray="6 4" dot={false} activeDot={{ r: 4 }} connectNulls={false} />
       </ComposedChart></ResponsiveContainer>
     </div>
   </>;
+}
+
+function ForecastEvaluation({ data }) {
+  const evaluation = data.evaluation;
+  const sufficient = evaluation?.status === 'sufficient';
+  const modelLabel = data.model?.label || 'Trend-adjusted moving average';
+  const historyFrom = data.history[0]?.date || '—';
+  const historyTo = data.history.at(-1)?.date || '—';
+  const forecastFrom = data.projection[0]?.date || '—';
+  const forecastTo = data.projection.at(-1)?.date || '—';
+  const number = (value) => Number.isFinite(value) ? value.toLocaleString('en-PH', { maximumFractionDigits: 2 }) : '—';
+  const metric = (value, revenue) => Number.isFinite(value) ? (revenue ? '₱' : '') + number(value) : '—';
+  const timestamp = evaluation?.evaluatedAt ? new Date(evaluation.evaluatedAt) : null;
+  const evaluatedLabel = timestamp && Number.isFinite(timestamp.getTime())
+    ? timestamp.toLocaleString('en-PH', { timeZone: evaluation.timeZone || 'Asia/Manila', dateStyle: 'medium', timeStyle: 'short' })
+    : '';
+
+  return (
+    <section className="card" aria-labelledby="fc-evaluation-title">
+      <div className="card-head">
+        <h2 className="card-title" id="fc-evaluation-title">Forecast evaluation</h2>
+        <p className="card-subtitle">{modelLabel} · {data.window}-day average. Estimates do not guarantee future results.</p>
+        <p className="card-subtitle">History: {historyFrom} – {historyTo}. Forecast: {forecastFrom} – {forecastTo}. {data.timeZone || 'Asia/Manila'}.</p>
+      </div>
+      {(data.synthetic || evaluation?.synthetic) && (
+        <p className="fc-ai-fallback" role="status"><strong>Synthetic demo data.</strong> These results do not establish accuracy on the venue's real operations.</p>
+      )}
+      {!sufficient ? (
+        <p className="fc-ai-fallback" role="status">{evaluation?.reason || 'Insufficient history: forecast evaluation is not available for this range.'}</p>
+      ) : (
+        <>
+          <p className="card-subtitle">{evaluation.horizonDays}-day horizon · {evaluation.foldCount} historical forecast origins · {evaluation.sampleCount} daily comparisons per target · {evaluation.evaluationPeriod.from} – {evaluation.evaluationPeriod.to}.</p>
+          <div className="fc-ai-columns">
+            {['revenue', 'bookings'].map((target) => {
+              const results = evaluation.targets[target];
+              const revenue = target === 'revenue';
+              const current = results.models.find((model) => model.id === evaluation.modelId);
+              const recommended = results.models.find((model) => model.id === results.recommendedModelId);
+              return (
+                <div key={target}>
+                  <h3 className="fc-ai-section-title">{revenue ? 'Revenue error · ₱ per day' : 'Reservation error · per day'}</h3>
+                  <p className="fc-ai-summary">Average historical error: {metric(current?.mae, revenue)} {revenue ? 'per day' : 'reservations per day'}.</p>
+                  <div className="admin-table-scroll admin-table-scroll-compact" tabIndex={0} role="region" aria-label={(revenue ? 'Revenue' : 'Reservation') + ' forecast model comparison'}>
+                    <table className="tbl">
+                      <thead><tr><th scope="col">Model</th><th scope="col"><abbr title="Mean absolute error">MAE</abbr></th><th scope="col"><abbr title="Root mean squared error">RMSE</abbr></th></tr></thead>
+                      <tbody>
+                        {results.models.map((model) => (
+                          <tr key={model.id}>
+                            <th scope="row">{model.label}{model.id === evaluation.modelId ? ' (in use)' : ''}</th>
+                            <td>{metric(model.mae, revenue)}</td>
+                            <td>{metric(model.rmse, revenue)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <p className="card-subtitle">{results.baselineBeatsCurrent
+                    ? recommended.label + ' had lower historical error. Consider this baseline when planning; the displayed forecast still uses ' + modelLabel + '.'
+                    : 'The displayed model matched or beat both baselines on mean absolute error.'}</p>
+                </div>
+              );
+            })}
+          </div>
+          <p className="card-subtitle">MAE is the average absolute error. RMSE gives larger errors more weight. Every prediction uses only business dates before its forecast origin; evaluation periods can overlap.</p>
+        </>
+      )}
+      <p className="card-subtitle">{data.rangeExplanation || 'The shaded range is heuristic; its probability coverage has not been measured.'}</p>
+      {evaluation && (
+        <details>
+          <summary>Evaluation details</summary>
+          <p className="card-subtitle">Model version: {evaluation.modelVersion}. {evaluatedLabel ? 'Evaluated ' + evaluatedLabel + ' (Asia/Manila).' : ''}</p>
+          {['revenue', 'bookings', 'zeroDays', 'missingDates', 'outliers', 'closures', 'revisions'].map((key) => evaluation.definitions?.[key] && <p className="card-subtitle" key={key}>{evaluation.definitions[key]}</p>)}
+        </details>
+      )}
+    </section>
+  );
 }
 
 function Forecasting() {
@@ -66,33 +143,30 @@ function Forecasting() {
   const [retryKey, setRetryKey] = useState(0);
 
 
-  const loadForecast = useCallback(async (window, range, cancelledRef) => {
+  const loadForecast = useCallback(async (window, range, signal) => {
     setLoading(true);
     setError(null);
     try {
-      const params = new URLSearchParams({ window: String(window), range });
-      const res = await fetch(`${API_BASE_URL}/api/forecast?${params}`, { credentials: 'include' });
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(body.message || 'Failed to load forecast.');
-      if (!cancelledRef.current) {
+      const body = await reportsService.getForecast(window, range, { signal });
+      if (!signal.aborted) {
         setData(body);
         if (Array.isArray(body.validWindows) && body.validWindows.length) setWindowOptions(body.validWindows);
         if (Array.isArray(body.validRanges) && body.validRanges.length) setRangeOptions(body.validRanges);
       }
     } catch (err) {
-      console.error(err);
-      if (!cancelledRef.current) setError(err.message);
+      if (!signal.aborted) {
+        console.error(err);
+        setError(err.message);
+      }
     } finally {
-      if (!cancelledRef.current) setLoading(false);
+      if (!signal.aborted) setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    const cancelledRef = { current: false };
-    loadForecast(smaWindow, forecastRange, cancelledRef);
-    return () => {
-      cancelledRef.current = true;
-    };
+    const controller = new AbortController();
+    loadForecast(smaWindow, forecastRange, controller.signal);
+    return () => controller.abort();
   }, [smaWindow, forecastRange, retryKey, loadForecast]);
 
   const projRevenue = data ? data.projection.reduce((s, p) => s + p.projectedRevenue, 0) : 0;
@@ -139,7 +213,7 @@ function Forecasting() {
             {data ? periodTotal(recentPeriods, 'bookingCount') : '—'}
           </div>
           <div className="mc-sub" id="fc-booking-trend-sub">
-            {loading && !data ? 'Loading…' : data ? `${periodTotal(priorPeriods, 'bookingCount')} in the previous ${data.window} days` : 'Confirmed reservations'}
+            {loading && !data ? 'Loading…' : data ? `${periodTotal(priorPeriods, 'bookingCount')} in the previous ${data.window} days` : 'Eligible reservations'}
           </div>
         </div>
         <div className="mc">
@@ -189,10 +263,13 @@ function Forecasting() {
 
       {data && (
         <>
+          {loading && <p className="fc-ai-fallback" role="status">Updating forecast… The previous results remain visible until the new range loads.</p>}
+          {error && !loading && <div className="fc-ai-fallback" role="alert"><span>{error} Previous results are still shown.</span><button type="button" className="btn-teal" onClick={() => setRetryKey((key) => key + 1)}>Retry</button></div>}
+          <ForecastEvaluation data={data} />
           <div className="card">
             <div className="card-head">
               <span className="card-title">Revenue: last {historyDays} days + {forecastLabel} projection</span>
-              <p className="card-subtitle">Solid line is actual revenue, dashed grey is the {data.window}-day SMA, dashed orange is the trend-adjusted forecast with an 80% confidence band.</p>
+              <p className="card-subtitle">Solid line is recorded revenue, dashed grey is the {data.window}-day average, and dashed orange is the forecast. The shaded area shows a heuristic variability range.</p>
             </div>
             <ForecastLineChart data={data} kind="revenue" />
           </div>

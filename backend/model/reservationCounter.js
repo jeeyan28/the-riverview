@@ -10,7 +10,7 @@ reservationCounterSchema.statics.nextSequence = async function (key, session) {
   const query = this.findByIdAndUpdate(
     key,
     { $inc: { seq: 1 } },
-    { upsert: true, new: true, setDefaultsOnInsert: true, ...(session ? { session } : {}) }
+    { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true, ...(session ? { session } : {}) }
   );
   const doc = await query;
   return doc.seq;

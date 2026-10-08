@@ -5,7 +5,7 @@ const Settings = require("../model/settings");
 const BookingLock = require("../model/bookingLock");
 const ReservationCounter = require("../model/reservationCounter");
 const AppError = require("./appError");
-const { sendReceiptEmail } = require("./mailer");
+const { queueReceipt } = require("./receiptOutbox");
 const { TIME_ZONE } = require("./constants");
 const { bookingStartMs, financialFields } = require("./bookingLifecycle");
 const { HOUR_MS, nearbyDates, operatingWindowForStart, occupiedCountAt } = require("./bookingSchedule");
@@ -13,11 +13,11 @@ const { calculateBookingPrice, computeDownPayment, parsePaxCapacity } = require(
 const { getPaymongoPaymentMethodLabel } = require("./paymongo");
 const { validDateKey } = require("./businessDate");
 
-async function voidExpiredBookings() {
+async function voidExpiredBookings({ limit = 100 } = {}) {
   const now = Date.now();
   const todayKey = new Intl.DateTimeFormat("en-CA", { timeZone: TIME_ZONE }).format(new Date(now));
   const expirableStatuses = [Booking.BOOKING_STATUS.CONFIRMED, Booking.BOOKING_STATUS.OVERDUE];
-  const activeReservations = await Booking.find({ status: { $in: expirableStatuses }, cancellationStatus: { $ne: "Requested" }, "venueClosure.status": { $ne: "pending" }, date: { $lte: todayKey } }).select("date timeIn duration");
+  const activeReservations = await Booking.find({ status: { $in: expirableStatuses }, cancellationStatus: { $ne: "Requested" }, "venueClosure.status": { $ne: "pending" }, date: { $lte: todayKey } }).sort({ date: 1, timeIn: 1 }).limit(Math.min(250, limit)).select("date timeIn duration");
   const expiredIds = activeReservations
     .filter((b) => {
       return bookingStartMs(b.date, b.timeIn) + Number(b.duration) * 3600000 <= now;
@@ -92,7 +92,7 @@ async function validateAndPriceBooking({ roomId, variantLabel, date, timeIn, dur
 
   if (guestCount !== undefined && guestCount !== null) {
     const pax = Number(guestCount);
-    if (!Number.isFinite(pax) || pax < 1) {
+    if (!Number.isInteger(pax) || pax < 1) {
       throw new AppError(400, "Number of guests (pax) must be at least 1.");
     }
     const capacity = parsePaxCapacity(selectedVariant?.pax) || (Number(room.capacity) > 0 ? Number(room.capacity) : null);
@@ -101,7 +101,26 @@ async function validateAndPriceBooking({ roomId, variantLabel, date, timeIn, dur
     }
   }
 
+  if (!isAdminBooking) {
+    const oh = settings.operatingHours || {};
+    const { serviceDate, serviceHour, openHour, closeHour } = operatingWindowForStart(date, timeIn, oh.openTime, oh.closeTime);
+    const isHoliday = (settings.holidays || []).some(h => h.date === serviceDate && h.fullDay);
+    const openDays = oh.openDays;
+    const [yy, mm, dd] = String(serviceDate).split("-").map(Number);
+    const dayOfWeek = new Date(yy, (mm || 1) - 1, dd || 1).getDay();
+    const isClosedDay = Array.isArray(openDays) && openDays.length > 0 && !openDays.includes(dayOfWeek);
+
+    if (isHoliday || isClosedDay) {
+      throw new AppError(409, "We're closed on the selected date. Please choose another day.", 'VENUE_CLOSED');
+    }
+
+    if (serviceHour < openHour || serviceHour + duration > closeHour) {
+      throw new AppError(409, "That time is outside our operating hours. Please choose another slot.", 'OUTSIDE_HOURS');
+    }
+  }
+
   const startMs = bookingStartMs(date, timeIn);
+  if (!isAdminBooking && startMs <= Date.now()) throw new AppError(409, "That start time has passed. Please choose a future time.");
   const capacity = getSlotCapacity(room, variantLabel);
   const query = Booking.find({
     room: room._id,
@@ -127,7 +146,7 @@ async function validateAndPriceBooking({ roomId, variantLabel, date, timeIn, dur
     const hourStart = startMs + hour * HOUR_MS;
     const bookedCount = occupiedCountAt(occupied, hourStart);
     if (bookedCount >= capacity) {
-      throw new AppError(409, "That time slot is fully reserved. Please pick another.");
+      throw new AppError(409, "That time slot is fully reserved. Please pick another.", 'SLOT_FULL');
     }
   }
 
@@ -138,23 +157,6 @@ async function validateAndPriceBooking({ roomId, variantLabel, date, timeIn, dur
     duration,
     guestCount,
   });
-  if (!isAdminBooking) {
-    const oh = settings.operatingHours || {};
-    const { serviceDate, serviceHour, openHour, closeHour } = operatingWindowForStart(date, timeIn, oh.openTime, oh.closeTime);
-    const isHoliday = (settings.holidays || []).some(h => h.date === serviceDate && h.fullDay);
-    const openDays = oh.openDays;
-    const [yy, mm, dd] = String(serviceDate).split("-").map(Number);
-    const dayOfWeek = new Date(yy, (mm || 1) - 1, dd || 1).getDay();
-    const isClosedDay = Array.isArray(openDays) && openDays.length > 0 && !openDays.includes(dayOfWeek);
-
-    if (isHoliday || isClosedDay) {
-      throw new AppError(409, "We're closed on the selected date. Please choose another day.");
-    }
-
-    if (serviceHour < openHour || serviceHour + duration > closeHour) {
-      throw new AppError(409, "That time is outside our operating hours. Please choose another slot.");
-    }
-  }
 
   return { room, selectedVariant, ...pricing };
 }
@@ -208,8 +210,8 @@ async function saveWithReservationCode(booking, facilityName, attempts = 5, sess
   }
 }
 
-async function finalizeBookingFromPayment({ paymentIntentId, metadata, paidPaymentId, paymentMethodType, provider = "paymongo" }) {
-  if (!["paymongo", "xendit"].includes(provider)) throw new Error("Unsupported payment provider.");
+async function finalizeBookingFromPayment({ paymentIntentId, metadata, paidPaymentId, paymentMethodType, provider = "paymongo", attemptId }) {
+  if (!["paymongo", "xendit", "demo"].includes(provider) || provider === 'demo' && process.env.APP_MODE !== 'demo') throw new Error("Unsupported payment provider.");
   const providerIdField = provider === "xendit" ? "xenditPaymentSessionId" : "paymongoPaymentIntentId";
   const existing = await Booking.findOne({ [providerIdField]: paymentIntentId });
   if (existing) return existing;
@@ -219,6 +221,8 @@ async function finalizeBookingFromPayment({ paymentIntentId, metadata, paidPayme
   let booking;
   try {
     booking = await runInTransaction(async (session) => {
+      const confirmed = await Booking.findOne({ [providerIdField]: paymentIntentId }).session(session);
+      if (confirmed) return confirmed;
       let room;
       let pricing;
       try {
@@ -271,7 +275,7 @@ async function finalizeBookingFromPayment({ paymentIntentId, metadata, paidPayme
         paymentChoice: metadata.paymentChoice === "full" ? "full" : "deposit",
         hourlyRates: paidHourlyRates,
         firstHourPayment: computeDownPayment(paidHourlyRates, 1),
-        paymentMethod: provider === "xendit"
+        paymentMethod: provider === 'demo' ? 'Demo simulation' : provider === "xendit"
           ? ({ GCASH: "GCash", PAYMAYA: "Maya" }[paymentMethodType] || "Xendit online payment")
           : getPaymongoPaymentMethodLabel(paymentMethodType),
         paymentProvider: provider,
@@ -287,6 +291,14 @@ async function finalizeBookingFromPayment({ paymentIntentId, metadata, paidPayme
       });
 
       await saveWithReservationCode(newBooking, room.name, undefined, session);
+      await queueReceipt(newBooking, { session });
+      if (attemptId) {
+        const result = await require('../model/paymentAttempt').updateOne({ _id: attemptId, provider, providerId: paymentIntentId, booking: null }, {
+          $set: { state: 'paid', issue: '', booking: newBooking._id, paymentId: paidPaymentId, receivedMinor: Math.round(Number(metadata.downPayment) * 100), verifiedAt: new Date(), resolution: 'booked', nextCheckAt: null },
+          $push: { events: { action: 'reservation_confirmed', evidence: newBooking.reservationCode } },
+        }, { session });
+        if (result.modifiedCount !== 1) throw new Error('Payment attempt changed during confirmation.');
+      }
       if (metadata.bookedBy) {
         await releaseLockForSlot({ roomId: room._id, variantLabel: variantLabel || null, date, timeIn, duration: Number(duration), lockedBy: metadata.bookedBy, session });
       }
@@ -298,10 +310,6 @@ async function finalizeBookingFromPayment({ paymentIntentId, metadata, paidPayme
     }
     throw err;
   }
-
-  await sendReceiptEmail(booking).catch((err) => {
-    console.error(`Failed to send receipt email for booking ${booking.reservationCode}:`, err.message);
-  });
 
   return booking;
 }

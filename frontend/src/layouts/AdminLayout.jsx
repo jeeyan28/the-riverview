@@ -3,6 +3,11 @@ import { Navigate, useLocation } from 'react-router-dom';
 import { Clock3, MapPin, Menu, ShieldCheck } from 'lucide-react';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import '../styles/admin/shared.css';
+import '../styles/admin/workspace-v2.css';
+import '../styles/admin/operations-v3.css';
+import '../styles/admin/admin-experience.css';
+import '../styles/admin/responsive.css';
+import '../styles/admin/route-overrides.css';
 import AdminSidebar, { PAGE_CONTEXT, PAGE_TITLES } from '../components/AdminSidebar';
 import ThemeToggle from '../components/ThemeToggle';
 import PageTransition from '../components/PageTransition';
@@ -12,11 +17,14 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../hooks/useTheme';
 import { AdminAppNavigation } from '../components/MobileAppNavigation';
 import { buildLoginPath } from '../utils/auth';
+import SessionNotice from '../components/SessionNotice';
+import DemoNotice from '../components/DemoNotice';
+import '../styles/reservation-services.css';
 
 const ADMIN_COMPACT_MEDIA = '(max-width: 900px)';
 
 function AdminLayout() {
-  const { initializing, isAdmin, hasPermission, roleLabel, user } = useAuth();
+  const { initializing, isAdmin, hasPermission, roleLabel, user, sessionVerified } = useAuth();
   const location = useLocation();
   const pageKey = location.pathname.split('/').pop();
   const pageTitle = PAGE_TITLES[pageKey] || 'Dashboard';
@@ -119,7 +127,8 @@ function AdminLayout() {
         </div>
 
         <div className="content">
-          <PageTransition variant="admin" />
+          <DemoNotice /><SessionNotice />
+          <div inert={!sessionVerified ? '' : undefined}><PageTransition variant="admin" /></div>
         </div>
 
         <AdminAppNavigation

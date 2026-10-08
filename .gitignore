@@ -9,6 +9,10 @@ node_modules/
 # Build output
 dist/
 build/
+.cache/
+coverage/
+test-results/
+playwright-report/
 
 # Vercel
 .vercel

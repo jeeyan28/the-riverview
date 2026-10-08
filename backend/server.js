@@ -6,11 +6,14 @@ const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
 const path = require("path");
+const { randomUUID } = require('node:crypto');
 const helmet = require("helmet");
 const session = require("express-session");
 const { STAFF_SESSION_MS, CUSTOMER_SESSION_MS } = require("./utils/sessionPolicy");
 const { MongoStore } = require("connect-mongo");
-require("dotenv").config({ path: path.join(__dirname, ".env") });
+if (process.env.APP_MODE !== 'demo') require("dotenv").config({ path: path.join(__dirname, ".env") });
+const { assertDemoEnvironment } = require('./utils/isolatedDatabase');
+if (assertDemoEnvironment()) process.env.MONGO_URI = process.env.DEMO_MONGO_URI;
 const { startReservationScheduler } = require('./utils/reservationScheduler');
 
 const app = express();
@@ -28,19 +31,23 @@ if (process.env.NODE_ENV === "production") {
 
 app.use(helmet());
 app.use((req, res, next) => {
+  req.id = randomUUID();
+  res.set('X-Request-ID', req.id);
   res.set("Cache-Control", "no-store");
   next();
 });
 
 let connectionPromise;
+let indexPromise;
 async function connectDB() {
-  if (mongoose.connection.readyState === 1) return;
-  if (!connectionPromise) {
-    connectionPromise = mongoose.connect(process.env.MONGO_URI)
+  if (mongoose.connection.readyState !== 1 && !connectionPromise) {
+    connectionPromise = mongoose.connect(process.env.MONGO_URI, { serverSelectionTimeoutMS: 5000, connectTimeoutMS: 10000 })
       .then(() => console.log("Connected to MongoDB"))
       .finally(() => { connectionPromise = null; });
   }
-  await connectionPromise;
+  if (connectionPromise) await connectionPromise;
+  indexPromise ||= Promise.all(['booking', 'bookingLock', 'reservationCounter', 'paymentAttempt', 'receiptJob', 'notification', 'rateLimitCounter', 'jobLease'].map(name => require(`./model/${name}`).init()));
+  await indexPromise;
 }
 
 app.use(async (req, res, next) => {
@@ -48,8 +55,8 @@ app.use(async (req, res, next) => {
     await connectDB();
     next();
   } catch (err) {
-    console.error("MongoDB connection failed:", err.message);
-    res.status(500).json({ message: "Database connection failed" });
+    console.error('Database unavailable:', { requestId: req.id, category: err.name });
+    res.status(503).json({ message: 'We could not process this request right now. Please try again.', code: 'DATABASE_UNAVAILABLE', requestId: req.id });
   }
 });
 
@@ -75,11 +82,16 @@ app.use(cors({
 
 const { verifyOrigin } = require("./middleware/csrf");
 app.use(verifyOrigin(allowedOrigins));
+app.use((req, res, next) => {
+  if (process.env.APP_MODE === 'demo' && req.method !== 'GET' && (req.path.includes('closure-refund') || req.path.includes('cancellation-review') || req.path.includes('upload') || req.path.includes('/google'))) return res.status(403).json({ message: 'This action is read-only in the synthetic demo.', code: 'DEMO_READ_ONLY' });
+  next();
+});
 
 app.get("/", (req, res) => {
   res.json({
     status: "ok",
     db: mongoose.connection.readyState === 1 ? "connected" : "disconnected",
+    demo: process.env.APP_MODE === 'demo',
   });
 });
 
@@ -89,7 +101,7 @@ const sessionStore = MongoStore.create({
   ttl: CUSTOMER_SESSION_MS / 1000,
   autoRemove: "native",
 }).on("error", (err) => {
-  console.error("Session store error:", err);
+  console.error('Session store error:', { category: err.name });
 });
 
 app.use(session({
@@ -128,16 +140,17 @@ app.use("/api/dashboard", require("./routes/dashboardRoutes"));
 app.use("/api/reports", require("./routes/reportRoutes"));
 app.use("/api/payments/paymongo", require("./routes/paymongoRoutes").router);
 app.use("/api/payments/xendit", require("./routes/xenditRoutes").router);
+app.use('/api/docs', express.static(path.join(__dirname, 'docs', 'api')));
 
 app.use((err, req, res, next) => {
   if (res.headersSent) return next(err);
-  console.error(err);
+  console.error('Request failed:', { requestId: req.id, category: err.name, code: err.code });
   const uploadError = typeof err.code === "string" && err.code.startsWith("LIMIT_");
   let status = Number.isInteger(err.status) && err.status >= 400 && err.status < 600 ? err.status : 500;
   if (err.code === "LIMIT_FILE_SIZE") status = 413;
   else if (uploadError) status = 400;
   const message = status >= 500 ? "Something went wrong." : status === 413 ? "The uploaded file or request is too large." : err.message || "Invalid request.";
-  return res.status(status).json({ message });
+  return res.status(status).json({ message: err instanceof require('./utils/appError') ? err.message : message, code: err.code || (status >= 500 ? 'SERVICE_ERROR' : 'INVALID_REQUEST'), requestId: req.id, ...(err.result ? err.result : {}) });
 });
 
 if (require.main === module) {

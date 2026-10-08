@@ -1,39 +1,12 @@
-import { useEffect, useId, useRef } from 'react';
+import { useId, useRef } from 'react';
 import { X } from 'lucide-react';
 import ModalPortal from './ModalPortal';
+import { useDialogFocus } from '../hooks/useDialogFocus';
 
 function Modal({ open, onClose, title, ariaLabel = 'Dialog', size, className = '', backdropClassName = '', children, actions }) {
   const dialogRef = useRef(null);
-  const onCloseRef = useRef(onClose);
   const titleId = useId();
-
-  useEffect(() => {
-    onCloseRef.current = onClose;
-  }, [onClose]);
-
-  useEffect(() => {
-    if (!open) return;
-    const prevOverflow = document.body.style.overflow;
-    const previouslyFocused = document.activeElement;
-    document.body.style.overflow = 'hidden';
-    const frame = requestAnimationFrame(() => {
-      const firstField = dialogRef.current?.querySelector(
-        '[data-autofocus], input:not([disabled]), select:not([disabled]), textarea:not([disabled])',
-      );
-      const first = firstField || dialogRef.current?.querySelector('button:not([disabled]), [tabindex="0"]');
-      (first || dialogRef.current)?.focus({ preventScroll: true });
-    });
-    function handleKeyDown(event) {
-      if (event.key === 'Escape') onCloseRef.current?.();
-    }
-    document.addEventListener('keydown', handleKeyDown);
-    return () => {
-      cancelAnimationFrame(frame);
-      document.removeEventListener('keydown', handleKeyDown);
-      document.body.style.overflow = prevOverflow;
-      previouslyFocused?.focus?.({ preventScroll: true });
-    };
-  }, [open]);
+  useDialogFocus(open, dialogRef, onClose);
 
   if (!open) return null;
 

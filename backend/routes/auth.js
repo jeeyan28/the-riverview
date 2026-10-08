@@ -644,11 +644,29 @@ router.post("/reset-password", authActionLimiter, resetPasswordLimiter, validate
 router.get("/me", ensureAuthenticated, async (req, res) => {
   res.json({ user: sanitizeUser(req.user) });
 });
-router.post("/logout", validate(emptyBodySchema), (req, res) => {
-  req.session.destroy(() => {
-    res.clearCookie("connect.sid");
-    res.json({ message: "Logged out." });
-  });
+router.post("/logout", validate(emptyBodySchema), async (req, res) => {
+  try {
+    if (req.session) {
+      await new Promise((resolve, reject) => {
+        req.session.destroy(err => err ? reject(err) : resolve());
+      });
+    }
+    res.clearCookie("connect.sid", {
+      path: "/",
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+    });
+    return res.json({ message: "Logged out." });
+  } catch (err) {
+    const requestId = req.id || crypto.randomUUID();
+    console.error("Session deletion failed:", { requestId, error: err.code || err.name || "Error" });
+    return res.status(503).json({
+      message: "We could not sign you out. Please try again.",
+      code: "LOGOUT_UNAVAILABLE",
+      requestId,
+    });
+  }
 });
 
 module.exports = router;

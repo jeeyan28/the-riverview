@@ -1,12 +1,12 @@
 import ConfirmDialog from './ConfirmDialog';
 
-function LogoutConfirmDialog({ open, pending = false, onConfirm, onCancel }) {
+function LogoutConfirmDialog({ open, pending = false, error = '', onConfirm, onCancel }) {
   return (
     <ConfirmDialog
       open={open}
       title="Log out?"
-      message="Are you sure you want to log out?"
-      confirmText={pending ? 'Logging out…' : 'Log out'}
+      message={error || 'Are you sure you want to log out?'}
+      confirmText={pending ? 'Logging out…' : error ? 'Retry sign out' : 'Log out'}
       confirmDisabled={pending}
       cancelDisabled={pending}
       onConfirm={onConfirm}

@@ -1,8 +1,9 @@
 class AppError extends Error {
-  constructor(status, message) {
+  constructor(status, message, code) {
     super(message);
     this.name = "AppError";
     this.status = status;
+    if (code) this.code = code;
   }
 
   static publicMessage(error, fallback = "Server error.") {

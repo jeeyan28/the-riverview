@@ -277,6 +277,9 @@ function verifyWebhookSignature(rawBody, signatureHeader) {
   if (!timestamp || !candidateSignature) {
     throw new Error("Malformed Paymongo-Signature header.");
   }
+  if (!/^\d{10}$/.test(timestamp) || Math.abs(Date.now() / 1000 - Number(timestamp)) > 300) {
+    throw new Error('Webhook request timestamp is outside the five-minute acceptance window.');
+  }
 
   const signedPayload = `${timestamp}.${rawBody}`;
   const expected = crypto.createHmac("sha256", secret).update(signedPayload).digest("hex");

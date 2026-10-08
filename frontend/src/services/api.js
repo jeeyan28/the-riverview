@@ -7,6 +7,8 @@ export class ApiError extends Error {
     this.name = 'ApiError';
     this.status = status;
     this.code = code;
+    this.serverCode = data?.code;
+    this.requestId = data?.requestId;
     this.data = data;
     this.field = data?.field;
     this.unverified = Boolean(data?.unverified);

@@ -1,85 +1,49 @@
-import { API_BASE_URL } from '../services/api.js';
+import { apiRequest } from '../services/api.js';
 import { slotStartMs } from './bookingHours.js';
 
 export function dateKey(y, m, d) {
   return `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 }
 
-export function getPaxCapacity(paxText) {
-  if (!paxText) return null;
-  const text = String(paxText);
-  const paxMatches = [...text.matchAll(/(\d+)\s*(?:pax|guests?|people)/gi)].map((match) => Number(match[1]));
-  const matches = paxMatches.length ? paxMatches : (text.match(/\d+/g) || []).map(Number);
-  if (!matches.length) return null;
-  const max = Math.max(...matches);
-  return max > 0 ? max : null;
+export function getPaxCapacity(value) {
+  if (!value) return null;
+  const text = String(value).trim();
+  if (/(?:^|\s)-\d|\d+\.\d/.test(text)) return null;
+  const range = text.match(/(\d+)\s*[-–]\s*(\d+)\s*(?:pax|guests?|people)?$/i);
+  if (range && (Number(range[1]) > Number(range[2]) || Number(range[1]) < 1 || Number(range[2]) > 100)) return null;
+  const explicit = [...text.matchAll(/(?:^|[^\d.])(\d+)\s*(?:pax|guests?|people)\b/gi)].map(match => Number(match[1]));
+  const numeric = /^\d+(?:\s*[-–]\s*\d+)?$/.test(text) ? (text.match(/\d+/g) || []).map(Number) : [];
+  const values = explicit.length ? explicit : numeric;
+  if (!values.length || values.some(number => number < 1 || number > 100)) return null;
+  if (numeric.length === 2 && numeric[0] > numeric[1]) return null;
+  return Math.max(...values);
 }
 
 const reservedCache = {};
 
-export async function fetchReservedHours(roomId, dateStr, variantLabel) {
-  const key = `${roomId}|${dateStr}|${variantLabel || ''}`;
+export async function fetchReservedHours(roomId, dateStr, variantLabel, options = {}) {
+  const key = roomId + '|' + dateStr + '|' + (variantLabel || '');
   if (reservedCache[key]) return reservedCache[key];
-
-  try {
-    const params = new URLSearchParams({ roomId, date: dateStr });
-    if (variantLabel) params.set('variantLabel', variantLabel);
-    const res = await fetch(
-      `${API_BASE_URL}/api/bookings/availability?${params.toString()}`,
-      { credentials: 'include' }
-    );
-    if (!res.ok) throw new Error('Failed to load availability');
-    const bookings = await res.json();
-
-    const hourCounts = {};
-
-    bookings.forEach((b) => {
-      const startHour = parseInt( String(b.timeIn).split(':')[0], 10 );
-      for ( let h = startHour; h < startHour + Number(b.duration); h++ ) 
-      { hourCounts[h] = (hourCounts[h] || 0) + 1; }
-    });
-    reservedCache[key] = hourCounts;
-  } catch (err) {
-  console.error(err);
-  }
-  return reservedCache[key] || {};
+  const params = new URLSearchParams({ roomId, date: dateStr });
+  if (variantLabel) params.set('variantLabel', variantLabel);
+  const bookings = await apiRequest('/api/bookings/availability?' + params, { ...options, fallbackMessage: 'Could not load start times. Please retry.' });
+  const counts = buildHourCounts(bookings);
+  reservedCache[key] = counts;
+  return counts;
 }
-
-export function clearReservedHours(
-  roomId,
-  dateStr,
-  variantLabel
-) {
-  const prefix = `${roomId}|${dateStr}|`;
-
-  Object.keys(reservedCache).forEach((key) => {
-    if (key.startsWith(prefix)) {
-      delete reservedCache[key];
-    }
-  });
+export function clearReservedHours(roomId, dateStr) {
+  const prefix = roomId + '|' + dateStr + '|';
+  Object.keys(reservedCache).forEach(key => { if (key.startsWith(prefix)) delete reservedCache[key]; });
 }
-
 const monthAvailabilityCache = {};
-
-export async function loadMonthAvailability(roomId, year, month, variantLabel) {
-  const key = `${roomId}|${year}-${month}|${variantLabel || ''}`;
+export async function loadMonthAvailability(roomId, year, month, variantLabel, options = {}) {
+  const key = roomId + '|' + year + '-' + month + '|' + (variantLabel || '');
   if (monthAvailabilityCache[key]) return monthAvailabilityCache[key];
-
-  try {
-    const params = new URLSearchParams({ roomId, year, month });
-    if (variantLabel) params.set('variantLabel', variantLabel);
-
-    const res = await fetch(
-      `${API_BASE_URL}/api/bookings/availability-month?${params.toString()}`,
-      { credentials: 'include' }
-    );
-    if (!res.ok) throw new Error('Failed to load month availability');
-    monthAvailabilityCache[key] = await res.json();
-  } catch (err) {
-    console.error(err);
-    monthAvailabilityCache[key] = {};
-  }
-  return monthAvailabilityCache[key];
+  const params = new URLSearchParams({ roomId, year, month });
+  if (variantLabel) params.set('variantLabel', variantLabel);
+  const data = await apiRequest('/api/bookings/availability-month?' + params, { ...options, fallbackMessage: 'Could not load the calendar. Please retry.' });
+  monthAvailabilityCache[key] = data;
+  return data;
 }
 
 export function clearMonthAvailability(roomId, year, month) {
@@ -148,10 +112,7 @@ export function isHolidayDate(dateStr, holidays) {
   return Boolean(getHolidayForDate(dateStr, holidays));
 }
 
-/**
- * Return the full-day closure record for a date so calendar views can explain
- * why a date is unavailable instead of showing a generic holiday label.
- */
+// closure
 export function getHolidayForDate(dateStr, holidays) {
   return (holidays || []).find((holiday) => holiday?.date === dateStr && holiday?.fullDay) || null;
 }

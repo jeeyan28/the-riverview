@@ -4,55 +4,24 @@
    Chrome's mobile "Desktop site" mode matches the real desktop layout. */
 
 @media (min-width: 641px) and (max-width: 900px) {
-  .public-site,
-  #app { --app-nav-height: 64px; }
+  .public-site { --app-nav-height: 64px; }
 
-  .customer-app-nav,
-  .admin-app-nav {
+  .customer-app-nav {
     bottom: max(8px, env(safe-area-inset-bottom));
     min-height: var(--app-nav-height);
     padding: 5px;
   }
 
-  .customer-app-nav .app-nav-item,
-  .admin-app-nav .app-nav-item { min-height: 52px; font-size: .64rem; }
+  .customer-app-nav .app-nav-item { min-height: 52px; font-size: .64rem; }
 
   .public-site { --section-space: 44px; --page-gutter: 24px; }
   .public-site :is(.how-it-works, .spaces, #about) { padding-block: 44px; }
   .public-site .hero h1 { font-size: clamp(2.7rem, 7vw, 4rem); }
   .public-site :is(.steps-grid, .about-right) { gap: 10px; }
-
-  #app .content { padding: 14px 14px calc(var(--app-nav-height) + 26px + env(safe-area-inset-bottom)); gap: 14px; }
-  #app .card { padding: 14px; }
-  #app .mc { min-height: 88px; padding: 11px; }
 }
 
 @media (max-width: 900px) {
   /* More admin destinations scroll like a native tab rail instead of shrinking. */
-  .admin-app-nav {
-    grid-auto-columns: 72px;
-    justify-content: start;
-    overflow-x: auto;
-    overflow-y: hidden;
-    overscroll-behavior-inline: contain;
-    scroll-snap-type: inline proximity;
-    scrollbar-width: none;
-  }
-
-  .admin-app-nav::-webkit-scrollbar { display: none; }
-  .admin-app-nav .app-nav-item { scroll-snap-align: center; }
-
-  #app[data-theme='light'] .admin-app-nav {
-    border-color: rgba(22, 43, 56, .12);
-    background: rgba(255, 255, 255, .94);
-    box-shadow: 0 12px 32px rgba(22, 43, 56, .14);
-  }
-
-  #app[data-theme='light'] .admin-app-nav .app-nav-item { color: #667281; }
-  #app[data-theme='light'] .admin-app-nav .app-nav-item.active {
-    color: #087f6c;
-    background: rgba(0, 163, 137, .11);
-  }
 
   html[data-theme='light'] .customer-app-nav {
     border-color: rgba(22, 43, 56, .12);
@@ -64,15 +33,13 @@
 @media (max-width: 640px) {
   html { font-size: 15px; }
 
-  .public-site,
-  #app {
+  .public-site {
     --app-nav-height: 60px;
     --radius-lg: 14px;
     --radius-md: 10px;
   }
 
-  .customer-app-nav,
-  .admin-app-nav {
+  .customer-app-nav {
     inset-inline: max(6px, env(safe-area-inset-left)) max(6px, env(safe-area-inset-right));
     bottom: max(6px, env(safe-area-inset-bottom));
     width: calc(100% - 12px);
@@ -84,10 +51,8 @@
   }
 
   .customer-app-nav { grid-auto-columns: minmax(0, 1fr); }
-  .admin-app-nav { grid-auto-columns: 66px; }
 
-  .customer-app-nav .app-nav-item,
-  .admin-app-nav .app-nav-item {
+  .customer-app-nav .app-nav-item {
     min-height: 52px;
     gap: 2px;
     padding: 3px 2px;
@@ -95,11 +60,9 @@
     font-size: .58rem;
   }
 
-  .customer-app-nav .app-nav-item svg,
-  .admin-app-nav .app-nav-item svg { width: 18px; height: 18px; }
+  .customer-app-nav .app-nav-item svg { width: 18px; height: 18px; }
 
-  .customer-app-nav .app-nav-item::before,
-  .admin-app-nav .app-nav-item::before { inset-inline: 28%; }
+  .customer-app-nav .app-nav-item::before { inset-inline: 28%; }
 
   .public-site {
     --header-h: 56px;
@@ -340,8 +303,7 @@
   .public-site #announcements-bell-btn-mobile > svg { width: 16px; height: 16px; }
   .public-site #announcements-bell-badge-mobile { min-width: 14px; height: 14px; padding-inline: 3px; font-size: .52rem; }
 
-  .public-site .toast,
-  #app .toast {
+  .public-site .toast {
     width: auto;
     max-width: min(286px, calc(100vw - 20px));
     gap: 6px;
@@ -431,64 +393,6 @@
   .pf-booking-title { font-size: .76rem; }
 
   /* The final admin layer keeps information dense without reducing tap size. */
-  #app .topbar {
-    min-height: 54px;
-    padding: max(5px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) 5px max(8px, env(safe-area-inset-left));
-    border-bottom-color: color-mix(in srgb, var(--border) 75%, transparent);
-  }
-  #app .admin-page-eyebrow { font-size: .53rem; letter-spacing: .09em; }
-  #app .page-title { font-size: .88rem; }
-  #app .topbar-right { gap: 2px; }
-  #app .topbar-right :is(button, a) { min-height: 44px; }
-  #app .theme-toggle { width: 54px; min-width: 54px; height: 44px; }
-  #app .theme-toggle[aria-checked='true'] .theme-toggle-thumb { transform: translateX(20px); }
-  #app .content { padding: 8px 8px calc(var(--app-nav-height) + 18px + env(safe-area-inset-bottom)); gap: 9px; }
-  #app .panel.active { gap: 9px; }
-  #app .card { padding: 10px; border-radius: 11px; }
-  #app .card-head { margin-bottom: 8px; }
-  #app .card-head :is(h2, h3) { font-size: .86rem; }
-  #app .card-head p { font-size: .64rem; line-height: 1.4; }
-  #app :is(.metric-row, .rm-stats-bar) { gap: 5px; }
-  #app .mc { min-height: 72px; padding: 8px; border-radius: 10px; }
-  #app .mc-label { font-size: .56rem; line-height: 1.2; }
-  #app .mc-val { font-size: 1rem; }
-  #app .mc-sub { font-size: .57rem; line-height: 1.25; }
-  #app :is(.settings-intro, .login-history-intro, .rm-toolbar-head) { padding: 9px 10px; }
-  #app :is(.settings-intro, .login-history-intro, .rm-toolbar-head) h2 { font-size: .86rem; }
-  #app :is(.settings-intro, .login-history-intro, .rm-toolbar-head) p { font-size: .62rem; line-height: 1.35; }
-  #app :is(.bk-toolbar-card, .um-toolbar-card, .fac-toolbar-card) { padding: 8px; }
-  #app :is(.bk-filters, .um-filters, .rep-log-filters, .users-filters, .rm-toolbar-actions, .monitor-report-filters) { gap: 6px; }
-  #app :is(.bk-filters, .um-filters, .rep-log-filters, .users-filters, .rm-toolbar-actions, .monitor-report-filters) > :is(button, select, input, a),
-  #app :is(.save-btn, .btn-teal, .btn-confirm, .btn-cancel) { min-height: 44px; font-size: .7rem; }
-  #app :is(.set-tab, .monitor-section-tabs button, .login-history-tabs button) { min-height: 44px; padding: 6px 7px; }
-  #app :is(.set-tab, .monitor-section-tabs button, .login-history-tabs button) strong,
-  #app :is(.set-tab, .monitor-section-tabs button, .login-history-tabs button) { font-size: .63rem; }
-  #app .fac-toolbar { padding: 7px; gap: 6px; }
-  #app .fac-chip { min-height: 36px; padding-inline: 9px; font-size: .65rem; }
-  #app .rm { min-height: 120px; padding: 10px; }
-  #app .rm-stat { min-height: 58px; padding: 7px 8px; }
-  #app .rm-stat-value { font-size: .94rem; }
-  #app :is(.rm-status-pill, .pay-timing-tag) { padding: 2px 6px; font-size: .59rem; }
-  #app :is(.modal-bg, .modal-backdrop) { padding: 8px; align-items: flex-end; }
-  #app .modal-box,
-  #app .modal-box.modal-lg,
-  #app .modal-box.modal-xl,
-  #app .modal-box.modal-2xl {
-    width: 100%;
-    max-height: calc(100dvh - 8px);
-    padding: 13px;
-    border-radius: 18px 18px 0 0;
-  }
-  #app .modal-heading { margin-bottom: 9px; }
-  #app .modal-title { font-size: .94rem; }
-  #app .modal-subtitle { font-size: .64rem; line-height: 1.35; }
-  #app .modal-body { font-size: .72rem; }
-  #app .form-group { margin-bottom: 8px; }
-  #app .form-group label { margin-bottom: 4px; font-size: .62rem; }
-  #app .form-control,
-  #app .form-select { min-height: 44px; font-size: 16px; }
-  #app .modal-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin-top: 10px; padding-top: 9px; }
-  #app .modal-actions > * { min-height: 44px; font-size: .7rem; }
 }
 
 @media (max-width: 360px) {
@@ -508,6 +412,5 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .customer-app-nav,
-  .admin-app-nav { scroll-behavior: auto; }
+  .customer-app-nav { scroll-behavior: auto; }
 }

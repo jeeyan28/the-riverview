@@ -32,6 +32,8 @@ export const paymentsService = {
 
   async createIntent(payload, options = {}) {
     const data = await apiRequest(`${BASE}/intent`, { ...options, method: 'POST', body: payload, fallbackMessage: 'Could not start online payment.' });
+    if (data.status === 'checking' && typeof data.attemptId === 'string') return data;
+    if (data.gateway === 'demo' && typeof data.attemptId === 'string') return data;
     if (data.gateway === 'xendit') {
       if (!data.referenceId || !isSecureRedirect(data.redirectUrl)) throw invalidResponse();
     } else if (typeof data.paymentIntentId !== 'string' || !data.paymentIntentId || typeof data.clientKey !== 'string' || !data.clientKey) {
@@ -39,6 +41,9 @@ export const paymentsService = {
     }
     return data;
   },
+
+  attemptStatus: (id, options) => apiRequest(`${BASE}/attempts/${id.startsWith('rv-') ? '' : 'client/'}${encodeURIComponent(id)}`, { ...options, fallbackMessage: 'We could not check your payment. Your original attempt is preserved.' }),
+  demoConfirm: id => apiRequest(`/api/payments/paymongo/demo/${encodeURIComponent(id)}/confirm`, { method: 'POST', body: {}, fallbackMessage: 'Could not simulate this demo payment.' }),
 
   status(id, { provider = 'paymongo', ...options } = {}) {
     const base = provider === 'xendit' ? '/api/payments/xendit' : BASE;

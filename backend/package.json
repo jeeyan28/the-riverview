@@ -9,7 +9,15 @@
   "scripts": {
     "start": "node server.js",
     "check": "node scripts/checkSyntax.js",
-    "audit": "npm audit --omit=dev"
+    "audit": "npm audit --omit=dev",
+    "test": "npm run test:unit",
+    "test:unit": "node --test --test-concurrency=1 tests/unit/*.test.js",
+    "test:integration": "node --test --test-concurrency=1 tests/integration/*.test.js",
+    "lint": "eslint .",
+    "demo": "node scripts/demo.js",
+    "demo:seed": "node scripts/seedDemo.js",
+    "demo:reset": "node scripts/seedDemo.js --reset",
+    "docs:check": "node scripts/checkApiDocs.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
@@ -33,5 +41,10 @@
     "exceljs": {
       "uuid": "^11.1.1"
     }
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.12.0",
+    "mongodb-memory-server": "^11.3.0"
   }
 }

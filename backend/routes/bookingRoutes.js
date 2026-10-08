@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const Booking = require("../model/booking");
+const ReceiptJob = require("../model/receiptJob");
 const Settings = require("../model/settings");
 const BookingLock = require("../model/bookingLock");
 const { RoomSession } = require("../model/monitoring");
@@ -9,10 +10,11 @@ const { LOCK_DURATION_MINUTES } = BookingLock;
 const { requirePermission, ensureAuthenticated } = require("../middleware/adminAuth");
 const { paymentProofUpload } = require("../middleware/upload");
 const { PERMISSIONS, isAdminRole, hasPermission } = require("../utils/permissions");
-const { validateAndPriceBooking, computeDownPayment, saveWithReservationCode, runInTransaction } = require("../utils/bookingHelper");
-const { repriceExistingBooking } = require("../utils/roomPricing");
+const { validateAndPriceBooking, saveWithReservationCode, runInTransaction } = require("../utils/bookingHelper");
+const { repriceExistingBooking, quoteOnlineBooking, parsePaxCapacity } = require("../utils/roomPricing");
+const { operatingWindowForStart } = require('../utils/bookingSchedule');
 const { shiftDate, nearbyDates, availabilityRows } = require("../utils/bookingSchedule");
-const { validate } = require("../middleware/validate");
+const { validate, Joi } = require("../middleware/validate");
 const {
   bookingIdParamsSchema,
   availabilityQuerySchema,
@@ -26,7 +28,7 @@ const {
   cancellationReviewSchema,
 } = require("../validation/bookingSchemas");
 const { logAudit } = require("../utils/auditLog");
-const { bookingActionLimiter } = require("../middleware/rateLimiter");
+const { bookingActionLimiter, availabilityLimiter } = require("../middleware/rateLimiter");
 const { CLOSABLE_STATUSES, AUTOMATIC_REFUND_STATUSES, isClosurePending, isBookingCustomer } = require("../utils/closurePolicy");
 const { queueClosureRefund, processClosureRefund, retryUnsubmittedClosureRefund, completeManualClosureRefund } = require("../utils/closureRefunds");
 const { notifyReservation, deliverNotificationEmails } = require("../utils/reservationNotifications");
@@ -34,6 +36,36 @@ const { validDateKey } = require("../utils/businessDate");
 const AppError = require("../utils/appError");
 
 const DATE_KEY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+const slotsQuerySchema = availabilityQuerySchema.keys({
+  duration: Joi.number().integer().min(1).max(5).default(1), guestCount: Joi.number().integer().min(1).max(100).default(1),
+  paymentChoice: Joi.string().valid('deposit', 'full').default('deposit'), claimDiscount: Joi.boolean().default(false),
+});
+
+router.get('/slots', availabilityLimiter, validate(slotsQuerySchema, 'query'), async (req, res) => {
+  const { roomId, date, variantLabel, duration, guestCount, paymentChoice, claimDiscount } = req.query;
+  const room = await require('../model/room').findById(roomId).lean();
+  if (!room) throw new AppError(404, 'Facility not found.');
+  const settings = await Settings.getSingleton();
+  const selectedVariant = (room.variants || []).find(variant => variant.label === variantLabel);
+  if (room.variants?.length && !selectedVariant) throw new AppError(400, 'Choose a configured room type.');
+  const hours = settings.operatingHours || {};
+  const { openHour, closeHour } = operatingWindowForStart(date, hours.openTime, hours.openTime, hours.closeTime);
+  const slots = [];
+  for (let hour = openHour; hour < closeHour; hour++) {
+    const actualDate = hour >= 24 ? shiftDate(date, 1) : date;
+    const timeIn = `${String(hour % 24).padStart(2, '0')}:00`;
+    const selection = { roomId, variantLabel, date: actualDate, timeIn, duration, guestCount, isAdminBooking: false };
+    try {
+      const priced = await validateAndPriceBooking(selection);
+      const quote = quoteOnlineBooking({ room: priced.room, variant: priced.selectedVariant, basePrice: priced, paymentChoice, claimDiscount });
+      slots.push({ date: actualDate, timeIn, displayHour: hour, startsNextDay: hour >= 24, state: 'available', quote: { amount: quote.amount, downPayment: quote.downPayment, remainingBalance: Math.round((quote.amount - quote.downPayment) * 100) / 100 } });
+    } catch (error) {
+      if (![400, 404, 409].includes(error.status)) throw error;
+      slots.push({ date: actualDate, timeIn, displayHour: hour, startsNextDay: hour >= 24, state: error.code === 'VENUE_CLOSED' ? 'closed' : error.code === 'SLOT_FULL' ? 'full' : 'outside_hours', reason: error.message });
+    }
+  }
+  res.json({ timeZone: 'Asia/Manila', serviceDate: date, operatingHours: hours, guestCapacity: parsePaxCapacity(selectedVariant?.pax) || room.capacity || null, slots });
+});
 
 router.get("/", requirePermission(PERMISSIONS.BOOKING_VIEW), async (req, res) => {
   try {
@@ -67,14 +99,15 @@ router.get("/", requirePermission(PERMISSIONS.BOOKING_VIEW), async (req, res) =>
     }
 
     const bookings = await Booking.find(filter).sort({ createdAt: -1 }).populate("room", "name variants");
-    res.json(bookings);
+    const receipts = await ReceiptJob.find({ booking: { $in: bookings.map(item => item._id) } }).select('booking state version').sort({ version: -1 }).lean();
+    res.json(bookings.map(item => ({ ...item.toObject(), receiptStatus: receipts.find(job => String(job.booking) === String(item._id))?.state || 'not_prepared' })));
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Server error." });
   }
 });
 
-router.get("/availability", validate(availabilityQuerySchema, "query"), async (req, res) => {
+router.get("/availability", availabilityLimiter, validate(availabilityQuerySchema, "query"), async (req, res) => {
   try {
     const { roomId, date, variantLabel } = req.query;
     const filter = {
@@ -99,7 +132,7 @@ router.get("/availability", validate(availabilityQuerySchema, "query"), async (r
 });
 
 
-router.get("/availability-month", validate(monthAvailabilityQuerySchema, "query"), async (req, res) => {
+router.get("/availability-month", availabilityLimiter, validate(monthAvailabilityQuerySchema, "query"), async (req, res) => {
   try {
     const { roomId, year, month, variantLabel } = req.query;
     const y = year;
@@ -191,7 +224,7 @@ router.delete("/lock/:id", ensureAuthenticated, validate(bookingIdParamsSchema, 
     res.json({ message: "Lock released." });
   } catch (err) {
     console.error(err);
-    res.status(400).json({ message: "Invalid lock id." });
+    res.status(503).json({ message: "Could not release the hold. Please try again.", code: "HOLD_UNAVAILABLE" });
   }
 });
 
@@ -260,7 +293,7 @@ router.get("/mine", ensureAuthenticated, async (req, res) => {
   }
 });
 
-router.get("/:id", ensureAuthenticated, async (req, res) => {
+router.get("/:id", ensureAuthenticated, validate(bookingIdParamsSchema, "params"), async (req, res) => {
   try {
     const booking = await Booking.findById(req.params.id).populate("room", "name");
     if (!booking) return res.status(404).json({ message: "Reservation not found." });
@@ -268,10 +301,11 @@ router.get("/:id", ensureAuthenticated, async (req, res) => {
     if (!isBookingCustomer(booking, req.user._id) && !isAdminRole(req.user.role)) {
       return res.status(403).json({ message: "Not allowed." });
     }
-    res.json(booking);
+    const receipt = await ReceiptJob.findOne({ booking: booking._id }).sort({ version: -1 }).select('state').lean();
+    res.json({ ...booking.toObject(), receiptStatus: receipt?.state || 'not_prepared' });
   } catch (err) {
-    console.error(err);
-    res.status(400).json({ message: "Invalid reservation id." });
+    console.error('Reservation lookup unavailable:', { requestId: req.id, category: err.name });
+    res.status(503).json({ message: "We could not load this reservation. Please retry.", code: "RESERVATION_UNAVAILABLE", requestId: req.id });
   }
 });
 
@@ -374,7 +408,7 @@ router.put("/:id/closure-refund", ensureAuthenticated, bookingActionLimiter, val
   }
 });
 
-router.put("/:id/closure-refund/check", requirePermission(PERMISSIONS.BOOKING_MANAGE), validate(bookingIdParamsSchema, "params"), validate(emptyBodySchema), async (req, res) => {
+router.put("/:id/closure-refund/check", requirePermission(PERMISSIONS.POS_REFUND), validate(bookingIdParamsSchema, "params"), validate(emptyBodySchema), async (req, res) => {
   const booking = await Booking.findById(req.params.id);
   if (!booking?.closureRefund) return res.status(404).json({ message: "Closure refund not found." });
   await processClosureRefund(booking._id, { force: true });
@@ -382,7 +416,7 @@ router.put("/:id/closure-refund/check", requirePermission(PERMISSIONS.BOOKING_MA
   res.json(await Booking.findById(booking._id));
 });
 
-router.put("/:id/closure-refund/retry", requirePermission(PERMISSIONS.BOOKING_MANAGE), bookingActionLimiter, validate(bookingIdParamsSchema, "params"), validate(emptyBodySchema), async (req, res) => {
+router.put("/:id/closure-refund/retry", requirePermission(PERMISSIONS.POS_REFUND), bookingActionLimiter, validate(bookingIdParamsSchema, "params"), validate(emptyBodySchema), async (req, res) => {
   try {
     const booking = await retryUnsubmittedClosureRefund(req.params.id);
     await logAudit({ category: "Booking", action: "updated", description: `Retried an unsubmitted closure refund for ${booking.reservationCode}`, user: req.user });
@@ -423,6 +457,7 @@ router.put("/:id/cancellation-review", requirePermission(PERMISSIONS.BOOKING_MAN
       const alreadyApproved = booking.cancellationStatus === "Approved" && booking.status === "Cancelled";
       if (!wasRequested && !alreadyApproved) throw new AppError(409, "There is no cancellation to review or refund to record.");
       if (alreadyApproved && req.body.decision !== "approve") throw new AppError(409, "An approved cancellation cannot be rejected.");
+      if ((Number(req.body.refundedAmount) > Number(booking.refundedAmount || 0) || req.body.refundException) && !hasPermission(req.user, PERMISSIONS.POS_REFUND)) throw new AppError(403, "Refund permission required.");
       const previousRefund = Number(booking.refundedAmount || 0);
       const fields = reviewCancellationFields(booking, {
         decision: req.body.decision,

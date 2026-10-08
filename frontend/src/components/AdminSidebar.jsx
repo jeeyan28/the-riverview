@@ -21,7 +21,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import Toast from './Toast';
 import { useToast } from '../hooks/useToast';
-import logo from '../assets/logo/logoo.png';
+import logo from '../assets/logo/logo-320.webp';
 
 const SIDEBAR_COLLAPSED_KEY = 'rv_admin_sidebar_collapsed';
 
@@ -223,7 +223,7 @@ function AdminSidebar({ compact = false, mobileOpen = false, onClose, triggerRef
       </button>
 
       <div className="sb-brand">
-        <img className="sb-logo" src={logo} alt="Riverview Logo" />
+        <img className="sb-logo" src={logo} width="160" height="160" alt="Riverview Logo" />
         {!isCollapsed && (
           <div>
             <div className="sb-title">Riverview</div>

@@ -1,6 +1,12 @@
-const rateLimit = require("express-rate-limit");
+const rawRateLimit = require("express-rate-limit");
 const crypto = require("crypto");
-const { ipKeyGenerator } = rateLimit;
+const { ipKeyGenerator } = rawRateLimit;
+const { MongoRateLimitStore } = require('../utils/rateLimitStore');
+
+function rateLimit(options) {
+  const prefix = crypto.createHash('sha256').update(options.message.message).digest('hex').slice(0, 16);
+  return rawRateLimit({ ...options, store: new MongoRateLimitStore(prefix), passOnStoreError: false });
+}
 
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -97,6 +103,14 @@ const paymentAttachLimiter = rateLimit({
   message: { message: "Too many payment attempts. Please try again later." },
 });
 
+const availabilityLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: 'Too many availability checks. Please wait a minute and try again.' },
+});
+
 module.exports = {
   loginLimiter,
   authActionLimiter,
@@ -108,4 +122,5 @@ module.exports = {
   bookingActionLimiter,
   paymentIntentLimiter,
   paymentAttachLimiter,
+  availabilityLimiter,
 };

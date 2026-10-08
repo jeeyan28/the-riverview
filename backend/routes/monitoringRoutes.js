@@ -138,8 +138,8 @@ roomsRouter.get("/:id", ensureAdmin, validate(idParamsSchema, "params"), async (
     const catalogRoom = Number(room.price) > 0 ? null : await Room.findOne({ name: room.facilityName }).select("name variants").lean();
     res.json(pricedMonitorRoom(room, catalogRoom));
   } catch (err) {
-    console.error(err);
-    res.status(400).json({ message: "Invalid room id." });
+    console.error('Monitor room unavailable:', { requestId: req.id, category: err.name });
+    res.status(503).json({ message: 'We could not load this room. Please retry.', code: 'ROOM_UNAVAILABLE', requestId: req.id });
   }
 });
 

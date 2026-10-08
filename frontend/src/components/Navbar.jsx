@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import logo from '../assets/logo/logoo.png';
+import logo from '../assets/logo/logo-320.webp';
 import { useAuth } from '../context/AuthContext';
 import ThemeToggle from './ThemeToggle';
 import AnnouncementsBell from './AnnouncementsBell';
@@ -28,7 +28,7 @@ function Navbar({
   const chipRef = useRef(null);
   const menuRef = useRef(null);
   const menuButtonRef = useRef(null);
-  const { user, isAdmin, logout } = useAuth();
+  const { user, isAdmin, logout, logoutError } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const isHome = location.pathname === '/';
@@ -156,7 +156,7 @@ function Navbar({
     <>
       <header id="site-header" className={scrolled ? 'scrolled' : ''}>
         <Link to="/" className="logo" aria-label="The Riverview home">
-          <img src={logo} alt="Riverview Logo" />
+          <img src={logo} width="160" height="160" alt="Riverview Logo" />
           <span className="logo-name">The Riverview</span>
         </Link>
 
@@ -310,6 +310,7 @@ function Navbar({
       )}
 
       <LogoutConfirmDialog
+        error={logoutError}
         open={showLogoutConfirm}
         pending={logoutPending}
         onConfirm={confirmLogout}

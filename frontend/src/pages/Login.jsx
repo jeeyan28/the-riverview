@@ -5,8 +5,8 @@ import AuthForm from '../components/AuthForm';
 import ForgotPasswordModal from '../components/ForgotPasswordModal';
 import AuthMorphOverlay from '../components/AuthMorphOverlay';
 import { useAuthMorph } from '../hooks/useAuthMorph';
-import logo from "../assets/logo/logoo.png";
-import loginIllustration from "../assets/images/login-illustration.jpg";
+import logo from "../assets/logo/logo-320.webp";
+import loginIllustration from "../assets/images/login-illustration.webp";
 
 function Login() {
   const [searchParams] = useSearchParams();
@@ -24,6 +24,7 @@ function Login() {
 
   return (
     <main className="login-page">
+      {import.meta.env.VITE_DEMO_MODE === 'true' && <div className="demo-login-hint" role="note">Synthetic demo · customer@riverview.demo / owner@riverview.demo / staff@riverview.demo<br />Password for these isolated accounts: Evaluate2026!</div>}
 
       <div className={`login-background${isMorphing ? ' is-dimmed' : ''}`}>
         <div
@@ -36,7 +37,7 @@ function Login() {
 
       <header className="login-header">
         <Link to="/" className="login-brand">
-          <img src={logo} alt="The Riverview" className="login-logo" />
+          <img src={logo} width="160" height="160" alt="The Riverview" className="login-logo" />
           <span className="login-brand-title">The Riverview</span>
         </Link>
       </header>

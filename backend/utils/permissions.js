@@ -59,7 +59,7 @@ function isAdminRole(role) {
 }
 
 function roleLevel(role) {
-  return ROLE_LEVEL.hasOwnProperty(role) ? ROLE_LEVEL[role] : -1;
+  return Object.hasOwn(ROLE_LEVEL, role) ? ROLE_LEVEL[role] : -1;
 }
 
 function roleLabel(role) {
@@ -81,7 +81,7 @@ function canManageTarget({ actor, target }) {
 }
 
 function canAssignRole({ actor, targetRole }) {
-  if (!ROLE_LEVEL.hasOwnProperty(targetRole)) {
+  if (!Object.hasOwn(ROLE_LEVEL, targetRole)) {
     return { ok: false, message: "Unknown role." };
   }
   if (targetRole === "super_admin") {

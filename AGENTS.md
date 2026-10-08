@@ -14,8 +14,8 @@ Read this before starting any task in this repo.
 
 - Do not create new Markdown files unless the user explicitly requests them. Do not generate feature plans, task summaries, progress logs, audit reports, changelogs, or duplicated documentation automatically. Explain plans and results in the chat.
 - Update existing README.md or SECURITY.md only when the implementation makes their current content inaccurate. Keep one root AGENTS.md; do not create additional instruction files for ordinary feature work.
-- Do not create or retain test.js, test/spec directories, fixtures, preview runners, debug scripts, screenshots, or generated review artifacts as part of ordinary feature work. Prefer existing validation commands or disposable checks run through stdin.
-- When temporary validation files are necessary, keep track of them and remove all files and folders created for that validation before finishing, including after failed checks. Retain new tests only when the user explicitly asks for them. Preserve pre-existing files unless their removal is authorized.
+- Maintained behavior, integration, component, and browser tests and necessary synthetic fixtures are allowed for the portfolio improvement work. Keep requested API documentation, reviewer walkthroughs, and actual demo screenshots; remove unrelated temporary validation artifacts.
+- When temporary validation files are necessary, keep track of them and remove all files and folders created for that validation before finishing, including after failed checks. Preserve maintained tests and pre-existing files unless their removal is authorized.
 - Run checks relevant to the change and report their actual results. Do not claim live integrations or deployment were tested when only local or mocked checks ran.
 - Reuse existing modules and dependencies. Do not add scaffolding, maintenance scripts, migrations, or dependencies unless the requested implementation needs them. Remove newly unused code introduced by the change.
 

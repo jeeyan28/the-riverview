@@ -1,5 +1,6 @@
 import '../../styles/admin/room-management.css';
 import '../../styles/admin/room-management-v2.css';
+import { getPaxCapacity } from '../../utils/rooms';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   AlertCircle,
@@ -852,11 +853,12 @@ function RoomManagement() {
                       />
                     </div>
                     <div className="ffield">
-                      <label className="flabel">Max Pax</label>
+                      <label className="flabel" htmlFor="room-max-guests">Maximum guests</label>
                       <input
-                        type="text" placeholder="e.g. 6 pax"
-                        value={activeRoom.pax} onChange={(e) => updateVariant(activeRoomIndex, 'pax', e.target.value)}
+                        id="room-max-guests" type="number" min="1" max="100" step="1" placeholder="Not confirmed"
+                        value={getPaxCapacity(activeRoom.pax) || ''} onChange={(e) => updateVariant(activeRoomIndex, 'pax', e.target.value ? `${e.target.value} guests` : '')}
                       />
+                      <span className="flabel-hint">Leave blank when the group limit is unknown. Inventory units are configured separately.</span>
                     </div>
                   </div>
 

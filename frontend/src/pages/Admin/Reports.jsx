@@ -91,7 +91,7 @@ function Reports() {
       <RevenueSummary summary={data?.summary} loading={loading} />
 
       {data?.warnings?.length > 0 && (
-        <div className="finance-warning" role="status"><strong>Payment review needed</strong><ul>{data.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul></div>
+        <div className="finance-warning" role="status"><strong>Unverified payment records</strong><ul>{data.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul></div>
       )}
 
       <div className="finance-activity">

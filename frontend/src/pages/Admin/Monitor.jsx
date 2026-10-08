@@ -4,11 +4,12 @@ import { Fragment, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { TriangleAlert } from 'lucide-react';
 import Modal from '../../components/Modal';
+import { ExtendSessionModal, FinishSessionModal, RoomDetailModal } from '../../components/admin/MonitorDialogs';
 import DataTable from '../../components/DataTable';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import { useConfirm } from '../../hooks/useConfirm';
 import { useAuth } from '../../context/AuthContext';
-import { monitorRoomsService, roomSessionsService } from '../../services/monitoring';
+import { roomSessionsService } from '../../services/monitoring';
 import { bookingsService } from '../../services/bookings';
 import { businessDate } from '../../utils/businessDate';
 import { reservationWindow, roomMonitorSchedule } from '../../utils/reservationStatus';
@@ -17,7 +18,6 @@ import { getBookingRoomTarget } from '../../utils/monitorInventory';
 import {
   useRoomMonitorData,
   sessionEnd,
-  formatStartTime,
   formatTimeRemaining,
   findRoomOccupancy,
   buildRoomView,
@@ -27,21 +27,8 @@ const FACILITY_ICONS = { Billiards: 'bi-disc', KTV: 'bi-mic', Court: 'bi-trophy'
 const FACILITY_ICON_DEFAULT = 'bi-building';
 const DUE_BOOKINGS_POLL_MS = 20 * 1000;
 const MAX_SESSION_HOURS = 5;
-const EXTENSION_OPTIONS = [
-  { hours: 0.5, label: '30 min' },
-  { hours: 1, label: '1 hr' },
-  { hours: 1.5, label: '1 hr 30 min' },
-  { hours: 2, label: '2 hrs' },
-];
-
 function canExtendSession(session) {
   return MAX_SESSION_HOURS - Number(session?.duration || 0) >= 0.5;
-}
-
-function sessionLengthLabel(hours) {
-  const wholeHours = Math.floor(Number(hours) || 0);
-  const minutes = Math.round(((Number(hours) || 0) - wholeHours) * 60);
-  return [wholeHours ? `${wholeHours} hr${wholeHours === 1 ? '' : 's'}` : '', minutes ? `${minutes} min` : ''].filter(Boolean).join(' ');
 }
 
 function paymentSummary(record, isBooking = false) {
@@ -119,8 +106,8 @@ function Monitor() {
   const { confirm, confirmProps } = useConfirm();
 
   const {
-    rooms, setRooms, sessions, loading, refreshError, lastUpdatedAt,
-    fetchRooms, fetchMonitorSessions, applySessionChange,
+    rooms, sessions, loading, refreshError, lastUpdatedAt,
+    fetchMonitorSessions, applySessionChange,
     viewMode, changeViewMode,
     soundMuted, toggleSoundMuted,
   } = useRoomMonitorData('admin');
@@ -130,8 +117,6 @@ function Monitor() {
   const [schedulePeriod, setSchedulePeriod] = useState('today');
   const [finishingSession, setFinishingSession] = useState(null);
   const [extendingSession, setExtendingSession] = useState(null);
-  const [showAddRoom, setShowAddRoom] = useState(false);
-  const [editRoomId, setEditRoomId] = useState(null);
   const [facilityFilter, setFacilityFilter] = useState('All');
   const [roomNameFilter, setRoomNameFilter] = useState('All');
   const [sortBy, setSortBy] = useState('default');
@@ -233,30 +218,6 @@ function Monitor() {
     setModal(null);
     await fetchMonitorSessions();
     if (bookingId) await fetchDueBookings();
-  }
-
-  async function handleAddRoom({ facilityName, roomName, roomNumber, price }) {
-    if (!guardPermission('room:manage')) return;
-    await monitorRoomsService.create({ facilityName, roomName, roomNumber, price });
-    await fetchRooms();
-  }
-
-  async function handleEditRoom({ facilityName, roomName, roomNumber, price }) {
-    if (!guardPermission('room:manage')) return;
-    await monitorRoomsService.update(editRoomId, { facilityName, roomName, roomNumber, price });
-    await fetchRooms();
-  }
-
-  async function deleteRoom(roomId) {
-    if (!guardPermission('room:manage')) return;
-    if (!(await confirm('Delete this table permanently? This cannot be undone.', { confirmText: 'Delete' }))) return;
-    try {
-      await monitorRoomsService.remove(roomId);
-      setRooms((prev) => prev.filter((r) => r._id !== roomId));
-    } catch (err) {
-      console.error(err);
-      alert(err.message || 'Could not delete this table.');
-    }
   }
 
   const facilities = [...new Set(rooms.map((r) => r.facilityName))];
@@ -787,14 +748,32 @@ function Monitor() {
       )}
 
       <SessionModal modal={modal} onClose={() => setModal(null)} onSubmit={handleModalSubmit} />
-      <ExtendSessionModal session={extendingSession ? sessions.find((session) => session._id === extendingSession._id) || extendingSession : null} onClose={() => setExtendingSession(null)} onSubmit={extendSession} />
-      <FinishSessionModal session={finishingSession ? sessions.find((session) => session._id === finishingSession._id) || finishingSession : null} disabled={!!refreshError} onClose={() => setFinishingSession(null)} onSubmit={finishSession} />
+      <ExtendSessionModal
+        session={extendingSession ? sessions.find((session) => session._id === extendingSession._id) || extendingSession : null}
+        maxSessionHours={MAX_SESSION_HOURS}
+        canExtendSession={canExtendSession}
+        formatMoney={money}
+        formatClock={boardClock}
+        formatReservationTime={reservationNoticeTime}
+        onClose={() => setExtendingSession(null)}
+        onSubmit={extendSession}
+      />
+      <FinishSessionModal
+        session={finishingSession ? sessions.find((session) => session._id === finishingSession._id) || finishingSession : null}
+        disabled={!!refreshError}
+        getPaymentSummary={paymentSummary}
+        formatMoney={money}
+        onClose={() => setFinishingSession(null)}
+        onSubmit={finishSession}
+      />
       <RoomDetailModal
         room={detailRoom}
         view={detailView}
         onClose={() => setDetailRoomId(null)}
-        canManage={canManage}
         canOperate={canOperate && !refreshError}
+        getPaymentSummary={paymentSummary}
+        canExtendSession={canExtendSession}
+        formatMoney={money}
         onExtend={() => {
           setDetailRoomId(null);
           setExtendingSession(detailView.occupancy);
@@ -807,482 +786,12 @@ function Monitor() {
           setDetailRoomId(null);
           cancelSession(detailView.occupancy._id);
         }}
-        onEdit={() => {
-          setDetailRoomId(null);
-          setEditRoomId(detailRoom._id);
-        }}
-        onDelete={() => {
-          setDetailRoomId(null);
-          deleteRoom(detailRoom._id);
-        }}
       />
 
       <ConfirmDialog {...confirmProps} />
     </div>
   );
 }
-
-function guestInitials(name) {
-  if (!name) return '?';
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  return parts.slice(0, 2).map((p) => p[0].toUpperCase()).join('') || '?';
-}
-
-function ExtendSessionModal({ session, onClose, onSubmit }) {
-  const [addedHours, setAddedHours] = useState(0.5);
-  const [collectNow, setCollectNow] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState('Cash');
-  const [quote, setQuote] = useState(null);
-  const [quoteError, setQuoteError] = useState('');
-  const [quoteAttempt, setQuoteAttempt] = useState(0);
-  const [saving, setSaving] = useState(false);
-  const [saveError, setSaveError] = useState('');
-
-  useEffect(() => {
-    if (!session) return;
-    setAddedHours(0.5);
-    setCollectNow(false);
-    setPaymentMethod('Cash');
-    setSaveError('');
-  }, [session?._id]);
-
-  useEffect(() => {
-    setQuote(null);
-    if (!session) return;
-    if (!canExtendSession(session) || Number(session.duration) + addedHours > MAX_SESSION_HOURS) {
-      setQuoteError(`Choose an extension that keeps the session within ${MAX_SESSION_HOURS} hours.`);
-      return;
-    }
-    let current = true;
-    setQuoteError('');
-    roomSessionsService.quoteExtension(session._id, addedHours)
-      .then((result) => { if (current) setQuote(result); })
-      .catch((error) => { if (current) setQuoteError(error.message || 'Could not calculate the extension charge.'); });
-    return () => { current = false; };
-  }, [session?._id, session?.duration, session?.amount, session?.paidAmount, session?.refundedAmount, session?.scheduledEndTime, addedHours, quoteAttempt]);
-
-  if (!session) return null;
-
-  const availableOptions = EXTENSION_OPTIONS.filter((option) => Number(session.duration) + option.hours <= MAX_SESSION_HOURS);
-  const balanceAfter = quote ? Math.max(0, Math.round((Number(quote.newBalance) - (collectNow ? Number(quote.addedCharge) : 0)) * 100) / 100) : 0;
-  const reservationTime = reservationNoticeTime(quote?.reservationStart);
-  const reservationStartMs = Date.parse(quote?.reservationStart || '');
-  const shorterExtensionFits = availableOptions.some((option) => option.hours < addedHours && sessionEnd(session).getTime() + option.hours * 60 * 60 * 1000 <= reservationStartMs);
-
-  async function handleSubmit(event) {
-    event.preventDefault();
-    if (!quote || quote.canExtend === false || Number(quote.addedHours) !== addedHours || saving) return;
-    setSaving(true);
-    setSaveError('');
-    try {
-      await onSubmit({ addedHours, collectNow, expectedCharge: quote.addedCharge, paymentMethod });
-    } catch (error) {
-      setSaveError(error.message || 'Could not extend this session.');
-      if (error.status === 409) setQuoteAttempt((value) => value + 1);
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <Modal open onClose={saving ? undefined : onClose} size="lg" className="extend-session-modal" title={`Extend session · ${session.roomName || session.facilityName} · Table ${session.roomNumber}`}>
-      <form className="session-extension" onSubmit={handleSubmit}>
-        <p className="mfield-note">{session.guestName || 'Walk-in guest'} · Current end {boardClock(sessionEnd(session))} · {sessionLengthLabel(session.duration)} of {MAX_SESSION_HOURS} hours used</p>
-        <div className="mfield-section-label">Add time</div>
-        <div className="session-extension-options" role="group" aria-label="Extension length">
-          {availableOptions.map((option) => (
-            <button key={option.hours} type="button" className={`session-extension-option${addedHours === option.hours ? ' active' : ''}`} aria-pressed={addedHours === option.hours} disabled={saving} onClick={() => { if (option.hours !== addedHours) { setQuote(null); setAddedHours(option.hours); } setSaveError(''); }}>{option.label}</button>
-          ))}
-        </div>
-        <div className="session-extension-quote-slot" aria-live="polite">
-          {quoteError && <div className="session-extension-retry"><p className="session-form-error" role="alert">{quoteError}</p>{availableOptions.length > 0 && <button type="button" className="rm-btn" onClick={() => setQuoteAttempt((value) => value + 1)}>Try again</button>}</div>}
-          {!quote && !quoteError && <p className="mfield-note" role="status">Calculating the extension charge…</p>}
-          {quote?.canExtend === false && (
-            <div className="session-availability-notice session-availability-notice--conflict" role="status">
-              <TriangleAlert size={20} aria-hidden="true" />
-              <div>
-                <span className="session-availability-label">Upcoming reservation{reservationTime ? ` · ${reservationTime}` : ''}</span>
-                <strong>Keep one {session.roomName || session.facilityName} table free</strong>
-                <p>Adding {sessionLengthLabel(addedHours)} would keep this table busy when the reservation starts.</p>
-                <p className="session-availability-action">
-                  {shorterExtensionFits
-                    ? 'Pick a shorter extension, or keep the current end time.'
-                    : `Keep the current end time, or free up another ${session.roomName || session.facilityName} table.`}
-                </p>
-              </div>
-            </div>
-          )}
-          {quote && quote.canExtend !== false && (
-            <>
-              <div className="session-payment-ledger session-extension-summary" aria-label="Extension payment summary">
-                <div><span>Current balance</span><strong>{money(quote.currentBalance)}</strong></div>
-                <div><span>Added time</span><strong>{money(quote.addedCharge)}</strong></div>
-                <div><span>New end time</span><strong>{boardClock(new Date(quote.scheduledEndTime))}</strong></div>
-                <div className={balanceAfter > 0 ? 'balance-due' : 'balance-paid'}><span>Balance after extension</span><strong>{money(balanceAfter)}</strong></div>
-              </div>
-              <div className="mfield-section-label">When will the guest pay for the added time?</div>
-              <div className="session-collection-options" role="group" aria-label="Extension payment timing">
-                <button type="button" className={collectNow ? 'active' : ''} aria-pressed={collectNow} disabled={saving} onClick={() => setCollectNow(true)}><strong>Pay before play</strong><small>Collect {money(quote.addedCharge)} now</small></button>
-                <button type="button" className={!collectNow ? 'active' : ''} aria-pressed={!collectNow} disabled={saving} onClick={() => setCollectNow(false)}><strong>Pay after play</strong><small>Add {money(quote.addedCharge)} to the balance</small></button>
-              </div>
-              {collectNow && Number(quote.currentBalance) > 0 && <p className="mfield-note">The earlier {money(quote.currentBalance)} balance will still be due when this session finishes.</p>}
-              {collectNow && (
-                <div className="mfield session-extension-method">
-                  <label htmlFor="extension-payment-method">Payment method</label>
-                  <select id="extension-payment-method" value={paymentMethod} disabled={saving} onChange={(event) => setPaymentMethod(event.target.value)}>
-                    <option value="Cash">Cash</option>
-                    <option value="GCash">GCash</option>
-                    <option value="Maya">Maya</option>
-                  </select>
-                </div>
-              )}
-            </>
-          )}
-        </div>
-        {saveError && <p className="session-form-error" role="alert">{saveError}</p>}
-        <div className="modal-actions">
-          <button type="button" className="btn-cancel" disabled={saving} onClick={onClose}>Cancel</button>
-          <button type="submit" className="btn-confirm" disabled={!quote || quote.canExtend === false || Number(quote.addedHours) !== addedHours || saving}>{saving ? 'Saving…' : 'Confirm extension'}</button>
-        </div>
-      </form>
-    </Modal>
-  );
-}
-
-function FinishSessionModal({ session, disabled, onClose, onSubmit }) {
-  const [submitting, setSubmitting] = useState(false);
-
-  const payment = paymentSummary(session);
-  const isFullyPaid = !!session && payment.balance === 0;
-
-  async function handleSubmit(event) {
-    event.preventDefault();
-    const received = Math.max(Number(session.paidAmount || 0), Number(session.amount || 0) + Number(session.refundedAmount || 0));
-    setSubmitting(true);
-    try {
-      await onSubmit({ paid: Number(session.amount) > 0, paidAmount: received });
-    } catch (err) {
-      alert(err.message || 'Could not finish this session.');
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  return (
-    <Modal open={!!session} onClose={onClose} title="Finish session">
-      {session && (
-        <form onSubmit={handleSubmit}>
-          <p className="mfield-note">{session.guestName || 'Walk-in guest'} · {session.roomName || `Table ${session.roomNumber}`} · charge {money(session.amount)}</p>
-          {isFullyPaid ? (
-            <div className="finish-session-notice finish-session-notice--paid" role="status">
-              <i className="bi bi-check-circle-fill" aria-hidden="true"></i>
-              <span><strong>Payment complete</strong><small>Finishing will close this session and make the table available.</small></span>
-            </div>
-          ) : (
-            <>
-              <div className="finish-payment-ledger" aria-label="Current payment balance">
-                <div><span>Already received</span><strong>{money(payment.collected)}</strong></div>
-                <div><span>Balance remaining</span><strong>{money(payment.balance)}</strong></div>
-              </div>
-              <p className="mfield-note">Collect the full {money(payment.balance)} balance before finishing. This will record it as paid.</p>
-            </>
-          )}
-          <div className="modal-actions"><button type="button" className="btn-cancel" onClick={onClose}>Keep active</button><button type="submit" className="btn-confirm" disabled={disabled || submitting}>{submitting ? 'Saving…' : isFullyPaid ? 'Finish session' : 'Record full payment & finish'}</button></div>
-        </form>
-      )}
-    </Modal>
-  );
-}
-
-function RoomDetailModal({ room, view, onClose, canManage, canOperate, onExtend, onEndSessionPaid, onCancelSession, onEdit, onDelete }) {
-  const title = room ? `Table ${room.roomNumber} — ${room.facilityName}` : 'Table details';
-
-  return (
-    <Modal open={!!room} onClose={onClose} title={title}>
-      {room && view && (
-        <>
-          <div className="rmd-top">
-            <span className={`rm-status-pill status-${view.stateClass}`}><span className="dot"></span>{view.statusLabel}</span>
-            {view.occupancy && <span className="rm-foot-price">{money(Number(view.occupancy.rate) || room.price)}/hr</span>}
-          </div>
-
-          {view.occupancy ? (
-            <>
-              <div className={`rmd-timer-block${view.isWarning ? ' warn' : ''}${(view.isPastEnd || view.isCritical) ? ' expired' : ''}`}>
-                {view.isPastEnd && <div className="rmd-timer-caption">Overdue</div>}
-                <div className="rmd-timer-value">{formatTimeRemaining(view.remaining, view.isPastEnd)}</div>
-                {!view.isPastEnd && <div className="rmd-timer-caption">Time left</div>}
-              </div>
-
-              {view.occupancy.guestName && (
-                <div className="rmd-guest-row">
-                  <div className="rmd-avatar">{guestInitials(view.occupancy.guestName)}</div>
-                  <div>
-                    <div className="rmd-guest-name">{view.occupancy.guestName}</div>
-                    <div className="rmd-guest-sub">Started {formatStartTime(view.occupancy)}</div>
-                  </div>
-                </div>
-              )}
-
-              <div className="rmd-stat-grid">
-                <div className="rmd-stat-box">
-                  <div className="lbl">Session type</div>
-                  <div className="val">{view.occupancy.booking ? 'Reserved' : 'Walk-in'}</div>
-                </div>
-                <div className="rmd-stat-box">
-                  <div className="lbl">Total charge</div>
-                  <div className="val">{money(view.occupancy.amount)}</div>
-                </div>
-                <div className="rmd-stat-box"><div className="lbl">Received</div><div className="val">{money(paymentSummary(view.occupancy).collected)}</div></div>
-                <div className="rmd-stat-box"><div className="lbl">Balance remaining</div><div className="val">{money(paymentSummary(view.occupancy).balance)}</div></div>
-              </div>
-            </>
-          ) : (
-            <div className="rmd-empty-block">
-              <i className="bi bi-check-circle"></i>
-              <span>Ready for a new session</span>
-              <div className="rmd-rate">₱{room.price}/hr</div>
-            </div>
-          )}
-
-          <div className="rmd-actions">
-            {view.occupancy ? (
-              canOperate && (
-                <>
-                  <button className="rm-btn rm-btn--success rm-btn--block" onClick={onEndSessionPaid}><i className="bi bi-check2-circle"></i>Finish Session</button>
-                  <div className="rmd-actions-row">
-                    {canExtendSession(view.occupancy) && <button className="rm-btn" onClick={onExtend}><i className="bi bi-clock-history"></i>Extend</button>}
-                    <button className="rm-btn danger" onClick={onCancelSession}><i className="bi bi-x-circle"></i>Cancel Session</button>
-                  </div>
-                </>
-              )
-            ) : null}
-            <button className="btn-cancel" onClick={onClose}>Close</button>
-          </div>
-        </>
-      )}
-    </Modal>
-  );
-}
-
-
-const FACILITY_PRESETS_KEY = 'roomMonitor.facilityPresets';
-const roomNamePresetsKey = (facilityName) => `roomMonitor.roomNamePresets.${facilityName}`;
-
-function loadPresets(key, seed = []) {
-  let stored = [];
-  try {
-    stored = JSON.parse(localStorage.getItem(key) || '[]');
-    if (!Array.isArray(stored)) stored = [];
-  } catch {
-    stored = [];
-  }
-  const clean = [...stored, ...seed].filter((v) => typeof v === 'string' && v.trim());
-  return [...new Set(clean)].sort((a, b) => a.localeCompare(b));
-}
-
-function savePresets(key, options) {
-  try { localStorage.setItem(key, JSON.stringify(options)); } catch {}
-}
-
-function PresetDropdown({ label, value, options, onSelect, onAdd, onDelete, placeholder }) {
-  const [addingNew, setAddingNew] = useState(false);
-  const [input, setInput] = useState('');
-
-  function handleSelect(v) {
-    if (v === '__add_new__') {
-      setAddingNew(true);
-      return;
-    }
-    setAddingNew(false);
-    onSelect(v);
-  }
-
-  function handleAdd() {
-    const trimmed = input.trim();
-    if (!trimmed) return;
-    onAdd(trimmed);
-    setAddingNew(false);
-    setInput('');
-  }
-
-  return (
-    <div className="mfield">
-      <label>{label}</label>
-      <div className="field-row">
-        <select value={value} onChange={(e) => handleSelect(e.target.value)} className="field-col">
-          <option value="">{placeholder}</option>
-          {options.map((opt) => (
-            <option key={opt} value={opt}>{opt}</option>
-          ))}
-          <option value="__add_new__">+ Add new option…</option>
-        </select>
-        {value && options.includes(value) && (
-          <button type="button" className="rm-btn danger" style={{ flex: '0 0 auto', padding: '7px 10px' }} onClick={() => onDelete(value)} title={`Remove "${value}" from list`}>
-            <i className="bi bi-trash"></i>
-          </button>
-        )}
-      </div>
-      {addingNew && (
-        <div className="field-row field-row--top-gap">
-          <input type="text" value={input} onChange={(e) => setInput(e.target.value)} placeholder={`New ${label.toLowerCase()}`} className="field-col" autoFocus />
-          <button type="button" className="rm-btn primary" style={{ flex: '0 0 auto', padding: '7px 12px' }} onClick={handleAdd}>Add</button>
-          <button type="button" className="rm-btn" style={{ flex: '0 0 auto', padding: '7px 10px' }} onClick={() => { setAddingNew(false); setInput(''); }} title="Cancel">
-            <i className="bi bi-x-lg"></i>
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function RoomFormModal({ open, onClose, onSubmit, existingFacilities, rooms, initialRoom }) {
-  const isEdit = !!initialRoom;
-  const [facilityName, setFacilityName] = useState('');
-  const [roomName, setRoomName] = useState('');
-  const [roomNumber, setRoomNumber] = useState('');
-  const [price, setPrice] = useState('');
-  const [facilityOptions, setFacilityOptions] = useState([]);
-  const [roomNameOptions, setRoomNameOptions] = useState([]);
-  const [submitting, setSubmitting] = useState(false);
-
-  useEffect(() => {
-    if (!open) return;
-    setFacilityName(initialRoom?.facilityName || '');
-    setRoomName(initialRoom?.roomName || '');
-    setRoomNumber(initialRoom?.roomNumber || '');
-    setPrice(initialRoom ? String(initialRoom.price ?? '') : '');
-    setFacilityOptions(loadPresets(FACILITY_PRESETS_KEY, existingFacilities));
-  }, [open, initialRoom]);
-
-  useEffect(() => {
-    if (!open || !facilityName) {
-      setRoomNameOptions([]);
-      return;
-    }
-    const seed = rooms.filter((r) => r.facilityName === facilityName).map((r) => r.roomName);
-    setRoomNameOptions(loadPresets(roomNamePresetsKey(facilityName), seed));
-  }, [open, facilityName, rooms]);
-
-  function handleAddFacility(trimmed) {
-    setFacilityOptions((prev) => {
-      if (prev.includes(trimmed)) return prev;
-      const next = [...prev, trimmed].sort((a, b) => a.localeCompare(b));
-      savePresets(FACILITY_PRESETS_KEY, next);
-      return next;
-    });
-    setFacilityName(trimmed);
-    setRoomName('');
-  }
-
-  function handleDeleteFacility(option) {
-    if (!window.confirm(`Remove "${option}" from the Facility list? This only affects the dropdown, not any existing room.`)) return;
-    setFacilityOptions((prev) => {
-      const next = prev.filter((o) => o !== option);
-      savePresets(FACILITY_PRESETS_KEY, next);
-      return next;
-    });
-    if (facilityName === option) setFacilityName('');
-  }
-
-  function handleAddRoomName(trimmed) {
-    setRoomNameOptions((prev) => {
-      if (prev.includes(trimmed)) return prev;
-      const next = [...prev, trimmed].sort((a, b) => a.localeCompare(b));
-      savePresets(roomNamePresetsKey(facilityName), next);
-      return next;
-    });
-    setRoomName(trimmed);
-  }
-
-  function handleDeleteRoomName(option) {
-    if (!window.confirm(`Remove "${option}" from this facility's Table Name list?`)) return;
-    setRoomNameOptions((prev) => {
-      const next = prev.filter((o) => o !== option);
-      savePresets(roomNamePresetsKey(facilityName), next);
-      return next;
-    });
-    if (roomName === option) setRoomName('');
-  }
-
-  async function handleSubmit() {
-    const trimmedFacility = facilityName.trim();
-    const trimmedRoomName = roomName.trim();
-    const trimmedRoomNumber = roomNumber.trim();
-    if (!trimmedFacility || !trimmedRoomName || !trimmedRoomNumber) {
-      alert('Please fill in Facility, Table Name, and Table No.');
-      return;
-    }
-    const parsedRoomNumber = parseInt(trimmedRoomNumber, 10);
-    if (Number.isFinite(parsedRoomNumber) && parsedRoomNumber <= 0) {
-      alert('Table No. must be greater than 0.');
-      return;
-    }
-    const trimmedPrice = price.trim();
-    if (!trimmedPrice || !Number.isFinite(Number(trimmedPrice)) || Number(trimmedPrice) <= 0) {
-      alert('Enter a rate greater than ₱0 per hour.');
-      return;
-    }
-    const numberTaken = rooms.some((r) => r.roomName === trimmedRoomName && String(r.roomNumber) === trimmedRoomNumber && r._id !== initialRoom?._id);
-    if (numberTaken) {
-      alert(`Table No. ${trimmedRoomNumber} is already used in "${trimmedRoomName}". Choose a different number.`);
-      return;
-    }
-    setSubmitting(true);
-    try {
-      await onSubmit({ facilityName: trimmedFacility, roomName: trimmedRoomName, roomNumber: trimmedRoomNumber, price: Number(trimmedPrice) });
-      onClose();
-    } catch (err) {
-      console.error(err);
-      alert(err.message || `Could not ${isEdit ? 'save' : 'create'} this table.`);
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  return (
-    <Modal open={open} onClose={onClose} title={isEdit ? 'Edit Table — Room Monitoring' : 'New Table — Room Monitoring'}>
-      <div className="mfield-section-label">Table identity</div>
-      <PresetDropdown
-        label="Facility"
-        value={facilityName}
-        options={facilityOptions}
-        onSelect={(v) => { setFacilityName(v); setRoomName(''); }}
-        onAdd={handleAddFacility}
-        onDelete={handleDeleteFacility}
-        placeholder="Select a facility…"
-      />
-      <PresetDropdown
-        label="Table Name"
-        value={roomName}
-        options={roomNameOptions}
-        onSelect={setRoomName}
-        onAdd={handleAddRoomName}
-        onDelete={handleDeleteRoomName}
-        placeholder={facilityName ? 'Select a table name…' : 'Pick a facility first'}
-      />
-
-      <div className="mfield-section-label">Number and rate</div>
-      <div className="mfield-grid">
-        <div className="mfield">
-          <label>Table No.</label>
-          <input type="text" value={roomNumber} onChange={(e) => setRoomNumber(e.target.value)} placeholder="e.g. 101" />
-        </div>
-        <div className="mfield">
-          <label>Rate (₱/hr)</label>
-          <input type="number" min="0.01" step="0.01" required value={price} onChange={(e) => setPrice(e.target.value)} placeholder="e.g. 150" />
-        </div>
-      </div>
-      <div className="modal-actions">
-        <button className="btn-cancel" onClick={onClose}>Cancel</button>
-        <button className="btn-confirm" disabled={submitting} onClick={handleSubmit}>
-          {submitting ? (isEdit ? 'Saving…' : 'Adding…') : (isEdit ? 'Save Changes' : 'Add Table')}
-        </button>
-      </div>
-    </Modal>
-  );
-}
-
 
 const HOUR_PRESETS = [1, 2, 3, 4, 5];
 

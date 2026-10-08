@@ -2,7 +2,7 @@ import { facilityImage } from '../utils/facilityImage';
 import { CalendarCheck, Info, Layers3 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { buildLoginPath, buildRoomReservationPath } from '../utils/auth';
+import { getPaxCapacity } from '../utils/rooms';
 import { effectiveDiscountPercent } from '../utils/roomPricing';
 
 function getFeatureIcon(feature = '') {
@@ -39,12 +39,17 @@ function FacilityBookingCard({ room, liveStatus, onSelect }) {
       : 'room-status-available';
 
   const interactive = typeof onSelect === 'function';
+  const limits = (hasVariants ? room.variants : [room]).map(variant => getPaxCapacity(variant.pax) || Number(room.capacity) || null);
+  const capacities = limits.filter(value => Number.isInteger(value) && value > 0);
+  const capacityCopy = !capacities.length || limits.some(value => !value)
+    ? 'Contact us to confirm group capacity for room types without a listed limit.'
+    : new Set(capacities).size === 1 ? `Up to ${capacities[0]} guests per room.` : `${Math.min(...capacities)}–${Math.max(...capacities)} guests depending on room type. Compare room limits in Details.`;
 
   return (
     <div className="room-card" data-room-id={room._id}>
       <div className="room-card-img">
         {showStatus && <span className={`room-card-status ${statusClass}`}>{statusLabel}</span>}
-        {cardImage ? <img src={cardImage} alt={room.name} /> : <span className="facility-name-placeholder">{room.name || 'Untitled Facility'}</span>}
+        {cardImage ? <img src={cardImage} alt={room.name} width="640" height="400" loading="lazy" decoding="async" /> : <span className="facility-name-placeholder">{room.name || 'Untitled Facility'}</span>}
       </div>
       <div className="room-card-body">
         <h3>{room.name || 'Untitled Facility'}</h3>
@@ -67,6 +72,7 @@ function FacilityBookingCard({ room, liveStatus, onSelect }) {
         )}
 
         <p className="room-card-desc">{room.description || ''}</p>
+        <p className="room-card-desc">{capacityCopy} {!capacities.length && <Link to="/contact">Confirm capacity</Link>}</p>
 
         {interactive ? (
           <div className="room-card-actions">
@@ -78,8 +84,8 @@ function FacilityBookingCard({ room, liveStatus, onSelect }) {
                 <CalendarCheck size={16} aria-hidden="true" /> Reserve
               </button>
             ) : (
-              <Link className="btn-select" to={buildLoginPath(buildRoomReservationPath(room._id))}>
-                <CalendarCheck size={16} aria-hidden="true" /> Reserve
+              <Link className="btn-select" to={`/rooms/${encodeURIComponent(room._id)}#availability`}>
+                <CalendarCheck size={16} aria-hidden="true" /> Check availability
               </Link>
             )}
           </div>

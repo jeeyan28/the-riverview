@@ -149,7 +149,7 @@ function buildSalesReport(bookings, sessions, { from, to, source = 'all', maxDay
   }
   summary.averageDuration = operatingCount ? Math.round(summary.bookedHours / operatingCount * 100) / 100 : 0;
   const reviewCount = rows.filter(r => r.financialReviewRequired).length;
-  return { range: { from, to, source, basis: 'service date', timeZone: TIME_ZONE }, summary, daily, byFacility: [...facilities.values()].sort((a, b) => b.collected - a.collected), hourly, rows, warnings: reviewCount ? [`${reviewCount} transaction(s) need payment review. Unverified legacy payments are excluded from collected totals.`] : [] };
+  return { range: { from, to, source, basis: 'service date', timeZone: TIME_ZONE }, summary, daily, byFacility: [...facilities.values()].sort((a, b) => b.collected - a.collected), hourly, rows, warnings: reviewCount ? [`${reviewCount} transaction(s) have unverified payment records. Unverified legacy payments are excluded from collected totals.`] : [] };
 }
 
 module.exports = { salesRows, buildSalesReport, bookingPayments };

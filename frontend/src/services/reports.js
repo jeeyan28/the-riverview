@@ -3,6 +3,11 @@ import { apiDownload, apiRequest } from './api';
 const BASE = '/api/reports';
 
 export const reportsService = {
+  getForecast(window, range, options = {}) {
+    const qs = new URLSearchParams({ window: String(window), range });
+    return apiRequest('/api/forecast?' + qs, { ...options, fallbackMessage: 'Could not load the forecast.' });
+  },
+
   getConfirmedBookingTrend(interval) {
     return apiRequest(`${BASE}/confirmed-booking-trend?interval=${encodeURIComponent(interval)}`, { fallbackMessage: 'Could not load confirmed reservations.' });
   },

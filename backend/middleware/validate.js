@@ -1,8 +1,8 @@
 const Joi = require("joi");
 
 function validate(schema, source = "body") {
-  return (req, res, next) => {
-    const { error, value } = schema.validate(req[source], {
+  return Object.assign((req, res, next) => {
+    const { error, value } = schema.validate(req[source] ?? (source === 'body' ? {} : undefined), {
       abortEarly: false,
       stripUnknown: true,
       convert: true,
@@ -19,7 +19,7 @@ function validate(schema, source = "body") {
       req[source] = value;
     }
     next();
-  };
+  }, { apiValidation: { schema, source } });
 }
 
 module.exports = { validate, Joi };

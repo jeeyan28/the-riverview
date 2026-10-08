@@ -98,7 +98,7 @@ function Analytics() {
       {error && <div className="finance-error" role="alert">{error}</div>}
       {data?.warnings?.length > 0 && (
         <div className="finance-warning" role="status">
-          <strong>Payment review needed</strong>
+          <strong>Unverified payment records</strong>
           <ul>{data.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul>
         </div>
       )}

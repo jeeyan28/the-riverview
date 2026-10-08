@@ -168,7 +168,6 @@
 .modal-bg.open .modal-box { animation: rv-dialog-enter 240ms var(--ease-out) both; transform-origin: center; }
 .public-site .mobile-nav-backdrop { animation: rv-backdrop-enter 180ms var(--ease-out) both; }
 .public-site .mobile-nav.open { animation: rv-public-drawer-enter var(--dur-drawer) var(--ease-drawer) both; }
-#app .admin-nav-backdrop { animation: rv-backdrop-enter 180ms var(--ease-out) both; }
 
 @keyframes rv-backdrop-enter { from { opacity: 0; } to { opacity: 1; } }
 @keyframes rv-dialog-enter {
@@ -227,13 +226,5 @@
 @media (prefers-reduced-motion: reduce) {
   .rv-loader-ball { animation: none; transform: translate3d(var(--loader-rest),0,0); }
   .rv-loader-line i { animation: none; opacity: .72; transform: scaleX(.72); }
-  :is(.bk-overlay,.pf-overlay),
-  :is(.bk-overlay,.pf-overlay).open,
-  :is(.bk-modal,.pf-modal),
-  :is(.bk-overlay,.pf-overlay).open :is(.bk-modal,.pf-modal),
-  .modal-bg.open,
-  .modal-bg.open .modal-box,
-  .public-site .mobile-nav-backdrop,
-  .public-site .mobile-nav.open,
-  #app .admin-nav-backdrop { animation: none; }
+  :is(.bk-overlay,.pf-overlay), :is(.bk-overlay,.pf-overlay).open, :is(.bk-modal,.pf-modal), :is(.bk-overlay,.pf-overlay).open :is(.bk-modal,.pf-modal), .modal-bg.open, .modal-bg.open .modal-box, .public-site .mobile-nav-backdrop, .public-site .mobile-nav.open { animation: none; }
 }

@@ -3,6 +3,7 @@ const Booking = require("../model/booking");
 const User = require("../model/user");
 const { EMAIL_RE } = require("./constants");
 const { sendNotificationEmail } = require("./mailer");
+const { remainingJobMs } = require("./jobDeadline");
 const { refundTiming, outstandingClosureRefund, REFUND_PROCESSING_ESTIMATE } = require("./closurePolicy");
 
 async function customerForBooking(booking, session) {
@@ -77,30 +78,37 @@ async function notifyReservation(booking, type, { session, suffix = "" } = {}) {
   } }, { upsert: true, returnDocument: "after", runValidators: true, session });
 }
 
-async function deliverNotificationEmails({ limit = 10, now = new Date() } = {}) {
+async function deliverNotificationEmails({ limit = 10, now = new Date(), send = sendNotificationEmail } = {}) {
   await Notification.updateMany({ type: "refund_attention", emailStatus: { $in: ["pending", "sending"] } }, { $set: { emailStatus: "skipped" } });
-  // A lease lets failed SMTP deliveries survive server restarts. Sending is
-  // at least once: a crash after SMTP acceptance can cause a delivery retry.
-  const jobs = [];
-  for (let i = 0; i < limit; i++) {
+  await Notification.updateMany({ emailStatus: { $in: ['pending', 'sending'] }, emailAttempts: { $gte: 5 }, emailRetryAt: { $lte: now } }, { $set: { emailStatus: 'attention', emailLastError: 'Automatic delivery attempts exhausted.' } });
+  let processed = 0;
+  for (let i = 0; i < Math.min(limit, 25) && remainingJobMs() > 1000; i++) {
+    const at = new Date();
     const job = await Notification.findOneAndUpdate({
-      emailStatus: { $in: ["pending", "sending"] }, emailRetryAt: { $lte: now },
-      type: { $ne: "refund_attention" },
-    }, { $set: { emailStatus: "sending", emailRetryAt: new Date(now.getTime() + 120000) }, $inc: { emailAttempts: 1 } }, { returnDocument: "after", sort: { createdAt: 1 } });
+      emailStatus: { $in: ["pending", "sending"] }, emailRetryAt: { $lte: at },
+      type: { $ne: "refund_attention" }, emailAttempts: { $lt: 5 },
+    }, { $set: { emailStatus: "sending", emailRetryAt: new Date(at.getTime() + 120000) }, $inc: { emailAttempts: 1 } }, { returnDocument: "after", sort: { createdAt: 1 } });
     if (!job) break;
-    jobs.push(job);
-  }
-  await Promise.all(jobs.map(async job => {
+    processed++;
+    let timer;
+    const fence = () => ({ _id: job._id, emailStatus: "sending", emailAttempts: job.emailAttempts, emailRetryAt: { $gt: new Date() } });
     try {
-      await sendNotificationEmail(job);
-      await Notification.updateOne({ _id: job._id, emailStatus: "sending", emailAttempts: job.emailAttempts }, { $set: { emailStatus: "sent", emailSentAt: new Date(), emailLastError: "" } });
+      await Promise.race([
+        Promise.resolve().then(() => send(job)),
+        new Promise((_, reject) => { timer = setTimeout(() => { const error = new Error('Delivery outcome uncertain.'); error.code = 'EMAIL_TIMEOUT'; reject(error); }, Math.max(1, Math.min(20000, remainingJobMs() - 500))); }),
+      ]);
+      await Notification.updateOne(fence(), { $set: { emailStatus: "sent", emailSentAt: new Date(), emailLastError: "" } });
     } catch (error) {
-      console.error(`Reservation email ${job._id} failed:`, error.code || error.name);
+      console.error('Reservation email failed:', { jobId: String(job._id), category: error.code || error.name });
+      if (error.code === 'EMAIL_TIMEOUT') {
+        await Notification.updateOne(fence(), { $set: { emailLastError: 'Delivery is uncertain. It will be retried after the delivery lease expires.' } });
+        break;
+      }
       const delay = Math.min(3600000, 60000 * 2 ** Math.min(job.emailAttempts, 6));
-      await Notification.updateOne({ _id: job._id, emailStatus: "sending", emailAttempts: job.emailAttempts }, { $set: { emailStatus: "pending", emailRetryAt: new Date(Date.now() + delay), emailLastError: error.code || error.name || "SMTP error" } });
-    }
-  }));
-  return jobs.length;
+      await Notification.updateOne(fence(), { $set: { emailStatus: job.emailAttempts >= 5 ? 'attention' : "pending", emailRetryAt: new Date(Date.now() + delay), emailLastError: 'Email delivery failed.' } });
+    } finally { clearTimeout(timer); }
+  }
+  return processed;
 }
 
 module.exports = { customerForBooking, linkUnassignedReservationNotifications, notificationCopy, notifyReservation, deliverNotificationEmails };

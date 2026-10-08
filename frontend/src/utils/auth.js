@@ -2,7 +2,8 @@ const ADMIN_ROLES = ['staff', 'manager', 'super_admin'];
 
 export function safeReturnPath(value) {
   const path = String(value || '').trim();
-  if (!path.startsWith('/') || path.startsWith('//') || path.includes('\\')) return '';
+  if (!path.startsWith('/') || path.startsWith('//') || path.includes('\\') || [...path].some(char => char.charCodeAt(0) <= 32)) return '';
+  try { const decoded = decodeURIComponent(path); if (decoded.startsWith('//') || decoded.includes('\\') || [...decoded].some(char => char.charCodeAt(0) < 32)) return ''; } catch { return ''; }
   return path;
 }
 

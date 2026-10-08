@@ -61,18 +61,17 @@ function DataTable({
                 <th
                   key={header.id}
                   className={canSort ? 'tbl-th-sortable' : undefined}
-                  onClick={canSort ? header.column.getToggleSortingHandler() : undefined}
+                  aria-sort={canSort ? sortDir === 'asc' ? 'ascending' : sortDir === 'desc' ? 'descending' : 'none' : undefined}
                 >
-                  <span className="tbl-th-inner">
+                  {canSort ? <button type="button" className="tbl-th-inner tbl-sort-button" onClick={header.column.getToggleSortingHandler()}>
                     {flexRender(header.column.columnDef.header, header.getContext())}
-                    {canSort && (
                       <i
+                        aria-hidden="true"
                         className={`ti tbl-sort-icon ${
                           sortDir === 'asc' ? 'ti-sort-ascending-2 is-active' : sortDir === 'desc' ? 'ti-sort-descending-2 is-active' : 'ti-arrows-sort'
                         }`}
                       ></i>
-                    )}
-                  </span>
+                  </button> : flexRender(header.column.columnDef.header, header.getContext())}
                 </th>
               );
             })}

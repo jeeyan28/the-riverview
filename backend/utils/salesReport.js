@@ -17,7 +17,7 @@ async function getSalesReport({ from, to, source = 'all', maxDays = 92 }) {
     const linked = await RoomSession.find({ booking: { $in: bookings.map(b => b._id) } }).lean();
     sessions.push(...linked.filter(s => !sessionIds.has(String(s._id))));
   }
-  return buildSalesReport(bookings, sessions, { from, to, source, maxDays });
+  return { ...buildSalesReport(bookings, sessions, { from, to, source, maxDays }), synthetic: process.env.APP_MODE === 'demo' };
 }
 
 module.exports = { getSalesReport };

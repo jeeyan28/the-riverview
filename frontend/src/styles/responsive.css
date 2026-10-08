@@ -2,7 +2,7 @@
 @import './auth-responsive.css';
 @import './public-responsive.css';
 @import './forms-responsive.css';
-@import './admin/responsive.css';
+
 
 html {
     -webkit-text-size-adjust: 100%;

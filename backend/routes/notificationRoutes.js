@@ -9,9 +9,10 @@ const { bookingIdParamsSchema, emptyBodySchema } = require("../validation/bookin
 router.use(ensureAuthenticated);
 router.get("/", async (req, res) => {
   await linkUnassignedReservationNotifications(req.user);
+  const filter = { user: req.user._id, type: { $in: Notification.schema.path('type').enumValues } };
   const [items, unreadCount] = await Promise.all([
-    Notification.find({ user: req.user._id }).sort({ createdAt: -1 }).limit(50).select("type title message booking reservationCode readAt createdAt").lean(),
-    Notification.countDocuments({ user: req.user._id, readAt: null }),
+    Notification.find(filter).sort({ createdAt: -1 }).limit(50).select("type title message booking reservationCode readAt createdAt").lean(),
+    Notification.countDocuments({ ...filter, readAt: null }),
   ]);
   res.json({ items, unreadCount });
 });

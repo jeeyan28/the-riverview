@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import '../styles/style.css';
@@ -17,16 +17,19 @@ import { useSiteSettings } from '../hooks/useSiteSettings';
 import { CustomerAppNavigation } from '../components/MobileAppNavigation';
 import { buildLoginPath } from '../utils/auth';
 import { useNotifications } from '../hooks/useNotifications';
+import SessionNotice from '../components/SessionNotice';
+import DemoNotice from '../components/DemoNotice';
+import '../styles/reservation-services.css';
 
 function MainLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const { initializing, user } = useAuth();
   const notifications = useNotifications(initializing ? null : user?._id);
-  const reservationParams = new URLSearchParams(location.search);
-  const reservationIntent = reservationParams.get('reservation')
-    ? { code: reservationParams.get('reservation'), action: reservationParams.get('action') }
-    : null;
+  const reservationIntent = useMemo(() => {
+    const params = new URLSearchParams(location.search);
+    return params.has('reservation') ? { code: params.get('reservation'), action: params.get('action') } : null;
+  }, [location.search]);
   const { settings } = useSiteSettings();
   const [announcementHeight, setAnnouncementHeight] = useState(0);
   const [theme, toggleTheme] = useTheme();
@@ -42,7 +45,9 @@ function MainLayout() {
       return;
     }
     setProfileOpen(true);
-  }, [initializing, user, location.pathname, location.search]);
+  }, [initializing, user, location.pathname, location.search, reservationIntent, navigate]);
+
+  useEffect(() => { if (!user && !initializing) setProfileOpen(false); }, [user, initializing]);
 
   function closeProfile() {
     setProfileOpen(false);
@@ -103,6 +108,7 @@ function MainLayout() {
       />
 
       <main>
+        <DemoNotice /><SessionNotice />
         <PageTransition />
       </main>
 

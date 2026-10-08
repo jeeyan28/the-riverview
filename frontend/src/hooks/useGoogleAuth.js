@@ -9,16 +9,24 @@ export function useGoogleAuth(onCredential, { enabled = true } = {}) {
   const clientRef = useRef(null);
   const onCredentialRef = useRef(onCredential);
   const embeddedBrowser = getEmbeddedBrowserInfo();
+  const embeddedName = embeddedBrowser?.name;
+  const googleAvailable = enabled && Boolean(GOOGLE_CLIENT_ID) && import.meta.env.VITE_DEMO_MODE !== 'true';
   onCredentialRef.current = onCredential;
 
   useEffect(() => {
     let cancelled = false;
     let retryTimer;
+    if (!googleAvailable || embeddedName) return undefined;
+    if (!window.google && !document.getElementById('riverview-google-sdk')) {
+      const script = document.createElement('script');
+      script.id = 'riverview-google-sdk';
+      script.src = 'https://accounts.google.com/gsi/client';
+      script.async = true;
+      document.head.appendChild(script);
+    }
 
     function init() {
       if (cancelled) return;
-      if (!enabled) return;
-      if (embeddedBrowser) return;
       if (!window.google || !window.google.accounts?.oauth2) {
         retryTimer = setTimeout(init, 300);
         return;
@@ -39,15 +47,15 @@ export function useGoogleAuth(onCredential, { enabled = true } = {}) {
       clearTimeout(retryTimer);
       clientRef.current = null;
     };
-  }, [embeddedBrowser?.name, enabled]);
+  }, [embeddedName, googleAvailable]);
 
   const triggerSignIn = useCallback(() => {
-    if (!enabled || !clientRef.current) {
+    if (!googleAvailable || !clientRef.current) {
       return false;
     }
     clientRef.current.requestCode();
     return true;
-  }, [enabled]);
+  }, [googleAvailable]);
 
-  return { triggerSignIn, embeddedBrowser };
+  return { triggerSignIn, embeddedBrowser, googleAvailable };
 }
