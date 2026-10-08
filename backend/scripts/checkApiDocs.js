@@ -13,8 +13,9 @@ const manifest = [
   ['monitoringRoutes', '/api/monitor-rooms', 'roomsRouter'], ['monitoringRoutes', '/api/room-sessions', 'sessionsRouter'],
   ['reportRoutes', '/api/reports'], ['forecastRoutes', '/api/forecast'], ['reservationJobsRoutes', '/api/jobs/reservations', 'router'],
 ];
-const hash = value => createHash('sha256').update(value).digest('hex');
-const serialize = value => JSON.stringify(value, (_, item) => typeof item === 'function' ? item.toString() : item instanceof RegExp ? item.source : item);
+const normalizeSource = value => String(value).replace(/\r\n?/g, '\n');
+const hash = value => createHash('sha256').update(normalizeSource(value)).digest('hex');
+const serialize = value => JSON.stringify(value, (_, item) => typeof item === 'function' ? normalizeSource(item.toString()) : item instanceof RegExp ? item.source : item);
 const ref = name => ({ $ref: `#/components/schemas/${name}` });
 const properties = (fields, description) => ({ type: 'object', description, properties: fields });
 const text = { type: 'string' }, number = { type: 'number' }, integer = { type: 'integer' };

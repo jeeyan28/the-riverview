@@ -21,7 +21,7 @@
         "summary": "POST /api/auth/register",
         "description": "Uses the existing venue policy and server-side validation. Mutating browser requests require an approved origin. Refer to request constraints and x-access for the authoritative gate.",
         "x-source": "routes/auth.js",
-        "x-source-sha256": "b8dd14a689434ce5c0cc50cf567e533eed713cd3dfc6754df6558845a1181e58",
+        "x-source-sha256": "c108a0a75edf6e31e90990e0bae12bf0639170df23ea7034133689100ca0113f",
         "x-access": [],
         "x-validation": [
           {
@@ -137,7 +137,7 @@
         "summary": "POST /api/auth/register/resend-otp",
         "description": "Uses the existing venue policy and server-side validation. Mutating browser requests require an approved origin. Refer to request constraints and x-access for the authoritative gate.",
         "x-source": "routes/auth.js",
-        "x-source-sha256": "b8dd14a689434ce5c0cc50cf567e533eed713cd3dfc6754df6558845a1181e58",
+        "x-source-sha256": "c108a0a75edf6e31e90990e0bae12bf0639170df23ea7034133689100ca0113f",
         "x-access": [],
         "x-validation": [
           {
@@ -250,7 +250,7 @@
         "summary": "POST /api/auth/register/verify-otp",
         "description": "Uses the existing venue policy and server-side validation. Mutating browser requests require an approved origin. Refer to request constraints and x-access for the authoritative gate.",
         "x-source": "routes/auth.js",
-        "x-source-sha256": "b8dd14a689434ce5c0cc50cf567e533eed713cd3dfc6754df6558845a1181e58",
+        "x-source-sha256": "c108a0a75edf6e31e90990e0bae12bf0639170df23ea7034133689100ca0113f",
         "x-access": [],
         "x-validation": [
           {
@@ -364,7 +364,7 @@
         "summary": "POST /api/auth/resend-verification",
         "description": "Uses the existing venue policy and server-side validation. Mutating browser requests require an approved origin. Refer to request constraints and x-access for the authoritative gate.",
         "x-source": "routes/auth.js",
-        "x-source-sha256": "b8dd14a689434ce5c0cc50cf567e533eed713cd3dfc6754df6558845a1181e58",
+        "x-source-sha256": "c108a0a75edf6e31e90990e0bae12bf0639170df23ea7034133689100ca0113f",
         "x-access": [],
         "x-validation": [
           {
@@ -477,7 +477,7 @@
         "summary": "POST /api/auth/verify-account-otp",
         "description": "Uses the existing venue policy and server-side validation. Mutating browser requests require an approved origin. Refer to request constraints and x-access for the authoritative gate.",
         "x-source": "routes/auth.js",
-        "x-source-sha256": "b8dd14a689434ce5c0cc50cf567e533eed713cd3dfc6754df6558845a1181e58",
+        "x-source-sha256": "c108a0a75edf6e31e90990e0bae12bf0639170df23ea7034133689100ca0113f",
         "x-access": [],
         "x-validation": [
           {
@@ -591,7 +591,7 @@
         "summary": "POST /api/auth/login",
         "description": "Creates a cookie session for a verified active account. Account lockout and shared IP/account limits apply. Returns sanitized identity; password is never returned.",
         "x-source": "routes/auth.js",
-        "x-source-sha256": "b8dd14a689434ce5c0cc50cf567e533eed713cd3dfc6754df6558845a1181e58",
+        "x-source-sha256": "c108a0a75edf6e31e90990e0bae12bf0639170df23ea7034133689100ca0113f",
         "x-access": [],
         "x-validation": [
           {
@@ -705,7 +705,7 @@
         "summary": "POST /api/auth/google",
         "description": "Uses the existing venue policy and server-side validation. Mutating browser requests require an approved origin. Refer to request constraints and x-access for the authoritative gate.",
         "x-source": "routes/auth.js",
-        "x-source-sha256": "b8dd14a689434ce5c0cc50cf567e533eed713cd3dfc6754df6558845a1181e58",
+        "x-source-sha256": "c108a0a75edf6e31e90990e0bae12bf0639170df23ea7034133689100ca0113f",
         "x-access": [],
         "x-validation": [
           {
@@ -818,7 +818,7 @@
         "summary": "POST /api/auth/forgot-password",
         "description": "Generic response independent of account existence. Recovery requires configured SMTP. OTP and reset tokens are short-lived and scoped to the account.",
         "x-source": "routes/auth.js",
-        "x-source-sha256": "b8dd14a689434ce5c0cc50cf567e533eed713cd3dfc6754df6558845a1181e58",
+        "x-source-sha256": "c108a0a75edf6e31e90990e0bae12bf0639170df23ea7034133689100ca0113f",
         "x-access": [],
         "x-validation": [
           {
@@ -931,7 +931,7 @@
         "summary": "POST /api/auth/verify-otp",
         "description": "Uses the existing venue policy and server-side validation. Mutating browser requests require an approved origin. Refer to request constraints and x-access for the authoritative gate.",
         "x-source": "routes/auth.js",
-        "x-source-sha256": "b8dd14a689434ce5c0cc50cf567e533eed713cd3dfc6754df6558845a1181e58",
+        "x-source-sha256": "c108a0a75edf6e31e90990e0bae12bf0639170df23ea7034133689100ca0113f",
         "x-access": [],
         "x-validation": [
           {
@@ -1045,7 +1045,7 @@
         "summary": "POST /api/auth/reset-password",
         "description": "Uses the existing venue policy and server-side validation. Mutating browser requests require an approved origin. Refer to request constraints and x-access for the authoritative gate.",
         "x-source": "routes/auth.js",
-        "x-source-sha256": "b8dd14a689434ce5c0cc50cf567e533eed713cd3dfc6754df6558845a1181e58",
+        "x-source-sha256": "c108a0a75edf6e31e90990e0bae12bf0639170df23ea7034133689100ca0113f",
         "x-access": [],
         "x-validation": [
           {
@@ -1159,7 +1159,7 @@
         "summary": "GET /api/auth/me",
         "description": "Revalidates account activity, verification and session version. A database failure is 503 SESSION_UNAVAILABLE, not authentication expiry.",
         "x-source": "routes/auth.js",
-        "x-source-sha256": "b8dd14a689434ce5c0cc50cf567e533eed713cd3dfc6754df6558845a1181e58",
+        "x-source-sha256": "c108a0a75edf6e31e90990e0bae12bf0639170df23ea7034133689100ca0113f",
         "x-access": [
           {
             "authenticated": true
@@ -1243,7 +1243,7 @@
         "summary": "POST /api/auth/logout",
         "description": "Destroys the stored session before clearing the cookie. Failure is 503 LOGOUT_UNAVAILABLE; retry is safe and the client retains identity.",
         "x-source": "routes/auth.js",
-        "x-source-sha256": "b8dd14a689434ce5c0cc50cf567e533eed713cd3dfc6754df6558845a1181e58",
+        "x-source-sha256": "c108a0a75edf6e31e90990e0bae12bf0639170df23ea7034133689100ca0113f",
         "x-access": [],
         "x-validation": [
           {
@@ -1354,7 +1354,7 @@
         "summary": "GET /api/rooms",
         "description": "Uses the existing venue policy and server-side validation. Mutating browser requests require an approved origin. Refer to request constraints and x-access for the authoritative gate.",
         "x-source": "routes/roomRoutes.js",
-        "x-source-sha256": "233882bf90b18ee5defe4a4d8d182c34c52f4e261eacd14fb107effa4ba4d83e",
+        "x-source-sha256": "b94996f14b456871091024807a3c59e7856c4efe20f6a91bcac0c95f702d4d1e",
         "x-access": [],
         "x-validation": [],
         "security": [],
@@ -1425,7 +1425,7 @@
         "summary": "POST /api/rooms",
         "description": "Uses the existing venue policy and server-side validation. Mutating browser requests require an approved origin. Refer to request constraints and x-access for the authoritative gate.",
         "x-source": "routes/roomRoutes.js",
-        "x-source-sha256": "233882bf90b18ee5defe4a4d8d182c34c52f4e261eacd14fb107effa4ba4d83e",
+        "x-source-sha256": "b94996f14b456871091024807a3c59e7856c4efe20f6a91bcac0c95f702d4d1e",
         "x-access": [
           {
             "permissions": [
@@ -1566,7 +1566,7 @@
         "summary": "GET /api/rooms/admin",
         "description": "Uses the existing venue policy and server-side validation. Mutating browser requests require an approved origin. Refer to request constraints and x-access for the authoritative gate.",
         "x-source": "routes/roomRoutes.js",
-        "x-source-sha256": "233882bf90b18ee5defe4a4d8d182c34c52f4e261eacd14fb107effa4ba4d83e",
+        "x-source-sha256": "b94996f14b456871091024807a3c59e7856c4efe20f6a91bcac0c95f702d4d1e",
         "x-access": [
           {
             "anyPermissions": [
@@ -1656,7 +1656,7 @@
         "summary": "GET /api/rooms/{id}",
         "description": "Uses the existing venue policy and server-side validation. Mutating browser requests require an approved origin. Refer to request constraints and x-access for the authoritative gate.",
         "x-source": "routes/roomRoutes.js",
-        "x-source-sha256": "233882bf90b18ee5defe4a4d8d182c34c52f4e261eacd14fb107effa4ba4d83e",
+        "x-source-sha256": "b94996f14b456871091024807a3c59e7856c4efe20f6a91bcac0c95f702d4d1e",
         "x-access": [],
         "x-validation": [
           {
@@ -1769,7 +1769,7 @@
         "summary": "PUT /api/rooms/{id}",
         "description": "Uses the existing venue policy and server-side validation. Mutating browser requests require an approved origin. Refer to request constraints and x-access for the authoritative gate.",
         "x-source": "routes/roomRoutes.js",
-        "x-source-sha256": "233882bf90b18ee5defe4a4d8d182c34c52f4e261eacd14fb107effa4ba4d83e",
+        "x-source-sha256": "b94996f14b456871091024807a3c59e7856c4efe20f6a91bcac0c95f702d4d1e",
         "x-access": [
           {
             "permissions": [
@@ -1940,7 +1940,7 @@
         "summary": "DELETE /api/rooms/{id}",
         "description": "Uses the existing venue policy and server-side validation. Mutating browser requests require an approved origin. Refer to request constraints and x-access for the authoritative gate.",
         "x-source": "routes/roomRoutes.js",
-        "x-source-sha256": "233882bf90b18ee5defe4a4d8d182c34c52f4e261eacd14fb107effa4ba4d83e",
+        "x-source-sha256": "b94996f14b456871091024807a3c59e7856c4efe20f6a91bcac0c95f702d4d1e",
         "x-access": [
           {
             "permissions": [
@@ -6061,7 +6061,7 @@
         "summary": "GET /api/payments/xendit/status/{referenceId}",
         "description": "Uses the existing venue policy and server-side validation. Mutating browser requests require an approved origin. Refer to request constraints and x-access for the authoritative gate.",
         "x-source": "routes/xenditRoutes.js",
-        "x-source-sha256": "531143706cf5945a7549fef225ba7759a373092ab543f4fb5573f9383c6c8c62",
+        "x-source-sha256": "a3508cd2f75a571a2650a6ec9b0d3db7c4fa0ef6f6a555df790d5308c4903fbb",
         "x-access": [
           {
             "authenticated": true
@@ -6154,7 +6154,7 @@
         "summary": "GET /api/monitor-rooms",
         "description": "Uses the existing venue policy and server-side validation. Mutating browser requests require an approved origin. Refer to request constraints and x-access for the authoritative gate.",
         "x-source": "routes/monitoringRoutes.js",
-        "x-source-sha256": "4ea153177349d197afee087c63c1d12f5e0d49fb39ed0761b94bb7caf6f17911",
+        "x-source-sha256": "3a205e5a51182ebeadd1876ae8c69accac07113bb0d0edf37bb20702351e753f",
         "x-access": [
           {
             "roles": [
@@ -6253,7 +6253,7 @@
         "summary": "POST /api/monitor-rooms",
         "description": "Uses the existing venue policy and server-side validation. Mutating browser requests require an approved origin. Refer to request constraints and x-access for the authoritative gate.",
         "x-source": "routes/monitoringRoutes.js",
-        "x-source-sha256": "4ea153177349d197afee087c63c1d12f5e0d49fb39ed0761b94bb7caf6f17911",
+        "x-source-sha256": "3a205e5a51182ebeadd1876ae8c69accac07113bb0d0edf37bb20702351e753f",
         "x-access": [
           {
             "permissions": [
@@ -6382,7 +6382,7 @@
         "summary": "GET /api/monitor-rooms/{id}",
         "description": "Uses the existing venue policy and server-side validation. Mutating browser requests require an approved origin. Refer to request constraints and x-access for the authoritative gate.",
         "x-source": "routes/monitoringRoutes.js",
-        "x-source-sha256": "4ea153177349d197afee087c63c1d12f5e0d49fb39ed0761b94bb7caf6f17911",
+        "x-source-sha256": "3a205e5a51182ebeadd1876ae8c69accac07113bb0d0edf37bb20702351e753f",
         "x-access": [
           {
             "roles": [
@@ -6513,7 +6513,7 @@
         "summary": "PUT /api/monitor-rooms/{id}",
         "description": "Uses the existing venue policy and server-side validation. Mutating browser requests require an approved origin. Refer to request constraints and x-access for the authoritative gate.",
         "x-source": "routes/monitoringRoutes.js",
-        "x-source-sha256": "4ea153177349d197afee087c63c1d12f5e0d49fb39ed0761b94bb7caf6f17911",
+        "x-source-sha256": "3a205e5a51182ebeadd1876ae8c69accac07113bb0d0edf37bb20702351e753f",
         "x-access": [
           {
             "anyPermissions": [
@@ -6671,7 +6671,7 @@
         "summary": "DELETE /api/monitor-rooms/{id}",
         "description": "Uses the existing venue policy and server-side validation. Mutating browser requests require an approved origin. Refer to request constraints and x-access for the authoritative gate.",
         "x-source": "routes/monitoringRoutes.js",
-        "x-source-sha256": "4ea153177349d197afee087c63c1d12f5e0d49fb39ed0761b94bb7caf6f17911",
+        "x-source-sha256": "3a205e5a51182ebeadd1876ae8c69accac07113bb0d0edf37bb20702351e753f",
         "x-access": [
           {
             "permissions": [
@@ -6828,7 +6828,7 @@
         "summary": "GET /api/room-sessions/report",
         "description": "Uses the existing venue policy and server-side validation. Mutating browser requests require an approved origin. Refer to request constraints and x-access for the authoritative gate.",
         "x-source": "routes/monitoringRoutes.js",
-        "x-source-sha256": "4ea153177349d197afee087c63c1d12f5e0d49fb39ed0761b94bb7caf6f17911",
+        "x-source-sha256": "3a205e5a51182ebeadd1876ae8c69accac07113bb0d0edf37bb20702351e753f",
         "x-access": [
           {
             "roles": [
@@ -6937,7 +6937,7 @@
         "summary": "GET /api/room-sessions/report/export",
         "description": "Uses the existing venue policy and server-side validation. Mutating browser requests require an approved origin. Refer to request constraints and x-access for the authoritative gate.",
         "x-source": "routes/monitoringRoutes.js",
-        "x-source-sha256": "4ea153177349d197afee087c63c1d12f5e0d49fb39ed0761b94bb7caf6f17911",
+        "x-source-sha256": "3a205e5a51182ebeadd1876ae8c69accac07113bb0d0edf37bb20702351e753f",
         "x-access": [
           {
             "roles": [
@@ -7047,7 +7047,7 @@
         "summary": "GET /api/room-sessions",
         "description": "Uses the existing venue policy and server-side validation. Mutating browser requests require an approved origin. Refer to request constraints and x-access for the authoritative gate.",
         "x-source": "routes/monitoringRoutes.js",
-        "x-source-sha256": "4ea153177349d197afee087c63c1d12f5e0d49fb39ed0761b94bb7caf6f17911",
+        "x-source-sha256": "3a205e5a51182ebeadd1876ae8c69accac07113bb0d0edf37bb20702351e753f",
         "x-access": [
           {
             "roles": [
@@ -7136,7 +7136,7 @@
         "summary": "POST /api/room-sessions",
         "description": "Uses the existing venue policy and server-side validation. Mutating browser requests require an approved origin. Refer to request constraints and x-access for the authoritative gate.",
         "x-source": "routes/monitoringRoutes.js",
-        "x-source-sha256": "4ea153177349d197afee087c63c1d12f5e0d49fb39ed0761b94bb7caf6f17911",
+        "x-source-sha256": "3a205e5a51182ebeadd1876ae8c69accac07113bb0d0edf37bb20702351e753f",
         "x-access": [
           {
             "anyPermissions": [
@@ -7269,7 +7269,7 @@
         "summary": "GET /api/room-sessions/start-availability",
         "description": "Uses the existing venue policy and server-side validation. Mutating browser requests require an approved origin. Refer to request constraints and x-access for the authoritative gate.",
         "x-source": "routes/monitoringRoutes.js",
-        "x-source-sha256": "4ea153177349d197afee087c63c1d12f5e0d49fb39ed0761b94bb7caf6f17911",
+        "x-source-sha256": "3a205e5a51182ebeadd1876ae8c69accac07113bb0d0edf37bb20702351e753f",
         "x-access": [
           {
             "permissions": [
@@ -7433,7 +7433,7 @@
         "summary": "GET /api/room-sessions/{id}/extend",
         "description": "Uses the existing venue policy and server-side validation. Mutating browser requests require an approved origin. Refer to request constraints and x-access for the authoritative gate.",
         "x-source": "routes/monitoringRoutes.js",
-        "x-source-sha256": "4ea153177349d197afee087c63c1d12f5e0d49fb39ed0761b94bb7caf6f17911",
+        "x-source-sha256": "3a205e5a51182ebeadd1876ae8c69accac07113bb0d0edf37bb20702351e753f",
         "x-access": [
           {
             "permissions": [
@@ -7593,7 +7593,7 @@
         "summary": "PUT /api/room-sessions/{id}/extend",
         "description": "Uses the existing venue policy and server-side validation. Mutating browser requests require an approved origin. Refer to request constraints and x-access for the authoritative gate.",
         "x-source": "routes/monitoringRoutes.js",
-        "x-source-sha256": "4ea153177349d197afee087c63c1d12f5e0d49fb39ed0761b94bb7caf6f17911",
+        "x-source-sha256": "3a205e5a51182ebeadd1876ae8c69accac07113bb0d0edf37bb20702351e753f",
         "x-access": [
           {
             "permissions": [
@@ -7755,7 +7755,7 @@
         "summary": "PUT /api/room-sessions/{id}/end",
         "description": "Uses the existing venue policy and server-side validation. Mutating browser requests require an approved origin. Refer to request constraints and x-access for the authoritative gate.",
         "x-source": "routes/monitoringRoutes.js",
-        "x-source-sha256": "4ea153177349d197afee087c63c1d12f5e0d49fb39ed0761b94bb7caf6f17911",
+        "x-source-sha256": "3a205e5a51182ebeadd1876ae8c69accac07113bb0d0edf37bb20702351e753f",
         "x-access": [
           {
             "permissions": [
@@ -7914,7 +7914,7 @@
         "summary": "PUT /api/room-sessions/{id}",
         "description": "Uses the existing venue policy and server-side validation. Mutating browser requests require an approved origin. Refer to request constraints and x-access for the authoritative gate.",
         "x-source": "routes/monitoringRoutes.js",
-        "x-source-sha256": "4ea153177349d197afee087c63c1d12f5e0d49fb39ed0761b94bb7caf6f17911",
+        "x-source-sha256": "3a205e5a51182ebeadd1876ae8c69accac07113bb0d0edf37bb20702351e753f",
         "x-access": [
           {
             "permissions": [
@@ -8071,7 +8071,7 @@
         "summary": "DELETE /api/room-sessions/{id}",
         "description": "Uses the existing venue policy and server-side validation. Mutating browser requests require an approved origin. Refer to request constraints and x-access for the authoritative gate.",
         "x-source": "routes/monitoringRoutes.js",
-        "x-source-sha256": "4ea153177349d197afee087c63c1d12f5e0d49fb39ed0761b94bb7caf6f17911",
+        "x-source-sha256": "3a205e5a51182ebeadd1876ae8c69accac07113bb0d0edf37bb20702351e753f",
         "x-access": [
           {
             "permissions": [
@@ -8228,7 +8228,7 @@
         "summary": "GET /api/reports/confirmed-booking-trend",
         "description": "Uses the existing venue policy and server-side validation. Mutating browser requests require an approved origin. Refer to request constraints and x-access for the authoritative gate.",
         "x-source": "routes/reportRoutes.js",
-        "x-source-sha256": "c8669a093aa681741797b0d4bc28423fcdc6a811ca8b222ed0fb632a366de706",
+        "x-source-sha256": "441a8e668de1849c06def29652693924eb1affd0fb322d5ffdd7c761b27bca3a",
         "x-access": [
           {
             "permissions": [
@@ -8330,7 +8330,7 @@
         "summary": "GET /api/reports",
         "description": "Uses the existing venue policy and server-side validation. Mutating browser requests require an approved origin. Refer to request constraints and x-access for the authoritative gate.",
         "x-source": "routes/reportRoutes.js",
-        "x-source-sha256": "c8669a093aa681741797b0d4bc28423fcdc6a811ca8b222ed0fb632a366de706",
+        "x-source-sha256": "441a8e668de1849c06def29652693924eb1affd0fb322d5ffdd7c761b27bca3a",
         "x-access": [
           {
             "permissions": [
@@ -8452,7 +8452,7 @@
         "summary": "GET /api/reports/export",
         "description": "Uses the existing venue policy and server-side validation. Mutating browser requests require an approved origin. Refer to request constraints and x-access for the authoritative gate.",
         "x-source": "routes/reportRoutes.js",
-        "x-source-sha256": "c8669a093aa681741797b0d4bc28423fcdc6a811ca8b222ed0fb632a366de706",
+        "x-source-sha256": "441a8e668de1849c06def29652693924eb1affd0fb322d5ffdd7c761b27bca3a",
         "x-access": [
           {
             "permissions": [
@@ -8692,7 +8692,7 @@
         "summary": "GET /api/jobs/reservations",
         "description": "Bearer CRON_SECRET only. Database lease fences stale workers across instances. Bounded independent stages: no-shows, refunds, payments, receipts, notifications. Default deadline 45 seconds; maximum 55 seconds. Returns completed or already_running; partial failure is 503 with counts and failedStages. Requires an externally configured scheduler, normally once per minute.",
         "x-source": "routes/reservationJobsRoutes.js",
-        "x-source-sha256": "bbeab3a57d16cc60cf6fb7c10cf4b91b625261fc23f7386f0ee949347ce103ba",
+        "x-source-sha256": "f5e5315e7b5bd9b3c5adf88ef57fb3a2b64c055824f7e357f924fbeefaf29754",
         "x-access": [],
         "x-validation": [],
         "security": [
@@ -21080,7 +21080,7 @@
     }
   },
   "x-domain-sha256": {
-    "utils/bookingHelper.js": "eba9338e0638b36803d247a2fed0d67cd7c12b50f8c7e8c525953e6d9c952ca5",
+    "utils/bookingHelper.js": "c9d97028f000a9280cd7bf9e7a714784f907e8fd4bff0b7df36da04186a5e321",
     "utils/roomPricing.js": "39575eb2a1cb1b0f8a378839d2ca343a091a03338687ab8d1c0b2b73075026d0",
     "utils/paymentAttempts.js": "532fa6cb4a26ec1f879fb053320ef20d62c747505938a2ff92b1659563484feb",
     "utils/paymentReconciliation.js": "d39372cca34eb1dc83a837cb4c28ca0edc48752aa38b946bf46945ed2870e984",

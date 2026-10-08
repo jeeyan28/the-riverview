@@ -218,7 +218,7 @@ Supported horizons are **14 days**, **8 weeks (56 days)** and **6 months (180 da
 
 Open [http://localhost:3000/api/docs/](http://localhost:3000/api/docs/) with the API running, or inspect [openapi.json](backend/docs/api/openapi.json): **56 paths, 68 operations**. The bundled viewer needs no third-party documentation service.
 
-The contract documents cookie sessions, origin checks, permissions, Joi validation, examples/errors, provider callbacks, cron authentication, availability/holds, bookings, payments/refunds, monitoring, reporting and forecasts. Drift checks compare actual route middleware, validation descriptions and handler/domain-source hashes, validate request examples against runtime Joi, and check structural/path/security references. This is a focused checker, not external OpenAPI certification.
+The contract documents cookie sessions, origin checks, permissions, Joi validation, examples/errors, provider callbacks, cron authentication, availability/holds, bookings, payments/refunds, monitoring, reporting and forecasts. Drift checks compare actual route middleware, validation descriptions and handler/domain-source hashes, validate request examples against runtime Joi, and check structural/path/security references. Source hashes and serialized validation functions normalize line endings so LF and CRLF checkouts produce the same contract. This is a focused checker, not external OpenAPI certification.
 
 ```powershell
 npm run docs:check --prefix backend
@@ -249,10 +249,10 @@ cd ..
 
 | Command, from repository root | Latest local result |
 | --- | --- |
-| `npm run check --prefix backend` | **118 source files passed** |
+| `npm run check --prefix backend` | **119 source files passed** |
 | `npm run lint --prefix backend` | **Passed, 0 errors / 0 warnings** |
 | `npm run lint --prefix frontend` | **Passed, 0 errors / 22 legacy hook warnings** |
-| `npm run test:unit --prefix backend` | **92 passed** |
+| `npm run test:unit --prefix backend` | **95 passed**, including 2 HTTP checks rerun with local loopback access |
 | `npm run test --prefix frontend` | **63 Node unit + 27 Vitest component tests passed** |
 | `npm run test:integration --prefix backend` | **29 passed** on a real disposable replica set |
 | `npm run test:e2e --prefix frontend` | **18 passed** across the 16 existing checks and 2 focused callback regressions, fresh demo / desktop/mobile Chromium |
@@ -265,7 +265,7 @@ Unit/components cover pricing/calendars/overnight intervals, auth/logout failure
 
 Integration setup creates/tears down a local replica set and fails if setup fails. Optional `TEST_MONGO_URI` must be local and named `riverview_test_*`; the suite drops that disposable database. Tests do not load application `.env`. Playwright starts the isolated demo unless a local demo runs already; `CI=true` forbids reusing an existing server. `CAPTURE_DOCS=true` refreshes only the five intended captures.
 
-The [quality workflow](.github/workflows/quality.yml) uses clean installs and runs syntax, lint, unit/components, real integration, contract, build, browser and full audit gates on Node **22/24** without application secrets. Finishing gates ran October 8, 2026 on **Node 25.6.1**; remote CI awaits publication, which this task did not perform. Critical auth/booking/polling/monitor hooks enforce dependency warnings as errors; 22 older hook warnings remain. Both lockfiles remain maintained. A targeted scan of 334 tracked/intended source/configuration/document files found no matching private keys, payment secrets, AWS IDs, GitHub tokens or credential-bearing MongoDB URIs. It excluded ignored environments and lockfiles and printed no secret values. Documentation code fences and 40 local links also passed a disposable stdin check.
+The [quality workflow](.github/workflows/quality.yml) uses clean installs and runs syntax, lint, unit/components, real integration, contract, build, browser and full audit gates on Node **22/24** without application secrets. Finishing gates ran October 8, 2026 on **Node 25.6.1**. The [reported GitHub run](https://github.com/jeeyan28/the-riverview/actions/runs/37710894112) passed installation, syntax, lint, behavior/components and integration checks, then failed at API contract drift caused by checkout line endings. The corrected contract gate and its LF/CRLF/source-drift regressions passed locally on **Node 22.23.3** and **24.21.0**; GitHub verification of the fix awaits a new push. Critical auth/booking/polling/monitor hooks enforce dependency warnings as errors; 22 older hook warnings remain. Both lockfiles remain maintained. A targeted scan of 334 tracked/intended source/configuration/document files found no matching private keys, payment secrets, AWS IDs, GitHub tokens or credential-bearing MongoDB URIs. It excluded ignored environments and lockfiles and printed no secret values. Documentation code fences and 40 local links also passed a disposable stdin check.
 
 ## Measured public-page performance
 
