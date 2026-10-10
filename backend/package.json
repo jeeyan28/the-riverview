@@ -34,7 +34,7 @@
     "joi": "^18.2.9",
     "mongoose": "^9.7.3",
     "multer": "^2.4.0",
-    "nodemailer": "^10.0.14",
+    "nodemailer": "^10.0.16",
     "simple-statistics": "^7.9.3"
   },
   "overrides": {
